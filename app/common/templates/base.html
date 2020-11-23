@@ -1,0 +1,43 @@
+{% load static %}{% load sass_tags %}<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html{
+        visibility: hidden;
+        opacity: 0;
+      }
+    </style>
+    <link type="text/css" rel="stylesheet" href="{% sass_src 'styles/tubesync.scss' %}" media="screen,projection"/>
+    <link rel="icon" href="{% static 'images/favicon.ico' %}" sizes="21x21" type="image/x-icon">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>TubeSync - {% block headtitle %}Synchronize YouTube to your local media server{% endblock %}</title>
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <a href="{% url 'sync:index' %}">
+          {% include 'tubesync.svg' with width='3rem' height='3rem' %}
+          <h1>TubeSync</h1>
+        </a>
+      </div>
+    </header>
+
+
+    <main>
+      <div class="container">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    <footer>
+      <div class="container">
+        footer
+      </div>
+    </footer>
+
+  </body>
+
+</html>
