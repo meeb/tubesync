@@ -1,12 +1,14 @@
 FROM debian:buster-slim
 
+ARG DEBIAN_FRONTEND="noninteractive"
+
 # Third party software versions
-ARG YOUTUBE_DL_VERSION=2020.11.24
-ENV YOUTUBE_DL_EXPECTED_SHA256=7d70f2e2d6b42d7c948a418744cd5c89832d67f4fb36f01f1cf4ea7dc8fe537a
-ENV YOUTUBE_DL_TARBALL=https://github.com/ytdl-org/youtube-dl/releases/download/${YOUTUBE_DL_VERSION}/youtube-dl-${YOUTUBE_DL_VERSION}.tar.gz
-ARG FFMPEG_VERSION=4.3.1
-ENV FFMPEG_EXPECTED_MD5=ee235393ec7778279144ee6cbdd9eb64
-ENV FFMPEG_TARBALL=https://johnvansickle.com/ffmpeg/releases/ffmpeg-${FFMPEG_VERSION}-amd64-static.tar.xz
+ARG YOUTUBE_DL_VERSION="2020.11.24"
+ENV YOUTUBE_DL_EXPECTED_SHA256="7d70f2e2d6b42d7c948a418744cd5c89832d67f4fb36f01f1cf4ea7dc8fe537a"
+ENV YOUTUBE_DL_TARBALL="https://github.com/ytdl-org/youtube-dl/releases/download/${YOUTUBE_DL_VERSION}/youtube-dl-${YOUTUBE_DL_VERSION}.tar.gz"
+ARG FFMPEG_VERSION="4.3.1"
+ENV FFMPEG_EXPECTED_MD5="ee235393ec7778279144ee6cbdd9eb64"
+ENV FFMPEG_TARBALL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-${FFMPEG_VERSION}-amd64-static.tar.xz"
 
 # Install third party software
 RUN set -x && \
@@ -33,8 +35,8 @@ RUN set -x && \
     apt-get -y autoremove --purge curl xz-utils binutils
 
 # Defaults
-ARG default_uid=10000
-ARG default_gid=10000
+ARG default_uid="10000"
+ARG default_gid="10000"
 
 # Copy app
 COPY app /app
@@ -48,11 +50,11 @@ COPY Pipfile.lock /app/Pipfile.lock
 WORKDIR /app
 
 # Set up the app
-ENV UID=$default_uid
-ENV GID=$default_gid
+ENV UID="${default_uid}"
+ENV GID="${default_gid}"
 RUN set -x && \
   # Install required distro packages
-  apt-get -y --no-install-recommends install python3-pip python3-dev gcc && \
+  apt-get -y --no-install-recommends install python3-pip python3-dev gcc make && \
   # Install wheel which is required for pipenv
   pip3 --disable-pip-version-check install wheel && \
   # Then install pipenv
@@ -87,7 +89,7 @@ RUN set -x && \
   rm /app/Pipfile.lock && \
   pipenv --clear && \
   pip3 --disable-pip-version-check uninstall -y pipenv wheel virtualenv && \
-  apt-get -y autoremove --purge python3-pip python3-dev gcc && \
+  apt-get -y autoremove --purge python3-pip python3-dev gcc make && \
   apt-get -y autoremove && \
   apt-get -y autoclean && \
   rm -rf /var/lib/apt/lists/* && \
@@ -113,4 +115,4 @@ EXPOSE 8080
 ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Run gunicorn
-CMD ["/usr/local/bin/gunicorn", "-c", "/app/tubesync/gunicorn.py", "--capture-output", "tubesync.wsgi:application"]
+CMD ["/usr/local/bin/gunicorn", "-c", "/app/tubesync/gunicorn.py", "-k", "uvicorn.workers.UvicornWorker", "--capture-output", "tubesync.asgi:application"]

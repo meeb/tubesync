@@ -13,6 +13,10 @@ pillow = "*"
 whitenoise = "*"
 gunicorn = "*"
 django-compressor = "*"
+uvicorn = "*"
+uvloop = "*"
+httptools = "*"
+django-simple-task = "*"
 
 [requires]
 python_version = "3"

@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'sass_processor',
+    'django_simple_task',
     'common',
     'sync',
 ]
@@ -108,6 +109,9 @@ Disallow: /
 
 HEALTHCHECK_FIREWALL = True
 HEALTHCHECK_ALLOWED_IPS = ('127.0.0.1',)
+
+
+DJANGO_SIMPLE_TASK_WORKERS = 2
 
 
 try:
