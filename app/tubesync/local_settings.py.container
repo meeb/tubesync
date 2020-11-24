@@ -1,0 +1,14 @@
+import os
+
+
+SECRET_KEY = str(os.getenv('DJANGO_SECRET_KEY', ''))
+ALLOWED_HOSTS_STR = str(os.getenv('DJANGO_ALLOWED_HOSTS', ''))
+ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
+
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': '/config/db.sqlite3',
+    }
+}

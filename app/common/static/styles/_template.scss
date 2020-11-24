@@ -6,7 +6,7 @@ html {
 }
 
 header {
-    
+
     background-color: $header-background-colour;
     color: $header-text-colour;
     padding: 1.3rem 0 1.5rem 0;
@@ -35,6 +35,29 @@ header {
 
 }
 
+nav {
+
+    background-color: $nav-background-colour;
+    color: $nav-text-colour;
+    height: 3rem;
+
+    a {
+        font-size: 1.1rem !important;
+        color: $nav-text-colour;
+        text-decoration: none;
+        line-height: 3rem;
+        height: 3rem;
+        i {
+            font-size: 1.1rem !important;
+        }
+        &:hover {
+            background-color: $nav-link-background-hover-colour !important;
+        }
+    }
+
+
+}
+
 main {
     
     padding: 2rem 0 2rem 0;
@@ -45,6 +68,29 @@ footer {
 
     background-color: $footer-background-colour;
     color: $footer-text-colour;
-    padding: 1.5rem 0 1.5rem 0;
+    padding-top: 1.5rem;
+
+    p {
+        margin: 0;
+        padding-bottom: 1.5rem;
+    }
+
+    svg {
+        path {
+            fill: $footer-link-colour !important;
+        }
+    }
+
+    i {
+        font-size: 0.85rem !important;
+    }
+
+    a {
+        color: $footer-link-colour;
+        text-decoration: none;
+        &:hover {
+            text-decoration: underline;
+        }
+    }
 
 }

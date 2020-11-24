@@ -10,6 +10,9 @@ django = "*"
 django-sass-processor = "*"
 libsass = "*"
 pillow = "*"
+whitenoise = "*"
+gunicorn = "*"
+django-compressor = "*"
 
 [requires]
 python_version = "3"

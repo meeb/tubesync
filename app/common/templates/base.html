@@ -25,6 +25,16 @@
       </div>
     </header>
 
+    <nav>
+      <div class="container">
+        <ul>
+          <li><a href=""><i class="fas fa-fw fa-th-large"></i><span class="hide-on-med-and-down"> Dashboard</span></a></li>
+          <li><a href=""><i class="fas fa-fw fa-play"></i><span class="hide-on-med-and-down"> Sources</span></a></li>
+          <li><a href=""><i class="fas fa-fw fa-film"></i><span class="hide-on-med-and-down"> Media</span></a></li>
+          <li><a href=""><i class="fas fa-fw fa-clock"></i><span class="hide-on-med-and-down"> Tasks</span></a></li>
+        </ul>
+      </div>
+    </nav>
 
     <main>
       <div class="container">
@@ -34,7 +44,14 @@
 
     <footer>
       <div class="container">
-        footer
+        <p>
+          <a href="{% url 'sync:index' %}">{% include 'tubesync.svg' with width='0.8rem' height='0.8rem' %} TubeSync</a>
+          is an open source synchronisation tool to automatically download videos from online video platforms.
+          <br>
+          The original code under a GPLv3 licence is available at
+          <a href="https://github.com/meeb/tubesync"><i class="fab fa-github"></i> https://github.com/meeb/tubesync</a>.
+        </p>
+        <p>Version {{ app_version }}.</p>
       </div>
     </footer>
 
