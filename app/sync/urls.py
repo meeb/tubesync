@@ -1,6 +1,6 @@
 from django.urls import path
-from .views import (DashboardView, SourcesView, ValidateSourceView, MediaView,
-                    TasksView, LogsView)
+from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceView,
+                    MediaView, TasksView, LogsView)
 
 
 app_name = 'sync'
@@ -19,6 +19,10 @@ urlpatterns = [
     path('source/validate/<slug:source_type>',
          ValidateSourceView.as_view(),
          name='validate-source'),
+
+    path('source/add',
+         AddSourceView.as_view(),
+         name='add-source'),
 
     path('media',
          MediaView.as_view(),

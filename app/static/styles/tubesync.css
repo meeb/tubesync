@@ -11127,6 +11127,10 @@ strong {
 .simpleform .row {
   margin-bottom: 0; }
 
+.simpleform .help-text {
+  color: #2ec4b6;
+  padding: 1rem 0 1rem 0; }
+
 .simpleform label {
   text-transform: uppercase;
   display: block;

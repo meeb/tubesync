@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block headtitle %}Add a new source{% endblock %}
+
+{% block content %}
+<div class="row no-margin-bottom">
+  <div class="col s12">
+    <h1>Add a source</h1>
+    <p>
+      You can use this form to add a new source. A source is what's polled on regular
+      basis to find new media to download, such as a channel or playlist.
+    </p>
+  </div>
+</div>
+<div class="row">
+  <form method="post" action="{% url 'sync:add-source' %}" class="col s12 simpleform">
+    {% csrf_token %}
+    {% include 'simpleform.html' with form=form %}
+    <div class="row no-margin-bottom padding-top">
+      <div class="col s12">
+        <button class="btn" type="submit" name="action">Add source <i class="fas fa-fw fa-plus"></i></button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

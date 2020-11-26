@@ -2,6 +2,10 @@
     .row {
         margin-bottom: 0;
     }
+    .help-text {
+        color: $form-help-text-colour;
+        padding: 1rem 0 1rem 0;
+    }
     label {
         text-transform: uppercase;
         display: block;

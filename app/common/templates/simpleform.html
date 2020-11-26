@@ -10,8 +10,16 @@
   {% if field.field.widget.input_type == 'hidden' %}{{ field }}{% else %}
   <div class="row">
     <div class="input-field col s12">
+      {% if field.field.widget.input_type == 'checkbox' %}
+      <label>
+        {{ field }}
+        <span>{{ field.label }}</span>
+      </label>
+      {% else %}
       {{ field.label_tag }}
       {{ field }}
+      {% endif %}
+      {% if field.help_text %}<span class="help-text"><i class="fas fa-info-circle"></i> {{ field.help_text }}</span>{% endif %}
     </div>
   </div>
   {% endif %}

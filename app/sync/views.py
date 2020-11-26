@@ -1,9 +1,10 @@
 from django.http import Http404
 from django.views.generic import TemplateView
-from django.views.generic.edit import FormView
+from django.views.generic.edit import FormView, CreateView
 from django.urls import reverse_lazy
 from django.forms import ValidationError
 from django.utils.translation import gettext_lazy as _
+from common.utils import append_uri_params
 from .models import Source
 from .forms import ValidateSourceForm
 from .utils import validate_url
@@ -36,7 +37,7 @@ class ValidateSourceView(FormView):
         Validate a URL and prepopulate a create source view form with confirmed
         accurate data. The aim here is to streamline onboarding of new sources
         which otherwise may not be entirely obvious to add, such as the "key"
-        being just a playlist ID or some other reasonably unobvious internals.
+        being just a playlist ID or some other reasonably opaque internals.
     '''
 
     template_name = 'sync/source-validate.html'
@@ -77,8 +78,9 @@ class ValidateSourceView(FormView):
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: {
             'scheme': 'https',
             'domain': 'www.youtube.com',
-            'path_regex': '^\/(c\/)?[^\/]+$',
+            'path_regex': '^\/(c\/)?([^\/]+)$',
             'qs_args': [],
+            'extract_key': ('path_regex', 1),
             'example': 'https://www.youtube.com/SOMECHANNEL'
         },
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: {
@@ -86,6 +88,7 @@ class ValidateSourceView(FormView):
             'domain': 'www.youtube.com',
             'path_regex': '^\/watch$',
             'qs_args': ['v', 'list'],
+            'extract_key': ('qs_args', 'list'),
             'example': 'https://www.youtube.com/watch?v=VIDEOID&list=PLAYLISTID'
         },
     }
@@ -93,6 +96,7 @@ class ValidateSourceView(FormView):
     def __init__(self, *args, **kwargs):
         self.source_type_str = ''
         self.source_type = None
+        self.key = ''
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
@@ -127,9 +131,8 @@ class ValidateSourceView(FormView):
         source_url = form.cleaned_data['source_url']
         validation_url = self.validation_urls.get(self.source_type)
         try:
-            validate_url(source_url, validation_url)
+            self.key = validate_url(source_url, validation_url)
         except ValidationError as e:
-            print(e)
             error = self.errors.get('invalid_url')
             item = self.help_item.get(self.source_type)
             form.add_error(
@@ -144,14 +147,23 @@ class ValidateSourceView(FormView):
             return super().form_invalid(form)
         return super().form_valid(form)
 
-    def clean(self):
-        cleaned_data = super().clean()
-        
-        print(cleaned_data)
-        return cleaned_data
-
     def get_success_url(self):
-        return reverse_lazy('sync:dashboard')
+        url = reverse_lazy('sync:add-source')
+        return append_uri_params(url, {'source_type': self.source_type,
+                                       'key': self.key})
+
+
+class AddSourceView(CreateView):
+    '''
+        Adds a new source, optionally takes some initial data querystring values to
+        prepopulate some of the more unclear values.
+    '''
+
+    template_name = 'sync/source-add.html'
+    model = Source
+    fields = ('source_type', 'key', 'name', 'directory', 'delete_old_media',
+              'days_to_keep', 'source_profile', 'prefer_60fps', 'prefer_hdr',
+              'output_format', 'fallback')
 
 
 class MediaView(TemplateView):

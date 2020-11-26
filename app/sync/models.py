@@ -54,9 +54,9 @@ class Source(models.Model):
     FALLBACK_NEXT_HD = 'h'
     FALLBACKS = (FALLBACK_FAIL, FALLBACK_NEXT_SD, FALLBACK_NEXT_HD)
     FALLBACK_CHOICES = (
-        (FALLBACK_FAIL, _('Fail')),
-        (FALLBACK_NEXT_SD, _('Next best SD')),
-        (FALLBACK_NEXT_HD, _('Next best HD')),
+        (FALLBACK_FAIL, _('Fail, do not download any media')),
+        (FALLBACK_NEXT_SD, _('Get next best SD media instead')),
+        (FALLBACK_NEXT_HD, _('Get next best HD media instead')),
     )
 
     uuid = models.UUIDField(
@@ -102,7 +102,7 @@ class Source(models.Model):
         _('name'),
         max_length=100,
         db_index=True,
-        help_text=_('Friendly name for the source, used locally')
+        help_text=_('Friendly name for the source, used locally in TubeSync only')
     )
     directory = models.CharField(
         _('directory'),
@@ -144,7 +144,7 @@ class Source(models.Model):
         db_index=True,
         choices=OUTPUT_FORMAT_CHOICES,
         default=OUTPUT_FORMAT_MKV,
-        help_text=_('Output format, the codec and container to save media')
+        help_text=_('Output format, the file format container in which to save media')
     )
     fallback = models.CharField(
         _('fallback'),
@@ -152,7 +152,7 @@ class Source(models.Model):
         db_index=True,
         choices=FALLBACK_CHOICES,
         default=FALLBACK_FAIL,
-        help_text=_('What do do when your first choice is not available')
+        help_text=_('What do do when media in your source profile is not available')
     )
 
     def __str__(self):
