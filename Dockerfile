@@ -3,9 +3,6 @@ FROM debian:buster-slim
 ARG DEBIAN_FRONTEND="noninteractive"
 
 # Third party software versions
-ARG YOUTUBE_DL_VERSION="2020.11.24"
-ENV YOUTUBE_DL_EXPECTED_SHA256="7d70f2e2d6b42d7c948a418744cd5c89832d67f4fb36f01f1cf4ea7dc8fe537a"
-ENV YOUTUBE_DL_TARBALL="https://github.com/ytdl-org/youtube-dl/releases/download/${YOUTUBE_DL_VERSION}/youtube-dl-${YOUTUBE_DL_VERSION}.tar.gz"
 ARG FFMPEG_VERSION="4.3.1"
 ENV FFMPEG_EXPECTED_MD5="ee235393ec7778279144ee6cbdd9eb64"
 ENV FFMPEG_TARBALL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-${FFMPEG_VERSION}-amd64-static.tar.xz"
@@ -14,12 +11,7 @@ ENV FFMPEG_TARBALL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-${FFMPEG_VE
 RUN set -x && \
     # Install required distro packages
     apt-get update && \
-    apt-get -y --no-install-recommends install curl xz-utils ca-certificates binutils python3 python3-setuptools && \
-    # Install youtube-dl
-    curl -L ${YOUTUBE_DL_TARBALL} --output /tmp/youtube-dl-${YOUTUBE_DL_VERSION}.tar.gz && \
-    echo "${YOUTUBE_DL_EXPECTED_SHA256}  /tmp/youtube-dl-${YOUTUBE_DL_VERSION}.tar.gz" | sha256sum -c - && \
-    tar -zxvf /tmp/youtube-dl-${YOUTUBE_DL_VERSION}.tar.gz -C /tmp && \
-    (cd /tmp/youtube-dl; python3 /tmp/youtube-dl/setup.py install) && \
+    apt-get -y --no-install-recommends install curl xz-utils ca-certificates binutils && \
     # Install ffmpeg
     curl -L ${FFMPEG_TARBALL} --output /tmp/ffmpeg-${FFMPEG_VERSION}-amd64-static.tar.xz && \
     echo "${FFMPEG_EXPECTED_MD5}  tmp/ffmpeg-${FFMPEG_VERSION}-amd64-static.tar.xz" | md5sum -c - && \
@@ -28,8 +20,6 @@ RUN set -x && \
     ls -lat /tmp/ffmpeg-4.3.1-amd64-static && \
     install -v -s -g root -o root -m 0755 -s /tmp/ffmpeg-${FFMPEG_VERSION}-amd64-static/ffmpeg -t /usr/local/bin && \
     # Clean up
-    rm /tmp/youtube-dl-${YOUTUBE_DL_VERSION}.tar.gz && \
-    rm -rf /tmp/youtube-dl && \
     rm -rf /tmp/ffmpeg-${FFMPEG_VERSION}-amd64-static.tar && \
     rm -rf /tmp/ffmpeg-${FFMPEG_VERSION}-amd64-static && \
     apt-get -y autoremove --purge curl xz-utils binutils
@@ -54,14 +44,14 @@ ENV UID="${default_uid}"
 ENV GID="${default_gid}"
 RUN set -x && \
   # Install required distro packages
-  apt-get -y --no-install-recommends install python3-pip python3-dev gcc make && \
+  apt-get -y --no-install-recommends install python3 python3-setuptools python3-pip python3-dev gcc make && \
   # Install wheel which is required for pipenv
   pip3 --disable-pip-version-check install wheel && \
   # Then install pipenv
   pip3 --disable-pip-version-check install pipenv && \
   # Create a 'www' user which the workers drop to
   groupadd -g ${GID} www && \
-  useradd -M -d /dev/null -s /bin/false -u ${UID} -g www www && \
+  useradd -M -d /app -s /bin/false -u ${UID} -g www www && \
   # Install non-distro packages
   pipenv install --system  && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database

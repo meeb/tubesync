@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import IndexView
+from .views import (DashboardView, SourcesView, ValidateSourceView, MediaView,
+                    TasksView, LogsView)
 
 
 app_name = 'sync'
@@ -8,7 +9,27 @@ app_name = 'sync'
 urlpatterns = [
 
     path('',
-         IndexView.as_view(),
-         name='index'),
+         DashboardView.as_view(),
+         name='dashboard'),
+        
+    path('sources',
+         SourcesView.as_view(),
+         name='sources'),
+
+    path('source/validate/<slug:source_type>',
+         ValidateSourceView.as_view(),
+         name='validate-source'),
+
+    path('media',
+         MediaView.as_view(),
+         name='media'),
+
+    path('tasks',
+         TasksView.as_view(),
+         name='tasks'),
+
+    path('logs',
+         LogsView.as_view(),
+         name='logs'),
 
 ]

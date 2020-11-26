@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block headtitle %}Source - Add{% endblock %}
+
+{% block content %}
+<div class="row no-margin-bottom">
+  <div class="col s12">
+    <h1>Add a {{ help_item }}</h1>
+    <p>{{ help_text|safe }}</p>
+    <p>Example: <strong>{{ help_example }}</strong></p>
+  </div>
+</div>
+<div class="row">
+  <form method="post" action="{% url 'sync:validate-source' source_type=source_type %}" class="col s12 simpleform">
+    {% csrf_token %}
+    {% include 'simpleform.html' with form=form %}
+    <div class="row no-margin-bottom padding-top">
+      <div class="col s12">
+        <button class="btn" type="submit" name="action">Add {{ help_item }} <i class="fas fa-fw fa-plus"></i></button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

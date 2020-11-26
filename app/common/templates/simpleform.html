@@ -1,0 +1,19 @@
+{% if form %}
+  {% if form.errors %}
+  <ul class="errors">
+    {% for _, error in form.errors.items %}
+    <li>{{ error }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% for field in form %}
+  {% if field.field.widget.input_type == 'hidden' %}{{ field }}{% else %}
+  <div class="row">
+    <div class="input-field col s12">
+      {{ field.label_tag }}
+      {{ field }}
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+{% endif %}

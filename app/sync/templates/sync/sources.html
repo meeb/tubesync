@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block headtitle %}Sources{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col s12 l6">
+    <a href="{% url 'sync:validate-source' source_type='youtube-channel' %}" class="btn"><i class="fas fa-plus"></i> Add a YouTube channel</a>
+  </div>
+  <div class="col s12 l6">
+    <a href="{% url 'sync:validate-source' source_type='youtube-playlist' %}" class="btn"><i class="fas fa-plus"></i> Add a YouTube playlist</a>
+  </div>
+</div>
+{% endblock %}

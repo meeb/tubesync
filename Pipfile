@@ -17,6 +17,7 @@ uvicorn = "*"
 uvloop = "*"
 httptools = "*"
 django-simple-task = "*"
+youtube-dl = "*"
 
 [requires]
 python_version = "3"
