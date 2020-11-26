@@ -15,6 +15,6 @@ class SourceAdmin(admin.ModelAdmin):
 class MediaAdmin(admin.ModelAdmin):
 
     ordering = ('-created',)
-    list_display = ('url',)
+    list_display = ('key', 'source')
     readonly_fields = ('uuid', 'created')
-    search_fields = ('uuid', 'key', 'url')
+    search_fields = ('uuid', 'source__key', 'key')

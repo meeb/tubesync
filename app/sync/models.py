@@ -80,7 +80,7 @@ class Source(models.Model):
         help_text=_('Date and time the source was last crawled')
     )
     source_type = models.CharField(
-        _('type'),
+        _('source type'),
         max_length=1,
         db_index=True,
         choices=SOURCE_TYPE_CHOICES,
@@ -207,11 +207,6 @@ class Media(models.Model):
         max_length=100,
         db_index=True,
         help_text=_('Media key, such as exact YouTube video ID')
-    )
-    url = models.URLField(
-        _('url'),
-        db_index=True,
-        help_text=_('URL of the media')
     )
     thumb = models.ImageField(
         _('thumb'),
