@@ -3,6 +3,7 @@ from django.views.generic import TemplateView
 from django.views.generic.edit import FormView, CreateView
 from django.urls import reverse_lazy
 from django.forms import ValidationError
+from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from common.utils import append_uri_params
 from .models import Source
@@ -92,6 +93,10 @@ class ValidateSourceView(FormView):
             'example': 'https://www.youtube.com/watch?v=VIDEOID&list=PLAYLISTID'
         },
     }
+    prepopulate_fields = {
+        Source.SOURCE_TYPE_YOUTUBE_CHANNEL: ('source_type', 'key', 'name', 'directory'),
+        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: ('source_type', 'key'),
+    }
 
     def __init__(self, *args, **kwargs):
         self.source_type_str = ''
@@ -149,8 +154,14 @@ class ValidateSourceView(FormView):
 
     def get_success_url(self):
         url = reverse_lazy('sync:add-source')
-        return append_uri_params(url, {'source_type': self.source_type,
-                                       'key': self.key})
+        fields_to_populate = self.prepopulate_fields.get(self.source_type)
+        fields = {}
+        for field in fields_to_populate:
+            if field == 'source_type':
+                fields[field] = self.source_type
+            elif field in ('key', 'name', 'directory'):
+                fields[field] = self.key
+        return append_uri_params(url, fields)
 
 
 class AddSourceView(CreateView):
@@ -164,6 +175,31 @@ class AddSourceView(CreateView):
     fields = ('source_type', 'key', 'name', 'directory', 'delete_old_media',
               'days_to_keep', 'source_profile', 'prefer_60fps', 'prefer_hdr',
               'output_format', 'fallback')
+
+    def __init__(self, *args, **kwargs):
+        self.prepopulated_data = {}
+        super().__init__(*args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        source_type = request.GET.get('source_type', '')
+        if source_type and source_type in Source.SOURCE_TYPES:
+            self.prepopulated_data['source_type'] = source_type
+        key = request.GET.get('key', '')
+        if key:
+            self.prepopulated_data['key'] = slugify(key)
+        name = request.GET.get('name', '')
+        if name:
+            self.prepopulated_data['name'] = slugify(name)
+        directory = request.GET.get('directory', '')
+        if directory:
+            self.prepopulated_data['directory'] = slugify(directory)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        initial = super().get_initial()
+        for k, v in self.prepopulated_data.items():
+            initial[k] = v
+        return initial
 
 
 class MediaView(TemplateView):
