@@ -32,6 +32,9 @@ ARG default_gid="10000"
 COPY app /app
 COPY app/tubesync/local_settings.py.container /app/tubesync/local_settings.py
 
+# Append container bundled software versions
+RUN echo "ffmpeg_version = '${FFMPEG_VERSION}-static'" >> /app/common/third_party_versions.py
+
 # Add Pipfiles
 COPY Pipfile /app/Pipfile
 COPY Pipfile.lock /app/Pipfile.lock

@@ -1,9 +1,10 @@
 from django.conf import settings
-from youtube_dl import version as yt_version
+from .third_party_versions import youtube_dl_version, ffmpeg_version
 
 
 def app_details(request):
     return {
         'app_version': str(settings.VERSION),
-        'youtube_dl_version': str(yt_version.__version__)
+        'youtube_dl_version': youtube_dl_version,
+        'ffmpeg_version': ffmpeg_version,
     }

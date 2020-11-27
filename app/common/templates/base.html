@@ -49,9 +49,13 @@
           <a href="{% url 'sync:dashboard' %}" class="nowrap">{% include 'tubesync.svg' with width='0.8rem' height='0.8rem' %} TubeSync</a>
           is an open source synchronisation tool to automatically download videos from online video platforms. The
           original code under a GPLv3 licence is available at
-          <a href="https://github.com/meeb/tubesync" class="nowrap"><i class="fab fa-github"></i> https://github.com/meeb/tubesync</a>.
+          <a href="https://github.com/meeb/tubesync" class="nowrap" target="_blank"><i class="fab fa-github"></i> https://github.com/meeb/tubesync</a>.
         </p>
-        <p>TubeSync version {{ app_version }} with <a href="https://yt-dl.org/"><i class="fas fa-link"></i> youtube-dl</a> version {{ youtube_dl_version }}.</p>
+        <p>
+          TubeSync version {{ app_version }} with
+          <a href="https://yt-dl.org/" target="_blank"><i class="fas fa-link"></i> youtube-dl</a> version {{ youtube_dl_version }} and 
+          <a href="https://ffmpeg.org/" target="_blank"><i class="fas fa-link"></i> FFmpeg</a> version {{ ffmpeg_version }}. 
+        </p>
       </div>
     </footer>
 
