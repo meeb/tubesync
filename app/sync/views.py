@@ -1,5 +1,6 @@
+from django.conf import settings
 from django.http import Http404
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, ListView, DetailView
 from django.views.generic.edit import FormView, CreateView
 from django.urls import reverse_lazy
 from django.forms import ValidationError
@@ -22,15 +23,36 @@ class DashboardView(TemplateView):
         return super().dispatch(request, *args, **kwargs)
 
 
-class SourcesView(TemplateView):
+class SourcesView(ListView):
     '''
         A bare list of the sources which have been created with their states.
     '''
 
     template_name = 'sync/sources.html'
+    context_object_name = 'sources'
+    paginate_by = settings.SOURCES_PER_PAGE
+    messages = {
+        'source-added': _('Your new source has been added'),
+        'source-deleted': _('Your selected source has been deleted.'),
+        'source-updated': _('Your selected source has been updated.'),
+    }
+
+    def __init__(self, *args, **kwargs):
+        self.message = None
+        super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
+        message_key = request.GET.get('message', '')
+        self.message = self.messages.get(message_key, '')
         return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return Source.objects.all().order_by('name')
+
+    def get_context_data(self, *args, **kwargs):
+        data = super().get_context_data(*args, **kwargs)
+        data['message'] = self.message
+        return data
 
 
 class ValidateSourceView(FormView):
@@ -64,16 +86,15 @@ class ValidateSourceView(FormView):
         ),
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: _(
             'Enter a YouTube playlist URL into the box below. A playlist URL will be '
-            'in the format of <strong>https://www.youtube.com/watch?v=AAAAAA&list='
+            'in the format of <strong>https://www.youtube.com/playlist?list='
             'BiGLoNgUnIqUeId</strong> where <strong>BiGLoNgUnIqUeId</strong> is the '
             'unique ID of the playlist you want to add.'
         ),
     }
     help_examples = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/google',
-        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: ('https://www.youtube.com/watch?v=DcKEPl'
-                                              '-MpLA&list=PL590L5WQmH8dpP0RyH5pCfIaDE'
-                                              'dt9nk7r')
+        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: ('https://www.youtube.com/playlist?list='
+                                              'PL590L5WQmH8dpP0RyH5pCfIaDEdt9nk7r')
     }
     validation_urls = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: {
@@ -87,10 +108,10 @@ class ValidateSourceView(FormView):
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: {
             'scheme': 'https',
             'domain': 'www.youtube.com',
-            'path_regex': '^\/watch$',
-            'qs_args': ['v', 'list'],
+            'path_regex': '^\/playlist$',
+            'qs_args': ['list'],
             'extract_key': ('qs_args', 'list'),
-            'example': 'https://www.youtube.com/watch?v=VIDEOID&list=PLAYLISTID'
+            'example': 'https://www.youtube.com/playlist?list=PLAYLISTID'
         },
     }
     prepopulate_fields = {
@@ -186,7 +207,7 @@ class AddSourceView(CreateView):
             self.prepopulated_data['source_type'] = source_type
         key = request.GET.get('key', '')
         if key:
-            self.prepopulated_data['key'] = slugify(key)
+            self.prepopulated_data['key'] = key.strip()
         name = request.GET.get('name', '')
         if name:
             self.prepopulated_data['name'] = slugify(name)
@@ -200,6 +221,16 @@ class AddSourceView(CreateView):
         for k, v in self.prepopulated_data.items():
             initial[k] = v
         return initial
+
+    def get_success_url(self):
+        url = reverse_lazy('sync:sources')
+        return append_uri_params(url, {'message': 'source-created'})
+
+
+class SourceView(DetailView):
+
+    template_name = 'sync/source.html'
+    model = Source
 
 
 class MediaView(TemplateView):

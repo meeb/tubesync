@@ -64,19 +64,34 @@ main {
 
     h1 {
         margin: 0;
-        padding: 0;
+        padding: 0 0 0.5rem 0;
         font-size: 2rem;
     }
 
     .btn {
         width: 100%;
-        background-color: $main-button-background-colour !important;
+        background-color: $main-button-background-colour;
         color: $main-button-text-colour !important;
         i {
             font-size: 0.9rem;
         }
         &:hover {
-            background-color: $main-button-background-hover-colour !important;
+            background-color: $main-button-background-hover-colour;
+        }
+    }
+
+    .collection {
+        .collection-item {
+            display: block;
+        }
+        a.collection-item {
+            &:hover {
+                background-color: $collection-background-hover-colour !important;
+                color: $collection-text-hover-colour !important;
+            }
+        }        
+        .no-items {
+            color: $collection-no-items-text-colour;
         }
     }
 

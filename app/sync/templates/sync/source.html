@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block headtitle %}Source - {{ source.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col s12">
+    <h1 class="truncate">Source: {{ source.name }}</h1>
+    <p class="truncate"><strong><a href="{{ source.url }}" target="_blank">{{ source.url }}</a></strong></p>
+    <p class="truncate">Saving to: <strong>{{ source.directory_path }}</strong></p>
+  </div>
+</div>
+<div class="row">
+  <div class="col s12">
+    <table class="striped">
+      <tr title="The source type">
+        <td class="hide-on-small-only">Type</td>
+        <td><span class="hide-on-med-and-up">Type<br></span><strong>{{ source.get_source_type_display }}</strong></td>
+      </tr>
+      <tr title="Name of the souce in TubeSync for your reference">
+        <td class="hide-on-small-only">Name</td>
+        <td><span class="hide-on-med-and-up">Name<br></span><strong>{{ source.name }}</strong></td>
+      </tr>
+      <tr title="Unique key of the source, such as the channel name or playlist ID">
+        <td class="hide-on-small-only">Key</td>
+        <td><span class="hide-on-med-and-up">Key<br></span><strong>{{ source.key }}</strong></td>
+      </tr>
+      <tr title="Directory the source will save media to">
+        <td class="hide-on-small-only">Directory</td>
+        <td><span class="hide-on-med-and-up">Directory<br></span><strong>{{ source.directory }}</strong></td>
+      </tr>
+      <tr title="When then source was created locally in TubeSync">
+        <td class="hide-on-small-only">Created</td>
+        <td><span class="hide-on-med-and-up">Created<br></span><strong>{{ source.created|date:'Y-m-d H-I-S' }}</strong></td>
+      </tr>
+      <tr title="When the source last checked for available media">
+        <td class="hide-on-small-only">Last crawl</td>
+        <td><span class="hide-on-med-and-up">Last crawl<br></span><strong>{% if source.last_crawl %}{{ source.last_crawl|date:'Y-m-d H-I-S' }}{% else %}Never{% endif %}</strong></td>
+      </tr>
+      <tr title="Quality and type of media the source will attempt to sync">
+        <td class="hide-on-small-only">Source profile</td>
+        <td><span class="hide-on-med-and-up">Source profile<br></span><strong>{{ source.get_source_profile_display }}</strong></td>
+      </tr>
+      <tr title="If available from the source media in 60FPS will be preferred">
+        <td class="hide-on-small-only">Prefer 60FPS?</td>
+        <td><span class="hide-on-med-and-up">Prefer 60FPS?<br></span><strong>{% if source.prefer_60fps %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
+      <tr title="If available from the source media in HDR will be preferred">
+        <td class="hide-on-small-only">Prefer HDR?</td>
+        <td><span class="hide-on-med-and-up">Prefer HDR?<br></span><strong>{% if source.prefer_hdr %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
+      <tr title="Output file container format to sync media in">
+        <td class="hide-on-small-only">Output format</td>
+        <td><span class="hide-on-med-and-up">Output format<br></span><strong>{{ source.get_output_format_display }}</strong></td>
+      </tr>
+      <tr title="What to do if your source profile is unavailable">
+        <td class="hide-on-small-only">Fallback</td>
+        <td><span class="hide-on-med-and-up">Fallback<br></span><strong>{{ source.get_fallback_display }}</strong></td>
+      </tr>
+      {% if source.delete_old_media and source.days_to_keep > 0 %}
+      <tr title="Days after which your media from this source will be locally deleted">
+        <td class="hide-on-small-only">Delete old media</td>
+        <td><span class="hide-on-med-and-up">Delete old media<br></span><strong>After {{ source.days_to_keep }} days</strong></td>
+      </tr>
+      {% else %}
+      <tr title="Media from this source will never be deleted">
+        <td class="hide-on-small-only">Delete old media</td>
+        <td><span class="hide-on-med-and-up">Delete old media<br></span><strong>No, keep forever</strong></td>
+      </tr>
+      {% endif %}
+      <tr title="Unique ID used for this source in TubeSync">
+        <td class="hide-on-small-only">UUID</td>
+        <td><span class="hide-on-med-and-up">UUID<br></span><strong>{{ source.uuid }}</strong></td>
+      </tr>
+    </table>
+  </div>
+</div>
+<div class="row no-margin-bottom">
+  <div class="col s12 l6 margin-bottom">
+    <a href="" class="btn"><i class="fas fa-pen-square"></i> Edit source</a>
+  </div>
+  <div class="col s12 l6 margin-bottom">
+    <a href="" class="btn delete-button"><i class="fas fa-trash-alt"></i> Delete source</a>
+  </div>
+</div>
+{% endblock %}

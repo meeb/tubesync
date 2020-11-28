@@ -1,4 +1,5 @@
 import uuid
+from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -59,6 +60,16 @@ class Source(models.Model):
         (FALLBACK_NEXT_HD, _('Get next best HD media instead')),
     )
 
+    ICONS = {
+        SOURCE_TYPE_YOUTUBE_CHANNEL: '<i class="fab fa-youtube"></i>',
+        SOURCE_TYPE_YOUTUBE_PLAYLIST: '<i class="fab fa-youtube"></i>',
+    }
+
+    URLS = {
+        SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/{key}',
+        SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/playlist?list={key}',
+    }
+
     uuid = models.UUIDField(
         _('uuid'),
         primary_key=True,
@@ -87,15 +98,11 @@ class Source(models.Model):
         default=SOURCE_TYPE_YOUTUBE_CHANNEL,
         help_text=_('Source type')
     )
-    url = models.URLField(
-        _('url'),
-        db_index=True,
-        help_text=_('URL of the source')
-    )
     key = models.CharField(
         _('key'),
         max_length=100,
         db_index=True,
+        unique=True,
         help_text=_('Source key, such as exact YouTube channel name or playlist ID')
     )
     name = models.CharField(
@@ -161,6 +168,22 @@ class Source(models.Model):
     class Meta:
         verbose_name = _('Source')
         verbose_name_plural = _('Sources')
+
+    @property
+    def icon(self):
+        return self.ICONS.get(self.source_type)
+    
+    @property
+    def url(self):
+        url = self.URLS.get(self.source_type)
+        return url.format(key=self.key)
+    
+    @property
+    def directory_path(self):
+        if self.source_profile == self.SOURCE_PROFILE_AUDIO:
+            return settings.SYNC_AUDIO_ROOT / self.directory
+        else:
+            return settings.SYNC_VIDEO_ROOT / self.directory
 
 
 def get_media_thumb_path(instance, filename):

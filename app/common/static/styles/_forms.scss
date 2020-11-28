@@ -39,3 +39,10 @@ select {
     border: 2px $form-select-border-colour solid;
     height: initial !important;
 }
+
+.delete-button {
+    background-color: $form-delete-button-background-colour !important;
+    &:hover {
+        background-color: $main-button-background-hover-colour !important;
+    }
+}

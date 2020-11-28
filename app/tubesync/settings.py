@@ -98,6 +98,8 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+SYNC_VIDEO_ROOT = BASE_DIR / 'downloads' / 'video'
+SYNC_AUDIO_ROOT = BASE_DIR / 'downloads' / 'audio'
 SASS_PROCESSOR_ROOT = STATIC_ROOT
 
 
@@ -112,6 +114,9 @@ HEALTHCHECK_ALLOWED_IPS = ('127.0.0.1',)
 
 
 DJANGO_SIMPLE_TASK_WORKERS = 2
+
+
+SOURCES_PER_PAGE = 50
 
 
 try:

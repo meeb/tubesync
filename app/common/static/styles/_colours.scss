@@ -10,7 +10,7 @@ $background-colour: $colour-near-white;
 $text-colour: $colour-near-black;
 
 $header-background-colour: $colour-red;
-$header-text-colour: $colour-white;
+$header-text-colour: $colour-near-white;
 
 $nav-background-colour: $colour-near-black;
 $nav-text-colour: $colour-near-white;
@@ -18,10 +18,10 @@ $nav-link-background-hover-colour: $colour-orange;
 
 $main-button-background-colour: $colour-light-blue;
 $main-button-background-hover-colour: $colour-orange;
-$main-button-text-colour: $colour-white;
+$main-button-text-colour: $colour-near-white;
 
 $footer-background-colour: $colour-red;
-$footer-text-colour: $colour-white;
+$footer-text-colour: $colour-near-white;
 $footer-link-colour: $colour-near-black;
 $footer-link-hover-colour: $colour-orange;
 
@@ -32,6 +32,11 @@ $form-select-border-colour: $colour-light-blue;
 $form-error-background-colour: $colour-red;
 $form-error-text-colour: $colour-near-white;
 $form-help-text-colour: $colour-light-blue;
+$form-delete-button-background-colour: $colour-red;
+
+$collection-no-items-text-colour: $colour-light-blue;
+$collection-background-hover-colour: $colour-orange;
+$collection-text-hover-colour: $colour-near-white;
 
 $box-error-background-colour: $colour-red;
-$box-error-text-colour: $colour-white;
+$box-error-text-colour: $colour-near-white;
