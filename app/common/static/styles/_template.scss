@@ -32,7 +32,6 @@ header {
         font-size: 3rem;
         line-height: 2.7rem;
     }
-
 }
 
 nav {
@@ -62,6 +61,14 @@ main {
     
     padding: 2rem 0 2rem 0;
 
+    a {
+        color: $main-link-colour;
+        text-decoration: underline;
+        &:hover {
+            color: $main-link-hover-colour;
+        }
+    }
+
     h1 {
         margin: 0;
         padding: 0 0 0.5rem 0;
@@ -85,6 +92,8 @@ main {
             display: block;
         }
         a.collection-item {
+            color: $main-link-colour;
+            text-decoration: none;
             &:hover {
                 background-color: $collection-background-hover-colour !important;
                 color: $collection-text-hover-colour !important;
@@ -92,6 +101,33 @@ main {
         }        
         .no-items {
             color: $collection-no-items-text-colour;
+        }
+    }
+
+
+    .pagination {
+        width: 100%;
+        padding-top: 1rem;
+        text-align: center;
+        a {
+            display: inline-block;
+            font-weight: bold;
+            text-decoration: none;
+            padding: 5px 10px 5px 10px;
+            margin: 0 3px 0 3px;
+            background-color: $pagination-background-colour;
+            color: $pagination-text-colour;
+            border: 2px $pagination-border-colour solid;
+            &:hover {
+                background-color: $pagination-background-hover-colour;
+                color: $pagination-text-hover-colour;
+                border: 2px $pagination-border-hover-colour solid;
+            }
+        }
+        .currentpage {
+            background-color: $pagination-current-background-colour;
+            color: $pagination-current-text-colour;
+            border: 2px $pagination-current-border-colour solid;
         }
     }
 

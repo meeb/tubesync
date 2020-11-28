@@ -2,9 +2,9 @@ $colour-white: #ffffff;
 $colour-black: #000000;
 $colour-near-black: #011627;
 $colour-near-white: #fdfffc;
-$colour-light-blue: #2ec4b6;
+$colour-light-blue: #2e8ac4;
 $colour-red: #e71d36;
-$colour-orange: #ff9f1c;
+$colour-orange: #f69e12;
 
 $background-colour: $colour-near-white;
 $text-colour: $colour-near-black;
@@ -19,6 +19,8 @@ $nav-link-background-hover-colour: $colour-orange;
 $main-button-background-colour: $colour-light-blue;
 $main-button-background-hover-colour: $colour-orange;
 $main-button-text-colour: $colour-near-white;
+$main-link-colour: $colour-light-blue;
+$main-link-hover-colour: $colour-orange;
 
 $footer-background-colour: $colour-red;
 $footer-text-colour: $colour-near-white;
@@ -40,3 +42,13 @@ $collection-text-hover-colour: $colour-near-white;
 
 $box-error-background-colour: $colour-red;
 $box-error-text-colour: $colour-near-white;
+
+$pagination-background-colour: $colour-near-white;
+$pagination-text-colour: $colour-near-black;
+$pagination-border-colour: $colour-light-blue;
+$pagination-background-hover-colour: $colour-light-blue;
+$pagination-text-hover-colour: $colour-near-white;
+$pagination-border-hover-colour: $colour-light-blue;
+$pagination-current-background-colour: $colour-orange;
+$pagination-current-text-colour: $colour-near-white;
+$pagination-current-border-colour: $colour-orange;
