@@ -62,6 +62,7 @@ db.sqlite3
 db.sqlite3-journal
 /app/static/
 /app/media/
+/app/downloads/
 
 # Flask stuff:
 instance/
