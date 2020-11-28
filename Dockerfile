@@ -63,10 +63,10 @@ RUN set -x && \
   mkdir -p /run/www && \
   chown -R www:www /run/www && \
   chmod -R 0700 /run/www && \
-  mkdir -p /config && \
+  mkdir -p /config/media && \
   chown -R www:www /config && \
   chmod -R 0755 /config && \
-  mkdir -p /downloads && \
+  mkdir -p /downloads/{audio,video} && \
   chown -R www:www /downloads && \
   chmod -R 0755 /downloads && \
   # Reset permissions

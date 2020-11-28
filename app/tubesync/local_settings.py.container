@@ -19,5 +19,6 @@ DATABASES = {
 }
 
 
+MEDIA_ROOT = ROOT_DIR / 'config' / 'media'
 SYNC_VIDEO_ROOT = ROOT_DIR / 'downloads' / 'video'
 SYNC_AUDIO_ROOT = ROOT_DIR / 'downloads' / 'audio'
