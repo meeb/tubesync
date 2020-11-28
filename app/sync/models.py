@@ -66,7 +66,7 @@ class Source(models.Model):
     }
 
     URLS = {
-        SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/{key}',
+        SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/c/{key}',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/playlist?list={key}',
     }
 
@@ -172,11 +172,15 @@ class Source(models.Model):
     @property
     def icon(self):
         return self.ICONS.get(self.source_type)
-    
+
+    @classmethod
+    def create_url(obj, source_type, key):
+        url = obj.URLS.get(source_type)
+        return url.format(key=key)
+
     @property
     def url(self):
-        url = self.URLS.get(self.source_type)
-        return url.format(key=self.key)
+        return Source.create_url(self.source_type, self.key)
     
     @property
     def directory_path(self):

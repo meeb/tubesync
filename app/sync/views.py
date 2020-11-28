@@ -1,15 +1,17 @@
 from django.conf import settings
 from django.http import Http404
 from django.views.generic import TemplateView, ListView, DetailView
-from django.views.generic.edit import FormView, CreateView, UpdateView
+from django.views.generic.edit import (FormView, FormMixin, CreateView, UpdateView,
+                                       DeleteView)
 from django.urls import reverse_lazy
 from django.forms import ValidationError
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from common.utils import append_uri_params
 from .models import Source
-from .forms import ValidateSourceForm
+from .forms import ValidateSourceForm, ConfirmDeleteSourceForm
 from .utils import validate_url
+from . import youtube
 
 
 class DashboardView(TemplateView):
@@ -155,7 +157,7 @@ class ValidateSourceView(FormView):
                 ValidationError(self.errors['invalid_source'])
             )
         source_url = form.cleaned_data['source_url']
-        validation_url = self.validation_urls.get(self.source_type)
+        validation_url = self.validation_urls.get(source_type)
         try:
             self.key = validate_url(source_url, validation_url)
         except ValidationError as e:
@@ -244,6 +246,30 @@ class UpdateSourceView(UpdateView):
     def get_success_url(self):
         url = reverse_lazy('sync:sources')
         return append_uri_params(url, {'message': 'source-updated'})
+
+
+class DeleteSourceView(DeleteView, FormMixin):
+    '''
+        Confirm the deletion of a source with an option to delete all the media
+        associated with the source from disk when the source is deleted.
+    '''
+
+    template_name = 'sync/source-delete.html'
+    model = Source
+    form_class = ConfirmDeleteSourceForm
+    context_object_name = 'source'
+
+    def post(self, request, *args, **kwargs):
+        delete_media_val = request.POST.get('delete_media', False)
+        delete_media = True if delete_media_val is not False else False
+        if delete_media:
+            # TODO: delete media files from disk linked to this source
+            pass
+        return super().post(request, *args, **kwargs)
+
+    def get_success_url(self):
+        url = reverse_lazy('sync:sources')
+        return append_uri_params(url, {'message': 'source-deleted'})
 
 
 class MediaView(TemplateView):

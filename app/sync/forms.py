@@ -1,5 +1,6 @@
 
 from django import forms
+from django.utils.translation import gettext_lazy as _
 
 
 class ValidateSourceForm(forms.Form):
@@ -10,6 +11,14 @@ class ValidateSourceForm(forms.Form):
         widget=forms.HiddenInput()
     )
     source_url = forms.URLField(
-        label='Source URL',
+        label=_('Source URL'),
         required=True
+    )
+
+
+class ConfirmDeleteSourceForm(forms.Form):
+
+    delete_media = forms.BooleanField(
+        label=_('Also delete downloaded media'),
+        required=False
     )

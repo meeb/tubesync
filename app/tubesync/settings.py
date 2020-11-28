@@ -119,6 +119,11 @@ DJANGO_SIMPLE_TASK_WORKERS = 2
 SOURCES_PER_PAGE = 25
 
 
+YOUTUBE_DEFAULTS = {
+    'age_limit': 99,
+}
+
+
 try:
     from .local_settings import *
 except ImportError as e:

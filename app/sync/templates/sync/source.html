@@ -80,7 +80,7 @@
     <a href="{% url 'sync:update-source' pk=source.pk %}" class="btn">Edit source <i class="fas fa-pen-square"></i></a>
   </div>
   <div class="col s12 l6 margin-bottom">
-    <a href="" class="btn delete-button">Delete source <i class="fas fa-trash-alt"></i></a>
+    <a href="{% url 'sync:delete-source' pk=source.pk %}" class="btn delete-button">Delete source <i class="fas fa-trash-alt"></i></a>
   </div>
 </div>
 {% endblock %}
