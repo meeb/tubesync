@@ -3,12 +3,13 @@
 {% block headtitle %}Sources{% endblock %}
 
 {% block content %}
+{% include 'infobox.html' with message=message %}
 <div class="row no-margin-bottom">
   <div class="col s12 l6 margin-bottom">
-    <a href="{% url 'sync:validate-source' source_type='youtube-channel' %}" class="btn"><i class="fab fa-youtube"></i> Add a YouTube channel</a>
+    <a href="{% url 'sync:validate-source' source_type='youtube-channel' %}" class="btn">Add a YouTube channel <i class="fab fa-youtube"></i></a>
   </div>
   <div class="col s12 l6 margin-bottom">
-    <a href="{% url 'sync:validate-source' source_type='youtube-playlist' %}" class="btn"><i class="fab fa-youtube"></i> Add a YouTube playlist</a>
+    <a href="{% url 'sync:validate-source' source_type='youtube-playlist' %}" class="btn">Add a YouTube playlist <i class="fab fa-youtube"></i></a>
   </div>
 </div>
 <div class="row no-margin-bottom">
@@ -27,11 +28,5 @@
     </div>
   </div>
 </div>
-{% if sources %}
-<div class="row">
-  <div class="col s12">
-    {% include 'pagination.html' with pagination=sources.paginator %}
-  </div>
-</div>
-{% endif %}
+{% include 'pagination.html' with pagination=sources.paginator %}
 {% endblock %}

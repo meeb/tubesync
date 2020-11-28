@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.http import Http404
 from django.views.generic import TemplateView, ListView, DetailView
-from django.views.generic.edit import FormView, CreateView
+from django.views.generic.edit import FormView, CreateView, UpdateView
 from django.urls import reverse_lazy
 from django.forms import ValidationError
 from django.utils.text import slugify
@@ -32,7 +32,7 @@ class SourcesView(ListView):
     context_object_name = 'sources'
     paginate_by = settings.SOURCES_PER_PAGE
     messages = {
-        'source-added': _('Your new source has been added'),
+        'source-created': _('Your new source has been added'),
         'source-deleted': _('Your selected source has been deleted.'),
         'source-updated': _('Your selected source has been updated.'),
     }
@@ -108,7 +108,7 @@ class ValidateSourceView(FormView):
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: {
             'scheme': 'https',
             'domain': 'www.youtube.com',
-            'path_regex': '^\/playlist$',
+            'path_regex': '^\/(playlist|watch)$',
             'qs_args': ['list'],
             'extract_key': ('qs_args', 'list'),
             'example': 'https://www.youtube.com/playlist?list=PLAYLISTID'
@@ -231,6 +231,19 @@ class SourceView(DetailView):
 
     template_name = 'sync/source.html'
     model = Source
+
+
+class UpdateSourceView(UpdateView):
+
+    template_name = 'sync/source-update.html'
+    model = Source
+    fields = ('source_type', 'key', 'name', 'directory', 'delete_old_media',
+              'days_to_keep', 'source_profile', 'prefer_60fps', 'prefer_hdr',
+              'output_format', 'fallback')
+
+    def get_success_url(self):
+        url = reverse_lazy('sync:sources')
+        return append_uri_params(url, {'message': 'source-updated'})
 
 
 class MediaView(TemplateView):

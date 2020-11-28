@@ -63,7 +63,7 @@ main {
 
     a {
         color: $main-link-colour;
-        text-decoration: underline;
+        text-decoration: none;
         &:hover {
             color: $main-link-hover-colour;
         }
@@ -129,6 +129,11 @@ main {
             color: $pagination-current-text-colour;
             border: 2px $pagination-current-border-colour solid;
         }
+    }
+
+    .infobox {
+        background-color: $infobox-background-colour;
+        color: $infobox-text-colour;
     }
 
 }

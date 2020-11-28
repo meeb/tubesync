@@ -1,7 +1,11 @@
 {% if paginator.num_pages > 1 %}
-<div class="pagination">
-  {% for i in paginator.page_range %}
-    <a class="pagenum{% if i == page_obj.number %} currentpage{% endif %}" href="?page={{ i }}">{{ i }}</a>
-  {% endfor %}
+<div class="row">
+  <div class="col s12">
+    <div class="pagination">
+      {% for i in paginator.page_range %}
+        <a class="pagenum{% if i == page_obj.number %} currentpage{% endif %}" href="?page={{ i }}">{{ i }}</a>
+      {% endfor %}
+    </div>
+  </div>
 </div>
 {% endif %}
