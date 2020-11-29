@@ -13,8 +13,6 @@ pillow = "*"
 whitenoise = "*"
 gunicorn = "*"
 django-compressor = "*"
-uvicorn = "*"
-uvloop = "*"
 httptools = "*"
 youtube-dl = "*"
 
