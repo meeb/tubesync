@@ -16,7 +16,6 @@ django-compressor = "*"
 uvicorn = "*"
 uvloop = "*"
 httptools = "*"
-django-simple-task = "*"
 youtube-dl = "*"
 
 [requires]

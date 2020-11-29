@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "b2f3530bcd9d615f37ba75913336690a3b61e5cb9bf2659212431cbe11dbef90"
+            "sha256": "7e1f9f9b7edc6d970be2bd4b0ffc39c7972571c637f1d3fe00cad719cef7e412"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -59,14 +59,6 @@
             ],
             "index": "pypi",
             "version": "==0.8.2"
-        },
-        "django-simple-task": {
-            "hashes": [
-                "sha256:c70c5fd1db9ba58026ea3a00831c2c1a4d335f29c106321bb2dce643b7a71319",
-                "sha256:fe6494f5297711f5ec767835163dad3e4f6b751aa8857f0c338e5271a0721a4f"
-            ],
-            "index": "pypi",
-            "version": "==0.1.2"
         },
         "gunicorn": {
             "hashes": [
@@ -241,11 +233,11 @@
         },
         "youtube-dl": {
             "hashes": [
-                "sha256:f61c8e4855559c33df66234b7e7ba303f4bcbef59639fb15825504d6484fd25f",
-                "sha256:f701befffe00ae4b0d56f88ed45e1295c151c340d0011efdb1005012abc81996"
+                "sha256:3d52d2c969ec9521a086c43f809fd7545708b7ba24d7379fb123b5438ba691e1",
+                "sha256:be0b605c65adbcda2844806359478fe88101def37c994f19c52fad45232af7cc"
             ],
             "index": "pypi",
-            "version": "==2020.11.24"
+            "version": "==2020.11.26"
         }
     },
     "develop": {}
