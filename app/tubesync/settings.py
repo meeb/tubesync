@@ -18,6 +18,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'sass_processor',
+    'django_simple_task',
+    'background_task',
     'common',
     'sync',
 ]

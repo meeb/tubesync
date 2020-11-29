@@ -15,6 +15,10 @@ gunicorn = "*"
 django-compressor = "*"
 httptools = "*"
 youtube-dl = "*"
+django-background-tasks = "*"
+uvicorn = "*"
+uvloop = "*"
+django-simple-task = "*"
 
 [requires]
 python_version = "3"

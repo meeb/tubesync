@@ -108,4 +108,4 @@ EXPOSE 8080
 ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Run gunicorn
-CMD ["/usr/local/bin/gunicorn", "-c", "/app/tubesync/gunicorn.py", "--capture-output", "tubesync.wsgi:application"]
+CMD ["/usr/local/bin/gunicorn", "-c", "/app/tubesync/gunicorn.py", "-k", "uvicorn.workers.UvicornWorker", "--capture-output", "tubesync.asgi:application"]
