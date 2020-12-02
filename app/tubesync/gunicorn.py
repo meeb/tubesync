@@ -5,7 +5,7 @@ import multiprocessing
 def get_num_workers():
     cpu_workers = multiprocessing.cpu_count() * 2 + 1
     try:
-        num_workers = int(os.getenv('GUNICORN_WORKERS', 1))
+        num_workers = int(os.getenv('GUNICORN_WORKERS', 2))
     except ValueError:
         num_workers = cpu_workers
     if 0 > num_workers > cpu_workers:

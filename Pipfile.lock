@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "83399df34fe306ade38c4e516198bfd67d88e57de8e5366a9038c5eb1ca86036"
+            "sha256": "229a3783dcfd9d030ac58856ecb5d52d806db6acfa40eb6346eb6b58d79e91ab"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -23,20 +23,13 @@
             ],
             "version": "==3.3.1"
         },
-        "click": {
-            "hashes": [
-                "sha256:d2b5255c7c6349bc1bd1e59e08cd12acbbd63ce649f2588755783aa94dfb6b1a",
-                "sha256:dacca89f4bfadd5de3d7489b7c8a566eee0d3676333fbb50030263894c38c0dc"
-            ],
-            "version": "==7.1.2"
-        },
         "django": {
             "hashes": [
-                "sha256:14a4b7cd77297fba516fc0d92444cc2e2e388aa9de32d7a68d4a83d58f5a4927",
-                "sha256:14b87775ffedab2ef6299b73343d1b4b41e5d4e2aa58c6581f114dbec01e3f8f"
+                "sha256:5c866205f15e7a7123f1eec6ab939d22d5bde1416635cab259684af66d8e48a2",
+                "sha256:edb10b5c45e7e9c0fb1dc00b76ec7449aca258a39ffd613dbd078c51d19c9f03"
             ],
             "index": "pypi",
-            "version": "==3.1.3"
+            "version": "==3.1.4"
         },
         "django-appconf": {
             "hashes": [
@@ -73,14 +66,6 @@
             "index": "pypi",
             "version": "==0.8.2"
         },
-        "django-simple-task": {
-            "hashes": [
-                "sha256:c70c5fd1db9ba58026ea3a00831c2c1a4d335f29c106321bb2dce643b7a71319",
-                "sha256:fe6494f5297711f5ec767835163dad3e4f6b751aa8857f0c338e5271a0721a4f"
-            ],
-            "index": "pypi",
-            "version": "==0.1.2"
-        },
         "gunicorn": {
             "hashes": [
                 "sha256:1904bb2b8a43658807108d59c3f3d56c2b6121a701161de0ddf9ad140073c626",
@@ -88,13 +73,6 @@
             ],
             "index": "pypi",
             "version": "==20.0.4"
-        },
-        "h11": {
-            "hashes": [
-                "sha256:3c6c61d69c6f13d41f1b80ab0322f1872702a3ba26e12aa864c928f6a43fbaab",
-                "sha256:ab6c335e1b6ef34b205d5ca3e228c9299cc7218b049819ec84a388c2525e5d87"
-            ],
-            "version": "==0.11.0"
         },
         "httptools": {
             "hashes": [
@@ -212,38 +190,6 @@
             ],
             "version": "==0.4.1"
         },
-        "typing-extensions": {
-            "hashes": [
-                "sha256:7cb407020f00f7bfc3cb3e7881628838e69d8f3fcab2f64742a5e76b2f841918",
-                "sha256:99d4073b617d30288f569d3f13d2bd7548c3a7e4c8de87db09a9d29bb3a4a60c",
-                "sha256:dafc7639cde7f1b6e1acc0f457842a83e722ccca8eef5270af2d74792619a89f"
-            ],
-            "markers": "python_version < '3.8'",
-            "version": "==3.7.4.3"
-        },
-        "uvicorn": {
-            "hashes": [
-                "sha256:562ef6aaa8fa723ab6b82cf9e67a774088179d0ec57cb17e447b15d58b603bcf",
-                "sha256:5836edaf4d278fe67ba0298c0537bdb6398cf359eb644f79e6500ca1aad232b3"
-            ],
-            "index": "pypi",
-            "version": "==0.12.3"
-        },
-        "uvloop": {
-            "hashes": [
-                "sha256:08b109f0213af392150e2fe6f81d33261bb5ce968a288eb698aad4f46eb711bd",
-                "sha256:123ac9c0c7dd71464f58f1b4ee0bbd81285d96cdda8bc3519281b8973e3a461e",
-                "sha256:4315d2ec3ca393dd5bc0b0089d23101276778c304d42faff5dc4579cb6caef09",
-                "sha256:4544dcf77d74f3a84f03dd6278174575c44c67d7165d4c42c71db3fdc3860726",
-                "sha256:afd5513c0ae414ec71d24f6f123614a80f3d27ca655a4fcf6cabe50994cc1891",
-                "sha256:b4f591aa4b3fa7f32fb51e2ee9fea1b495eb75b0b3c8d0ca52514ad675ae63f7",
-                "sha256:bcac356d62edd330080aed082e78d4b580ff260a677508718f88016333e2c9c5",
-                "sha256:e7514d7a48c063226b7d06617cbb12a14278d4323a065a8d46a7962686ce2e95",
-                "sha256:f07909cd9fc08c52d294b1570bba92186181ca01fe3dc9ffba68955273dd7362"
-            ],
-            "index": "pypi",
-            "version": "==0.14.0"
-        },
         "whitenoise": {
             "hashes": [
                 "sha256:05ce0be39ad85740a78750c86a93485c40f08ad8c62a6006de0233765996e5c7",
@@ -254,11 +200,11 @@
         },
         "youtube-dl": {
             "hashes": [
-                "sha256:3d52d2c969ec9521a086c43f809fd7545708b7ba24d7379fb123b5438ba691e1",
-                "sha256:be0b605c65adbcda2844806359478fe88101def37c994f19c52fad45232af7cc"
+                "sha256:bc82acb0b59b25b822fad85bef0cbe78e5754ca532e3bd6899fe06386e2b8e7c",
+                "sha256:daa514c0d36af478fe249ea93ca63ae3aaa60ac5f82aa3d5514bce9ba7ed8451"
             ],
             "index": "pypi",
-            "version": "==2020.11.26"
+            "version": "==2020.12.2"
         }
     },
     "develop": {}

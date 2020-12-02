@@ -47,7 +47,7 @@ ENV UID="${default_uid}"
 ENV GID="${default_gid}"
 RUN set -x && \
   # Install required distro packages
-  apt-get -y --no-install-recommends install python3 python3-setuptools python3-pip python3-dev gcc make && \
+  apt-get -y --no-install-recommends install python3 python3-setuptools python3-pip python3-dev gcc make psmisc procps && \
   # Install wheel which is required for pipenv
   pip3 --disable-pip-version-check install wheel && \
   # Then install pipenv
@@ -56,7 +56,7 @@ RUN set -x && \
   groupadd -g ${GID} www && \
   useradd -M -d /app -s /bin/false -u ${UID} -g www www && \
   # Install non-distro packages
-  pipenv install --system  && \
+  pipenv install --system --verbose && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   rm -rf /app/db.sqlite3 && \
   # Create config, downloads and run dirs we can write to
@@ -98,7 +98,7 @@ RUN set -x && \
 HEALTHCHECK --interval=1m --timeout=10s CMD /app/healthcheck.py http://127.0.0.1:8080/healthcheck
 
 # Drop to the www user
-USER www
+#USER www
 
 # ENVS and ports
 ENV PYTHONPATH "/app:${PYTHONPATH}"
@@ -108,4 +108,4 @@ EXPOSE 8080
 ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Run gunicorn
-CMD ["/usr/local/bin/gunicorn", "-c", "/app/tubesync/gunicorn.py", "-k", "uvicorn.workers.UvicornWorker", "--capture-output", "tubesync.asgi:application"]
+CMD ["/usr/local/bin/gunicorn", "-c", "/app/tubesync/gunicorn.py", "--capture-output", "tubesync.wsgi:application"]

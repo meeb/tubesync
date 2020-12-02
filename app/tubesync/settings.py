@@ -18,7 +18,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'sass_processor',
-    'django_simple_task',
     'background_task',
     'common',
     'sync',
@@ -114,7 +113,11 @@ HEALTHCHECK_FIREWALL = True
 HEALTHCHECK_ALLOWED_IPS = ('127.0.0.1',)
 
 
-DJANGO_SIMPLE_TASK_WORKERS = 2
+MAX_ATTEMPTS = 10                           # Number of times tasks will be retried
+MAX_RUN_TIME = 1800                         # Maximum amount of time in seconds a task can run
+BACKGROUND_TASK_RUN_ASYNC = True            # Run tasks async in the background
+BACKGROUND_TASK_ASYNC_THREADS = 2           # Number of async tasks to run at once
+BACKGROUND_TASK_PRIORITY_ORDERING = 'DESC'  # Process high priority tasks first
 
 
 SOURCES_PER_PAGE = 25
