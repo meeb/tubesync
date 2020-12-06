@@ -429,7 +429,11 @@ class Media(models.Model):
     def loaded_metadata(self):
         if self.pk in _metadata_cache:
             return _metadata_cache[self.pk]
-        _metadata_cache[self.pk] = json.loads(self.metadata)
+        try:
+            unpacked_data = json.loads(self.metadata)
+        except Exception:
+            return {}
+        _metadata_cache[self.pk] = unpacked_data
         return _metadata_cache[self.pk]
 
     @property
@@ -460,9 +464,9 @@ class Media(models.Model):
         dateobj = upload_date if upload_date else self.created
         datestr = dateobj.strftime('%Y-%m-%d')
         source_name = slugify(self.source.name)
-        title = slugify(self.title.replace('&', 'and').replace('+', 'and'))
+        name = slugify(self.name.replace('&', 'and').replace('+', 'and'))
         ext = self.source.extension
-        fn = f'{datestr}_{source_name}_{title}'[:100]
+        fn = f'{datestr}_{source_name}_{name}'[:100]
         return f'{fn}.{ext}'
 
     @property

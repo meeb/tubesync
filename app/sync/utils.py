@@ -1,5 +1,6 @@
 import os
 import re
+import math
 from pathlib import Path
 import requests
 from PIL import Image
@@ -57,6 +58,27 @@ def get_remote_image(url):
     r = requests.get(url, headers=headers, stream=True, timeout=60)
     r.raw.decode_content = True
     return Image.open(r.raw)
+
+
+def resize_image_to_height(image, width, height):
+    '''
+        Resizes an image to 'height' pixels keeping the ratio. If the resulting width
+        is larger than 'width' then crop it. If the resulting width is smaller than
+        'width' then stretch it.
+    '''
+    ratio = image.width / image.height
+    scaled_width = math.ceil(height * ratio)
+    if scaled_width < width:
+        # Width too small, stretch it
+        scaled_width = width
+    image = image.resize((scaled_width, height), Image.ANTIALIAS)
+    if scaled_width > width:
+        # Width too large, crop it
+        delta = scaled_width - width
+        left, upper = (delta / 2), 0
+        right, lower = (left + width), height
+        image = image.crop((left, upper, right, lower))
+    return image
 
 
 def file_is_editable(filepath):

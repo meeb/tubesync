@@ -15,7 +15,7 @@ from background_task import background
 from background_task.models import Task
 from common.logger import log
 from .models import Source, Media
-from .utils import get_remote_image
+from .utils import get_remote_image, resize_image_to_height
 
 
 def delete_index_source_task(source_id):
@@ -57,10 +57,7 @@ def index_source_task(source_id):
         media.metadata = json.dumps(video)
         upload_date = media.upload_date
         if upload_date:
-            if timezone.is_aware(upload_date):
-                media.published = upload_date
-            else:
-                media.published = timezone.make_aware(upload_date)
+            media.published = timezone.make_aware(upload_date)
         media.save()
         log.info(f'Indexed media: {source} / {media}')
 
@@ -76,13 +73,12 @@ def download_media_thumbnail(media_id, url):
     except Media.DoesNotExist:
         # Task triggered but the media no longer exists, ignore task
         return
+    width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
+    height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
     i = get_remote_image(url)
-    ratio = i.width / i.height
-    new_height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
-    new_width = math.ceil(new_height * ratio)
     log.info(f'Resizing {i.width}x{i.height} thumbnail to '
-             f'{new_width}x{new_height}: {url}')
-    i = i.resize((new_width, new_height), Image.ANTIALIAS)
+             f'{width}x{height}: {url}')
+    i = resize_image_to_height(i, width, height)
     image_file = BytesIO()
     i.save(image_file, 'JPEG', quality=80, optimize=True, progressive=True)
     image_file.seek(0)

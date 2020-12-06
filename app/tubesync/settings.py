@@ -127,6 +127,7 @@ MEDIA_PER_PAGE = 36
 INDEX_SOURCE_EVERY = 21600  # Seconds between indexing sources, 21600 = every 6 hours
 
 
+MEDIA_THUMBNAIL_WIDTH = 430                 # Width in pixels to resize thumbnails to
 MEDIA_THUMBNAIL_HEIGHT = 240                # Height in pixels to resize thumbnails to
 
 

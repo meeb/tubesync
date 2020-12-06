@@ -10,7 +10,7 @@
     <a href="{% url 'sync:media-item' pk=m.pk %}" class="collection-item">
       <div class="card mediacard">
         <div class="card-image">
-          <img src="{% if m.thumb %}{% url 'sync:media-thumb' pk=m.pk %}{% else %}{% static 'images/nothumb.jpg' %} {% endif %}">
+          <img src="{% if m.thumb %}{% url 'sync:media-thumb' pk=m.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}">
           <span class="card-title truncate">{{ m.source }}<br>
             <span>{{ m.name }}</span><br>
             <span>{{ m.published|date:'Y-m-d' }}</span>
