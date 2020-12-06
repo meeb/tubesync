@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceView,
                     SourceView, UpdateSourceView, DeleteSourceView, MediaView,
-                    MediaThumbView, MediaItemView, TasksView, LogsView)
+                    MediaThumbView, MediaItemView, TasksView)
 
 
 app_name = 'sync'
@@ -60,11 +60,5 @@ urlpatterns = [
     path('tasks',
          TasksView.as_view(),
          name='tasks'),
-
-    # Log URLs
-
-    path('logs',
-         LogsView.as_view(),
-         name='logs'),
 
 ]

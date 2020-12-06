@@ -359,7 +359,6 @@ class TasksView(TemplateView):
         return super().dispatch(request, *args, **kwargs)
 
 
-class LogsView(TemplateView):
     '''
         The last X days of logs.
     '''
