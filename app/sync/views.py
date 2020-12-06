@@ -338,7 +338,11 @@ class MediaThumbView(DetailView):
             thumb = b64decode('R0lGODlhAQABAIABAP///wAAACH5BAEKAAEALAA'
                               'AAAABAAEAAAICTAEAOw==')
             content_type = 'image/gif'
-        return HttpResponse(thumb, content_type=content_type)
+        response = HttpResponse(thumb, content_type=content_type)
+        # Thumbnail media is never updated so we can ask the browser to cache it
+        # for ages, 604800 = 7 days
+        response['Cache-Control'] = 'public, max-age=604800'
+        return response
 
 
 class MediaItemView(DetailView):

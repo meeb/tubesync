@@ -89,6 +89,16 @@ class Source(models.Model):
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'id',
     }
 
+    PUBLISHED_FIELD = {  # Field returned by indexing which contains the published date
+        SOURCE_TYPE_YOUTUBE_CHANNEL: 'upload_date',
+        SOURCE_TYPE_YOUTUBE_PLAYLIST: 'upload_date',
+    }
+
+    TITLE_FIELD = {  # Field returned by indexing which contains the media title
+        SOURCE_TYPE_YOUTUBE_CHANNEL: 'title',
+        SOURCE_TYPE_YOUTUBE_PLAYLIST: 'title',
+    }
+
     uuid = models.UUIDField(
         _('uuid'),
         primary_key=True,
@@ -443,7 +453,8 @@ class Media(models.Model):
 
     @property
     def title(self):
-        return self.loaded_metadata.get('title', '').strip()
+        k = self.source.TITLE_FIELD.get(self.source.source_type, '')
+        return self.loaded_metadata.get(k, '').strip()
 
     @property
     def name(self):
@@ -452,7 +463,8 @@ class Media(models.Model):
 
     @property
     def upload_date(self):
-        upload_date_str = self.loaded_metadata.get('upload_date', '').strip()
+        k = self.source.PUBLISHED_FIELD.get(self.source.source_type, '')
+        upload_date_str = self.loaded_metadata.get(k, '').strip()
         try:
             return datetime.strptime(upload_date_str, '%Y%m%d')
         except (AttributeError, ValueError) as e:

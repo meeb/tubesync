@@ -7,8 +7,8 @@
 <div class="row no-margin-bottom">
   {% for m in media %}
   <div class="col s12 m6 l4 xl3">
-    <a href="{% url 'sync:media-item' pk=m.pk %}" class="collection-item">
-      <div class="card mediacard">
+    <div class="card mediacard">
+      <a href="{% url 'sync:media-item' pk=m.pk %}" class="">
         <div class="card-image">
           <img src="{% if m.thumb %}{% url 'sync:media-thumb' pk=m.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}">
           <span class="card-title truncate">{{ m.source }}<br>
@@ -16,8 +16,8 @@
             <span>{{ m.published|date:'Y-m-d' }}</span>
           </span>
         </div>
-      </div>
-    </a>
+      </a>
+    </div>
   </div>
   {% empty %}
   <div class="col s12">
