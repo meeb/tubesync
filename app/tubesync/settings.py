@@ -131,6 +131,7 @@ MAX_MEDIA_THUMBNAIL_SIZE = (320, 240)       # Max size in pixels for media thumb
 
 
 YOUTUBE_DEFAULTS = {
+    'no_color': True,       # Do not use colours in output
     'age_limit': 99,        # 'Age in years' to spoof
 }
 
