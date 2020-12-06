@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from background_task import background
 from background_task.models import Task
+from common.logger import log
 from .models import Source, Media
 from .utils import get_remote_image
 
@@ -23,6 +24,7 @@ def delete_index_source_task(source_id):
         pass
     if task:
         # A scheduled task exists for this Source, delete it
+        log.info(f'Deleting Source index task: {task}')
         task.delete()
 
 
@@ -51,6 +53,7 @@ def index_source_task(source_id):
         media.source = source
         media.metadata = json.dumps(video)
         media.save()
+        log.info(f'Indexed media: {source} / {media}')
 
 
 @background(schedule=0)
@@ -68,6 +71,7 @@ def download_media_thumbnail(media_id, url):
     max_width, max_height = getattr(settings, 'MAX_MEDIA_THUMBNAIL_SIZE', (512, 512))
     if i.width > max_width or i.height > max_height:
         # Image is larger than we want to save, resize it
+        log.info(f'Resizing thumbnail ({i.width}x{i.height}): {url}')
         i.thumbnail(size=(max_width, max_height))
     image_file = BytesIO()
     i.save(image_file, 'JPEG', quality=80, optimize=True, progressive=True)
@@ -81,4 +85,5 @@ def download_media_thumbnail(media_id, url):
         ),
         save=True
     )
+    log.info(f'Saved thumbnail for: {media} from: {url}')
     return True

@@ -8,6 +8,7 @@
     <h1 class="truncate">Source <strong>{{ source.name }}</strong></h1>
     <p class="truncate"><strong><a href="{{ source.url }}" target="_blank"><i class="fas fa-link"></i> {{ source.url }}</a></strong></p>
     <p class="truncate">Saving to: <strong>{{ source.directory_path }}</strong></p>
+    <p><a href="{% url 'sync:media' %}?filter={{ source.pk }}" class="btn">Media<span class="hide-on-small-only"> linked to this source</span> <i class="fas fa-fw fa-film"></i></a></p>
   </div>
 </div>
 <div class="row">
@@ -31,15 +32,25 @@
       </tr>
       <tr title="When then source was created locally in TubeSync">
         <td class="hide-on-small-only">Created</td>
-        <td><span class="hide-on-med-and-up">Created<br></span><strong>{{ source.created|date:'Y-m-d H-I-S' }}</strong></td>
+        <td><span class="hide-on-med-and-up">Created<br></span><strong>{{ source.created|date:'Y-m-d H:i:s' }}</strong></td>
       </tr>
       <tr title="When the source last checked for available media">
         <td class="hide-on-small-only">Last crawl</td>
         <td><span class="hide-on-med-and-up">Last crawl<br></span><strong>{% if source.last_crawl %}{{ source.last_crawl|date:'Y-m-d H-I-S' }}{% else %}Never{% endif %}</strong></td>
       </tr>
       <tr title="Quality and type of media the source will attempt to sync">
-        <td class="hide-on-small-only">Source profile</td>
-        <td><span class="hide-on-med-and-up">Source profile<br></span><strong>{{ source.get_source_profile_display }}</strong></td>
+        <td class="hide-on-small-only">Source resolution</td>
+        <td><span class="hide-on-med-and-up">Source resolution<br></span><strong>{{ source.get_source_resolution_display }}</strong></td>
+      </tr>
+      {% if source.is_video %}
+      <tr title="Preferred video codec to download">
+        <td class="hide-on-small-only">Source video codec</td>
+        <td><span class="hide-on-med-and-up">Source video codec<br></span><strong>{{ source.get_source_vcodec_display }}</strong></td>
+      </tr>
+      {% endif %}
+      <tr title="Preferred audio codec to download">
+        <td class="hide-on-small-only">Source audio codec</td>
+        <td><span class="hide-on-med-and-up">Source audio codec<br></span><strong>{{ source.get_source_acodec_display }}</strong></td>
       </tr>
       <tr title="If available from the source media in 60FPS will be preferred">
         <td class="hide-on-small-only">Prefer 60FPS?</td>
@@ -49,11 +60,11 @@
         <td class="hide-on-small-only">Prefer HDR?</td>
         <td><span class="hide-on-med-and-up">Prefer HDR?<br></span><strong>{% if source.prefer_hdr %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
       </tr>
-      <tr title="Output file container format to sync media in">
-        <td class="hide-on-small-only">Output format</td>
-        <td><span class="hide-on-med-and-up">Output format<br></span><strong>{{ source.get_output_format_display }}</strong></td>
+      <tr title="Output file extension">
+        <td class="hide-on-small-only">Output extension</td>
+        <td><span class="hide-on-med-and-up">Output extension<br></span><strong>{{ source.extension }}</strong></td>
       </tr>
-      <tr title="What to do if your source profile is unavailable">
+      <tr title="What to do if your source resolution or codecs are unavailable">
         <td class="hide-on-small-only">Fallback</td>
         <td><span class="hide-on-med-and-up">Fallback<br></span><strong>{{ source.get_fallback_display }}</strong></td>
       </tr>

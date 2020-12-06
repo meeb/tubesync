@@ -88,11 +88,12 @@ main {
     }
 
     .collection {
+        margin: 0.5rem 0 0 0 !important;
         .collection-item {
             display: block;
         }
         a.collection-item {
-            color: $main-link-colour;
+            color: $collection-text-colour;
             text-decoration: none;
             &:hover {
                 background-color: $collection-background-hover-colour !important;

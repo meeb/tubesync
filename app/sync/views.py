@@ -6,6 +6,7 @@ from django.views.generic.edit import (FormView, FormMixin, CreateView, UpdateVi
                                        DeleteView)
 from django.http import HttpResponse
 from django.urls import reverse_lazy
+from django.db.models import Count
 from django.forms import ValidationError
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
@@ -52,7 +53,8 @@ class SourcesView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        return Source.objects.all().order_by('name')
+        all_sources = Source.objects.all().order_by('name')
+        return all_sources.annotate(media_count=Count('media_source'))
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)

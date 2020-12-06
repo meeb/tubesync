@@ -17,10 +17,9 @@
     <div class="collection">
     {% for source in sources %}
       <a href="{% url 'sync:source' pk=source.pk %}" class="collection-item">
-        {{ source.icon|safe }} <strong>{{ source.name }}</strong><br>
-        {{ source.get_source_type_display }}<br>
-        {{ source.get_source_profile_display }} media in a {{ source.get_output_format_display }}
-        {% if source.delete_old_media and source.days_to_keep > 0 %}Delete media after {{ source.days_to_keep }} days{% endif %}
+        {{ source.icon|safe }} <strong>{{ source.name }}</strong>, {{ source.get_source_type_display }}<br>
+        {{ source.format_summary }}<br>
+        <strong>{{ source.media_count }}</strong> media items{% if source.delete_old_media and source.days_to_keep > 0 %}, keep {{ source.days_to_keep }} days of media{% endif %}
       </a>
     {% empty %}
       <span class="collection-item no-items"><i class="fas fa-info-circle"></i> You haven't added any sources.</span>

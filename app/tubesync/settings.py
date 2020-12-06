@@ -124,14 +124,14 @@ SOURCES_PER_PAGE = 25
 MEDIA_PER_PAGE = 25
 
 
-INDEX_SOURCE_EVERY = 60  # Seconds between indexing sources, 21600 = every 6 hours
+INDEX_SOURCE_EVERY = 21600  # Seconds between indexing sources, 21600 = every 6 hours
 
 
 MAX_MEDIA_THUMBNAIL_SIZE = (320, 240)       # Max size in pixels for media thumbnails
 
 
 YOUTUBE_DEFAULTS = {
-    'age_limit': 99,        # Age in years to spoof the client as
+    'age_limit': 99,        # 'Age in years' to spoof
 }
 
 

@@ -1,9 +1,10 @@
 from django.conf import settings
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, pre_delete, post_delete
 from django.dispatch import receiver
 
 from .models import Source, Media
 from .tasks import delete_index_source_task, index_source_task, download_media_thumbnail
+from .utils import delete_file
 
 
 @receiver(post_save, sender=Source)
@@ -12,6 +13,14 @@ def source_post_save(sender, instance, created, **kwargs):
     if created:
         # If the source is newly created schedule its indexing
         index_source_task(str(instance.pk), repeat=settings.INDEX_SOURCE_EVERY)
+
+
+@receiver(pre_delete, sender=Source)
+def source_post_delete(sender, instance, **kwargs):
+    # Triggered just before a source is deleted, delete all media objects to trigger
+    # the Media models post_delete signal
+    for media in Media.objects.filter(source=instance):
+        media.delete()
 
 
 @receiver(post_delete, sender=Source)
@@ -33,6 +42,5 @@ def media_post_save(sender, instance, created, **kwargs):
 
 @receiver(post_delete, sender=Media)
 def media_post_delete(sender, instance, **kwargs):
-    # Triggered when media is deleted
-    pass
-    # TODO: delete thumbnail and media file from disk
+    # Triggered when media is deleted, delete media thumbnail
+    delete_file(instance.thumb.path)

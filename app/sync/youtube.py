@@ -5,10 +5,13 @@
 
 
 from django.conf import settings
+from copy import copy
+from common.logger import log
 import youtube_dl
 
 
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
+_defaults.update({'logger': log})
 
 
 class YouTubeError(youtube_dl.utils.DownloadError):
@@ -24,8 +27,8 @@ def get_media_info(url):
         or playlist this returns a dict of all the videos on the channel or playlist
         as well as associated metadata.
     '''
-
-    opts = _defaults.update({
+    opts = copy(_defaults)
+    opts.update({
         'skip_download': True,
         'forcejson': True,
         'simulate': True,

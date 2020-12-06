@@ -128,11 +128,14 @@ class Source(models.Model):
         _('name'),
         max_length=100,
         db_index=True,
+        unique=True,
         help_text=_('Friendly name for the source, used locally in TubeSync only')
     )
     directory = models.CharField(
         _('directory'),
         max_length=100,
+        db_index=True,
+        unique=True,
         help_text=_('Directory name to save the media into')
     )
     delete_old_media = models.BooleanField(
@@ -199,6 +202,33 @@ class Source(models.Model):
     @property
     def icon(self):
         return self.ICONS.get(self.source_type)
+
+    @property
+    def is_audio(self):
+        return self.source_resolution == self.SOURCE_RESOLUTION_AUDIO
+
+    @property
+    def is_video(self):
+        return not self.is_audio
+
+    @property
+    def extension(self):
+        '''
+            The extension is also used by youtube-dl to set the output container. As
+            it is possible to quite easily pick combinations of codecs and containers
+            which are invalid (e.g. OPUS audio in an MP4 container) just set this for
+            people. All video is set to mkv containers, audio-only is set to m4a or ogg
+            depending on audio codec.
+        '''
+        if self.is_audio:
+            if self.source_acodec == self.SOURCE_ACODEC_M4A:
+                return 'm4a'
+            elif self.source_acodec == self.SOURCE_ACODEC_OPUS:
+                return 'ogg'
+            else:
+                raise ValueError('Unable to choose audio extension, uknown acodec')
+        else:
+            return 'mkv'
 
     @classmethod
     def create_url(obj, source_type, key):
@@ -388,25 +418,6 @@ class Media(models.Model):
         return _metadata_cache[self.pk]
 
     @property
-    def extension(self):
-        '''
-            The extension is also used by youtube-dl to set the output container. As
-            it is possible to quite easily pick combinations of codecs and containers
-            which are invalid (e.g. OPUS audio in an MP4 container) just set this for
-            people. All video is set to mkv containers, audio-only is set to m4a or ogg
-            depending on audio codec.
-        '''
-        if self.source.source_resolution == Source.SOURCE_RESOLUTION_AUDIO:
-            if self.source.source_acodec == Source.SOURCE_ACODEC_M4A:
-                return 'm4a'
-            elif self.source.source_acodec == Source.SOURCE_ACODEC_OPUS:
-                return 'ogg'
-            else:
-                raise ValueError('Unable to choose audio extension, uknown acodec')
-        else:
-            return 'mkv'
-
-    @property
     def url(self):
         url = self.URLS.get(self.source.source_type, '')
         return url.format(key=self.key)
@@ -426,6 +437,12 @@ class Media(models.Model):
     @property
     def filename(self):
         upload_date = self.upload_date.strftime('%Y-%m-%d')
+        source_name = slugify(self.source.name)
         title = slugify(self.title.replace('&', 'and').replace('+', 'and'))
-        ext = self.extension
-        return f'{upload_date}_{title}.{ext}'
+        ext = self.source.extension
+        fn = f'{upload_date}_{source_name}_{title}'[:100]
+        return f'{fn}.{ext}'
+
+    @property
+    def filepath(self):
+        return self.source.directory_path / self.filename
