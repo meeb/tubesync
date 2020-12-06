@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block headtitle %}Media - {{ media.key }}{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col s12">
+    <h1 class="truncate">Media <strong>{{ media.key }}</strong></h1>
+    <p class="truncate"><strong><a href="{{ media.url }}" target="_blank"><i class="fas fa-link"></i> {{ media.url }}</a></strong></p>
+    <p class="truncate">Saving to: <strong>{{ media.source.directory_path }}</strong></p>
+  </div>
+</div>
+<div class="row">
+  <div class="col s12">
+    <table class="striped">
+      <tr title="The media source">
+        <td class="hide-on-small-only">Source</td>
+        <td><span class="hide-on-med-and-up">Source<br></span><strong><a href="{% url 'sync:source' pk=media.source.pk %}">{{ media.source }}</a></strong></td>
+      </tr>
+      <tr title="The media title">
+        <td class="hide-on-small-only">Title</td>
+        <td><span class="hide-on-med-and-up">Title<br></span><strong>{{ media.title }}</strong></td>
+      </tr>
+      <tr title="The filename the media will be downloaded as">
+        <td class="hide-on-small-only">Filename</td>
+        <td><span class="hide-on-med-and-up">Filename<br></span><strong>{{ media.filename }}</strong></td>
+      </tr>
+      <tr title="The desired format">
+        <td class="hide-on-small-only">Desired format</td>
+        <td><span class="hide-on-med-and-up">Desired format<br></span><strong>{{ media.source.format_summary }}</strong></td>
+      </tr>
+      <tr title="Has the media been downloaded">
+        <td class="hide-on-small-only">Downloaded</td>
+        <td><span class="hide-on-med-and-up">Downloaded<br></span><strong>{% if media.downloaded %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
+    </table>
+  </div>
+</div>
+{% endblock %}

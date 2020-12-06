@@ -104,6 +104,23 @@ main {
         }
     }
 
+    .mediacard {
+        .card-title {
+            padding: 3px 10px 3px 5px !important;
+            margin: 5px !important;
+            line-height: 1.5rem;
+            font-size: 1.5rem;
+            left: initial !important;
+            right: 0 !important;
+            max-width: 75% !important;
+            opacity: 80%;
+            background-color: $mediacard-title-background-colour !important;
+            color: $mediacard-title-text-colour !important;
+            span {
+                font-size: 1rem;
+            }
+        }
+    }
 
     .pagination {
         width: 100%;

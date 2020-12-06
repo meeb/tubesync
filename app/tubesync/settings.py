@@ -96,7 +96,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
-MEDIA_URL = '/media/'
+#MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 SYNC_VIDEO_ROOT = BASE_DIR / 'downloads' / 'video'
 SYNC_AUDIO_ROOT = BASE_DIR / 'downloads' / 'audio'
@@ -121,10 +121,17 @@ BACKGROUND_TASK_PRIORITY_ORDERING = 'DESC'  # Process high priority tasks first
 
 
 SOURCES_PER_PAGE = 25
+MEDIA_PER_PAGE = 25
+
+
+INDEX_SOURCE_EVERY = 60  # Seconds between indexing sources, 21600 = every 6 hours
+
+
+MAX_MEDIA_THUMBNAIL_SIZE = (320, 240)       # Max size in pixels for media thumbnails
 
 
 YOUTUBE_DEFAULTS = {
-    'age_limit': 99,
+    'age_limit': 99,        # Age in years to spoof the client as
 }
 
 

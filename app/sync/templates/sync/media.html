@@ -1,11 +1,30 @@
-{% extends 'base.html' %}
+{% extends 'base.html' %}{% load static %}
 
-{% block headtitle %}Media{% endblock %}
+{% block headtitle %}Media{% if source %} - {{ source }}{% endif %}{% endblock %}
 
 {% block content %}
-<div class="row">
-  <div class="col s12">
-    media    
+{% include 'infobox.html' with message=message %}
+<div class="row no-margin-bottom">
+  {% for m in media %}
+  <div class="col s12 m6 l4 xl3">
+    <a href="{% url 'sync:media-item' pk=m.pk %}" class="collection-item">
+      <div class="card mediacard">
+        <div class="card-image">
+          <img src="{% if m.thumb %}{% url 'sync:media-thumb' pk=m.pk %}{% else %}{% static 'images/nothumb.jpg' %} {% endif %}">
+          <span class="card-title truncate">{{ m.source }}<br>
+            <span>{{ m }}</span>
+          </span>
+        </div>
+      </div>
+    </a>
   </div>
+  {% empty %}
+  <div class="col s12">
+    <div class="collection">
+      <span class="collection-item no-items"><i class="fas fa-info-circle"></i> No media has been indexed.</span>
+    </div>
+  </div>
+  {% endfor %}
 </div>
+{% include 'pagination.html' with pagination=sources.paginator %}
 {% endblock %}

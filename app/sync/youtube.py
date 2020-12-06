@@ -15,22 +15,20 @@ class YouTubeError(youtube_dl.utils.DownloadError):
     '''
         Generic wrapped error for all errors that could be raised by youtube-dl.
     '''
-
     pass
 
 
-def extract_info(url):
+def get_media_info(url):
     '''
         Extracts information from a YouTube URL and returns it as a dict. For a channel
         or playlist this returns a dict of all the videos on the channel or playlist
         as well as associated metadata.
     '''
+
     opts = _defaults.update({
         'skip_download': True,
         'forcejson': True,
         'simulate': True,
-        'extract_flat': 'in_playlist',
-        'playlist_items': 1,
     })
     response = {}
     with youtube_dl.YoutubeDL(opts) as y:

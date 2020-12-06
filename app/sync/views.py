@@ -1,16 +1,19 @@
+from base64 import b64decode
 from django.conf import settings
 from django.http import Http404
 from django.views.generic import TemplateView, ListView, DetailView
 from django.views.generic.edit import (FormView, FormMixin, CreateView, UpdateView,
                                        DeleteView)
+from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.forms import ValidationError
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from common.utils import append_uri_params
-from .models import Source
+from .models import Source, Media
 from .forms import ValidateSourceForm, ConfirmDeleteSourceForm
 from .utils import validate_url
+from . import signals
 from . import youtube
 
 
@@ -196,8 +199,8 @@ class AddSourceView(CreateView):
     template_name = 'sync/source-add.html'
     model = Source
     fields = ('source_type', 'key', 'name', 'directory', 'delete_old_media',
-              'days_to_keep', 'source_profile', 'prefer_60fps', 'prefer_hdr',
-              'output_format', 'fallback')
+              'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
+              'prefer_60fps', 'prefer_hdr', 'fallback')
 
     def __init__(self, *args, **kwargs):
         self.prepopulated_data = {}
@@ -240,8 +243,8 @@ class UpdateSourceView(UpdateView):
     template_name = 'sync/source-update.html'
     model = Source
     fields = ('source_type', 'key', 'name', 'directory', 'delete_old_media',
-              'days_to_keep', 'source_profile', 'prefer_60fps', 'prefer_hdr',
-              'output_format', 'fallback')
+              'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
+              'prefer_60fps', 'prefer_hdr', 'fallback')
 
     def get_success_url(self):
         url = reverse_lazy('sync:sources')
@@ -272,15 +275,75 @@ class DeleteSourceView(DeleteView, FormMixin):
         return append_uri_params(url, {'message': 'source-deleted'})
 
 
-class MediaView(TemplateView):
+class MediaView(ListView):
     '''
         A bare list of media added with their states.
     '''
 
     template_name = 'sync/media.html'
+    context_object_name = 'media'
+    paginate_by = settings.MEDIA_PER_PAGE
+    messages = {
+        'filter': _('Viewing media for source: <strong>{name}</strong>'),
+    }
+
+    def __init__(self, *args, **kwargs):
+        self.filter_source = None
+        super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
+        filter_by = request.GET.get('filter', '')
+        if filter_by:
+            try:
+                self.filter_source = Source.objects.get(pk=filter_by)
+            except Source.DoesNotExist:
+                self.filter_source = None
         return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        if self.filter_source:
+            return Media.objects.filter(source=self.filter_source).order_by('-created')
+        else:
+            return Media.objects.all().order_by('-created')
+
+    def get_context_data(self, *args, **kwargs):
+        data = super().get_context_data(*args, **kwargs)
+        data['message'] = ''
+        data['source'] = None
+        if self.filter_source:
+            message = str(self.messages.get('filter', ''))
+            print(message)
+            data['message'] = message.format(name=self.filter_source.name)
+            data['source'] = self.filter_source
+        print(data)
+        return data
+
+
+class MediaThumbView(DetailView):
+    '''
+        Shows a media thumbnail. Whitenose doesn't support post-start media image
+        serving and the images here are pretty small, just serve them manually. This
+        isn't fast, but it's not likely to be a serious bottleneck.
+    '''
+
+    model = Media
+
+    def get(self, request, *args, **kwargs):
+        media = self.get_object()
+        if media.thumb:
+            thumb = open(media.thumb.path, 'rb').read()
+            content_type = 'image/jpeg' 
+        else:
+            thumb = b64decode('R0lGODlhAQABAIABAP///wAAACH5BAEKAAEALAA'
+                              'AAAABAAEAAAICTAEAOw==')
+            content_type = 'image/gif'
+        return HttpResponse(thumb, content_type=content_type)
+
+
+class MediaItemView(DetailView):
+
+    template_name = 'sync/media-item.html'
+    model = Media
 
 
 class TasksView(TemplateView):

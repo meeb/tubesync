@@ -1,4 +1,6 @@
 import re
+import requests
+from PIL import Image
 from urllib.parse import urlsplit, parse_qs
 from django.forms import ValidationError
 
@@ -42,3 +44,13 @@ def validate_url(url, validator):
     elif extract_from == 'qs_args':
         extract_value = url_query_parts[extract_param][0]
     return extract_value
+
+
+def get_remote_image(url):
+    headers = {
+        'user-agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                       '(KHTML, like Gecko) Chrome/69.0.3497.64 Safari/537.36')
+    }
+    r = requests.get(url, headers=headers, stream=True, timeout=60)
+    r.raw.decode_content = True
+    return Image.open(r.raw)

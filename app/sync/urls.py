@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceView,
                     SourceView, UpdateSourceView, DeleteSourceView, MediaView,
-                    TasksView, LogsView)
+                    MediaThumbView, MediaItemView, TasksView, LogsView)
 
 
 app_name = 'sync'
@@ -41,11 +41,19 @@ urlpatterns = [
          DeleteSourceView.as_view(),
          name='delete-source'),
 
-    # Media URLs (note /media/ is the static media URL, don't use that)
+    # Media URLs
 
-    path('mediafiles',
+    path('media',
          MediaView.as_view(),
          name='media'),
+
+    path('media-thumb/<uuid:pk>',
+         MediaThumbView.as_view(),
+         name='media-thumb'),
+
+    path('media-item/<uuid:pk>',
+         MediaItemView.as_view(),
+         name='media-item'),
 
     # Task URLs
 
