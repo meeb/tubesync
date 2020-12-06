@@ -107,3 +107,12 @@ def delete_file(filepath):
     if file_is_editable(filepath):
         return os.remove(filepath)
     return False
+
+
+def seconds_to_timestr(seconds):
+   seconds = seconds % (24 * 3600)
+   hour = seconds // 3600
+   seconds %= 3600
+   minutes = seconds // 60
+   seconds %= 60
+   return '{:02d}:{:02d}:{:02d}'.format(hour, minutes, seconds)

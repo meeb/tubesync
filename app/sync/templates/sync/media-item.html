@@ -21,6 +21,10 @@
         <td class="hide-on-small-only">Title</td>
         <td><span class="hide-on-med-and-up">Title<br></span><strong>{{ media.title }}</strong></td>
       </tr>
+      <tr title="The media duration">
+        <td class="hide-on-small-only">Duration</td>
+        <td><span class="hide-on-med-and-up">Duration<br></span><strong>{{ media.duration_formatted }}</strong></td>
+      </tr>
       <tr title="The filename the media will be downloaded as">
         <td class="hide-on-small-only">Filename</td>
         <td><span class="hide-on-med-and-up">Filename<br></span><strong>{{ media.filename }}</strong></td>
@@ -32,6 +36,16 @@
       <tr title="Has the media been downloaded">
         <td class="hide-on-small-only">Downloaded</td>
         <td><span class="hide-on-med-and-up">Downloaded<br></span><strong>{% if media.downloaded %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
+      <tr title="The available media formats">
+        <td class="hide-on-small-only">Available formats</td>
+        <td><span class="hide-on-med-and-up">Available formats<br></span>
+          {% for format in media.formats %}
+          <strong>{{ format.format }}</strong><br>
+          {% empty %}
+          Media has no detected available formats
+          {% endfor %}
+        </td>
       </tr>
     </table>
   </div>

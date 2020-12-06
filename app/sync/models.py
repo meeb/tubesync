@@ -7,6 +7,7 @@ from django.db import models
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from .youtube import get_media_info as get_youtube_media_info
+from .utils import seconds_to_timestr
 
 
 class Source(models.Model):
@@ -69,34 +70,25 @@ class Source(models.Model):
         (FALLBACK_NEXT_HD, _('Get next best HD media or codec instead')),
     )
 
+    # Fontawesome icons used for the source on the front end
     ICONS = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: '<i class="fab fa-youtube"></i>',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: '<i class="fab fa-youtube"></i>',
     }
-
+    # Format to use to display a URL for the source
     URLS = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/c/{key}',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/playlist?list={key}',
     }
-
+    # Callback functions to get a list of media from the source
     INDEXERS = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: get_youtube_media_info,
         SOURCE_TYPE_YOUTUBE_PLAYLIST: get_youtube_media_info,
     }
-
-    KEY_FIELD = {  # Field returned by indexing which contains a unique key
+    # Field names to find the media ID used as the key when storing media
+    KEY_FIELD = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: 'id',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'id',
-    }
-
-    PUBLISHED_FIELD = {  # Field returned by indexing which contains the published date
-        SOURCE_TYPE_YOUTUBE_CHANNEL: 'upload_date',
-        SOURCE_TYPE_YOUTUBE_PLAYLIST: 'upload_date',
-    }
-
-    TITLE_FIELD = {  # Field returned by indexing which contains the media title
-        SOURCE_TYPE_YOUTUBE_CHANNEL: 'title',
-        SOURCE_TYPE_YOUTUBE_PLAYLIST: 'title',
     }
 
     uuid = models.UUIDField(
@@ -313,9 +305,33 @@ class Media(models.Model):
         Source.
     '''
 
+    # Format to use to display a URL for the media
     URLS = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/watch?v={key}',
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/watch?v={key}',
+    }
+    # Maps standardised names to names used in source metdata
+    METADATA_FIELDS = {
+        'upload_date': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'upload_date',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'upload_date',
+        },
+        'title': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'title',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'title',
+        },
+        'description': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'description',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'description',
+        },
+        'duration': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'duration',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'duration',
+        },
+        'formats': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'formats',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'formats',
+        }
     }
 
     uuid = models.UUIDField(
@@ -435,6 +451,10 @@ class Media(models.Model):
         verbose_name = _('Media')
         verbose_name_plural = _('Media')
 
+    def get_metadata_field(self, field):
+        fields = self.METADATA_FIELDS.get(field, {})
+        return fields.get(self.source.source_type, '')
+
     @property
     def loaded_metadata(self):
         if self.pk in _metadata_cache:
@@ -453,8 +473,8 @@ class Media(models.Model):
 
     @property
     def title(self):
-        k = self.source.TITLE_FIELD.get(self.source.source_type, '')
-        return self.loaded_metadata.get(k, '').strip()
+        field = self.get_metadata_field('title')
+        return self.loaded_metadata.get(field, '').strip()
 
     @property
     def name(self):
@@ -463,12 +483,29 @@ class Media(models.Model):
 
     @property
     def upload_date(self):
-        k = self.source.PUBLISHED_FIELD.get(self.source.source_type, '')
-        upload_date_str = self.loaded_metadata.get(k, '').strip()
+        field = self.get_metadata_field('upload_date')
+        upload_date_str = self.loaded_metadata.get(field, '').strip()
         try:
             return datetime.strptime(upload_date_str, '%Y%m%d')
         except (AttributeError, ValueError) as e:
             return None
+
+    @property
+    def duration(self):
+        field = self.get_metadata_field('duration')
+        return int(self.loaded_metadata.get(field, 0))
+
+    @property
+    def duration_formatted(self):
+        duration = self.duration
+        if duration > 0:
+            return seconds_to_timestr(duration)
+        return '??:??:??'
+
+    @property
+    def formats(self):
+        field = self.get_metadata_field('formats')
+        return self.loaded_metadata.get(field, [])
 
     @property
     def filename(self):
