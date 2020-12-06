@@ -7,7 +7,7 @@ from django.db import models
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from .youtube import get_media_info as get_youtube_media_info
-from .utils import seconds_to_timestr
+from .utils import seconds_to_timestr, parse_media_format
 
 
 class Source(models.Model):
@@ -24,26 +24,34 @@ class Source(models.Model):
         (SOURCE_TYPE_YOUTUBE_PLAYLIST, _('YouTube playlist')),
     )
 
-    SOURCE_RESOLUTION_360p = '360p'
-    SOURCE_RESOLUTION_480p = '480p'
+    SOURCE_RESOLUTION_360P = '360p'
+    SOURCE_RESOLUTION_480P = '480p'
     SOURCE_RESOLUTION_720P = '720p'
     SOURCE_RESOLUTION_1080P = '1080p'
     SOURCE_RESOLUTION_1440P = '1440p'
     SOURCE_RESOLUTION_2160P = '2160p'
     SOURCE_RESOLUTION_AUDIO = 'audio'
-    SOURCE_RESOLUTIONS = (SOURCE_RESOLUTION_360p, SOURCE_RESOLUTION_480p,
+    SOURCE_RESOLUTIONS = (SOURCE_RESOLUTION_360P, SOURCE_RESOLUTION_480P,
                           SOURCE_RESOLUTION_720P, SOURCE_RESOLUTION_1080P,
                           SOURCE_RESOLUTION_1440P, SOURCE_RESOLUTION_2160P,
                           SOURCE_RESOLUTION_AUDIO)
     SOURCE_RESOLUTION_CHOICES = (
-        (SOURCE_RESOLUTION_360p, _('360p (SD)')),
-        (SOURCE_RESOLUTION_480p, _('480p (SD)')),
+        (SOURCE_RESOLUTION_360P, _('360p (SD)')),
+        (SOURCE_RESOLUTION_480P, _('480p (SD)')),
         (SOURCE_RESOLUTION_720P, _('720p (HD)')),
         (SOURCE_RESOLUTION_1080P, _('1080p (Full HD)')),
         (SOURCE_RESOLUTION_1440P, _('1440p (2K)')),
         (SOURCE_RESOLUTION_2160P, _('2160p (4K)')),
         (SOURCE_RESOLUTION_AUDIO, _('Audio only')),
     )
+    RESOLUTION_MAP = {
+        SOURCE_RESOLUTION_360P: 360,
+        SOURCE_RESOLUTION_480P: 480,
+        SOURCE_RESOLUTION_720P: 720,
+        SOURCE_RESOLUTION_1080P: 1080,
+        SOURCE_RESOLUTION_1440P: 1440,
+        SOURCE_RESOLUTION_2160P: 2160
+    }
 
     SOURCE_VCODEC_AVC1 = 'AVC1'
     SOURCE_VCODEC_VP9 = 'VP9'
@@ -54,12 +62,12 @@ class Source(models.Model):
         (SOURCE_VCODEC_VP9, _('VP9')),
     )
 
-    SOURCE_ACODEC_M4A = 'M4A'
+    SOURCE_ACODEC_MP4A = 'MP4A'
     SOURCE_ACODEC_OPUS = 'OPUS'
-    SOURCE_ACODECS = (SOURCE_ACODEC_M4A, SOURCE_ACODEC_OPUS)
-    SOURCE_ACODEC_PRIORITY = (SOURCE_ACODEC_OPUS, SOURCE_ACODEC_M4A)
+    SOURCE_ACODECS = (SOURCE_ACODEC_MP4A, SOURCE_ACODEC_OPUS)
+    SOURCE_ACODEC_PRIORITY = (SOURCE_ACODEC_OPUS, SOURCE_ACODEC_MP4A)
     SOURCE_ACODEC_CHOICES = (
-        (SOURCE_ACODEC_M4A, _('M4A')),
+        (SOURCE_ACODEC_MP4A, _('MP4A')),
         (SOURCE_ACODEC_OPUS, _('OPUS')),
     )
 
@@ -266,6 +274,10 @@ class Source(models.Model):
     def key_field(self):
         return self.KEY_FIELD.get(self.source_type, '')
 
+    @property
+    def source_resolution_height(self):
+        return self.RESOLUTION_MAP.get(self.source_resolution, 0)
+
     def index_media(self):
         '''
             Index the media source returning a list of media metadata as dicts.
@@ -457,6 +469,113 @@ class Media(models.Model):
     def get_metadata_field(self, field):
         fields = self.METADATA_FIELDS.get(field, {})
         return fields.get(self.source.source_type, '')
+
+    def get_best_combined_format(self):
+        '''
+            Attempts to see if there is a single, combined audio and video format that
+            exactly matches the source requirements. This is used over separate audio
+            and video formats if possible.
+
+            single format structure = {
+                'format_id': '22',
+                'url': '... long url ...',
+                'player_url': None,
+                'ext': 'mp4',
+                'width': 1280,
+                'height': 720,
+                'acodec': 'mp4a.40.2',
+                'abr': 192,
+                'vcodec': 'avc1.64001F',
+                'asr': 44100,
+                'filesize': None,
+                'format_note': '720p',
+                'fps': 30,
+                'tbr': 1571.695,
+                'format': '22 - 1280x720 (720p)',
+                'protocol': 'https',
+                'http_headers': {... dict of headers ...}
+            }
+
+            or for hdr = {
+                'format_id': '336',
+                'url': '... long url ...',
+                'player_url': None,
+                'asr': None,
+                'filesize': 312014985,
+                'format_note': '1440p60 HDR',
+                'fps': 60,
+                'height': 1440,
+                'tbr': 16900.587,
+                'width': 2560,
+                'ext': 'webm',
+                'vcodec': 'vp9.2',
+                'acodec': 'none',
+                'downloader_options': {'http_chunk_size': 10485760},
+                'format': '336 - 2560x1440 (1440p60 HDR)',
+                'protocol': 'https',
+                'http_headers': {... dict of headers ...}
+            }
+
+        '''
+        candidates = []
+        for fmt in self.formats:
+            parsed_fmt = parse_media_format(fmt)
+            # Check height matches
+            print(self.source.source_resolution_height, parsed_fmt['height'])
+            if self.source.source_resolution_height != parsed_fmt['height']:
+                print()
+                continue
+            print('height OK')
+            # Check the video codec matches
+            print(self.source.source_vcodec, parsed_fmt['vcodec'])
+            if self.source.source_vcodec != parsed_fmt['vcodec']:
+                print()
+                continue
+            print('vcodec OK')
+            # Check the audio codec matches
+            print(self.source.source_acodec, parsed_fmt['acodec'])
+            if self.source.source_acodec != parsed_fmt['acodec']:
+                print()
+                continue
+            print('acodec OK')
+            # All OK so far...
+            candidates.append(parsed_fmt)
+            print()
+        for c in candidates:
+            print(c)
+        return 'combined'
+
+    def get_best_audio_format(self):
+        '''
+            Finds the best match for the source required audio format. If the source
+            has a 'fallback' of fail this can return no match.
+        '''
+        return 'audio'
+
+    def get_best_video_format(self):
+        '''
+            Finds the best match for the source required video format. If the source
+            has a 'fallback' of fail this can return no match.
+        '''
+        return 'video'
+
+    def get_format_str(self):
+        '''
+            Returns a youtube-dl compatible format string for the best matches
+            combination of source requirements and available audio and video formats.
+        '''
+        if self.source.is_audio:
+            audio_format = self.get_best_audio_format()
+            return 'a'
+        else:
+            combined_format = self.get_best_combined_format()
+            if combined_format:
+                return 'c'
+            else:
+                audio_format = self.get_best_audio_format()
+                video_format = self.get_best_video_format()
+                return 'a+v'
+        return False
 
     @property
     def loaded_metadata(self):

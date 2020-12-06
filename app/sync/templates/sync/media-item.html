@@ -41,11 +41,19 @@
         <td class="hide-on-small-only">Available formats</td>
         <td><span class="hide-on-med-and-up">Available formats<br></span>
           {% for format in media.formats %}
-          <strong>{{ format.format }}</strong><br>
+          <span class="truncate">ID: <strong>{{ format.format_id }}</strong>{% if format.vcodec|lower != 'none' %}, <strong>{{ format.format_note }} ({{ format.width }}x{{ format.height }})</strong>, fps:<strong>{{ format.fps|lower }}</strong>, video:<strong>{{ format.vcodec }} @{{ format.tbr }}k</strong>{% endif %}{% if format.acodec|lower != 'none' %}, audio:<strong>{{ format.acodec }} @{{ format.abr }}k / {{ format.asr }}Hz</strong>{% endif %}</span>
           {% empty %}
-          Media has no detected available formats
+          Media has no indexed available formats
           {% endfor %}
         </td>
+      </tr>
+      <tr title="Best available format for source requirements">
+        <td class="hide-on-small-only">Best match</td>
+        <td><span class="hide-on-med-and-up">Best match<br></span><strong>
+          audio: {{ media.get_best_audio_format }}<br>
+          video: {{ media.get_best_video_format }}<br>
+          combo: {{ media.get_best_combined_format }}
+        </strong></td>
       </tr>
     </table>
   </div>

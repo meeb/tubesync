@@ -66,6 +66,7 @@ def resize_image_to_height(image, width, height):
         is larger than 'width' then crop it. If the resulting width is smaller than
         'width' then stretch it.
     '''
+    image = image.convert('RGB')
     ratio = image.width / image.height
     scaled_width = math.ceil(height * ratio)
     if scaled_width < width:
@@ -116,3 +117,30 @@ def seconds_to_timestr(seconds):
    minutes = seconds // 60
    seconds %= 60
    return '{:02d}:{:02d}:{:02d}'.format(hour, minutes, seconds)
+
+
+def parse_media_format(format_dict):
+    vcodec_full = format_dict.get('vcodec', '')
+    vcodec_parts = vcodec_full.split('.')
+    if len(vcodec_parts) > 0:
+        vcodec = vcodec_parts[0].strip().upper()
+    else:
+        vcodec = None
+    if vcodec == 'NONE':
+        vcodec = None
+    acodec_full = format_dict.get('acodec', '')
+    acodec_parts = acodec_full.split('.')
+    if len(acodec_parts) > 0:
+        acodec = acodec_parts[0].strip().upper()
+    else:
+        acodec = None
+    if acodec == 'NONE':
+        acodec = None
+    return {
+        'id': format_dict.get('format_id', ''),
+        'height': format_dict.get('height', 0),
+        'is_60fps': format_dict.get('fps', 0) == 60,
+        'is_hdr': 'HDR' in format_dict.get('format', '').upper(),
+        'vcodec': vcodec,
+        'acodec': acodec,
+    }

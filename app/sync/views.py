@@ -335,6 +335,7 @@ class MediaThumbView(DetailView):
             thumb = open(media.thumb.path, 'rb').read()
             content_type = 'image/jpeg' 
         else:
+            # No thumbnail on disk, return a blank 1x1 gif
             thumb = b64decode('R0lGODlhAQABAIABAP///wAAACH5BAEKAAEALAA'
                               'AAAABAAEAAAICTAEAOw==')
             content_type = 'image/gif'
@@ -358,16 +359,6 @@ class TasksView(TemplateView):
     '''
 
     template_name = 'sync/tasks.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        return super().dispatch(request, *args, **kwargs)
-
-
-    '''
-        The last X days of logs.
-    '''
-
-    template_name = 'sync/logs.html'
 
     def dispatch(self, request, *args, **kwargs):
         return super().dispatch(request, *args, **kwargs)
