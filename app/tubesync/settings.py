@@ -120,19 +120,20 @@ BACKGROUND_TASK_ASYNC_THREADS = 2           # Number of async tasks to run at on
 BACKGROUND_TASK_PRIORITY_ORDERING = 'DESC'  # Process high priority tasks first
 
 
-SOURCES_PER_PAGE = 25
-MEDIA_PER_PAGE = 25
+SOURCES_PER_PAGE = 36
+MEDIA_PER_PAGE = 36
 
 
 INDEX_SOURCE_EVERY = 21600  # Seconds between indexing sources, 21600 = every 6 hours
 
 
-MAX_MEDIA_THUMBNAIL_SIZE = (320, 240)       # Max size in pixels for media thumbnails
+MEDIA_THUMBNAIL_HEIGHT = 240                # Height in pixels to resize thumbnails to
 
 
 YOUTUBE_DEFAULTS = {
     'no_color': True,       # Do not use colours in output
     'age_limit': 99,        # 'Age in years' to spoof
+    'ignoreerrors': True,   # Skip on errors (such as unavailable videos in playlists)
 }
 
 

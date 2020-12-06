@@ -3,7 +3,7 @@
   <div class="col s12">
     <div class="pagination">
       {% for i in paginator.page_range %}
-        <a class="pagenum{% if i == page_obj.number %} currentpage{% endif %}" href="?page={{ i }}">{{ i }}</a>
+        <a class="pagenum{% if i == page_obj.number %} currentpage{% endif %}" href="?{% if filter %}filter={{ filter }}&{% endif %}page={{ i }}">{{ i }}</a>
       {% endfor %}
     </div>
   </div>

@@ -304,9 +304,10 @@ class MediaView(ListView):
 
     def get_queryset(self):
         if self.filter_source:
-            return Media.objects.filter(source=self.filter_source).order_by('-created')
+            q = Media.objects.filter(source=self.filter_source)
         else:
-            return Media.objects.all().order_by('-created')
+            q = Media.objects.all()
+        return q.order_by('-published', '-created')
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
@@ -314,10 +315,8 @@ class MediaView(ListView):
         data['source'] = None
         if self.filter_source:
             message = str(self.messages.get('filter', ''))
-            print(message)
             data['message'] = message.format(name=self.filter_source.name)
             data['source'] = self.filter_source
-        print(data)
         return data
 
 

@@ -43,4 +43,5 @@ def media_post_save(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=Media)
 def media_post_delete(sender, instance, **kwargs):
     # Triggered when media is deleted, delete media thumbnail
-    delete_file(instance.thumb.path)
+    if instance.thumb:
+        delete_file(instance.thumb.path)

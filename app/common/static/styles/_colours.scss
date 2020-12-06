@@ -41,11 +41,14 @@ $collection-text-colour: $colour-near-black;
 $collection-background-hover-colour: $colour-orange;
 $collection-text-hover-colour: $colour-near-white;
 
-$mediacard-title-background-colour: $colour-white;
-$mediacard-title-text-colour: $colour-black;
+$mediacard-title-background-colour: $colour-black;
+$mediacard-title-text-colour: $colour-white;
 
 $box-error-background-colour: $colour-red;
 $box-error-text-colour: $colour-near-white;
+
+$infobox-background-colour: $colour-near-black;
+$infobox-text-colour: $colour-near-white;
 
 $pagination-background-colour: $colour-near-white;
 $pagination-text-colour: $colour-near-black;
@@ -56,6 +59,3 @@ $pagination-border-hover-colour: $colour-light-blue;
 $pagination-current-background-colour: $colour-orange;
 $pagination-current-text-colour: $colour-near-white;
 $pagination-current-border-colour: $colour-orange;
-
-$infobox-background-colour: $colour-near-white;
-$infobox-text-colour: $colour-near-black;

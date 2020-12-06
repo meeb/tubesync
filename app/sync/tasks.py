@@ -5,9 +5,12 @@
 
 
 import json
+import math
 from io import BytesIO
+from PIL import Image
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from background_task import background
 from background_task.models import Task
 from common.logger import log
@@ -52,6 +55,12 @@ def index_source_task(source_id):
             media = Media(key=key)
         media.source = source
         media.metadata = json.dumps(video)
+        upload_date = media.upload_date
+        if upload_date:
+            if timezone.is_aware(upload_date):
+                media.published = upload_date
+            else:
+                media.published = timezone.make_aware(upload_date)
         media.save()
         log.info(f'Indexed media: {source} / {media}')
 
@@ -68,11 +77,12 @@ def download_media_thumbnail(media_id, url):
         # Task triggered but the media no longer exists, ignore task
         return
     i = get_remote_image(url)
-    max_width, max_height = getattr(settings, 'MAX_MEDIA_THUMBNAIL_SIZE', (512, 512))
-    if i.width > max_width or i.height > max_height:
-        # Image is larger than we want to save, resize it
-        log.info(f'Resizing thumbnail ({i.width}x{i.height}): {url}')
-        i.thumbnail(size=(max_width, max_height))
+    ratio = i.width / i.height
+    new_height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
+    new_width = math.ceil(new_height * ratio)
+    log.info(f'Resizing {i.width}x{i.height} thumbnail to '
+             f'{new_width}x{new_height}: {url}')
+    i = i.resize((new_width, new_height), Image.ANTIALIAS)
     image_file = BytesIO()
     i.save(image_file, 'JPEG', quality=80, optimize=True, progressive=True)
     image_file.seek(0)

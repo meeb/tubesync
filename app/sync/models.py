@@ -188,7 +188,7 @@ class Source(models.Model):
         max_length=1,
         db_index=True,
         choices=FALLBACK_CHOICES,
-        default=FALLBACK_FAIL,
+        default=FALLBACK_NEXT_HD,
         help_text=_('What do do when media in your source resolution and codecs is not available')
     )
 
@@ -269,7 +269,22 @@ class Source(models.Model):
         if not callable(indexer):
             raise Exception(f'Source type f"{self.source_type}" has no indexer')
         response = indexer(self.url)
-        return response.get('entries', [])
+
+        # Account for nested playlists, such as a channel of playlists of playlists
+        def _recurse_playlists(playlist):
+            videos = []
+            entries = playlist.get('entries', [])
+            for entry in entries:
+                if not entry:
+                    continue
+                subentries = entry.get('entries', [])
+                if subentries:
+                    videos = videos + _recurse_playlists(entry)
+                else:
+                    videos.append(entry)
+            return videos
+
+        return _recurse_playlists(response)
 
 
 def get_media_thumb_path(instance, filename):
@@ -427,20 +442,27 @@ class Media(models.Model):
         return self.loaded_metadata.get('title', '').strip()
 
     @property
+    def name(self):
+        title = self.title
+        return title if title else self.key
+
+    @property
     def upload_date(self):
         upload_date_str = self.loaded_metadata.get('upload_date', '').strip()
         try:
             return datetime.strptime(upload_date_str, '%Y%m%d')
-        except ValueError as e:
+        except (AttributeError, ValueError) as e:
             return None
 
     @property
     def filename(self):
-        upload_date = self.upload_date.strftime('%Y-%m-%d')
+        upload_date = self.upload_date
+        dateobj = upload_date if upload_date else self.created
+        datestr = dateobj.strftime('%Y-%m-%d')
         source_name = slugify(self.source.name)
         title = slugify(self.title.replace('&', 'and').replace('+', 'and'))
         ext = self.source.extension
-        fn = f'{upload_date}_{source_name}_{title}'[:100]
+        fn = f'{datestr}_{source_name}_{title}'[:100]
         return f'{fn}.{ext}'
 
     @property

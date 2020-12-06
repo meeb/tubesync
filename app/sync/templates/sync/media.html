@@ -12,7 +12,8 @@
         <div class="card-image">
           <img src="{% if m.thumb %}{% url 'sync:media-thumb' pk=m.pk %}{% else %}{% static 'images/nothumb.jpg' %} {% endif %}">
           <span class="card-title truncate">{{ m.source }}<br>
-            <span>{{ m }}</span>
+            <span>{{ m.name }}</span><br>
+            <span>{{ m.published|date:'Y-m-d' }}</span>
           </span>
         </div>
       </div>
@@ -26,5 +27,5 @@
   </div>
   {% endfor %}
 </div>
-{% include 'pagination.html' with pagination=sources.paginator %}
+{% include 'pagination.html' with pagination=sources.paginator filter=source.pk %}
 {% endblock %}
