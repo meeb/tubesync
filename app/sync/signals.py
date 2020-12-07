@@ -9,10 +9,10 @@ from .utils import delete_file
 
 @receiver(post_save, sender=Source)
 def source_post_save(sender, instance, created, **kwargs):
-    # Triggered when a source is saved
-    if created:
-        # If the source is newly created schedule its indexing
-        index_source_task(str(instance.pk), repeat=settings.INDEX_SOURCE_EVERY)
+    # Triggered when a source is saved, delete any source tasks that might exist
+    delete_index_source_task(str(instance.pk))
+    # Create a new scheduled indexing task as the repeat schedule may have changed
+    index_source_task(str(instance.pk), repeat=instance.index_schedule)
 
 
 @receiver(pre_delete, sender=Source)

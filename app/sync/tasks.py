@@ -11,6 +11,7 @@ from PIL import Image
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
+from django.db.utils import IntegrityError
 from background_task import background
 from background_task.models import Task
 from common.logger import log
@@ -58,8 +59,11 @@ def index_source_task(source_id):
         upload_date = media.upload_date
         if upload_date:
             media.published = timezone.make_aware(upload_date)
-        media.save()
-        log.info(f'Indexed media: {source} / {media}')
+        try:
+            media.save()
+            log.info(f'Indexed media: {source} / {media}')
+        except IntegrityError as e:
+            log.error(f'Index media failed: {source} / {media} with "{e}"')
 
 
 @background(schedule=0)

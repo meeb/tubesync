@@ -30,6 +30,10 @@
         <td class="hide-on-small-only">Directory</td>
         <td><span class="hide-on-med-and-up">Directory<br></span><strong>{{ source.directory }}</strong></td>
       </tr>
+      <tr title="Schedule of how often to index the source for new media">
+        <td class="hide-on-small-only">Index schedule</td>
+        <td><span class="hide-on-med-and-up">Index schedule<br></span><strong>{{ source.get_index_schedule_display }}</strong></td>
+      </tr>
       <tr title="When then source was created locally in TubeSync">
         <td class="hide-on-small-only">Created</td>
         <td><span class="hide-on-med-and-up">Created<br></span><strong>{{ source.created|date:'Y-m-d H:i:s' }}</strong></td>

@@ -200,9 +200,9 @@ class AddSourceView(CreateView):
 
     template_name = 'sync/source-add.html'
     model = Source
-    fields = ('source_type', 'key', 'name', 'directory', 'delete_old_media',
-              'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
-              'prefer_60fps', 'prefer_hdr', 'fallback')
+    fields = ('source_type', 'key', 'name', 'directory', 'index_schedule',
+              'delete_old_media', 'days_to_keep', 'source_resolution', 'source_vcodec',
+              'source_acodec', 'prefer_60fps', 'prefer_hdr', 'fallback')
 
     def __init__(self, *args, **kwargs):
         self.prepopulated_data = {}
@@ -244,9 +244,9 @@ class UpdateSourceView(UpdateView):
 
     template_name = 'sync/source-update.html'
     model = Source
-    fields = ('source_type', 'key', 'name', 'directory', 'delete_old_media',
-              'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
-              'prefer_60fps', 'prefer_hdr', 'fallback')
+    fields = ('source_type', 'key', 'name', 'directory', 'index_schedule',
+              'delete_old_media', 'days_to_keep', 'source_resolution', 'source_vcodec',
+              'source_acodec', 'prefer_60fps', 'prefer_hdr', 'fallback')
 
     def get_success_url(self):
         url = reverse_lazy('sync:sources')

@@ -102,6 +102,16 @@ class Source(models.Model):
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'id',
     }
 
+    class IndexSchedule(models.IntegerChoices):
+        EVERY_HOUR = 3600, _('Every hour')
+        EVERY_2_HOURS = 7200, _('Every 2 hours')
+        EVERY_3_HOURS = 10800, _('Every 3 hours')
+        EVERY_4_HOURS = 14400, _('Every 4 hours')
+        EVERY_5_HOURS = 18000, _('Every 5 hours')
+        EVERY_6_HOURS = 21600, _('Every 6 hours')
+        EVERY_12_HOURS = 43200, _('Every 12 hours')
+        EVERY_24_HOURS = 86400, _('Every 24 hours')
+
     uuid = models.UUIDField(
         _('uuid'),
         primary_key=True,
@@ -150,6 +160,13 @@ class Source(models.Model):
         db_index=True,
         unique=True,
         help_text=_('Directory name to save the media into')
+    )
+    index_schedule = models.IntegerField(
+        _('index schedule'),
+        choices=IndexSchedule.choices,
+        db_index=True,
+        default=IndexSchedule.EVERY_6_HOURS,
+        help_text=_('Schedule of how often to index the source for new media')
     )
     delete_old_media = models.BooleanField(
         _('delete old media'),
