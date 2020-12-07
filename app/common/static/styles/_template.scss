@@ -75,6 +75,12 @@ main {
         font-size: 2rem;
     }
 
+    h2 {
+        margin: 0;
+        padding: 2rem 0 0.5rem 0;
+        font-size: 1.5rem;
+    }
+
     .btn {
         width: 100%;
         background-color: $main-button-background-colour;
@@ -90,6 +96,7 @@ main {
     .collection {
         margin: 0.5rem 0 0 0 !important;
         .collection-item {
+            transition: initial !important;
             display: block;
         }
         a.collection-item {
@@ -165,6 +172,15 @@ main {
     .infobox {
         background-color: $infobox-background-colour;
         color: $infobox-text-colour;
+    }
+
+    .errorbox {
+        background-color: $errorbox-background-colour;
+        color: $errorbox-text-colour;
+    }
+
+    .error-text {
+        color: $error-text-colour !important;
     }
 
 }

@@ -3,6 +3,11 @@
 {% block headtitle %}Media{% if source %} - {{ source }}{% endif %}{% endblock %}
 
 {% block content %}
+<div class="row">
+  <div class="col s12">
+    <h1 class="truncate">Media</h1>
+  </div>
+</div>
 {% include 'infobox.html' with message=message %}
 <div class="row no-margin-bottom">
   {% for m in media %}
@@ -22,7 +27,7 @@
   {% empty %}
   <div class="col s12">
     <div class="collection">
-      <span class="collection-item no-items"><i class="fas fa-info-circle"></i> No media has been indexed.</span>
+      <span class="collection-item no-items"><i class="fas fa-info-circle"></i> No media has been indexed{% if source %} that matches the specified source filter{% endif %}.</span>
     </div>
   </div>
   {% endfor %}

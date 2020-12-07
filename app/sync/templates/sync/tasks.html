@@ -5,7 +5,83 @@
 {% block content %}
 <div class="row">
   <div class="col s12">
-    tasks
+    <h1>Tasks</h1>
+    <p>
+      Tasks are the background work that TubeSync undertakes to index and download
+      media. This page allows you to see basic overview of what is running and what is
+      scheduled to perform in the future as well as check up on any errors that might
+      have occured.
+    </p>
+  </div>
+</div>
+<div class="row">
+  <div class="col s12">
+    <h2>{{ running|length }} Running</h2>
+    <p>
+      Running tasks are tasks which currently being worked on right now.
+    </p>
+    <div class="collection">
+      {% for task in running %}
+        <a href="{% url task.url pk=task.instance.pk %}" class="collection-item">
+          <i class="fas fa-running"></i> <strong>{{ task }}</strong><br>
+          <i class="far fa-clock"></i> Task started at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+        </a>
+      {% empty %}
+        <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no running tasks.</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+<div class="row">
+  <div class="col s12">
+    <h2>{{ errors|length }} Error{{ errors|length|pluralize }}</h2>
+    <p>
+      Tasks which generated an error are shown here. Tasks are retried a couple of
+      times, so if there was an intermittent error such as a download got interrupted
+      it will be scheduled to run again.
+    </p>
+    <div class="collection">
+      {% for task in errors %}
+        <a href="{% url task.url pk=task.instance.pk %}" class="collection-item error-text">
+          <i class="fas fa-exclamation-triangle"></i> <strong>{{ task }}</strong>, attempted {{ task.attempts }} time{{ task.attempts|pluralize }}<br>
+          Error: &quot;{{ task.error_message }}&quot;<br>
+          <i class="fas fa-history"></i> Task will be retried at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+        </a>
+      {% empty %}
+        <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no tasks with errors.</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+<div class="row">
+  <div class="col s12">
+    <h2>{{ scheduled|length }} Scheduled</h2>
+    <p>
+      Tasks which are scheduled to run in the future or are waiting in a queue to be
+      processed. They can be waiting for an available worker to run immediately, or
+      run in the future at the specified &quot;run at&quot; time.
+    </p>
+    <div class="collection">
+      {% for task in scheduled %}
+        <a href="{% url task.url pk=task.instance.pk %}" class="collection-item">
+          <i class="far fa-stopwatch"></i> <strong>{{ task }}</strong><br>
+          Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>
+          <i class="fas fa-redo"></i> Task will run at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+        </a>
+      {% empty %}
+        <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no scheduled tasks.</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+<div class="row">
+  <div class="col s12">
+    <h2>Completed</h2>
+    <p>
+      A record of recently completed tasks is kept for a few days. You can use the button
+      below to view recent tasks which have completed successfully.
+    </p>
+    <a href="{% url 'sync:tasks-completed' %}" class="btn"><span class="hide-on-med-and-down">View </span>Completed tasks <i class="fas fa-check-double"></i></a>
   </div>
 </div>
 {% endblock %}

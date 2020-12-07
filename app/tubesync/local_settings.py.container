@@ -1,13 +1,15 @@
 import os
 from pathlib import Path
+from 
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = Path('/')
 
 
-SECRET_KEY = str(os.getenv('DJANGO_SECRET_KEY', ''))
-ALLOWED_HOSTS_STR = str(os.getenv('DJANGO_ALLOWED_HOSTS', ''))
+RANDOM_SECRET = hexlify(os.urandom(32)).decode()
+SECRET_KEY = str(os.getenv('DJANGO_SECRET_KEY', RANDOM_SECRET))
+ALLOWED_HOSTS_STR = str(os.getenv('TUBESYNC_HOSTS', 'localhost'))
 ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
 
 
@@ -17,6 +19,9 @@ DATABASES = {
         'NAME': '/config/db.sqlite3',
     }
 }
+
+
+BACKGROUND_TASK_ASYNC_THREADS = int(os.get('TUBESYNC_WORKERS', 2))
 
 
 MEDIA_ROOT = ROOT_DIR / 'config' / 'media'

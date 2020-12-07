@@ -9,11 +9,14 @@ from django.urls import reverse_lazy
 from django.db.models import Count
 from django.forms import ValidationError
 from django.utils.text import slugify
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.utils import append_uri_params
+from background_task.models import Task, CompletedTask
 from .models import Source, Media
 from .forms import ValidateSourceForm, ConfirmDeleteSourceForm
 from .utils import validate_url
+from .tasks import map_task_to_instance, get_error_message, get_source_completed_tasks
 from . import signals
 from . import youtube
 
@@ -108,6 +111,7 @@ class ValidateSourceView(FormView):
             'scheme': 'https',
             'domain': 'www.youtube.com',
             'path_regex': '^\/(c\/)?([^\/]+)$',
+            'path_must_not_match': ('/playlist',),
             'qs_args': [],
             'extract_key': ('path_regex', 1),
             'example': 'https://www.youtube.com/SOMECHANNEL'
@@ -116,7 +120,8 @@ class ValidateSourceView(FormView):
             'scheme': 'https',
             'domain': 'www.youtube.com',
             'path_regex': '^\/(playlist|watch)$',
-            'qs_args': ['list'],
+            'path_must_not_match': (),
+            'qs_args': ('list',),
             'extract_key': ('qs_args', 'list'),
             'example': 'https://www.youtube.com/playlist?list=PLAYLISTID'
         },
@@ -239,6 +244,16 @@ class SourceView(DetailView):
     template_name = 'sync/source.html'
     model = Source
 
+    def get_context_data(self, *args, **kwargs):
+        data = super().get_context_data(*args, **kwargs)
+        data['errors'] = []
+        for error in get_source_completed_tasks(self.object.pk, only_errors=True):
+            error_message = get_error_message(error)
+            setattr(error, 'error_message', error_message)
+            data['errors'].append(error)
+        data['media'] = Media.objects.filter(source=self.object).order_by('-published')
+        return data
+
 
 class UpdateSourceView(UpdateView):
 
@@ -286,7 +301,7 @@ class MediaView(ListView):
     context_object_name = 'media'
     paginate_by = settings.MEDIA_PER_PAGE
     messages = {
-        'filter': _('Viewing media for source: <strong>{name}</strong>'),
+        'filter': _('Viewing media filtered for source: <strong>{name}</strong>'),
     }
 
     def __init__(self, *args, **kwargs):
@@ -352,13 +367,90 @@ class MediaItemView(DetailView):
     model = Media
 
 
-class TasksView(TemplateView):
+class TasksView(ListView):
     '''
         A list of tasks queued to be completed. Typically, this is scraping for new
         media or downloading media.
     '''
 
     template_name = 'sync/tasks.html'
+    context_object_name = 'tasks'
+
+    def get_queryset(self):
+        return Task.objects.all().order_by('run_at')
+
+    def get_context_data(self, *args, **kwargs):
+        data = super().get_context_data(*args, **kwargs)
+        data['running'] = []
+        data['errors'] = []
+        data['scheduled'] = []
+        queryset = self.get_queryset()
+        now = timezone.now()
+        for task in queryset:
+            obj, url = map_task_to_instance(task)
+            if not obj:
+                # Orphaned task, ignore it (it will be deleted when it fires)
+                continue
+            setattr(task, 'instance', obj)
+            setattr(task, 'url', url)
+            if task.locked_by_pid_running():
+                data['running'].append(task)
+            elif task.has_error():
+                error_message = get_error_message(task)
+                setattr(task, 'error_message', error_message)
+                data['errors'].append(task)
+            else:
+                data['scheduled'].append(task)
+        return data
+
+
+class CompletedTasksView(ListView):
+    '''
+        List of tasks which have been completed with an optional per-source filter.
+    '''
+
+    template_name = 'sync/tasks-completed.html'
+    context_object_name = 'tasks'
+    paginate_by = settings.TASKS_PER_PAGE
+    messages = {
+        'filter': _('Viewing tasks filtered for source: <strong>{name}</strong>'),
+    }
+
+    def __init__(self, *args, **kwargs):
+        self.filter_source = None
+        super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
+        filter_by = request.GET.get('filter', '')
+        if filter_by:
+            try:
+                self.filter_source = Source.objects.get(pk=filter_by)
+            except Source.DoesNotExist:
+                self.filter_source = None
         return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return CompletedTask.objects.all().order_by('-run_at')
+
+    def get_queryset(self):
+        if self.filter_source:
+            return CompletedTask.objects.all().order_by('-run_at')
+            #tasks = []
+            #for task in CompletedTask.objects.all().order_by('-run_at'):
+            #    # ???
+            #q = Media.objects.filter(source=self.filter_source)
+        return CompletedTask.objects.all().order_by('-run_at')
+
+    def get_context_data(self, *args, **kwargs):
+        data = super().get_context_data(*args, **kwargs)
+        for task in data['tasks']:
+            if task.has_error():
+                error_message = get_error_message(task)
+                setattr(task, 'error_message', error_message)
+        data['message'] = ''
+        data['source'] = None
+        if self.filter_source:
+            message = str(self.messages.get('filter', ''))
+            data['message'] = message.format(name=self.filter_source.name)
+            data['source'] = self.filter_source
+        return data

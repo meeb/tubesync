@@ -221,6 +221,11 @@ class Source(models.Model):
         default=FALLBACK_NEXT_HD,
         help_text=_('What do do when media in your source resolution and codecs is not available')
     )
+    has_failed = models.BooleanField(
+        _('has failed'),
+        default=False,
+        help_text=_('Source has failed to index media')
+    )
 
     def __str__(self):
         return self.name
@@ -307,6 +312,8 @@ class Source(models.Model):
         # Account for nested playlists, such as a channel of playlists of playlists
         def _recurse_playlists(playlist):
             videos = []
+            if not playlist:
+                return videos
             entries = playlist.get('entries', [])
             for entry in entries:
                 if not entry:

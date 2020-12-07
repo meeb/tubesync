@@ -118,10 +118,12 @@ MAX_RUN_TIME = 1800                         # Maximum amount of time in seconds 
 BACKGROUND_TASK_RUN_ASYNC = True            # Run tasks async in the background
 BACKGROUND_TASK_ASYNC_THREADS = 2           # Number of async tasks to run at once
 BACKGROUND_TASK_PRIORITY_ORDERING = 'DESC'  # Process high priority tasks first
+COMPLETED_TASKS_DAYS_TO_KEEP = 30            # Number of days to keep completed tasks
 
 
 SOURCES_PER_PAGE = 36
 MEDIA_PER_PAGE = 36
+TASKS_PER_PAGE = 100
 
 
 MEDIA_THUMBNAIL_WIDTH = 430                 # Width in pixels to resize thumbnails to

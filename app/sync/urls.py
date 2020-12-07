@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceView,
                     SourceView, UpdateSourceView, DeleteSourceView, MediaView,
-                    MediaThumbView, MediaItemView, TasksView)
+                    MediaThumbView, MediaItemView, TasksView, CompletedTasksView)
 
 
 app_name = 'sync'
@@ -60,5 +60,9 @@ urlpatterns = [
     path('tasks',
          TasksView.as_view(),
          name='tasks'),
+
+    path('tasks-completed',
+         CompletedTasksView.as_view(),
+         name='tasks-completed'),
 
 ]

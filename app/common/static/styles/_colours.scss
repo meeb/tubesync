@@ -2,9 +2,9 @@ $colour-white: #ffffff;
 $colour-black: #000000;
 $colour-near-black: #011627;
 $colour-near-white: #fdfffc;
-$colour-light-blue: #2e8ac4;
+$colour-light-blue: #1e5c83;
 $colour-red: #e71d36;
-$colour-orange: #ef9912;
+$colour-orange: #ff9c00;
 
 $background-colour: $colour-near-white;
 $text-colour: $colour-near-black;
@@ -37,7 +37,7 @@ $form-help-text-colour: $colour-light-blue;
 $form-delete-button-background-colour: $colour-red;
 
 $collection-no-items-text-colour: $colour-near-black;
-$collection-text-colour: $colour-near-black;
+$collection-text-colour: $colour-light-blue;
 $collection-background-hover-colour: $colour-orange;
 $collection-text-hover-colour: $colour-near-white;
 
@@ -52,6 +52,9 @@ $box-error-text-colour: $colour-near-white;
 $infobox-background-colour: $colour-near-black;
 $infobox-text-colour: $colour-near-white;
 
+$errorbox-background-colour: $colour-red;
+$errorbox-text-colour: $colour-near-white;
+
 $pagination-background-colour: $colour-near-white;
 $pagination-text-colour: $colour-near-black;
 $pagination-border-colour: $colour-light-blue;
@@ -61,3 +64,5 @@ $pagination-border-hover-colour: $colour-light-blue;
 $pagination-current-background-colour: $colour-orange;
 $pagination-current-text-colour: $colour-near-white;
 $pagination-current-border-colour: $colour-orange;
+
+$error-text-colour: $colour-red;

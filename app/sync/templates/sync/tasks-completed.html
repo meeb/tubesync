@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block headtitle %}Tasks - Completed{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col s12">
+    <h1 class="truncate">Completed tasks</h1>
+  </div>
+</div>
+{% include 'infobox.html' with message=message %}
+<div class="row">
+  <div class="col s12">
+    <div class="collection">
+    {% for task in tasks %}
+      <span class="collection-item">
+      {% if task.has_error %}
+        <i class="fas fa-exclamation-triangle"></i> <strong>{{ task.verbose_name }}</strong><br>
+        Error: &quot;{{ task.error_message }}&quot;<br>
+        <i class="far fa-clock"></i> Task started at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+      {% else %}
+        <i class="fas fa-check"></i> <strong>{{ task.verbose_name }}</strong><br>
+        <i class="far fa-clock"></i> Task started at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+      {% endif %}
+      </span>
+    {% empty %}
+      <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There have been no completed tasks.</span>
+    {% endfor %}
+    </div>
+  </div>
+</div>
+{% include 'pagination.html' with pagination=sources.paginator filter=source.pk %}
+{% endblock %}

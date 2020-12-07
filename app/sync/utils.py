@@ -14,25 +14,31 @@ def validate_url(url, validator):
         Validate a URL against a dict of validation requirements. Returns an extracted
         part of the URL if the URL is valid, if invalid raises a ValidationError.
     '''
-    valid_scheme, valid_netloc, valid_path, valid_query, extract_parts = (
-        validator['scheme'], validator['domain'], validator['path_regex'],
-        validator['qs_args'], validator['extract_key'])
+    valid_scheme, valid_netloc, valid_path, invalid_paths, valid_query, \
+        extract_parts = (
+            validator['scheme'], validator['domain'], validator['path_regex'],
+            validator['path_must_not_match'], validator['qs_args'],
+            validator['extract_key']
+    )
     url_parts = urlsplit(str(url).strip())
     url_scheme = str(url_parts.scheme).strip().lower()
     if url_scheme != valid_scheme:
-        raise ValidationError(f'scheme "{url_scheme}" must be "{valid_scheme}"')
+        raise ValidationError(f'invalid scheme "{url_scheme}" must be "{valid_scheme}"')
     url_netloc = str(url_parts.netloc).strip().lower()
     if url_netloc != valid_netloc:
-        raise ValidationError(f'domain "{url_netloc}" must be "{valid_netloc}"')
+        raise ValidationError(f'invalid domain "{url_netloc}" must be "{valid_netloc}"')
     url_path = str(url_parts.path).strip()
     matches = re.findall(valid_path, url_path)
     if not matches:
-        raise ValidationError(f'path "{url_path}" must match "{valid_path}"')
+        raise ValidationError(f'invalid path "{url_path}" must match "{valid_path}"')
+    for invalid_path in invalid_paths:
+        if url_path.lower() == invalid_path.lower():
+            raise ValidationError(f'path "{url_path}" is not valid')
     url_query = str(url_parts.query).strip()
     url_query_parts = parse_qs(url_query)
     for required_query in valid_query:
         if required_query not in url_query_parts:
-            raise ValidationError(f'query string "{url_query}" must '
+            raise ValidationError(f'invalid query string "{url_query}" must '
                                   f'contain the parameter "{required_query}"')
     extract_from, extract_param = extract_parts
     extract_value = ''
@@ -76,7 +82,7 @@ def resize_image_to_height(image, width, height):
     if scaled_width > width:
         # Width too large, crop it
         delta = scaled_width - width
-        left, upper = (delta / 2), 0
+        left, upper = round(delta / 2), 0
         right, lower = (left + width), height
         image = image.crop((left, upper, right, lower))
     return image

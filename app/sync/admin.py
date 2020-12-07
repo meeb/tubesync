@@ -6,7 +6,7 @@ from .models import Source, Media
 class SourceAdmin(admin.ModelAdmin):
 
     ordering = ('-created',)
-    list_display = ('name',)
+    list_display = ('name', 'get_source_type_display', 'last_crawl', 'has_failed')
     readonly_fields = ('uuid', 'created')
     search_fields = ('uuid', 'key', 'name')
 
