@@ -41,9 +41,7 @@ class SourcesView(ListView):
     context_object_name = 'sources'
     paginate_by = settings.SOURCES_PER_PAGE
     messages = {
-        'source-created': _('Your new source has been added'),
         'source-deleted': _('Your selected source has been deleted.'),
-        'source-updated': _('Your selected source has been updated.'),
     }
 
     def __init__(self, *args, **kwargs):
@@ -235,7 +233,7 @@ class AddSourceView(CreateView):
         return initial
 
     def get_success_url(self):
-        url = reverse_lazy('sync:sources')
+        url = reverse_lazy('sync:source', kwargs={'pk': self.object.pk})
         return append_uri_params(url, {'message': 'source-created'})
 
 
@@ -243,9 +241,23 @@ class SourceView(DetailView):
 
     template_name = 'sync/source.html'
     model = Source
+    messages = {
+        'source-created': _('Your new source has been created'),
+        'source-updated': _('Your source has been updated.'),
+    }
+
+    def __init__(self, *args, **kwargs):
+        self.message = None
+        super().__init__(*args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        message_key = request.GET.get('message', '')
+        self.message = self.messages.get(message_key, '')
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
+        data['message'] = self.message
         data['errors'] = []
         for error in get_source_completed_tasks(self.object.pk, only_errors=True):
             error_message = get_error_message(error)
@@ -264,7 +276,7 @@ class UpdateSourceView(UpdateView):
               'source_acodec', 'prefer_60fps', 'prefer_hdr', 'fallback')
 
     def get_success_url(self):
-        url = reverse_lazy('sync:sources')
+        url = reverse_lazy('sync:source', kwargs={'pk': self.object.pk})
         return append_uri_params(url, {'message': 'source-updated'})
 
 
@@ -365,6 +377,19 @@ class MediaItemView(DetailView):
 
     template_name = 'sync/media-item.html'
     model = Media
+
+    def get_context_data(self, *args, **kwargs):
+        data = super().get_context_data(*args, **kwargs)
+        combined_exact, combined_format = self.object.get_best_combined_format()
+        audio_exact, audio_format = self.object.get_best_audio_format()
+        video_exact, video_format = self.object.get_best_video_format()
+        data['combined_exact'] = combined_exact
+        data['combined_format'] = combined_format
+        data['audio_exact'] = audio_exact
+        data['audio_format'] = audio_format
+        data['video_exact'] = video_exact
+        data['video_format'] = video_format
+        return data
 
 
 class TasksView(ListView):

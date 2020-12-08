@@ -18,6 +18,7 @@
     <a href="{% url 'sync:tasks-completed' %}?filter={{ source.pk }}" class="btn">View tasks<span class="hide-on-small-only"> linked to this source</span> <i class="far fa-fw fa-clock"></i></a>
   </div>
 </div>
+{% include 'infobox.html' with message=message %}
 {% if source.has_failed %}{% include 'errorbox.html' with message='This source has encountered permanent failures listed at the bottom of this page, check its settings' %}{% endif %}
 <div class="row">
   <div class="col s12">

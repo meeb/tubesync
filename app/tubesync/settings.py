@@ -130,6 +130,10 @@ MEDIA_THUMBNAIL_WIDTH = 430                 # Width in pixels to resize thumbnai
 MEDIA_THUMBNAIL_HEIGHT = 240                # Height in pixels to resize thumbnails to
 
 
+VIDEO_HEIGHT_CUTOFF = 360       # Smallest resolution in pixels permitted to download
+VIDEO_HEIGHT_IS_HD = 500        # Height in pixels to count as 'HD'
+
+
 YOUTUBE_DEFAULTS = {
     'no_color': True,       # Do not use colours in output
     'age_limit': 99,        # 'Age in years' to spoof

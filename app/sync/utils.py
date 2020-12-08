@@ -142,11 +142,21 @@ def parse_media_format(format_dict):
         acodec = None
     if acodec == 'NONE':
         acodec = None
+    try:
+        fps = int(format_dict.get('fps', 0))
+    except (ValueError, TypeError):
+        fps = 0
+    format_full = format_dict.get('format_note', '').strip().upper()
+    format_str = format_full[:-2] if format_full.endswith('60') else format_full
     return {
         'id': format_dict.get('format_id', ''),
+        'format': format_str,
+        'format_verbose': format_dict.get('format', ''),
         'height': format_dict.get('height', 0),
-        'is_60fps': format_dict.get('fps', 0) == 60,
-        'is_hdr': 'HDR' in format_dict.get('format', '').upper(),
         'vcodec': vcodec,
+        'vbr': format_dict.get('tbr', 0),
         'acodec': acodec,
+        'abr': format_dict.get('abr', 0),
+        'is_60fps': fps > 50,
+        'is_hdr': 'HDR' in format_dict.get('format', '').upper(),
     }
