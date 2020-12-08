@@ -13,18 +13,24 @@
   <div class="col s12">
     <div class="collection">
     {% for task in tasks %}
-      <span class="collection-item">
+      
       {% if task.has_error %}
+      <span class="collection-item">
         <i class="fas fa-exclamation-triangle"></i> <strong>{{ task.verbose_name }}</strong><br>
+        Source: &quot;{{ task.queue }}&quot;<br>
         Error: &quot;{{ task.error_message }}&quot;<br>
-        <i class="far fa-clock"></i> Task started at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+        <i class="far fa-clock"></i> Task ran at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+      </span>
       {% else %}
+      <span class="collection-item">
         <i class="fas fa-check"></i> <strong>{{ task.verbose_name }}</strong><br>
-        <i class="far fa-clock"></i> Task started at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+        Source: &quot;{{ task.queue }}&quot;<br>
+        <i class="far fa-clock"></i> Task ran at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+      </span>
       {% endif %}
       </span>
     {% empty %}
-      <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There have been no completed tasks.</span>
+      <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There have been no completed tasks{% if source %} that match the specified source filter{% endif %}.</span>
     {% endfor %}
     </div>
   </div>

@@ -434,12 +434,10 @@ class CompletedTasksView(ListView):
 
     def get_queryset(self):
         if self.filter_source:
-            return CompletedTask.objects.all().order_by('-run_at')
-            #tasks = []
-            #for task in CompletedTask.objects.all().order_by('-run_at'):
-            #    # ???
-            #q = Media.objects.filter(source=self.filter_source)
-        return CompletedTask.objects.all().order_by('-run_at')
+            q = CompletedTask.objects.filter(queue=str(self.filter_source.pk))
+        else:
+            q = CompletedTask.objects.all()
+        return q.order_by('-run_at')
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)

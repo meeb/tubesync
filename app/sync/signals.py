@@ -27,6 +27,7 @@ def source_pre_save(sender, instance, **kwargs):
         index_source_task(
             str(instance.pk),
             repeat=instance.index_schedule,
+            queue=str(instance.pk),
             verbose_name=verbose_name.format(instance.name)
         )
 
@@ -42,6 +43,7 @@ def source_post_save(sender, instance, created, **kwargs):
         index_source_task(
             str(instance.pk),
             repeat=instance.index_schedule,
+            queue=str(instance.pk),
             verbose_name=verbose_name.format(instance.name)
         )
 
@@ -82,10 +84,11 @@ def media_post_save(sender, instance, created, **kwargs):
         if thumbnail_url:
             log.info(f'Scheduling task to download thumbnail for: {instance.name} '
                      f'from: {thumbnail_url}')
-            verbose_name = _('Downloading media thumbnail for "{}')
+            verbose_name = _('Downloading media thumbnail for "{}"')
             download_media_thumbnail(
                 str(instance.pk),
                 thumbnail_url,
+                queue=str(instance.source.pk),
                 verbose_name=verbose_name.format(instance.name)
             )
 
