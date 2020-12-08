@@ -126,6 +126,11 @@ def seconds_to_timestr(seconds):
 
 
 def parse_media_format(format_dict):
+    '''
+        This parser primarily adapts the format dict returned by youtube-dl into a
+        standard form used by the matchers in matching.py. If youtube-dl changes
+        any internals, update it here.
+    '''
     vcodec_full = format_dict.get('vcodec', '')
     vcodec_parts = vcodec_full.split('.')
     if len(vcodec_parts) > 0:

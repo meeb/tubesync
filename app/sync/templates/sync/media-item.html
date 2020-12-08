@@ -41,6 +41,10 @@
         <td class="hide-on-small-only">Downloaded</td>
         <td><span class="hide-on-med-and-up">Downloaded<br></span><strong>{% if media.downloaded %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
       </tr>
+      <tr title="Can the media be downloaded">
+        <td class="hide-on-small-only">Can download</td>
+        <td><span class="hide-on-med-and-up">Can download<br></span><strong>{% if youtube_dl_format %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
       <tr title="The available media formats">
         <td class="hide-on-small-only">Available formats</td>
         <td><span class="hide-on-med-and-up">Available formats<br></span>
@@ -58,6 +62,10 @@
           Audio: <strong>{% if audio_format %}{{ audio_format }} {% if audio_exact %}(exact match){% else %}(fallback){% endif %}{% else %}No match{% endif %}</strong><br>
           Video: <strong>{% if video_format %}{{ video_format }} {% if video_exact %}(exact match){% else %}(fallback){% endif %}{% else %}No match{% endif %}
         </strong></td>
+      </tr>
+      <tr title="Format string passed to youtube-dl">
+        <td class="hide-on-small-only">youtube-dl format</td>
+        <td><span class="hide-on-med-and-up">youtube-dl format<br></span><strong>{% if youtube_dl_format %}{{ youtube_dl_format }}{% else %}No matching formats{% endif %}</strong></td>
       </tr>
     </table>
   </div>

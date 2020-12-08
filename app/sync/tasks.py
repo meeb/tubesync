@@ -33,7 +33,7 @@ def get_hash(task_name, pk):
 
 def map_task_to_instance(task):
     '''
-        Reverse-maps an scheduled backgrond task to an instance. Requires the task name
+        Reverse-maps a scheduled backgrond task to an instance. Requires the task name
         to be a known task function and the first argument to be a UUID. This is used
         because UUID's are incompatible with background_task's "creator" feature.
     '''
@@ -45,6 +45,17 @@ def map_task_to_instance(task):
         Source: 'sync:source',
         Media: 'sync:media-item',
     }
+    # If the task has a UUID set in its .queue it's probably a link to a Source
+    if task.queue:
+        try:
+            queue_uuid = uuid.UUID(task.queue)
+            try:
+                return Source.objects.get(pk=task.queue)
+            except Source.DoesNotExist:
+                pass
+        except (TypeError, ValueError, AttributeError):
+            pass
+    # Unpack 
     task_func, task_args_str = task.task_name, task.task_params
     model = TASK_MAP.get(task_func, None)
     if not model:
@@ -75,7 +86,8 @@ def map_task_to_instance(task):
 
 def get_error_message(task):
     '''
-        Extract an error message from a failed task.
+        Extract an error message from a failed task. This is the last line of the
+        last_error field with the method name removed.
     '''
     if not task.has_error():
         return ''
@@ -92,8 +104,7 @@ def get_source_completed_tasks(source_id, only_errors=False):
     '''
         Returns a queryset of CompletedTask objects for a source by source ID.
     '''
-    source_hash = get_hash('sync.tasks.index_source_task', source_id)
-    q = {'task_hash': source_hash}
+    q = {'queue': source_id}
     if only_errors:
         q['failed_at__isnull'] = False
     return CompletedTask.objects.filter(**q).order_by('-failed_at')
@@ -163,7 +174,7 @@ def index_source_task(source_id):
 @background(schedule=0)
 def download_media_thumbnail(media_id, url):
     '''
-        Downloads an image from a URL and saves it as a local thumbnail attached to a
+        Downloads an image from a URL and save it as a local thumbnail attached to a
         Media object.
     '''
     try:

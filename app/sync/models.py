@@ -8,6 +8,8 @@ from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from .youtube import get_media_info as get_youtube_media_info
 from .utils import seconds_to_timestr, parse_media_format
+from .matching import (get_best_combined_format, get_best_audio_format, 
+                       get_best_video_format)
 
 
 class Source(models.Model):
@@ -259,7 +261,7 @@ class Source(models.Model):
             depending on audio codec.
         '''
         if self.is_audio:
-            if self.source_acodec == self.SOURCE_ACODEC_M4A:
+            if self.source_acodec == self.SOURCE_ACODEC_MP4A:
                 return 'm4a'
             elif self.source_acodec == self.SOURCE_ACODEC_OPUS:
                 return 'ogg'
@@ -284,9 +286,9 @@ class Source(models.Model):
         else:
             vc = self.source_vcodec
         ac = self.source_acodec
-        f = '60FPS' if self.prefer_60fps else ''
-        h = 'HDR' if self.prefer_hdr else ''
-        return f'{self.source_resolution} (video:{vc}, audio:{ac}) {f} {h}'.strip()
+        f = ' 60FPS' if self.is_video and self.prefer_60fps else ''
+        h = ' HDR' if self.is_video and self.prefer_hdr else ''
+        return f'{self.source_resolution} (video:{vc}, audio:{ac}){f}{h}'.strip()
 
     @property
     def directory_path(self):
@@ -506,250 +508,46 @@ class Media(models.Model):
             yield parse_media_format(fmt)
 
     def get_best_combined_format(self):
-        '''
-            Attempts to see if there is a single, combined audio and video format that
-            exactly matches the source requirements. This is used over separate audio
-            and video formats if possible. Combined formats are the easiest to check
-            for as they must exactly match the source profile be be valid.
-        '''
-        for fmt in self.iter_formats():
-            # Check height matches
-            if self.source.source_resolution.strip().upper() != fmt['format']:
-                continue
-            # Check the video codec matches
-            if self.source.source_vcodec != fmt['vcodec']:
-                continue
-            # Check the audio codec matches
-            if self.source.source_acodec != fmt['acodec']:
-                continue
-            # if the source prefers 60fps, check for it
-            if self.source.prefer_60fps:
-                if not fmt['is_60fps']:
-                    continue
-            # If the source prefers HDR, check for it
-            if self.source.prefer_hdr:
-                if not fmt['is_hdr']:
-                    continue
-            # If we reach here, we have a combined match!
-            return True, fmt['id']
-        return False, False
+        return get_best_combined_format(self)
 
     def get_best_audio_format(self):
-        '''
-            Finds the best match for the source required audio format. If the source
-            has a 'fallback' of fail this can return no match.
-        '''
-        # Order all audio-only formats by bitrate
-        audio_formats = []
-        for fmt in self.iter_formats():
-            # If the format has a video stream, skip it
-            if fmt['vcodec']:
-                continue
-            audio_formats.append(fmt)
-        audio_formats = list(reversed(sorted(audio_formats, key=lambda k: k['abr'])))
-        if not audio_formats:
-            # Media has no audio formats at all
-            return False, False
-        # Find the highest bitrate audio format with a matching codec
-        for fmt in audio_formats:
-            if self.source.source_acodec == fmt['acodec']:
-                # Matched!
-                return True, fmt['id']
-        # No codecs matched
-        if self.source.can_fallback:
-            # Can fallback, find the next highest bitrate non-matching codec
-            return False, audio_formats[0]
-        else:
-            # Can't fallback
-            return False, False
-
+        return get_best_audio_format(self)
 
     def get_best_video_format(self):
-        '''
-            Finds the best match for the source required video format. If the source
-            has a 'fallback' of fail this can return no match. Resolution is treated
-            as the most important factor to match.
-        '''
-        min_height = getattr(settings, 'VIDEO_HEIGHT_CUTOFF', 360)
-        fallback_hd_cutoff = getattr(settings, 'VIDEO_HEIGHT_IS_HD', 500)
-        # Filter video-only formats by resolution that matches the source
-        video_formats = []
-        for fmt in self.iter_formats():
-            # If the format has an audio stream, skip it
-            if fmt['acodec']:
-                continue
-            if self.source.source_resolution.strip().upper() == fmt['format']:
-                video_formats.append(fmt)
-        # Check we matched some streams
-        if not video_formats:
-            # No streams match the requested resolution, see if we can fallback
-            if self.source.can_fallback:
-                # Find the next-best format matches by height
-                for fmt in self.iter_formats():
-                    # If the format has an audio stream, skip it
-                    if fmt['acodec']:
-                        continue
-                    if (fmt['height'] <= self.source.source_resolution_height and 
-                        fmt['height'] >= min_height):
-                        video_formats.append(fmt)
-            else:
-                # Can't fallback
-                return False, False
-        video_formats = list(reversed(sorted(video_formats, key=lambda k: k['height'])))
-        if not video_formats:
-            # Still no matches
-            return False, False
-        exact_match, best_match = None, None
-        # Of our filtered video formats, check for resolution + codec + hdr + fps match
-        if self.source.prefer_60fps and self.source.prefer_hdr:
-            for fmt in video_formats:
-                # Check for an exact match
-                if (self.source.source_resolution.strip().upper() == fmt['format'] and
-                    self.source.source_vcodec == fmt['vcodec'] and 
-                    fmt['is_hdr'] and
-                    fmt['is_60fps']):
-                    # Exact match
-                    exact_match, best_match = True, fmt
-                    break
-            if self.source.can_fallback:
-                if not best_match:
-                    for fmt in video_formats:
-                        # Check for a codec, hdr and fps match but drop the resolution
-                        if (self.source.source_vcodec == fmt['vcodec'] and 
-                            fmt['is_hdr'] and fmt['is_60fps']):
-                            # Close match
-                            exact_match, best_match = False, fmt
-                            break
-                if not best_match:
-                    for fmt in video_formats:
-                        # Check for hdr and fps match but drop the resolution and codec
-                        if fmt['is_hdr'] and fmt['is_60fps']:
-                            exact_match, best_match = False, fmt
-                            break
-                if not best_match:
-                    for fmt in video_formats:
-                        # Check for fps match but drop the resolution and codec and hdr
-                        if fmt['is_hdr'] and fmt['is_60fps']:
-                            exact_match, best_match = False, fmt
-                            break
-                if not best_match:
-                    # Match the highest resolution
-                    exact_match, best_match = False, video_formats[0]
-        # Check for resolution + codec + fps match
-        if self.source.prefer_60fps and not self.source.prefer_hdr:
-            for fmt in video_formats:
-                # Check for an exact match
-                if (self.source.source_resolution.strip().upper() == fmt['format'] and
-                    self.source.source_vcodec == fmt['vcodec'] and 
-                    fmt['is_60fps']):
-                    # Exact match
-                    exact_match, best_match = True, fmt
-                    break
-            if self.source.can_fallback:
-                if not best_match:
-                    for fmt in video_formats:
-                        # Check for a codec and fps match but drop the resolution
-                        if (self.source.source_vcodec == fmt['vcodec'] and 
-                            fmt['is_60fps']):
-                            exact_match, best_match = False, fmt
-                            break
-                if not best_match:
-                    for fmt in video_formats:
-                        # Check for an fps match but drop the resolution and codec
-                        if fmt['is_60fps']:
-                            exact_match, best_match = False, fmt
-                            break
-                if not best_match:
-                    # Match the highest resolution
-                    exact_match, best_match = False, video_formats[0]
-        # Check for resolution + codec + hdr
-        if self.source.prefer_hdr and not self.source.prefer_60fps:
-            for fmt in video_formats:
-                # Check for an exact match
-                if (self.source.source_resolution.strip().upper() == fmt['format'] and
-                    self.source.source_vcodec == fmt['vcodec'] and 
-                    fmt['is_hdr']):
-                    # Exact match
-                    exact_match, best_match = True, fmt
-                    break
-            if self.source.can_fallback:
-                if not best_match:
-                    for fmt in video_formats:
-                        # Check for a codec and hdr match but drop the resolution
-                        if (self.source.source_vcodec == fmt['vcodec'] and 
-                            fmt['is_hdr']):
-                            exact_match, best_match = True, fmt
-                            break
-                if not best_match:
-                    for fmt in video_formats:
-                        # Check for an hdr match but drop the resolution and codec
-                        if fmt['is_hdr']:
-                            exact_match, best_match = False, fmt
-                            break
-                if not best_match:
-                    # Match the highest resolution
-                    exact_match, best_match = False, video_formats[0]
-        # check for resolution + codec
-        if not self.source.prefer_hdr and not self.source.prefer_60fps:
-            for fmt in video_formats:
-                # Check for an exact match
-                if (self.source.source_resolution.strip().upper() == fmt['format'] and
-                    self.source.source_vcodec == fmt['vcodec'] and
-                    not fmt['is_60fps']):
-                    # Exact match
-                    exact_match, best_match = True, fmt
-                    break
-            if self.source.can_fallback:
-                if not best_match:
-                    for fmt in video_formats:
-                        # Check for a codec match without 60fps and drop the resolution
-                        if (self.source.source_vcodec == fmt['vcodec'] and
-                            not fmt['is_60fps']):
-                            exact_match, best_match = False, fmt
-                            break
-                if not best_match:
-                    for fmt in video_formats:
-                        # Check for a codec match but drop the resolution
-                        if self.source.source_vcodec == fmt['vcodec']:
-                            # Close match
-                            exact_match, best_match = False, fmt
-                            break
-                if not best_match:
-                    # Match the highest resolution
-                    exact_match, best_match = False, video_formats[0]
-        # See if we found a match
-        if best_match:
-            # Final check to see if the match we found was good enough
-            if exact_match:
-                return True, best_match['id']
-            elif self.source.can_fallback:
-                # Allow the fallback if it meets requirements
-                if (self.source.fallback == self.source.FALLBACK_NEXT_BEST_HD and
-                    best_match['height'] >= fallback_hd_cutoff):
-                    return False, best_match['id']
-                elif self.source.fallback == self.source.FALLBACK_NEXT_BEST:
-                    return False, best_match['id']
-        # Nope, failed to find match
-        return False, False
-
+        return get_best_video_format(self)
 
     def get_format_str(self):
         '''
             Returns a youtube-dl compatible format string for the best matches
             combination of source requirements and available audio and video formats.
+            Returns boolean False if there is no valid downloadable combo.
         '''
         if self.source.is_audio:
-            audio_format = self.get_best_audio_format()
-            return 'a'
-        else:
-            combined_format = self.get_best_combined_format()
-            if combined_format:
-                return 'c'
+            audio_match, audio_format = self.get_best_audio_format()
+            if audio_format:
+                return str(audio_format)
             else:
-                audio_format = self.get_best_audio_format()
-                video_format = self.get_best_video_format()
-                return 'a+v'
+                return False
+        else:
+            combined_match, combined_format = self.get_best_combined_format()
+            if combined_format:
+                return str(combined_format)
+            else:
+                audio_match, audio_format = self.get_best_audio_format()
+                video_match, video_format = self.get_best_video_format()
+                if audio_format and video_format:
+                    return f'{audio_format}+{video_format}'
+                else:
+                    return False
         return False
+
+    @property
+    def can_download(self):
+        '''
+            Returns boolean True if the media can be downloaded, that is, the media
+            has stored formats which are compatible with the source requirements.
+        '''
+        return self.get_format_str() is not False
 
     @property
     def loaded_metadata(self):

@@ -23,7 +23,7 @@ from . import youtube
 
 class DashboardView(TemplateView):
     '''
-        The dashboard shows non-interactive totals and summaries, nothing more.
+        The dashboard shows non-interactive totals and summaries.
     '''
 
     template_name = 'sync/dashboard.html'
@@ -349,8 +349,8 @@ class MediaView(ListView):
 
 class MediaThumbView(DetailView):
     '''
-        Shows a media thumbnail. Whitenose doesn't support post-start media image
-        serving and the images here are pretty small, just serve them manually. This
+        Shows a media thumbnail. Whitenoise doesn't support post-start media image
+        serving and the images here are pretty small so just serve them manually. This
         isn't fast, but it's not likely to be a serious bottleneck.
     '''
 
@@ -389,12 +389,13 @@ class MediaItemView(DetailView):
         data['audio_format'] = audio_format
         data['video_exact'] = video_exact
         data['video_format'] = video_format
+        data['youtube_dl_format'] = self.object.get_format_str()
         return data
 
 
 class TasksView(ListView):
     '''
-        A list of tasks queued to be completed. Typically, this is scraping for new
+        A list of tasks queued to be completed. This is, for example, scraping for new
         media or downloading media.
     '''
 

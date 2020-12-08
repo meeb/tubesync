@@ -49,7 +49,7 @@ def source_post_save(sender, instance, created, **kwargs):
 
 
 @receiver(pre_delete, sender=Source)
-def source_post_delete(sender, instance, **kwargs):
+def source_pre_delete(sender, instance, **kwargs):
     # Triggered before a source is deleted, delete all media objects to trigger
     # the Media models post_delete signal
     for media in Media.objects.filter(source=instance):
@@ -66,7 +66,7 @@ def source_post_delete(sender, instance, **kwargs):
 
 @receiver(task_failed, sender=Task)
 def task_task_failed(sender, task_id, completed_task, **kwargs):
-    # Triggered after a source fails by reaching its max retry attempts
+    # Triggered after a task fails by reaching its max retry attempts
     obj, url = map_task_to_instance(completed_task)
     if isinstance(obj, Source):
         log.error(f'Permanent failure for source: {obj} task: {completed_task}')
@@ -78,7 +78,7 @@ def task_task_failed(sender, task_id, completed_task, **kwargs):
 def media_post_save(sender, instance, created, **kwargs):
     # Triggered after media is saved
     if created:
-        # If the media is newly created fire a task off to download its thumbnail
+        # If the media is newly created start a task to download its thumbnail
         metadata = instance.loaded_metadata
         thumbnail_url = metadata.get('thumbnail', '')
         if thumbnail_url:
