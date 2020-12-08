@@ -51,7 +51,7 @@ def get_best_audio_format(media):
     audio_formats = []
     for fmt in media.iter_formats():
         # If the format has a video stream, skip it
-        if fmt['vcodec']:
+        if fmt['vcodec'] is not None:
             continue
         audio_formats.append(fmt)
     audio_formats = list(reversed(sorted(audio_formats, key=lambda k: k['abr'])))
@@ -86,7 +86,7 @@ def get_best_video_format(media):
     video_formats = []
     for fmt in media.iter_formats():
         # If the format has an audio stream, skip it
-        if fmt['acodec']:
+        if fmt['acodec'] is not None:
             continue
         if media.source.source_resolution.strip().upper() == fmt['format']:
             video_formats.append(fmt)
@@ -97,7 +97,7 @@ def get_best_video_format(media):
             # Find the next-best format matches by height
             for fmt in media.iter_formats():
                 # If the format has an audio stream, skip it
-                if fmt['acodec']:
+                if fmt['acodec'] is not None:
                     continue
                 if (fmt['height'] <= media.source.source_resolution_height and 
                     fmt['height'] >= min_height):
@@ -106,8 +106,6 @@ def get_best_video_format(media):
             # Can't fallback
             return False, False
     video_formats = list(reversed(sorted(video_formats, key=lambda k: k['height'])))
-    print('height', media.source.source_resolution_height)
-    print('video_formats', video_formats)
     if not video_formats:
         # Still no matches
         return False, False

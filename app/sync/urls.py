@@ -51,7 +51,7 @@ urlpatterns = [
          MediaThumbView.as_view(),
          name='media-thumb'),
 
-    path('media-item/<uuid:pk>',
+    path('media/<uuid:pk>',
          MediaItemView.as_view(),
          name='media-item'),
 

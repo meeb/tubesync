@@ -110,8 +110,8 @@ def get_source_completed_tasks(source_id, only_errors=False):
     return CompletedTask.objects.filter(**q).order_by('-failed_at')
 
 
-def delete_index_source_task(source_id):
-    Task.objects.drop_task('sync.tasks.index_source_task', args=(source_id,))
+def delete_task(task_name, source_id):
+    return Task.objects.filter(task_name=task_name, queue=str(source_id)).delete()
 
 
 def cleanup_completed_tasks():

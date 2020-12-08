@@ -109,7 +109,7 @@ class ValidateSourceView(FormView):
             'scheme': 'https',
             'domain': 'www.youtube.com',
             'path_regex': '^\/(c\/)?([^\/]+)$',
-            'path_must_not_match': ('/playlist',),
+            'path_must_not_match': ('/playlist', '/c/playlist'),
             'qs_args': [],
             'extract_key': ('path_regex', 1),
             'example': 'https://www.youtube.com/SOMECHANNEL'
