@@ -53,7 +53,6 @@ def download_media(url, media_format, extension, output_file):
         'outtmpl': output_file,
         'quiet': True,
     })
-    print(opts)
     with youtube_dl.YoutubeDL(opts) as y:
         try:
             return y.download([url])

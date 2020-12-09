@@ -379,6 +379,10 @@ class Media(models.Model):
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'title',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'title',
         },
+        'thumbnail': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'thumbnail',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'thumbnail',
+        },
         'description': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'description',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'description',
@@ -598,6 +602,11 @@ class Media(models.Model):
     @property
     def title(self):
         field = self.get_metadata_field('title')
+        return self.loaded_metadata.get(field, '').strip()
+
+    @property
+    def thumbnail(self):
+        field = self.get_metadata_field('thumbnail')
         return self.loaded_metadata.get(field, '').strip()
 
     @property

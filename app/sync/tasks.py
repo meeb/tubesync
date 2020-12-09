@@ -74,7 +74,6 @@ def map_task_to_instance(task):
         instance = model.objects.get(pk=instance_uuid)
         return instance, url
     except model.DoesNotExist:
-        print('!!!', model, instance_uuid)
         return None, None
 
 
@@ -108,8 +107,8 @@ def delete_task_by_source(task_name, source_id):
     return Task.objects.filter(task_name=task_name, queue=str(source_id)).delete()
 
 
-def delete_task_by_media(task_name, media_id):
-    return Task.objects.drop_task(task_name, args=(str(media_id),))
+def delete_task_by_media(task_name, args):
+    return Task.objects.drop_task(task_name, args=args)
 
 
 def cleanup_completed_tasks():

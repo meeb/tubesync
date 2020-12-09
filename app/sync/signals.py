@@ -85,8 +85,7 @@ def media_post_save(sender, instance, created, **kwargs):
     # Triggered after media is saved
     if created:
         # If the media is newly created start a task to download its thumbnail
-        metadata = instance.loaded_metadata
-        thumbnail_url = metadata.get('thumbnail', '')
+        thumbnail_url = instance.thumbnail
         if thumbnail_url:
             log.info(f'Scheduling task to download thumbnail for: {instance.name} '
                      f'from: {thumbnail_url}')
@@ -109,7 +108,7 @@ def media_post_save(sender, instance, created, **kwargs):
             instance.save()
     # If the media has not yet been downloaded schedule it to be downloaded
     if not instance.downloaded:
-        delete_task_by_media('sync.tasks.download_media', instance.pk)
+        delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
         verbose_name = _('Downloading media for "{}"')
         download_media(
             str(instance.pk),
@@ -122,7 +121,11 @@ def media_post_save(sender, instance, created, **kwargs):
 def media_pre_delete(sender, instance, **kwargs):
     # Triggered before media is deleted, delete any scheduled tasks
     log.info(f'Deleting tasks for media: {instance.name}')
-    delete_task_by_media('sync.tasks.download_media_thumbnail', instance.pk)
+    delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
+    thumbnail_url = instance.thumbnail
+    if thumbnail_url:
+        delete_task_by_media('sync.tasks.download_media_thumbnail',
+                             (str(instance.pk), thumbnail_url))
     # Delete media thumbnail if it exists
     if instance.thumb:
         log.info(f'Deleting thumbnail for: {instance} path: {instance.thumb.path}')

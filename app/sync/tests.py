@@ -291,6 +291,9 @@ class FrontEndTestCase(TestCase):
         found_thumbnail_task1 = False
         found_thumbnail_task2 = False
         found_thumbnail_task3 = False
+        found_download_task1 = False
+        found_download_task2 = False
+        found_download_task3 = False
         q = {'queue': str(test_source.pk),
              'task_name': 'sync.tasks.download_media_thumbnail'}
         for task in Task.objects.filter(**q):
@@ -300,9 +303,21 @@ class FrontEndTestCase(TestCase):
                 found_thumbnail_task2 = True
             if test_media3_pk in task.task_params:
                 found_thumbnail_task3 = True
+        q = {'queue': str(test_source.pk),
+             'task_name': 'sync.tasks.download_media'}
+        for task in Task.objects.filter(**q):
+            if test_media1_pk in task.task_params:
+                found_download_task1 = True
+            if test_media2_pk in task.task_params:
+                found_download_task2 = True
+            if test_media3_pk in task.task_params:
+                found_download_task3 = True
         self.assertTrue(found_thumbnail_task1)
         self.assertTrue(found_thumbnail_task2)
         self.assertTrue(found_thumbnail_task3)
+        self.assertTrue(found_download_task1)
+        self.assertTrue(found_download_task2)
+        self.assertTrue(found_download_task3)
         # Check the media is listed on the media overview page
         response = c.get('/media')
         self.assertEqual(response.status_code, 200)
@@ -329,8 +344,12 @@ class FrontEndTestCase(TestCase):
         response = c.get(f'/media/{test_media3_pk}')
         self.assertEqual(response.status_code, 404)
         # Confirm any tasks have been deleted
-        tasks = Task.objects.filter(**q)
-        self.assertFalse(tasks)
+        q = {'task_name': 'sync.tasks.download_media_thumbnail'}
+        download_media_thumbnail_tasks = Task.objects.filter(**q)
+        self.assertFalse(download_media_thumbnail_tasks)
+        q = {'task_name': 'sync.tasks.download_media'}
+        download_media_tasks = Task.objects.filter(**q)
+        self.assertFalse(download_media_tasks)
 
     def test_tasks(self):
         # Tasks overview page
