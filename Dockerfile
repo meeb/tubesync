@@ -29,8 +29,8 @@ ARG default_uid="10000"
 ARG default_gid="10000"
 
 # Copy app
-COPY app /app
-COPY app/tubesync/local_settings.py.container /app/tubesync/local_settings.py
+COPY tubesync /app
+COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
 
 # Append container bundled software versions
 RUN echo "ffmpeg_version = '${FFMPEG_VERSION}-static'" >> /app/common/third_party_versions.py

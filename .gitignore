@@ -60,9 +60,9 @@ coverage.xml
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
-/app/static/
-/app/media/
-/app/downloads/
+/tubesync/static/
+/tubesync/media/
+/tubesync/downloads/
 
 # Flask stuff:
 instance/
