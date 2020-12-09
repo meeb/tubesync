@@ -4,6 +4,7 @@
 '''
 
 
+import os
 import json
 import math
 import uuid
@@ -18,7 +19,7 @@ from django.db.utils import IntegrityError
 from background_task import background
 from background_task.models import Task, CompletedTask
 from common.logger import log
-from common.errors import NoMediaException
+from common.errors import NoMediaException, DownloadFailedException
 from .models import Source, Media
 from .utils import get_remote_image, resize_image_to_height
 
@@ -39,23 +40,14 @@ def map_task_to_instance(task):
     '''
     TASK_MAP = {
         'sync.tasks.index_source_task': Source,
+        'sync.tasks.check_source_directory_exists': Source,
         'sync.tasks.download_media_thumbnail': Media,
+        'sync.tasks.download_media': Media,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
         Media: 'sync:media-item',
     }
-    # If the task has a UUID set in its .queue it's probably a link to a Source
-    if task.queue:
-        try:
-            queue_uuid = uuid.UUID(task.queue)
-            try:
-                url = MODEL_URL_MAP.get(Source, None)
-                return Source.objects.get(pk=task.queue), url
-            except Source.DoesNotExist:
-                pass
-        except (TypeError, ValueError, AttributeError):
-            pass
     # Unpack 
     task_func, task_args_str = task.task_name, task.task_params
     model = TASK_MAP.get(task_func, None)
@@ -82,6 +74,7 @@ def map_task_to_instance(task):
         instance = model.objects.get(pk=instance_uuid)
         return instance, url
     except model.DoesNotExist:
+        print('!!!', model, instance_uuid)
         return None, None
 
 
@@ -111,8 +104,12 @@ def get_source_completed_tasks(source_id, only_errors=False):
     return CompletedTask.objects.filter(**q).order_by('-failed_at')
 
 
-def delete_task(task_name, source_id):
+def delete_task_by_source(task_name, source_id):
     return Task.objects.filter(task_name=task_name, queue=str(source_id)).delete()
+
+
+def delete_task_by_media(task_name, media_id):
+    return Task.objects.drop_task(task_name, args=(str(media_id),))
 
 
 def cleanup_completed_tasks():
@@ -172,16 +169,37 @@ def index_source_task(source_id):
     cleanup_completed_tasks()
 
 
+
+@background(schedule=0)
+def check_source_directory_exists(source_id):
+    '''
+        Checks the output directory for a source exists and is writable, if it does
+        not attempt to create it. This is a task so if there are permission errors
+        they are logged as failed tasks.
+    '''
+    try:
+        source = Source.objects.get(pk=source_id)
+    except Source.DoesNotExist:
+        # Task triggered but the Source has been deleted, delete the task
+        delete_index_source_task(source_id)
+        return
+    # Check the source output directory exists
+    if not source.directory_exists():
+        # Try and create it
+        log.info(f'Creating directory: {source.directory_path}')
+        source.make_directory()
+
+
 @background(schedule=0)
 def download_media_thumbnail(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
-        Media object.
+        Media instance.
     '''
     try:
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist:
-        # Task triggered but the media no longer exists, ignore task
+        # Task triggered but the media no longer exists, do nothing
         return
     width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
     height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
@@ -203,3 +221,51 @@ def download_media_thumbnail(media_id, url):
     )
     log.info(f'Saved thumbnail for: {media} from: {url}')
     return True
+
+
+@background(schedule=0)
+def download_media(media_id):
+    '''
+        Downloads the media to disk and attaches it to the Media instance.
+    '''
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist:
+        # Task triggered but the media no longer exists, do nothing
+        return
+    log.info(f'Downloading media: {media} (UUID: {media.pk}) to: {media.filepath}')
+    format_str, container = media.download_media()
+    if os.path.exists(media.filepath):
+        # Media has been downloaded successfully
+        log.info(f'Successfully downloaded media: {media} (UUID: {media.pk}) to: '
+                 f'{media.filepath}')
+        # Link the media file to the object and update info about the download
+        media.media_file.name = str(media.filepath)
+        media.downloaded = True
+        if '+' in format_str:
+            vformat_code, aformat_code = format_str.split('+')
+            aformat = media.get_format_by_code(aformat_code)
+            vformat = media.get_format_by_code(vformat_code)
+            media.downloaded_audio_codec = aformat['acodec']
+            media.downloaded_video_codec = vformat['vcodec']
+            media.downloaded_container = container
+            media.downloaded_fps = vformat['fps']
+            media.downloaded_hdr = vformat['is_hdr']
+            media.downloaded_filesize = os.path.getsize(media.filepath)
+        else:
+            cformat_code = format_str
+            cformat = media.get_format_by_code(cformat_code)
+            media.downloaded_audio_codec = cformat['acodec']
+            media.downloaded_video_codec = cformat['vcodec']
+            media.downloaded_container = container
+            media.downloaded_fps = cformat['fps']
+            media.downloaded_hdr = cformat['is_hdr']
+            media.downloaded_filesize = os.path.getsize(media.filepath)
+        media.save()
+    else:
+        # Expected file doesn't exist on disk
+        err = (f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
+               f'expected outfile does not exist: {media.filepath}')
+        log.error(err)
+        # Raising an error here triggers the task to be re-attempted (or fail)
+        raise DownloadFailedException(err)

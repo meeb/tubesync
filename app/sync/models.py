@@ -1,3 +1,4 @@
+import os
 import uuid
 import json
 from datetime import datetime
@@ -6,7 +7,9 @@ from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
-from .youtube import get_media_info as get_youtube_media_info
+from common.errors import NoFormatException
+from .youtube import (get_media_info as get_youtube_media_info,
+                      download_media as download_youtube_media)
 from .utils import seconds_to_timestr, parse_media_format
 from .matching import (get_best_combined_format, get_best_audio_format, 
                        get_best_video_format)
@@ -297,6 +300,13 @@ class Source(models.Model):
         else:
             return settings.SYNC_VIDEO_ROOT / self.directory
 
+    def make_directory(self):
+        return os.makedirs(self.directory_path, exist_ok=True)
+
+    def directory_exists(self):
+        return (os.path.isdir(self.directory_path) and
+                os.access(self.directory_path, os.W_OK))
+
     @property
     def key_field(self):
         return self.KEY_FIELD.get(self.source_type, '')
@@ -342,6 +352,10 @@ def get_media_thumb_path(instance, filename):
     filename = f'{fileid.lower()}.jpg'
     prefix = fileid[:2]
     return Path('thumbs') / prefix / filename
+
+
+def get_media_file_path(instance, filename):
+    return instance.filepath
 
 
 class Media(models.Model):
@@ -414,7 +428,7 @@ class Media(models.Model):
     thumb = models.ImageField(
         _('thumb'),
         upload_to=get_media_thumb_path,
-        max_length=100,
+        max_length=200,
         blank=True,
         null=True,
         width_field='thumb_width',
@@ -444,6 +458,14 @@ class Media(models.Model):
         db_index=True,
         default=False,
         help_text=_('Media has a matching format and can be downloaded')
+    )
+    media_file = models.FileField(
+        _('media file'),
+        upload_to=get_media_file_path,
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text=_('Media file')
     )
     downloaded = models.BooleanField(
         _('downloaded'),
@@ -501,6 +523,9 @@ class Media(models.Model):
     class Meta:
         verbose_name = _('Media')
         verbose_name_plural = _('Media')
+        unique_together = (
+            ('source', 'key'),
+        )
 
     def get_metadata_field(self, field):
         fields = self.METADATA_FIELDS.get(field, {})
@@ -539,9 +564,18 @@ class Media(models.Model):
                 audio_match, audio_format = self.get_best_audio_format()
                 video_match, video_format = self.get_best_video_format()
                 if audio_format and video_format:
-                    return f'{audio_format}+{video_format}'
+                    return f'{video_format}+{audio_format}'
                 else:
                     return False
+        return False
+    
+    def get_format_by_code(self, format_code):
+        '''
+            Matches a format code, such as '22', to a processed format dict.
+        '''
+        for fmt in self.iter_formats():
+            if format_code == fmt['id']:
+                return fmt
         return False
 
     @property
@@ -549,13 +583,17 @@ class Media(models.Model):
         try:
             return json.loads(self.metadata)
         except Exception as e:
-            print('!!!!', e)
             return {}
 
     @property
     def url(self):
         url = self.URLS.get(self.source.source_type, '')
         return url.format(key=self.key)
+
+    @property
+    def description(self):
+        field = self.get_metadata_field('description')
+        return self.loaded_metadata.get(field, '').strip()
 
     @property
     def title(self):
@@ -599,11 +637,31 @@ class Media(models.Model):
         dateobj = upload_date if upload_date else self.created
         datestr = dateobj.strftime('%Y-%m-%d')
         source_name = slugify(self.source.name)
-        name = slugify(self.name.replace('&', 'and').replace('+', 'and'))
+        name = slugify(self.name.replace('&', 'and').replace('+', 'and'))[:50]
+        key = self.key.strip()
+        fmt = self.source.source_resolution.lower()
+        codecs = []
+        vcodec = self.source.source_vcodec.lower()
+        acodec = self.source.source_acodec.lower()
+        if vcodec:
+            codecs.append(vcodec)
+        if acodec:
+            codecs.append(acodec)
+        codecs = '-'.join(codecs)
         ext = self.source.extension
-        fn = f'{datestr}_{source_name}_{name}'[:100]
-        return f'{fn}.{ext}'
+        return f'{datestr}_{source_name}_{name}_{key}-{fmt}-{codecs}.{ext}'
 
     @property
     def filepath(self):
         return self.source.directory_path / self.filename
+
+    def download_media(self):
+        format_str = self.get_format_str()
+        if not format_str:
+            raise NoFormatException(f'Cannot download, media "{self.pk}" ({media}) has '
+                                    f'no valid format available')
+        # Download the media with youtube-dl
+        download_youtube_media(self.url, format_str, self.source.extension,
+                               str(self.filepath))
+        # Return the download paramaters
+        return format_str, self.source.extension

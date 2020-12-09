@@ -40,3 +40,23 @@ def get_media_info(url):
         except youtube_dl.utils.DownloadError as e:
             raise YouTubeError(f'Failed to extract_info for "{url}": {e}') from e
     return response
+
+
+def download_media(url, media_format, extension, output_file):
+    '''
+        Downloads a YouTube URL to a file on disk.
+    '''
+    opts = copy(_defaults)
+    opts.update({
+        'format': media_format,
+        'merge_output_format': extension,
+        'outtmpl': output_file,
+        'quiet': True,
+    })
+    print(opts)
+    with youtube_dl.YoutubeDL(opts) as y:
+        try:
+            return y.download([url])
+        except youtube_dl.utils.DownloadError as e:
+            raise YouTubeError(f'Failed to download for "{url}": {e}') from e
+    return False

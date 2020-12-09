@@ -6,8 +6,9 @@ from background_task.signals import task_failed
 from background_task.models import Task
 from common.logger import log
 from .models import Source, Media
-from .tasks import (delete_task, index_source_task, download_media_thumbnail,
-                    map_task_to_instance)
+from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
+                    download_media_thumbnail, map_task_to_instance,
+                    check_source_directory_exists, download_media)
 from .utils import delete_file
 
 
@@ -22,7 +23,7 @@ def source_pre_save(sender, instance, **kwargs):
         return
     if existing_source.index_schedule != instance.index_schedule:
         # Indexing schedule has changed, recreate the indexing task
-        delete_task('sync.tasks.index_source_task', instance.pk)
+        delete_task_by_source('sync.tasks.index_source_task', instance.pk)
         verbose_name = _('Index media from source "{}"')
         index_source_task(
             str(instance.pk),
@@ -34,10 +35,11 @@ def source_pre_save(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Source)
 def source_post_save(sender, instance, created, **kwargs):
-    # Triggered after a source is saved
+    # Triggered after a source is saved, Create a new task to check the directory exists
+    check_source_directory_exists(str(instance.pk))
     if created:
         # Create a new indexing task for newly created sources
-        delete_task('sync.tasks.index_source_task', instance.pk)
+        delete_task_by_source('sync.tasks.index_source_task', instance.pk)
         log.info(f'Scheduling media indexing for source: {instance.name}')
         verbose_name = _('Index media from source "{}"')
         index_source_task(
@@ -65,7 +67,7 @@ def source_pre_delete(sender, instance, **kwargs):
 def source_post_delete(sender, instance, **kwargs):
     # Triggered after a source is deleted
     log.info(f'Deleting tasks for source: {instance.name}')
-    delete_task('sync.tasks.index_source_task', instance.pk)
+    delete_task_by_source('sync.tasks.index_source_task', instance.pk)
 
 
 @receiver(task_failed, sender=Task)
@@ -88,7 +90,7 @@ def media_post_save(sender, instance, created, **kwargs):
         if thumbnail_url:
             log.info(f'Scheduling task to download thumbnail for: {instance.name} '
                      f'from: {thumbnail_url}')
-            verbose_name = _('Downloading media thumbnail for "{}"')
+            verbose_name = _('Downloading thumbnail for "{}"')
             download_media_thumbnail(
                 str(instance.pk),
                 thumbnail_url,
@@ -105,13 +107,22 @@ def media_post_save(sender, instance, created, **kwargs):
         if instance.can_download:
             instance.can_download = True
             instance.save()
+    # If the media has not yet been downloaded schedule it to be downloaded
+    if not instance.downloaded:
+        delete_task_by_media('sync.tasks.download_media', instance.pk)
+        verbose_name = _('Downloading media for "{}"')
+        download_media(
+            str(instance.pk),
+            queue=str(instance.source.pk),
+            verbose_name=verbose_name.format(instance.name)
+        )
 
 
 @receiver(pre_delete, sender=Media)
 def media_pre_delete(sender, instance, **kwargs):
     # Triggered before media is deleted, delete any scheduled tasks
     log.info(f'Deleting tasks for media: {instance.name}')
-    delete_task('sync.tasks.download_media_thumbnail', instance.source.pk)
+    delete_task_by_media('sync.tasks.download_media_thumbnail', instance.pk)
     # Delete media thumbnail if it exists
     if instance.thumb:
         log.info(f'Deleting thumbnail for: {instance} path: {instance.thumb.path}')
