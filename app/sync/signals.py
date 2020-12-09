@@ -46,6 +46,10 @@ def source_post_save(sender, instance, created, **kwargs):
             queue=str(instance.pk),
             verbose_name=verbose_name.format(instance.name)
         )
+    # Trigger the post_save signal for each media item linked to this source as various
+    # flags may need to be recalculated
+    for media in Media.objects.filter(source=instance):
+        media.save()
 
 
 @receiver(pre_delete, sender=Source)
@@ -91,6 +95,16 @@ def media_post_save(sender, instance, created, **kwargs):
                 queue=str(instance.source.pk),
                 verbose_name=verbose_name.format(instance.name)
             )
+    # Recalculate the "can_download" flag, this may need to change if the source
+    # specifications have been changed
+    if instance.get_format_str():
+        if not instance.can_download:
+            instance.can_download = True
+            instance.save()
+    else:
+        if instance.can_download:
+            instance.can_download = True
+            instance.save()
 
 
 @receiver(pre_delete, sender=Media)

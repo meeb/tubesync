@@ -439,6 +439,12 @@ class Media(models.Model):
         null=True,
         help_text=_('JSON encoded metadata for the media')
     )
+    can_download = models.BooleanField(
+        _('can download'),
+        db_index=True,
+        default=False,
+        help_text=_('Media has a matching format and can be downloaded')
+    )
     downloaded = models.BooleanField(
         _('downloaded'),
         db_index=True,
@@ -537,14 +543,6 @@ class Media(models.Model):
                 else:
                     return False
         return False
-
-    @property
-    def can_download(self):
-        '''
-            Returns boolean True if the media can be downloaded, that is, the media
-            has stored formats which are compatible with the source requirements.
-        '''
-        return self.get_format_str() is not False
 
     @property
     def loaded_metadata(self):
