@@ -18,7 +18,7 @@
           <img src="{% if m.thumb %}{% url 'sync:media-thumb' pk=m.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}">
           <span class="card-title truncate">{{ m.source }}<br>
             <span>{{ m.name }}</span><br>
-            <span>{{ m.published|date:'Y-m-d' }}</span>
+            <span>{% if m.can_download %}{{ m.published|date:'Y-m-d' }}{% else %}<i class="fas fa-exclamation-triangle"></i> No matching formats{% endif %}</span>
           </span>
         </div>
       </a>
