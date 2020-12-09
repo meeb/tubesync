@@ -1,12 +1,13 @@
 '''
-    Note these tests do not test the scheduled tasks that perform live requests to
-    index media or download content. They only check for compliance of web
-    interface and validation code.
+    Tests do not test the scheduled tasks that perform live requests to index media or
+    download content. They only check for compliance of web interface and check
+    the matching code logic is working as expected.
 '''
 
 
 import logging
 from urllib.parse import urlsplit
+from django.conf import settings
 from django.test import TestCase, Client
 from django.utils import timezone
 from background_task.models import Task
@@ -165,19 +166,19 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         # Update the source key
         data = {
-            'source_type': 'c',
+            'source_type': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
             'key': 'updatedkey',  # changed
             'name': 'testname',
             'directory': 'testdirectory',
-            'index_schedule': 3600,
+            'index_schedule': Source.IndexSchedule.EVERY_HOUR,
             'delete_old_media': False,
             'days_to_keep': 14,
-            'source_resolution': '1080p',
-            'source_vcodec': 'VP9',
-            'source_acodec': 'OPUS',
+            'source_resolution': Source.SOURCE_RESOLUTION_1080P,
+            'source_vcodec': Source.SOURCE_VCODEC_VP9,
+            'source_acodec': Source.SOURCE_ACODEC_OPUS,
             'prefer_60fps': False,
             'prefer_hdr': False,
-            'fallback': 'f'
+            'fallback': Source.FALLBACK_FAIL
         }
         response = c.post(f'/source-update/{source_uuid}', data)
         self.assertEqual(response.status_code, 302)
@@ -192,19 +193,19 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(source.key, 'updatedkey')
         # Update the source index schedule which should recreate the scheduled task
         data = {
-            'source_type': 'c',
+            'source_type': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
             'key': 'updatedkey',
             'name': 'testname',
             'directory': 'testdirectory',
-            'index_schedule': 7200,
+            'index_schedule': Source.IndexSchedule.EVERY_2_HOURS,  # changed
             'delete_old_media': False,
             'days_to_keep': 14,
-            'source_resolution': '1080p',
-            'source_vcodec': 'VP9',
-            'source_acodec': 'OPUS',
+            'source_resolution': Source.SOURCE_RESOLUTION_1080P,
+            'source_vcodec': Source.SOURCE_VCODEC_VP9,
+            'source_acodec': Source.SOURCE_ACODEC_OPUS,
             'prefer_60fps': False,
             'prefer_hdr': False,
-            'fallback': 'f'
+            'fallback': Source.FALLBACK_FAIL
         }
         response = c.post(f'/source-update/{source_uuid}', data)
         self.assertEqual(response.status_code, 302)
@@ -252,39 +253,39 @@ class FrontEndTestCase(TestCase):
         response = c.get('/media')
         self.assertEqual(response.status_code, 200)
         # Add a test source
-        test_source = Source.objects.create(**{
-            'source_type': 'c',
-            'key': 'testkey',
-            'name': 'testname',
-            'directory': 'testdirectory',
-            'index_schedule': 3600,
-            'delete_old_media': False,
-            'days_to_keep': 14,
-            'source_resolution': '1080p',
-            'source_vcodec': 'VP9',
-            'source_acodec': 'OPUS',
-            'prefer_60fps': False,
-            'prefer_hdr': False,
-            'fallback': 'f'
-        })
+        test_source = Source.objects.create(
+            source_type=Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            key='testkey',
+            name='testname',
+            directory='testdirectory',
+            index_schedule=Source.IndexSchedule.EVERY_HOUR,
+            delete_old_media=False,
+            days_to_keep=14,
+            source_resolution=Source.SOURCE_RESOLUTION_1080P,
+            source_vcodec=Source.SOURCE_VCODEC_VP9,
+            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            prefer_60fps=False,
+            prefer_hdr=False,
+            fallback=Source.FALLBACK_FAIL
+        )
         # Add some media
-        test_media1 = Media.objects.create(**{
-            'key': 'mediakey1',
-            'source': test_source,
-            'metadata': '{"thumbnail":"https://example.com/thumb.jpg"}',
-        })
+        test_media1 = Media.objects.create(
+            key='mediakey1',
+            source=test_source,
+            metadata='{"thumbnail":"https://example.com/thumb.jpg"}',
+        )
         test_media1_pk = str(test_media1.pk)
-        test_media2 = Media.objects.create(**{
-            'key': 'mediakey2',
-            'source': test_source,
-            'metadata': '{"thumbnail":"https://example.com/thumb.jpg"}',
-        })
+        test_media2 = Media.objects.create(
+            key='mediakey2',
+            source=test_source,
+            metadata='{"thumbnail":"https://example.com/thumb.jpg"}',
+        )
         test_media2_pk = str(test_media2.pk)
-        test_media3 = Media.objects.create(**{
-            'key': 'mediakey3',
-            'source': test_source,
-            'metadata': '{"thumbnail":"https://example.com/thumb.jpg"}',
-        })
+        test_media3 = Media.objects.create(
+            key='mediakey3',
+            source=test_source,
+            metadata='{"thumbnail":"https://example.com/thumb.jpg"}',
+        )
         test_media3_pk = str(test_media3.pk)
         # Check the tasks to fetch the media thumbnails have been scheduled
         found_thumbnail_task1 = False
@@ -341,1001 +342,53 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
+metadata_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata.json'
+metadata = open(metadata_filepath, 'rt').read()
+metadata_hdr_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_hdr.json'
+metadata_hdr = open(metadata_hdr_filepath, 'rt').read()
+metadata_60fps_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_60fps.json'
+metadata_60fps = open(metadata_60fps_filepath, 'rt').read()
+metadata_60fps_hdr_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_60fps_hdr.json'
+metadata_60fps_hdr = open(metadata_60fps_hdr_filepath, 'rt').read()
+all_test_metadata = {
+    'boring': metadata,
+    'hdr': metadata_hdr,
+    '60fps': metadata_60fps,
+    '60fps+hdr': metadata_60fps_hdr,
+}
+
+
 class FormatMatchingTestCase(TestCase):
 
     def setUp(self):
         # Disable general logging for test case
         logging.disable(logging.CRITICAL)
-        # Test metadata pulled from https://youtube.com/watch?v=AIigN0EAGcA
-        metadata = '''
-            {
-                "id":"AIigN0EAGcA",
-                "uploader":"The HDR Channel",
-                "uploader_id":"UCve7_yAZHFNipzeAGBI5t9g",
-                "uploader_url":"http://www.youtube.com/channel/UCve7_yAZHFNipzeAGBI5t9g",
-                "channel_id":"UCve7_yAZHFNipzeAGBI5t9g",
-                "channel_url":"http://www.youtube.com/channel/UCve7_yAZHFNipzeAGBI5t9g",
-                "upload_date":"20161202",
-                "license":null,
-                "creator":null,
-                "title":"Real 4K HDR: Earth and Aurora Borealis seen from ISS - HDR UHD (Chromecast Ultra)",
-                "alt_title":null,
-                "thumbnails":[
-                    {
-                        "url":"[truncated]",
-                        "width":168,
-                        "height":94,
-                        "resolution":"168x94",
-                        "id":"0"
-                    },
-                    {
-                        "url":"[truncated]",
-                        "width":196,
-                        "height":110,
-                        "resolution":"196x110",
-                        "id":"1"
-                    },
-                    {
-                        "url":"[truncated]",
-                        "width":246,
-                        "height":138,
-                        "resolution":"246x138",
-                        "id":"2"
-                    },
-                    {
-                        "url":"[truncated]",
-                        "width":336,
-                        "height":188,
-                        "resolution":"336x188",
-                        "id":"3"
-                    },
-                    {
-                        "url":"[truncated]",
-                        "width":1920,
-                        "height":1080,
-                        "resolution":"1920x1080",
-                        "id":"4"
-                    }
-                ],
-                "description":"[truncated]",
-                "categories":[
-                    "Travel & Events"
-                ],
-                "tags":[
-                    "hdr",
-                    "hdr10",
-                    "4k",
-                    "uhd",
-                    "chromecast ultra",
-                    "real hdr"
-                ],
-                "subtitles":{
-                    
-                },
-                "automatic_captions":{
-                    
-                },
-                "duration":353.0,
-                "age_limit":0,
-                "annotations":null,
-                "chapters":null,
-                "webpage_url":"https://www.youtube.com/watch?v=AIigN0EAGcA",
-                "view_count":131816,
-                "like_count":211,
-                "dislike_count":20,
-                "average_rating":4.6536798,
-                "formats":[
-                    {
-                        "format_id":"249",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"webm",
-                        "format_note":"tiny",
-                        "acodec":"opus",
-                        "abr":50,
-                        "asr":48000,
-                        "filesize":2690312,
-                        "fps":null,
-                        "height":null,
-                        "tbr":65.092,
-                        "width":null,
-                        "vcodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"249 - audio only (tiny)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"250",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"webm",
-                        "format_note":"tiny",
-                        "acodec":"opus",
-                        "abr":70,
-                        "asr":48000,
-                        "filesize":3502678,
-                        "fps":null,
-                        "height":null,
-                        "tbr":85.607,
-                        "width":null,
-                        "vcodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"250 - audio only (tiny)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"140",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"m4a",
-                        "format_note":"tiny",
-                        "acodec":"mp4a.40.2",
-                        "abr":128,
-                        "container":"m4a_dash",
-                        "asr":44100,
-                        "filesize":5703344,
-                        "fps":null,
-                        "height":null,
-                        "tbr":130.563,
-                        "width":null,
-                        "vcodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"140 - audio only (tiny)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"251",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"webm",
-                        "format_note":"tiny",
-                        "acodec":"opus",
-                        "abr":160,
-                        "asr":48000,
-                        "filesize":6488055,
-                        "fps":null,
-                        "height":null,
-                        "tbr":157.878,
-                        "width":null,
-                        "vcodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"251 - audio only (tiny)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"160",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"mp4",
-                        "height":144,
-                        "format_note":"144p",
-                        "vcodec":"avc1.4d400c",
-                        "asr":null,
-                        "filesize":1655725,
-                        "fps":30,
-                        "tbr":84.26,
-                        "width":256,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"160 - 256x144 (144p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"278",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"webm",
-                        "height":144,
-                        "format_note":"144p",
-                        "container":"webm",
-                        "vcodec":"vp9",
-                        "asr":null,
-                        "filesize":3399643,
-                        "fps":30,
-                        "tbr":97.395,
-                        "width":256,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"278 - 256x144 (144p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"330",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "asr":null,
-                        "filesize":4569924,
-                        "format_note":"144p HDR",
-                        "fps":30,
-                        "height":144,
-                        "tbr":151.8,
-                        "width":256,
-                        "ext":"webm",
-                        "vcodec":"vp9.2",
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"330 - 256x144 (144p HDR)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"133",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"mp4",
-                        "height":240,
-                        "format_note":"240p",
-                        "vcodec":"avc1.4d4015",
-                        "asr":null,
-                        "filesize":3090930,
-                        "fps":30,
-                        "tbr":154.701,
-                        "width":426,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"133 - 426x240 (240p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"242",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"webm",
-                        "height":240,
-                        "format_note":"240p",
-                        "vcodec":"vp9",
-                        "asr":null,
-                        "filesize":5194185,
-                        "fps":30,
-                        "tbr":220.461,
-                        "width":426,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"242 - 426x240 (240p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"331",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "asr":null,
-                        "filesize":8625105,
-                        "format_note":"240p HDR",
-                        "fps":30,
-                        "height":240,
-                        "tbr":269.523,
-                        "width":426,
-                        "ext":"webm",
-                        "vcodec":"vp9.2",
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"331 - 426x240 (240p HDR)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"134",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"mp4",
-                        "height":360,
-                        "format_note":"360p",
-                        "vcodec":"avc1.4d401e",
-                        "asr":null,
-                        "filesize":7976121,
-                        "fps":30,
-                        "tbr":372.176,
-                        "width":640,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"134 - 640x360 (360p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"243",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"webm",
-                        "height":360,
-                        "format_note":"360p",
-                        "vcodec":"vp9",
-                        "asr":null,
-                        "filesize":10334380,
-                        "fps":30,
-                        "tbr":408.705,
-                        "width":640,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"243 - 640x360 (360p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"332",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "asr":null,
-                        "filesize":19094551,
-                        "format_note":"360p HDR",
-                        "fps":30,
-                        "height":360,
-                        "tbr":580.076,
-                        "width":640,
-                        "ext":"webm",
-                        "vcodec":"vp9.2",
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"332 - 640x360 (360p HDR)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"244",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"webm",
-                        "height":480,
-                        "format_note":"480p",
-                        "vcodec":"vp9",
-                        "asr":null,
-                        "filesize":18651778,
-                        "fps":30,
-                        "tbr":748.286,
-                        "width":854,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"244 - 854x480 (480p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"135",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"mp4",
-                        "height":480,
-                        "format_note":"480p",
-                        "vcodec":"avc1.4d401f",
-                        "asr":null,
-                        "filesize":17751590,
-                        "fps":30,
-                        "tbr":828.339,
-                        "width":854,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"135 - 854x480 (480p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"333",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "asr":null,
-                        "filesize":37534410,
-                        "format_note":"480p HDR",
-                        "fps":30,
-                        "height":480,
-                        "tbr":1088.473,
-                        "width":854,
-                        "ext":"webm",
-                        "vcodec":"vp9.2",
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"333 - 854x480 (480p HDR)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"136",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"mp4",
-                        "height":720,
-                        "format_note":"720p",
-                        "vcodec":"avc1.4d401f",
-                        "asr":null,
-                        "filesize":33269335,
-                        "fps":30,
-                        "tbr":1391.37,
-                        "width":1280,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"136 - 1280x720 (720p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"247",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"webm",
-                        "height":720,
-                        "format_note":"720p",
-                        "vcodec":"vp9",
-                        "asr":null,
-                        "filesize":38700375,
-                        "fps":30,
-                        "tbr":1509.156,
-                        "width":1280,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"247 - 1280x720 (720p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"334",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "asr":null,
-                        "filesize":84688291,
-                        "format_note":"720p HDR",
-                        "fps":30,
-                        "height":720,
-                        "tbr":2459.121,
-                        "width":1280,
-                        "ext":"webm",
-                        "vcodec":"vp9.2",
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"334 - 1280x720 (720p HDR)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"248",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"webm",
-                        "height":1080,
-                        "format_note":"1080p",
-                        "vcodec":"vp9",
-                        "asr":null,
-                        "filesize":74559430,
-                        "fps":30,
-                        "tbr":2655.043,
-                        "width":1920,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"248 - 1920x1080 (1080p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"137",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"mp4",
-                        "height":1080,
-                        "format_note":"1080p",
-                        "vcodec":"avc1.640028",
-                        "asr":null,
-                        "filesize":66088922,
-                        "fps":30,
-                        "tbr":3401.043,
-                        "width":1920,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"137 - 1920x1080 (1080p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"335",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "asr":null,
-                        "filesize":147068515,
-                        "format_note":"1080p HDR",
-                        "fps":30,
-                        "height":1080,
-                        "tbr":4143.689,
-                        "width":1920,
-                        "ext":"webm",
-                        "vcodec":"vp9.2",
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"335 - 1920x1080 (1080p HDR)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"271",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"webm",
-                        "height":1440,
-                        "format_note":"1440p",
-                        "vcodec":"vp9",
-                        "asr":null,
-                        "filesize":220803978,
-                        "fps":30,
-                        "tbr":8844.345,
-                        "width":2560,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"271 - 2560x1440 (1440p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"336",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "asr":null,
-                        "filesize":445968338,
-                        "format_note":"1440p HDR",
-                        "fps":30,
-                        "height":1440,
-                        "tbr":11013.316,
-                        "width":2560,
-                        "ext":"webm",
-                        "vcodec":"vp9.2",
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"336 - 2560x1440 (1440p HDR)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"313",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"webm",
-                        "height":2160,
-                        "format_note":"2160p",
-                        "vcodec":"vp9",
-                        "asr":null,
-                        "filesize":592906196,
-                        "fps":30,
-                        "tbr":17720.165,
-                        "width":3840,
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"313 - 3840x2160 (2160p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"337",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "asr":null,
-                        "filesize":985983779,
-                        "format_note":"2160p HDR",
-                        "fps":30,
-                        "height":2160,
-                        "tbr":23857.847,
-                        "width":3840,
-                        "ext":"webm",
-                        "vcodec":"vp9.2",
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"337 - 3840x2160 (2160p HDR)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"18",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"mp4",
-                        "width":640,
-                        "height":360,
-                        "acodec":"mp4a.40.2",
-                        "abr":96,
-                        "vcodec":"avc1.42001E",
-                        "asr":44100,
-                        "filesize":23149671,
-                        "format_note":"360p",
-                        "fps":30,
-                        "tbr":525.68,
-                        "format":"18 - 640x360 (360p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"22",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"mp4",
-                        "width":1280,
-                        "height":720,
-                        "acodec":"mp4a.40.2",
-                        "abr":192,
-                        "vcodec":"avc1.64001F",
-                        "asr":44100,
-                        "filesize":null,
-                        "format_note":"720p",
-                        "fps":30,
-                        "tbr":884.489,
-                        "format":"22 - 1280x720 (720p)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    }
-                ],
-                "is_live":null,
-                "start_time":null,
-                "end_time":null,
-                "series":null,
-                "season_number":null,
-                "episode_number":null,
-                "track":null,
-                "artist":null,
-                "album":null,
-                "release_date":null,
-                "release_year":null,
-                "extractor":"youtube",
-                "webpage_url_basename":"AIigN0EAGcA",
-                "extractor_key":"Youtube",
-                "n_entries":13,
-                "playlist":"HDR",
-                "playlist_id":"PL0ajMRlXs96rAqJhIMXiG34khg31MVWdP",
-                "playlist_title":"HDR",
-                "playlist_uploader":"4K",
-                "playlist_uploader_id":"UCp5zSuQPhXhFEurTP0l4yCw",
-                "playlist_index":13,
-                "thumbnail":"https://i.ytimg.com/vi_webp/AIigN0EAGcA/maxresdefault.webp",
-                "display_id":"AIigN0EAGcA",
-                "requested_subtitles":null,
-                "requested_formats":[
-                    {
-                        "format_id":"337",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "asr":null,
-                        "filesize":985983779,
-                        "format_note":"2160p HDR",
-                        "fps":30,
-                        "height":2160,
-                        "tbr":23857.847,
-                        "width":3840,
-                        "ext":"webm",
-                        "vcodec":"vp9.2",
-                        "acodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"337 - 3840x2160 (2160p HDR)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    },
-                    {
-                        "format_id":"251",
-                        "url":"[truncated]",
-                        "player_url":null,
-                        "ext":"webm",
-                        "format_note":"tiny",
-                        "acodec":"opus",
-                        "abr":160,
-                        "asr":48000,
-                        "filesize":6488055,
-                        "fps":null,
-                        "height":null,
-                        "tbr":157.878,
-                        "width":null,
-                        "vcodec":"none",
-                        "downloader_options":{
-                            "http_chunk_size":10485760
-                        },
-                        "format":"251 - audio only (tiny)",
-                        "protocol":"https",
-                        "http_headers":{
-                            "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3704.8 Safari/537.36",
-                            "Accept-Charset":"ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-                            "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Encoding":"gzip, deflate",
-                            "Accept-Language":"en-us,en;q=0.5"
-                        }
-                    }
-                ],
-                "format":"337 - 3840x2160 (2160p HDR)+251 - audio only (tiny)",
-                "format_id":"337+251",
-                "width":3840,
-                "height":2160,
-                "resolution":null,
-                "fps":30,
-                "vcodec":"vp9.2",
-                "vbr":null,
-                "stretched_ratio":null,
-                "acodec":"opus",
-                "abr":160,
-                "ext":"webm"
-            }
-        '''.strip()
         # Add a test source
-        self.source = Source.objects.create(**{
-            'source_type': 'c',
-            'key': 'testkey',
-            'name': 'testname',
-            'directory': 'testdirectory',
-            'index_schedule': 3600,
-            'delete_old_media': False,
-            'days_to_keep': 14,
-            'source_resolution': '1080p',
-            'source_vcodec': 'VP9',
-            'source_acodec': 'OPUS',
-            'prefer_60fps': False,
-            'prefer_hdr': False,
-            'fallback': 'f'
-        })
+        self.source = Source.objects.create(
+            source_type=Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            key='testkey',
+            name='testname',
+            directory='testdirectory',
+            index_schedule=3600,
+            delete_old_media=False,
+            days_to_keep=14,
+            source_resolution=Source.SOURCE_RESOLUTION_1080P,
+            source_vcodec=Source.SOURCE_VCODEC_VP9,
+            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            prefer_60fps=False,
+            prefer_hdr=False,
+            fallback=Source.FALLBACK_FAIL
+        )
         # Add some media
-        self.media = Media.objects.create(**{
-            'key': 'mediakey',
-            'source': self.source,
-            'metadata': metadata,
-        })
+        self.media = Media.objects.create(
+            key='mediakey',
+            source=self.source,
+            metadata='{}'
+        )
 
-    '''
-        Parsed media format reference for test metadata:
-            {'id': '249', 'format': 'TINY', 'format_verbose': '249 - audio only (tiny)', 'height': None, 'vcodec': None, 'vbr': 65.092, 'acodec': 'OPUS', 'abr': 50, 'is_60fps': False, 'is_hdr': False}
-            {'id': '250', 'format': 'TINY', 'format_verbose': '250 - audio only (tiny)', 'height': None, 'vcodec': None, 'vbr': 85.607, 'acodec': 'OPUS', 'abr': 70, 'is_60fps': False, 'is_hdr': False}
-            {'id': '140', 'format': 'TINY', 'format_verbose': '140 - audio only (tiny)', 'height': None, 'vcodec': None, 'vbr': 130.563, 'acodec': 'MP4A', 'abr': 128, 'is_60fps': False, 'is_hdr': False}
-            {'id': '251', 'format': 'TINY', 'format_verbose': '251 - audio only (tiny)', 'height': None, 'vcodec': None, 'vbr': 157.878, 'acodec': 'OPUS', 'abr': 160, 'is_60fps': False, 'is_hdr': False}
-            {'id': '160', 'format': '144P', 'format_verbose': '160 - 256x144 (144p)', 'height': 144, 'vcodec': 'AVC1', 'vbr': 84.26, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '278', 'format': '144P', 'format_verbose': '278 - 256x144 (144p)', 'height': 144, 'vcodec': 'VP9', 'vbr': 97.395, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '330', 'format': '144P HDR', 'format_verbose': '330 - 256x144 (144p HDR)', 'height': 144, 'vcodec': 'VP9', 'vbr': 151.8, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': True}
-            {'id': '133', 'format': '240P', 'format_verbose': '133 - 426x240 (240p)', 'height': 240, 'vcodec': 'AVC1', 'vbr': 154.701, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '242', 'format': '240P', 'format_verbose': '242 - 426x240 (240p)', 'height': 240, 'vcodec': 'VP9', 'vbr': 220.461, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '331', 'format': '240P HDR', 'format_verbose': '331 - 426x240 (240p HDR)', 'height': 240, 'vcodec': 'VP9', 'vbr': 269.523, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': True}
-            {'id': '134', 'format': '360P', 'format_verbose': '134 - 640x360 (360p)', 'height': 360, 'vcodec': 'AVC1', 'vbr': 372.176, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '243', 'format': '360P', 'format_verbose': '243 - 640x360 (360p)', 'height': 360, 'vcodec': 'VP9', 'vbr': 408.705, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '332', 'format': '360P HDR', 'format_verbose': '332 - 640x360 (360p HDR)', 'height': 360, 'vcodec': 'VP9', 'vbr': 580.076, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': True}
-            {'id': '244', 'format': '480P', 'format_verbose': '244 - 854x480 (480p)', 'height': 480, 'vcodec': 'VP9', 'vbr': 748.286, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '135', 'format': '480P', 'format_verbose': '135 - 854x480 (480p)', 'height': 480, 'vcodec': 'AVC1', 'vbr': 828.339, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '333', 'format': '480P HDR', 'format_verbose': '333 - 854x480 (480p HDR)', 'height': 480, 'vcodec': 'VP9', 'vbr': 1088.473, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': True}
-            {'id': '136', 'format': '720P', 'format_verbose': '136 - 1280x720 (720p)', 'height': 720, 'vcodec': 'AVC1', 'vbr': 1391.37, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '247', 'format': '720P', 'format_verbose': '247 - 1280x720 (720p)', 'height': 720, 'vcodec': 'VP9', 'vbr': 1509.156, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '334', 'format': '720P HDR', 'format_verbose': '334 - 1280x720 (720p HDR)', 'height': 720, 'vcodec': 'VP9', 'vbr': 2459.121, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': True}
-            {'id': '248', 'format': '1080P', 'format_verbose': '248 - 1920x1080 (1080p)', 'height': 1080, 'vcodec': 'VP9', 'vbr': 2655.043, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '137', 'format': '1080P', 'format_verbose': '137 - 1920x1080 (1080p)', 'height': 1080, 'vcodec': 'AVC1', 'vbr': 3401.043, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '335', 'format': '1080P HDR', 'format_verbose': '335 - 1920x1080 (1080p HDR)', 'height': 1080, 'vcodec': 'VP9', 'vbr': 4143.689, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': True}
-            {'id': '271', 'format': '1440P', 'format_verbose': '271 - 2560x1440 (1440p)', 'height': 1440, 'vcodec': 'VP9', 'vbr': 8844.345, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '336', 'format': '1440P HDR', 'format_verbose': '336 - 2560x1440 (1440p HDR)', 'height': 1440, 'vcodec': 'VP9', 'vbr': 11013.316, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': True}
-            {'id': '313', 'format': '2160P', 'format_verbose': '313 - 3840x2160 (2160p)', 'height': 2160, 'vcodec': 'VP9', 'vbr': 17720.165, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': False}
-            {'id': '337', 'format': '2160P HDR', 'format_verbose': '337 - 3840x2160 (2160p HDR)', 'height': 2160, 'vcodec': 'VP9', 'vbr': 23857.847, 'acodec': None, 'abr': 0, 'is_60fps': False, 'is_hdr': True}
-            {'id': '18', 'format': '360P', 'format_verbose': '18 - 640x360 (360p)', 'height': 360, 'vcodec': 'AVC1', 'vbr': 525.68, 'acodec': 'MP4A', 'abr': 96, 'is_60fps': False, 'is_hdr': False}
-            {'id': '22', 'format': '720P', 'format_verbose': '22 - 1280x720 (720p)', 'height': 720, 'vcodec': 'AVC1', 'vbr': 884.489, 'acodec': 'MP4A', 'abr': 192, 'is_60fps': False, 'is_hdr': False}
-
-    '''
-
-    def test_combined_format_matching(self):
+    def test_combined_exact_format_matching(self):
+        self.source.fallback = Source.FALLBACK_FAIL
+        self.media.metadata = all_test_metadata['boring']
         expected_matches = {
             # (format, vcodec, acodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', 'MP4A', True, False): (False, False),
@@ -1459,10 +512,12 @@ class FormatMatchingTestCase(TestCase):
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_combined_format()
-            self.assertEqual(match_type, expeceted_match_type)
             self.assertEqual(format_code, expected_format_code)
+            self.assertEqual(match_type, expeceted_match_type)
 
-    def test_audio_format_matching(self):
+    def test_audio_exact_format_matching(self):
+        self.source.fallback = Source.FALLBACK_FAIL
+        self.media.metadata = all_test_metadata['boring']
         expected_matches = {
             # (format, vcodec, acodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', 'MP4A', True, False): (True, '140'),
@@ -1602,133 +657,417 @@ class FormatMatchingTestCase(TestCase):
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_audio_format()
-            self.assertEqual(match_type, expeceted_match_type)
             self.assertEqual(format_code, expected_format_code)
+            self.assertEqual(match_type, expeceted_match_type)
 
-    def test_video_format_matching(self):
+    def test_video_exact_format_matching(self):
+        self.source.fallback = Source.FALLBACK_FAIL
+        # Test no 60fps, no HDR metadata
+        self.media.metadata = all_test_metadata['boring']
         expected_matches = {
-            # (format, vcodec, acodec, prefer_60fps, prefer_hdr): (match_type, code),
-            ('360p', 'AVC1', 'MP4A', True, False): (True, '140'),
-            ('360p', 'AVC1', 'MP4A', False, True): (True, '140'),
-            ('360p', 'AVC1', 'MP4A', False, False): (True, '140'),
-            ('360p', 'AVC1', 'OPUS', True, True): (True, '251'),
-            ('360p', 'AVC1', 'OPUS', True, False): (True, '251'),
-            ('360p', 'AVC1', 'OPUS', False, True): (True, '251'),
-            ('360p', 'AVC1', 'OPUS', False, False): (True, '251'),
-            ('360p', 'VP9', 'MP4A', True, True): (True, '140'),
-            ('360p', 'VP9', 'MP4A', True, False): (True, '140'),
-            ('360p', 'VP9', 'MP4A', False, True): (True, '140'),
-            ('360p', 'VP9', 'MP4A', False, False): (True, '140'),
-            ('360p', 'VP9', 'OPUS', True, True): (True, '251'),
-            ('360p', 'VP9', 'OPUS', True, False): (True, '251'),
-            ('360p', 'VP9', 'OPUS', False, True): (True, '251'),
-            ('360p', 'VP9', 'OPUS', False, False): (True, '251'),
-            ('480p', 'AVC1', 'MP4A', True, True): (True, '140'),
-            ('480p', 'AVC1', 'MP4A', True, False): (True, '140'),
-            ('480p', 'AVC1', 'MP4A', False, True): (True, '140'),
-            ('480p', 'AVC1', 'MP4A', False, False): (True, '140'),
-            ('480p', 'AVC1', 'OPUS', True, True): (True, '251'),
-            ('480p', 'AVC1', 'OPUS', True, False): (True, '251'),
-            ('480p', 'AVC1', 'OPUS', False, True): (True, '251'),
-            ('480p', 'AVC1', 'OPUS', False, False): (True, '251'),
-            ('480p', 'VP9', 'MP4A', True, True): (True, '140'),
-            ('480p', 'VP9', 'MP4A', True, False): (True, '140'),
-            ('480p', 'VP9', 'MP4A', False, True): (True, '140'),
-            ('480p', 'VP9', 'MP4A', False, False): (True, '140'),
-            ('480p', 'VP9', 'OPUS', True, True): (True, '251'),
-            ('480p', 'VP9', 'OPUS', True, False): (True, '251'),
-            ('480p', 'VP9', 'OPUS', False, True): (True, '251'),
-            ('480p', 'VP9', 'OPUS', False, False): (True, '251'),
-            ('720p', 'AVC1', 'MP4A', True, True): (True, '140'),
-            ('720p', 'AVC1', 'MP4A', True, False): (True, '140'),
-            ('720p', 'AVC1', 'MP4A', False, True): (True, '140'),
-            ('720p', 'AVC1', 'MP4A', False, False): (True, '140'),
-            ('720p', 'AVC1', 'OPUS', True, True): (True, '251'),
-            ('720p', 'AVC1', 'OPUS', True, False): (True, '251'),
-            ('720p', 'AVC1', 'OPUS', False, True): (True, '251'),
-            ('720p', 'AVC1', 'OPUS', False, False): (True, '251'),
-            ('720p', 'VP9', 'MP4A', True, True): (True, '140'),
-            ('720p', 'VP9', 'MP4A', True, False): (True, '140'),
-            ('720p', 'VP9', 'MP4A', False, True): (True, '140'),
-            ('720p', 'VP9', 'MP4A', False, False): (True, '140'),
-            ('720p', 'VP9', 'OPUS', True, True): (True, '251'),
-            ('720p', 'VP9', 'OPUS', True, False): (True, '251'),
-            ('720p', 'VP9', 'OPUS', False, True): (True, '251'),
-            ('720p', 'VP9', 'OPUS', False, False): (True, '251'),
-            ('1080p', 'AVC1', 'MP4A', True, True): (True, '140'),
-            ('1080p', 'AVC1', 'MP4A', True, False): (True, '140'),
-            ('1080p', 'AVC1', 'MP4A', False, True): (True, '140'),
-            ('1080p', 'AVC1', 'MP4A', False, False): (True, '140'),
-            ('1080p', 'AVC1', 'OPUS', True, True): (True, '251'),
-            ('1080p', 'AVC1', 'OPUS', True, False): (True, '251'),
-            ('1080p', 'AVC1', 'OPUS', False, True): (True, '251'),
-            ('1080p', 'AVC1', 'OPUS', False, False): (True, '251'),
-            ('1080p', 'VP9', 'MP4A', True, True): (True, '140'),
-            ('1080p', 'VP9', 'MP4A', True, False): (True, '140'),
-            ('1080p', 'VP9', 'MP4A', False, True): (True, '140'),
-            ('1080p', 'VP9', 'MP4A', False, False): (True, '140'),
-            ('1080p', 'VP9', 'OPUS', True, True): (True, '251'),
-            ('1080p', 'VP9', 'OPUS', True, False): (True, '251'),
-            ('1080p', 'VP9', 'OPUS', False, True): (True, '251'),
-            ('1080p', 'VP9', 'OPUS', False, False): (True, '251'),
-            ('1440p', 'AVC1', 'MP4A', True, True): (True, '140'),
-            ('1440p', 'AVC1', 'MP4A', True, False): (True, '140'),
-            ('1440p', 'AVC1', 'MP4A', False, True): (True, '140'),
-            ('1440p', 'AVC1', 'MP4A', False, False): (True, '140'),
-            ('1440p', 'AVC1', 'OPUS', True, True): (True, '251'),
-            ('1440p', 'AVC1', 'OPUS', True, False): (True, '251'),
-            ('1440p', 'AVC1', 'OPUS', False, True): (True, '251'),
-            ('1440p', 'AVC1', 'OPUS', False, False): (True, '251'),
-            ('1440p', 'VP9', 'MP4A', True, True): (True, '140'),
-            ('1440p', 'VP9', 'MP4A', True, False): (True, '140'),
-            ('1440p', 'VP9', 'MP4A', False, True): (True, '140'),
-            ('1440p', 'VP9', 'MP4A', False, False): (True, '140'),
-            ('1440p', 'VP9', 'OPUS', True, True): (True, '251'),
-            ('1440p', 'VP9', 'OPUS', True, False): (True, '251'),
-            ('1440p', 'VP9', 'OPUS', False, True): (True, '251'),
-            ('1440p', 'VP9', 'OPUS', False, False): (True, '251'),
-            ('2160p', 'AVC1', 'MP4A', True, True): (True, '140'),
-            ('2160p', 'AVC1', 'MP4A', True, False): (True, '140'),
-            ('2160p', 'AVC1', 'MP4A', False, True): (True, '140'),
-            ('2160p', 'AVC1', 'MP4A', False, False): (True, '140'),
-            ('2160p', 'AVC1', 'OPUS', True, True): (True, '251'),
-            ('2160p', 'AVC1', 'OPUS', True, False): (True, '251'),
-            ('2160p', 'AVC1', 'OPUS', False, True): (True, '251'),
-            ('2160p', 'AVC1', 'OPUS', False, False): (True, '251'),
-            ('2160p', 'VP9', 'MP4A', True, True): (True, '140'),
-            ('2160p', 'VP9', 'MP4A', True, False): (True, '140'),
-            ('2160p', 'VP9', 'MP4A', False, True): (True, '140'),
-            ('2160p', 'VP9', 'MP4A', False, False): (True, '140'),
-            ('2160p', 'VP9', 'OPUS', True, True): (True, '251'),
-            ('2160p', 'VP9', 'OPUS', True, False): (True, '251'),
-            ('2160p', 'VP9', 'OPUS', False, True): (True, '251'),
-            ('2160p', 'VP9', 'OPUS', False, False): (True, '251'),
-            ('4320p', 'AVC1', 'MP4A', True, True): (True, '140'),
-            ('4320p', 'AVC1', 'MP4A', True, False): (True, '140'),
-            ('4320p', 'AVC1', 'MP4A', False, True): (True, '140'),
-            ('4320p', 'AVC1', 'MP4A', False, False): (True, '140'),
-            ('4320p', 'AVC1', 'OPUS', True, True): (True, '251'),
-            ('4320p', 'AVC1', 'OPUS', True, False): (True, '251'),
-            ('4320p', 'AVC1', 'OPUS', False, True): (True, '251'),
-            ('4320p', 'AVC1', 'OPUS', False, False): (True, '251'),
-            ('4320p', 'VP9', 'MP4A', True, True): (True, '140'),
-            ('4320p', 'VP9', 'MP4A', True, False): (True, '140'),
-            ('4320p', 'VP9', 'MP4A', False, True): (True, '140'),
-            ('4320p', 'VP9', 'MP4A', False, False): (True, '140'),
-            ('4320p', 'VP9', 'OPUS', True, True): (True, '251'),
-            ('4320p', 'VP9', 'OPUS', True, False): (True, '251'),
-            ('4320p', 'VP9', 'OPUS', False, True): (True, '251'),
-            ('4320p', 'VP9', 'OPUS', False, False): (True, '251'),
+            # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
+            ('360p', 'AVC1', False, True): (False, False),
+            ('360p', 'AVC1', True, False): (False, False),
+            ('360p', 'AVC1', True, True): (False, False),
+            ('360p', 'VP9', False, False): (True, '243'),              # Exact match
+            ('360p', 'VP9', False, True): (False, False),
+            ('360p', 'VP9', True, False): (False, False),
+            ('360p', 'VP9', True, True): (False, False),
+            ('480p', 'AVC1', False, False): (True, '135'),             # Exact match
+            ('480p', 'AVC1', False, True): (False, False),
+            ('480p', 'AVC1', True, False): (False, False),
+            ('480p', 'AVC1', True, True): (False, False),
+            ('480p', 'VP9', False, False): (True, '244'),              # Exact match
+            ('480p', 'VP9', False, True): (False, False),
+            ('480p', 'VP9', True, False): (False, False),
+            ('480p', 'VP9', True, True): (False, False),
+            ('720p', 'AVC1', False, False): (True, '136'),             # Exact match
+            ('720p', 'AVC1', False, True): (False, False),
+            ('720p', 'AVC1', True, False): (False, False),
+            ('720p', 'AVC1', True, True): (False, False),
+            ('720p', 'VP9', False, False): (True, '247'),              # Exact match
+            ('720p', 'VP9', False, True): (False, False),
+            ('720p', 'VP9', True, False): (False, False),
+            ('720p', 'VP9', True, True): (False, False),
+            ('1080p', 'AVC1', False, False): (True, '137'),            # Exact match
+            ('1080p', 'AVC1', False, True): (False, False),
+            ('1080p', 'AVC1', True, False): (False, False),
+            ('1080p', 'AVC1', True, True): (False, False),
+            ('1080p', 'VP9', False, False): (True, '248'),             # Exact match
+            ('1080p', 'VP9', False, True): (False, False),
+            ('1080p', 'VP9', True, False): (False, False),
+            ('1080p', 'VP9', True, True): (False, False),
+            # No test formats in 'boring' metadata > 1080p
         }
         for params, expected in expected_matches.items():
-            resolution, vcodec, acodec, prefer_60fps, prefer_hdr = params
+            resolution, vcodec, prefer_60fps, prefer_hdr = params
             expeceted_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
-            self.source.source_acodec = acodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
-            print((resolution, vcodec, acodec, prefer_60fps, prefer_hdr), match_type, format_code)
-            #self.assertEqual(match_type, expeceted_match_type)
-            #self.assertEqual(format_code, expected_format_code)
+            self.assertEqual(format_code, expected_format_code)
+            self.assertEqual(match_type, expeceted_match_type)
+        # Test 60fps metadata
+        self.media.metadata = all_test_metadata['60fps']
+        expected_matches = {
+            # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
+            ('360p', 'AVC1', False, True): (False, False),
+            ('360p', 'AVC1', True, False): (False, False),
+            ('360p', 'AVC1', True, True): (False, False),
+            ('360p', 'VP9', False, False): (True, '243'),              # Exact match
+            ('360p', 'VP9', False, True): (False, False),
+            ('360p', 'VP9', True, False): (False, False),
+            ('360p', 'VP9', True, True): (False, False),
+            ('480p', 'AVC1', False, False): (True, '135'),             # Exact match
+            ('480p', 'AVC1', False, True): (False, False),
+            ('480p', 'AVC1', True, False): (False, False),
+            ('480p', 'AVC1', True, True): (False, False),
+            ('480p', 'VP9', False, False): (True, '244'),              # Exact match
+            ('480p', 'VP9', False, True): (False, False),
+            ('480p', 'VP9', True, False): (False, False),
+            ('480p', 'VP9', True, True): (False, False),
+            ('720p', 'AVC1', False, False): (True, '136'),             # Exact match
+            ('720p', 'AVC1', False, True): (False, False),
+            ('720p', 'AVC1', True, False): (True, '298'),              # Exact match, 60fps
+            ('720p', 'AVC1', True, True): (False, False),
+            ('720p', 'VP9', False, False): (True, '247'),              # Exact match
+            ('720p', 'VP9', False, True): (False, False),
+            ('720p', 'VP9', True, False): (True, '302'),               # Exact match, 60fps
+            ('720p', 'VP9', True, True): (False, False),
+            # No test formats in '60fps' metadata > 720p
+        }
+        for params, expected in expected_matches.items():
+            resolution, vcodec, prefer_60fps, prefer_hdr = params
+            expeceted_match_type, expected_format_code = expected
+            self.source.source_resolution = resolution
+            self.source.source_vcodec = vcodec
+            self.source.prefer_60fps = prefer_60fps
+            self.source.prefer_hdr = prefer_hdr
+            match_type, format_code = self.media.get_best_video_format()
+            self.assertEqual(format_code, expected_format_code)
+            self.assertEqual(match_type, expeceted_match_type)
+        # Test hdr metadata
+        self.media.metadata = all_test_metadata['hdr']
+        expected_matches = {
+            # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
+            ('360p', 'AVC1', False, True): (False, False),
+            ('360p', 'AVC1', True, False): (False, False),
+            ('360p', 'AVC1', True, True): (False, False),
+            ('360p', 'VP9', False, False): (True, '243'),              # Exact match
+            ('360p', 'VP9', False, True): (True, '332'),               # Exact match, hdr
+            ('360p', 'VP9', True, False): (False, False),
+            ('360p', 'VP9', True, True): (False, False),
+            ('480p', 'AVC1', False, False): (True, '135'),             # Exact match
+            ('480p', 'AVC1', False, True): (False, False),
+            ('480p', 'AVC1', True, False): (False, False),
+            ('480p', 'AVC1', True, True): (False, False),
+            ('480p', 'VP9', False, False): (True, '244'),              # Exact match
+            ('480p', 'VP9', False, True): (True, '333'),               # Exact match, hdr
+            ('480p', 'VP9', True, False): (False, False),
+            ('480p', 'VP9', True, True): (False, False),
+            ('720p', 'AVC1', False, False): (True, '136'),             # Exact match
+            ('720p', 'AVC1', False, True): (False, False),
+            ('720p', 'AVC1', True, False): (False, False),
+            ('720p', 'AVC1', True, True): (False, False),
+            ('720p', 'VP9', False, False): (True, '247'),              # Exact match
+            ('720p', 'VP9', False, True): (True, '334'),               # Exact match, hdr
+            ('720p', 'VP9', True, False): (False, False),
+            ('720p', 'VP9', True, True): (False, False),
+            ('1440p', 'AVC1', False, False): (False, False),
+            ('1440p', 'AVC1', False, True): (False, False),
+            ('1440p', 'AVC1', True, False): (False, False),
+            ('1440p', 'AVC1', True, True): (False, False),
+            ('1440p', 'VP9', False, False): (True, '271'),             # Exact match
+            ('1440p', 'VP9', False, True): (True, '336'),              # Exact match, hdr
+            ('1440p', 'VP9', True, False): (False, False),
+            ('1440p', 'VP9', True, True): (False, False),
+            ('2160p', 'AVC1', False, False): (False, False),
+            ('2160p', 'AVC1', False, True): (False, False),
+            ('2160p', 'AVC1', True, False): (False, False),
+            ('2160p', 'AVC1', True, True): (False, False),
+            ('2160p', 'VP9', False, False): (True, '313'),             # Exact match
+            ('2160p', 'VP9', False, True): (True, '337'),              # Exact match, hdr
+            ('2160p', 'VP9', True, False): (False, False),
+            ('2160p', 'VP9', True, True): (False, False),
+            # No test formats in 'hdr' metadata > 4k
+        }
+        for params, expected in expected_matches.items():
+            resolution, vcodec, prefer_60fps, prefer_hdr = params
+            expeceted_match_type, expected_format_code = expected
+            self.source.source_resolution = resolution
+            self.source.source_vcodec = vcodec
+            self.source.prefer_60fps = prefer_60fps
+            self.source.prefer_hdr = prefer_hdr
+            match_type, format_code = self.media.get_best_video_format()
+            self.assertEqual(format_code, expected_format_code)
+            self.assertEqual(match_type, expeceted_match_type)
+        # Test 60fps+hdr metadata
+        self.media.metadata = all_test_metadata['60fps+hdr']
+        expected_matches = {
+            # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
+            ('360p', 'AVC1', False, True): (False, False),
+            ('360p', 'AVC1', True, False): (False, False),
+            ('360p', 'AVC1', True, True): (False, False),
+            ('360p', 'VP9', False, False): (True, '243'),              # Exact match
+            ('360p', 'VP9', False, True): (True, '332'),               # Exact match, hdr
+            ('360p', 'VP9', True, False): (False, False),
+            ('360p', 'VP9', True, True): (True, '332'),                # Exact match, 60fps+hdr
+            ('480p', 'AVC1', False, False): (True, '135'),             # Exact match
+            ('480p', 'AVC1', False, True): (False, False),
+            ('480p', 'AVC1', True, False): (False, False),
+            ('480p', 'AVC1', True, True): (False, False),
+            ('480p', 'VP9', False, False): (True, '244'),              # Exact match
+            ('480p', 'VP9', False, True): (True, '333'),               # Exact match, hdr
+            ('480p', 'VP9', True, False): (False, False),
+            ('480p', 'VP9', True, True): (True, '333'),                # Exact match, 60fps+hdr
+            ('720p', 'AVC1', False, False): (True, '136'),             # Exact match
+            ('720p', 'AVC1', False, True): (False, False),
+            ('720p', 'AVC1', True, False): (True, '298'),              # Exact match, 60fps
+            ('720p', 'AVC1', True, True): (False, False),
+            ('720p', 'VP9', False, False): (True, '247'),              # Exact match
+            ('720p', 'VP9', False, True): (True, '334'),               # Exact match, hdr
+            ('720p', 'VP9', True, False): (True, '302'),               # Exact match, 60fps
+            ('720p', 'VP9', True, True): (True, '334'),                # Exact match, 60fps+hdr
+            ('1440p', 'AVC1', False, False): (False, False),
+            ('1440p', 'AVC1', False, True): (False, False),
+            ('1440p', 'AVC1', True, False): (False, False),
+            ('1440p', 'AVC1', True, True): (False, False),
+            ('1440p', 'VP9', False, False): (False, False),
+            ('1440p', 'VP9', False, True): (True, '336'),              # Exact match, hdr
+            ('1440p', 'VP9', True, False): (True, '308'),              # Exact match, 60fps
+            ('1440p', 'VP9', True, True): (True, '336'),               # Exact match, 60fps+hdr
+            ('2160p', 'AVC1', False, False): (False, False),
+            ('2160p', 'AVC1', False, True): (False, False),
+            ('2160p', 'AVC1', True, False): (False, False),
+            ('2160p', 'AVC1', True, True): (False, False),
+            ('2160p', 'VP9', False, False): (False, False),
+            ('2160p', 'VP9', False, True): (True, '337'),              # Exact match, hdr
+            ('2160p', 'VP9', True, False): (True, '315'),              # Exact match, 60fps
+            ('2160p', 'VP9', True, True): (True, '337'),               # Exact match, 60fps+hdr
+            ('4320P', 'AVC1', False, False): (False, False),
+            ('4320P', 'AVC1', False, True): (False, False),
+            ('4320P', 'AVC1', True, False): (False, False),
+            ('4320P', 'AVC1', True, True): (False, False),
+            ('4320P', 'VP9', False, False): (False, False),
+            ('4320P', 'VP9', False, True): (False, False),
+            ('4320P', 'VP9', True, False): (True, '272'),              # Exact match, 60fps
+            ('4320P', 'VP9', True, True): (False, False),
+        }
+        for params, expected in expected_matches.items():
+            resolution, vcodec, prefer_60fps, prefer_hdr = params
+            expeceted_match_type, expected_format_code = expected
+            self.source.source_resolution = resolution
+            self.source.source_vcodec = vcodec
+            self.source.prefer_60fps = prefer_60fps
+            self.source.prefer_hdr = prefer_hdr
+            match_type, format_code = self.media.get_best_video_format()
+            self.assertEqual(format_code, expected_format_code)
+            self.assertEqual(match_type, expeceted_match_type)
+
+    def test_video_next_best_format_matching(self):
+        self.source.fallback = Source.FALLBACK_NEXT_BEST
+        # Test no 60fps, no HDR metadata
+        self.media.metadata = all_test_metadata['boring']
+        expected_matches = {
+            # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
+            ('360p', 'AVC1', False, True): (False, '134'),             # Fallback match, no hdr
+            ('360p', 'AVC1', True, False): (False, '134'),             # Fallback match, no 60fps
+            ('360p', 'AVC1', True, True): (False, '134'),              # Fallback match, no 60fps+hdr
+            ('360p', 'VP9', False, False): (True, '243'),              # Exact match
+            ('360p', 'VP9', False, True): (False, '243'),              # Fallback match, no hdr
+            ('360p', 'VP9', True, False): (False, '243'),              # Fallback match, no 60fps
+            ('360p', 'VP9', True, True): (False, '243'),               # Fallback match, no 60fps+hdr
+            ('480p', 'AVC1', False, False): (True, '135'),             # Exact match
+            ('480p', 'AVC1', False, True): (False, '135'),             # Fallback match, no hdr
+            ('480p', 'AVC1', True, False): (False, '135'),             # Fallback match, no 60fps
+            ('480p', 'AVC1', True, True): (False, '135'),              # Fallback match, no 60fps+hdr
+            ('480p', 'VP9', False, False): (True, '244'),              # Exact match
+            ('480p', 'VP9', False, True): (False, '244'),              # Fallback match, no hdr
+            ('480p', 'VP9', True, False): (False, '244'),              # Fallback match, no 60fps
+            ('480p', 'VP9', True, True): (False, '244'),               # Fallback match, no 60fps+hdr
+            ('720p', 'AVC1', False, False): (True, '136'),             # Exact match
+            ('720p', 'AVC1', False, True): (False, '136'),             # Fallback match, no hdr
+            ('720p', 'AVC1', True, False): (False, '136'),             # Fallback match, no 60fps
+            ('720p', 'AVC1', True, True): (False, '136'),              # Fallback match, no 60fps+hdr
+            ('720p', 'VP9', False, False): (True, '247'),              # Exact match
+            ('720p', 'VP9', False, True): (False, '247'),              # Fallback match, no hdr
+            ('720p', 'VP9', True, False): (False, '247'),              # Fallback match, no 60fps
+            ('720p', 'VP9', True, True): (False, '247'),               # Fallback match, no 60fps+hdr
+            ('1080p', 'AVC1', False, False): (True, '137'),            # Exact match
+            ('1080p', 'AVC1', False, True): (False, '137'),            # Fallback match, no hdr
+            ('1080p', 'AVC1', True, False): (False, '137'),            # Fallback match, no 60fps
+            ('1080p', 'AVC1', True, True): (False, '137'),             # Fallback match, no 60fps+hdr
+            ('1080p', 'VP9', False, False): (True, '248'),             # Exact match
+            ('1080p', 'VP9', False, True): (False, '248'),             # Fallback match, no hdr
+            ('1080p', 'VP9', True, False): (False, '248'),             # Fallback match, no 60fps
+            ('1080p', 'VP9', True, True): (False, '248'),              # Fallback match, no 60fps+hdr
+            # No test formats in 'boring' metadata > 1080p
+        }
+        for params, expected in expected_matches.items():
+            resolution, vcodec, prefer_60fps, prefer_hdr = params
+            expeceted_match_type, expected_format_code = expected
+            self.source.source_resolution = resolution
+            self.source.source_vcodec = vcodec
+            self.source.prefer_60fps = prefer_60fps
+            self.source.prefer_hdr = prefer_hdr
+            match_type, format_code = self.media.get_best_video_format()
+            self.assertEqual(format_code, expected_format_code)
+            self.assertEqual(match_type, expeceted_match_type)
+        # Test 60fps metadata
+        self.media.metadata = all_test_metadata['60fps']
+        expected_matches = {
+            # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
+            ('360p', 'AVC1', False, True): (False, '134'),             # Fallback match, no hdr
+            ('360p', 'AVC1', True, False): (False, '134'),             # Fallback match, no 60fps
+            ('360p', 'AVC1', True, True): (False, '134'),              # Fallback match, no 60fps+hdr
+            ('360p', 'VP9', False, False): (True, '243'),              # Exact match
+            ('360p', 'VP9', False, True): (False, '243'),              # Fallback match, no hdr
+            ('360p', 'VP9', True, False): (False, '243'),              # Fallback match, no 60fps
+            ('360p', 'VP9', True, True): (False, '243'),               # Fallback match, no 60fps+hdr
+            ('480p', 'AVC1', False, False): (True, '135'),             # Exact match
+            ('480p', 'AVC1', False, True): (False, '135'),             # Fallback match, no hdr
+            ('480p', 'AVC1', True, False): (False, '135'),             # Fallback match, no 60fps
+            ('480p', 'AVC1', True, True): (False, '135'),              # Fallback match, no 60fps+hdr
+            ('480p', 'VP9', False, False): (True, '244'),              # Exact match
+            ('480p', 'VP9', False, True): (False, '244'),              # Fallback match, no hdr
+            ('480p', 'VP9', True, False): (False, '244'),              # Fallback match, no 60fps
+            ('480p', 'VP9', True, True): (False, '244'),               # Fallback match, no 60fps+hdr
+            ('720p', 'AVC1', False, False): (True, '136'),             # Exact match
+            ('720p', 'AVC1', False, True): (False, '136'),             # Fallback match, no hdr
+            ('720p', 'AVC1', True, False): (True, '298'),              # Exact match, 60fps
+            ('720p', 'AVC1', True, True): (False, '298'),              # Fallback, 60fps, no hdr
+            ('720p', 'VP9', False, False): (True, '247'),              # Exact match
+            ('720p', 'VP9', False, True): (False, '247'),              # Fallback match, no hdr
+            ('720p', 'VP9', True, False): (True, '302'),               # Exact match, 60fps
+            ('720p', 'VP9', True, True): (False, '302'),               # Fallback, 60fps, no hdr
+            # No test formats in '60fps' metadata > 720p
+        }
+        for params, expected in expected_matches.items():
+            resolution, vcodec, prefer_60fps, prefer_hdr = params
+            expeceted_match_type, expected_format_code = expected
+            self.source.source_resolution = resolution
+            self.source.source_vcodec = vcodec
+            self.source.prefer_60fps = prefer_60fps
+            self.source.prefer_hdr = prefer_hdr
+            match_type, format_code = self.media.get_best_video_format()
+            self.assertEqual(format_code, expected_format_code)
+            self.assertEqual(match_type, expeceted_match_type)
+        # Test hdr metadata
+        self.media.metadata = all_test_metadata['hdr']
+        expected_matches = {
+            # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
+            ('360p', 'AVC1', False, True): (False, '332'),             # Fallback match, hdr, switched to VP9
+            ('360p', 'AVC1', True, False): (False, '134'),             # Fallback match, no 60fps
+            ('360p', 'AVC1', True, True): (False, '332'),              # Fallback match, 60fps+hdr, switched to VP9
+            ('360p', 'VP9', False, False): (True, '243'),              # Exact match
+            ('360p', 'VP9', False, True): (True, '332'),               # Exact match, hdr
+            ('360p', 'VP9', True, False): (False, '243'),              # Fallback match, no 60fps
+            ('360p', 'VP9', True, True): (False, '332'),               # Fallback match, hdr, no 60fps
+            ('480p', 'AVC1', False, False): (True, '135'),             # Exact match
+            ('480p', 'AVC1', False, True): (False, '333'),             # Fallback match, hdr, switched to VP9
+            ('480p', 'AVC1', True, False): (False, '135'),             # Fallback match, no 60fps
+            ('480p', 'AVC1', True, True): (False, '333'),              # Fallback match, hdr, switched to VP9
+            ('480p', 'VP9', False, False): (True, '244'),              # Exact match
+            ('480p', 'VP9', False, True): (True, '333'),               # Exact match, hdr
+            ('480p', 'VP9', True, False): (False, '244'),              # Fallback match, no 60fps
+            ('480p', 'VP9', True, True): (False, '333'),               # Fallback match, hdr, no 60fps
+            ('720p', 'AVC1', False, False): (True, '136'),             # Exact match
+            ('720p', 'AVC1', False, True): (False, '334'),             # Fallback match, hdr, switched to VP9
+            ('720p', 'AVC1', True, False): (False, '136'),             # Fallback match, no 60fps
+            ('720p', 'AVC1', True, True): (False, '334'),              # Fallback match, hdr, switched to VP9
+            ('720p', 'VP9', False, False): (True, '247'),              # Exact match
+            ('720p', 'VP9', False, True): (True, '334'),               # Exact match, hdr
+            ('720p', 'VP9', True, False): (False, '247'),              # Fallback match, no 60fps
+            ('720p', 'VP9', True, True): (False, '334'),               # Fallback match, no 60fps
+            ('1440p', 'AVC1', False, False): (False, '271'),           # Fallback match, switched to VP9
+            ('1440p', 'AVC1', False, True): (False, '336'),            # Fallback match, hdr, switched to VP9
+            ('1440p', 'AVC1', True, False): (False, '336'),            # Fallback match, hdr, switched to VP9, no 60fps
+            ('1440p', 'AVC1', True, True): (False, '336'),             # Fallback match, hdr, switched to VP9, no 60fps
+            ('1440p', 'VP9', False, False): (True, '271'),             # Exact match
+            ('1440p', 'VP9', False, True): (True, '336'),              # Exact match, hdr
+            ('1440p', 'VP9', True, False): (False, '271'),             # Fallback match, no 60fps
+            ('1440p', 'VP9', True, True): (False, '336'),              # Fallback match, no 60fps
+            ('2160p', 'AVC1', False, False): (False, '313'),           # Fallback match, switched to VP9
+            ('2160p', 'AVC1', False, True): (False, '337'),            # Fallback match, hdr, switched to VP9
+            ('2160p', 'AVC1', True, False): (False, '337'),            # Fallback match, hdr, switched to VP9, no 60fps
+            ('2160p', 'AVC1', True, True): (False, '337'),             # Fallback match, hdr, switched to VP9, no 60fps
+            ('2160p', 'VP9', False, False): (True, '313'),             # Exact match
+            ('2160p', 'VP9', False, True): (True, '337'),              # Exact match, hdr
+            ('2160p', 'VP9', True, False): (False, '313'),             # Fallback match, no 60fps
+            ('2160p', 'VP9', True, True): (False, '337'),              # Fallback match, no 60fps
+            # No test formats in 'hdr' metadata > 4k
+        }
+        for params, expected in expected_matches.items():
+            resolution, vcodec, prefer_60fps, prefer_hdr = params
+            expeceted_match_type, expected_format_code = expected
+            self.source.source_resolution = resolution
+            self.source.source_vcodec = vcodec
+            self.source.prefer_60fps = prefer_60fps
+            self.source.prefer_hdr = prefer_hdr
+            match_type, format_code = self.media.get_best_video_format()
+            self.assertEqual(format_code, expected_format_code)
+            self.assertEqual(match_type, expeceted_match_type)
+        # Test 60fps+hdr metadata
+        self.media.metadata = all_test_metadata['60fps+hdr']
+        expected_matches = {
+            # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
+            ('360p', 'AVC1', False, True): (False, '134'),             # Fallback match, no hdr
+            ('360p', 'AVC1', True, False): (False, '134'),             # Fallback match, no 60fps
+            ('360p', 'AVC1', True, True): (False, '332'),              # Fallback match, 60fps+hdr, switched to VP9
+            ('360p', 'VP9', False, False): (True, '243'),              # Exact match
+            ('360p', 'VP9', False, True): (True, '332'),               # Exact match, hdr
+            ('360p', 'VP9', True, False): (False, '332'),              # Fallback match, 60fps, extra hdr
+            ('360p', 'VP9', True, True): (True, '332'),                # Exact match, 60fps+hdr
+            ('480p', 'AVC1', False, False): (True, '135'),             # Exact match
+            ('480p', 'AVC1', False, True): (False, '135'),             # Fallback match, no hdr
+            ('480p', 'AVC1', True, False): (False, '135'),             # Fallback match, no 60fps
+            ('480p', 'AVC1', True, True): (False, '333'),              # Fallback match, 60fps+hdr, switched to VP9
+            ('480p', 'VP9', False, False): (True, '244'),              # Exact match
+            ('480p', 'VP9', False, True): (True, '333'),               # Exact match, hdr
+            ('480p', 'VP9', True, False): (False, '333'),              # Fallback match, 60fps, extra hdr
+            ('480p', 'VP9', True, True): (True, '333'),                # Exact match, 60fps+hdr
+            ('720p', 'AVC1', False, False): (True, '136'),             # Exact match
+            ('720p', 'AVC1', False, True): (False, '136'),             # Fallback match, no hdr
+            ('720p', 'AVC1', True, False): (True, '298'),              # Exact match, 60fps
+            ('720p', 'AVC1', True, True): (False, '334'),              # Fallback match, 60fps+hdr, switched to VP9
+            ('720p', 'VP9', False, False): (True, '247'),              # Exact match
+            ('720p', 'VP9', False, True): (True, '334'),               # Exact match, hdr
+            ('720p', 'VP9', True, False): (True, '302'),               # Exact match, 60fps
+            ('720p', 'VP9', True, True): (True, '334'),                # Exact match, 60fps+hdr
+            ('1440p', 'AVC1', False, False): (False, '308'),           # Fallback match, 60fps, switched to VP9 (no 1440p AVC1)
+            ('1440p', 'AVC1', False, True): (False, '336'),            # Fallback match, 60fps+hdr, switched to VP9 (no 1440p AVC1)
+            ('1440p', 'AVC1', True, False): (False, '308'),            # Fallback match, 60fps, switched to VP9 (no 1440p AVC1)
+            ('1440p', 'AVC1', True, True): (False, '336'),             # Fallback match, 60fps+hdr, switched to VP9 (no 1440p AVC1)
+            ('1440p', 'VP9', False, False): (False, '308'),            # Fallback, 60fps
+            ('1440p', 'VP9', False, True): (True, '336'),              # Exact match, hdr
+            ('1440p', 'VP9', True, False): (True, '308'),              # Exact match, 60fps
+            ('1440p', 'VP9', True, True): (True, '336'),               # Exact match, 60fps+hdr
+            ('2160p', 'AVC1', False, False): (False, '315'),           # Fallback, 60fps, switched to VP9 (no 2160p AVC1)
+            ('2160p', 'AVC1', False, True): (False, '337'),            # Fallback match, 60fps+hdr, switched to VP9 (no 2160p AVC1)
+            ('2160p', 'AVC1', True, False): (False, '315'),            # Fallback, switched to VP9 (no 2160p AVC1)
+            ('2160p', 'AVC1', True, True): (False, '337'),             # Fallback match, 60fps+hdr, switched to VP9 (no 2160p AVC1)
+            ('2160p', 'VP9', False, False): (False, '315'),            # Fallback, 60fps
+            ('2160p', 'VP9', False, True): (True, '337'),              # Exact match, hdr
+            ('2160p', 'VP9', True, False): (True, '315'),              # Exact match, 60fps
+            ('2160p', 'VP9', True, True): (True, '337'),               # Exact match, 60fps+hdr
+            ('4320P', 'AVC1', False, False): (False, '272'),           # Fallback, 60fps, switched to VP9 (no 4320P AVC1, no other 8k streams)
+            ('4320P', 'AVC1', False, True): (False, '272'),            # Fallback, 60fps, switched to VP9 (no 4320P AVC1, no other 8k streams)
+            ('4320P', 'AVC1', True, False): (False, '272'),            # Fallback, 60fps, switched to VP9 (no 4320P AVC1, no other 8k streams)
+            ('4320P', 'AVC1', True, True): (False, '272'),             # Fallback, 60fps, switched to VP9 (no 4320P AVC1, no other 8k streams)
+            ('4320P', 'VP9', False, False): (False, '272'),            # Fallback, 60fps (no other 8k streams)
+            ('4320P', 'VP9', False, True): (False, '272'),             # Fallback, 60fps (no other 8k streams)
+            ('4320P', 'VP9', True, False): (True, '272'),              # Exact match, 60fps
+            ('4320P', 'VP9', True, True): (False, '272'),              # Fallback, 60fps (no other 8k streams)
+        }
+        for params, expected in expected_matches.items():
+            resolution, vcodec, prefer_60fps, prefer_hdr = params
+            expeceted_match_type, expected_format_code = expected
+            self.source.source_resolution = resolution
+            self.source.source_vcodec = vcodec
+            self.source.prefer_60fps = prefer_60fps
+            self.source.prefer_hdr = prefer_hdr
+            match_type, format_code = self.media.get_best_video_format()
+            self.assertEqual(format_code, expected_format_code)
+            self.assertEqual(match_type, expeceted_match_type)

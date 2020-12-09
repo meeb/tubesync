@@ -154,9 +154,9 @@ def parse_media_format(format_dict):
     format_full = format_dict.get('format_note', '').strip().upper()
     format_str = format_full[:-2] if format_full.endswith('60') else format_full
     format_str = format_str.strip()
-    format_str = format_full[:-3] if format_full.endswith('HDR') else format_full
+    format_str = format_str[:-3] if format_str.endswith('HDR') else format_str
     format_str = format_str.strip()
-    format_str = format_full[:-2] if format_full.endswith('60') else format_full
+    format_str = format_str[:-2] if format_str.endswith('60') else format_str
     format_str = format_str.strip()
     return {
         'id': format_dict.get('format_id', ''),

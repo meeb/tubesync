@@ -344,9 +344,6 @@ def get_media_thumb_path(instance, filename):
     return Path('thumbs') / prefix / filename
 
 
-_metadata_cache = {}
-
-
 class Media(models.Model):
     '''
         Media is a single piece of media, such as a single YouTube video linked to a
@@ -551,14 +548,11 @@ class Media(models.Model):
 
     @property
     def loaded_metadata(self):
-        if self.pk in _metadata_cache:
-            return _metadata_cache[self.pk]
         try:
-            unpacked_data = json.loads(self.metadata)
-        except Exception:
+            return json.loads(self.metadata)
+        except Exception as e:
+            print('!!!!', e)
             return {}
-        _metadata_cache[self.pk] = unpacked_data
-        return _metadata_cache[self.pk]
 
     @property
     def url(self):

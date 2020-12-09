@@ -50,7 +50,8 @@ def map_task_to_instance(task):
         try:
             queue_uuid = uuid.UUID(task.queue)
             try:
-                return Source.objects.get(pk=task.queue)
+                url = MODEL_URL_MAP.get(Source, None)
+                return Source.objects.get(pk=task.queue), url
             except Source.DoesNotExist:
                 pass
         except (TypeError, ValueError, AttributeError):
