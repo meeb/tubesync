@@ -15,7 +15,7 @@ from common.utils import append_uri_params
 from background_task.models import Task, CompletedTask
 from .models import Source, Media
 from .forms import ValidateSourceForm, ConfirmDeleteSourceForm
-from .utils import validate_url
+from .utils import validate_url, delete_file
 from .tasks import map_task_to_instance, get_error_message, get_source_completed_tasks
 from . import signals
 from . import youtube
@@ -295,8 +295,9 @@ class DeleteSourceView(DeleteView, FormMixin):
         delete_media_val = request.POST.get('delete_media', False)
         delete_media = True if delete_media_val is not False else False
         if delete_media:
-            # TODO: delete media files from disk linked to this source
-            pass
+            for media in Media.objects.filter(source=source):
+                if media.media_file:
+                    delete_file(media.media_file.name)
         return super().post(request, *args, **kwargs)
 
     def get_success_url(self):
