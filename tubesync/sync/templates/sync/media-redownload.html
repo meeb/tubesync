@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block headtitle %}Redownload media - {{ media }}{% endblock %}
+
+{% block content %}
+<div class="row no-margin-bottom">
+  <div class="col s12">
+    <h1>Redownload media <strong>{{ media }}</strong></h1>
+    <p>
+      You can delete the downloaded file for your media <strong>{{ media }}</strong> and
+      schedule it to be redownloaded. You might want to use this if you moved the original
+      file on disk and want to download it again, or, if you changed your source settings
+      such as changed the desired resolution and want to redownload the media in a different
+      format.
+    </p>
+  </div>
+</div>
+<div class="row">
+  <form method="post" action="{% url 'sync:redownload-media' pk=media.pk %}" class="col s12 simpleform">
+    {% csrf_token %}
+    {% include 'simpleform.html' with form=form %}
+    <div class="row no-margin-bottom padding-top">
+      <div class="col s12">
+        <button class="btn" type="submit" name="action">Really delete and redownload media <i class="fas fa-trash-alt"></i></button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

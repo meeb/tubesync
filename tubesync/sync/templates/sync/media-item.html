@@ -5,13 +5,14 @@
 {% block content %}
 <div class="row">
   <div class="col s12">
-    <h1 class="truncate">Media <strong>{{ media.key }}</strong></h1>
+    <h1 class="truncate">Media <strong>{{ media.key }}</strong> {{ download_state_icon|safe }}</h1>
     {% if media.title %}<h2 class="truncate"><strong>{{ media.title }}</strong></h2>{% endif %}
     <p class="truncate"><strong><a href="{{ media.url }}" target="_blank"><i class="fas fa-link"></i> {{ media.url }}</a></strong></p>
     <p class="truncate">Downloading to: <strong>{{ media.source.directory_path }}</strong></p>
   </div>
 </div>
 {% if not media.can_download %}{% include 'errorbox.html' with message='Media cannot be downloaded because it has no formats which match the source requirements.' %}{% endif %}
+{% include 'infobox.html' with message=message %}
 <div class="row">
   <div class="col s12 m7">
     <div><i class="fas fa-quote-left"></i></div>
@@ -26,6 +27,19 @@
     </div>
   </div>
 </div>
+{% if task %}
+<div class="row">
+  <div class="col s12">
+    <div class="collection">
+      <span class="collection-item">
+        <i class="fas fa-stopwatch"></i> <strong>{{ task }}</strong><br>
+        {% if task.instance.index_schedule %}Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>{% endif %}
+        <i class="fas fa-redo"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>{% endif %}
+      </span>
+    </div>
+  </div>
+</div>
+{% endif %}
 <div class="row">
   <div class="col s12">
     <table class="striped">
@@ -106,4 +120,11 @@
     </table>
   </div>
 </div>
+{% if media.downloaded %}
+<div class="row">
+  <div class="col s12">
+    <a href="{% url 'sync:redownload-media' pk=media.pk %}" class="btn">Delete and redownload media <i class="fas fa-cloud-download-alt"></i></a>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

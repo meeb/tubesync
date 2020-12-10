@@ -29,6 +29,7 @@ def source_pre_save(sender, instance, **kwargs):
             str(instance.pk),
             repeat=instance.index_schedule,
             queue=str(instance.pk),
+            priority=5,
             verbose_name=verbose_name.format(instance.name)
         )
 
@@ -46,6 +47,7 @@ def source_post_save(sender, instance, created, **kwargs):
             str(instance.pk),
             repeat=instance.index_schedule,
             queue=str(instance.pk),
+            priority=5,
             verbose_name=verbose_name.format(instance.name)
         )
     # Trigger the post_save signal for each media item linked to this source as various
@@ -82,9 +84,18 @@ def task_task_failed(sender, task_id, completed_task, **kwargs):
 
 @receiver(post_save, sender=Media)
 def media_post_save(sender, instance, created, **kwargs):
-    # Triggered after media is saved
-    if created:
-        # If the media is newly created start a task to download its thumbnail
+    # Triggered after media is saved, Recalculate the "can_download" flag, this may
+    # need to change if the source specifications have been changed
+    if instance.get_format_str():
+        if not instance.can_download:
+            instance.can_download = True
+            instance.save()
+    else:
+        if instance.can_download:
+            instance.can_download = True
+            instance.save()
+    # If the media is missing a thumbnail schedule it to be downloaded
+    if not instance.thumb:
         thumbnail_url = instance.thumbnail
         if thumbnail_url:
             log.info(f'Scheduling task to download thumbnail for: {instance.name} '
@@ -94,18 +105,9 @@ def media_post_save(sender, instance, created, **kwargs):
                 str(instance.pk),
                 thumbnail_url,
                 queue=str(instance.source.pk),
+                priority=10,
                 verbose_name=verbose_name.format(instance.name)
             )
-    # Recalculate the "can_download" flag, this may need to change if the source
-    # specifications have been changed
-    if instance.get_format_str():
-        if not instance.can_download:
-            instance.can_download = True
-            instance.save()
-    else:
-        if instance.can_download:
-            instance.can_download = True
-            instance.save()
     # If the media has not yet been downloaded schedule it to be downloaded
     if not instance.downloaded:
         delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
@@ -113,6 +115,7 @@ def media_post_save(sender, instance, created, **kwargs):
         download_media(
             str(instance.pk),
             queue=str(instance.source.pk),
+            priority=15,
             verbose_name=verbose_name.format(instance.name)
         )
 

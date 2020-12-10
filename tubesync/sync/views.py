@@ -4,6 +4,7 @@ from django.http import Http404
 from django.views.generic import TemplateView, ListView, DetailView
 from django.views.generic.edit import (FormView, FormMixin, CreateView, UpdateView,
                                        DeleteView)
+from django.views.generic.detail import SingleObjectMixin
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.db.models import Count
@@ -14,9 +15,11 @@ from django.utils.translation import gettext_lazy as _
 from common.utils import append_uri_params
 from background_task.models import Task, CompletedTask
 from .models import Source, Media
-from .forms import ValidateSourceForm, ConfirmDeleteSourceForm
+from .forms import ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm
 from .utils import validate_url, delete_file
-from .tasks import map_task_to_instance, get_error_message, get_source_completed_tasks
+from .tasks import (map_task_to_instance, get_error_message,
+                    get_source_completed_tasks, get_media_download_task,
+                    delete_task_by_media)
 from . import signals
 from . import youtube
 
@@ -295,6 +298,7 @@ class DeleteSourceView(DeleteView, FormMixin):
         delete_media_val = request.POST.get('delete_media', False)
         delete_media = True if delete_media_val is not False else False
         if delete_media:
+            source = self.get_object()
             for media in Media.objects.filter(source=source):
                 if media.media_file:
                     delete_file(media.media_file.name)
@@ -378,12 +382,29 @@ class MediaItemView(DetailView):
 
     template_name = 'sync/media-item.html'
     model = Media
+    messages = {
+        'redownloading': _('Media file has been deleted and scheduled to redownload'),
+    }
+
+    def __init__(self, *args, **kwargs):
+        self.message = None
+        super().__init__(*args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        message_key = request.GET.get('message', '')
+        self.message = self.messages.get(message_key, '')
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
+        data['message'] = self.message
         combined_exact, combined_format = self.object.get_best_combined_format()
         audio_exact, audio_format = self.object.get_best_audio_format()
         video_exact, video_format = self.object.get_best_video_format()
+        task = get_media_download_task(self.object.pk)
+        data['task'] = task
+        data['download_state'] = self.object.get_download_state(task)
+        data['download_state_icon'] = self.object.get_download_state_icon(task)
         data['combined_exact'] = combined_exact
         data['combined_format'] = combined_format
         data['audio_exact'] = audio_exact
@@ -392,6 +413,48 @@ class MediaItemView(DetailView):
         data['video_format'] = video_format
         data['youtube_dl_format'] = self.object.get_format_str()
         return data
+
+
+class MediaRedownloadView(FormView, SingleObjectMixin):
+
+    template_name = 'sync/media-redownload.html'
+    form_class = RedownloadMediaForm
+    model = Media
+
+    def __init__(self, *args, **kwargs):
+        self.object = None
+        super().__init__(*args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        # Delete any active download tasks for the media
+        delete_task_by_media('sync.tasks.download_media', (str(self.object.pk),))
+        # If the thumbnail file exists on disk, delete it
+        if self.object.thumb_file_exists:
+            delete_file(self.object.thumb.path)
+            self.object.thumb = None
+        # If the media file exists on disk, delete it
+        if self.object.media_file_exists:
+            delete_file(self.object.media_file.path)
+            self.object.media_file = None
+        # Reset all download data
+        self.object.downloaded = False
+        self.object.downloaded_audio_codec = None
+        self.object.downloaded_video_codec = None
+        self.object.downloaded_container = None
+        self.object.downloaded_fps = None
+        self.object.downloaded_hdr = False
+        self.object.downloaded_filesize = None
+        # Saving here will trigger the post_create signals to schedule new tasks
+        self.object.save()
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        url = reverse_lazy('sync:media-item', kwargs={'pk': self.object.pk})
+        return append_uri_params(url, {'message': 'redownloading'})
 
 
 class TasksView(ListView):
@@ -420,6 +483,7 @@ class TasksView(ListView):
                 continue
             setattr(task, 'instance', obj)
             setattr(task, 'url', url)
+            setattr(task, 'run_now', task.run_at < now)
             if task.locked_by_pid_running():
                 data['running'].append(task)
             elif task.has_error():

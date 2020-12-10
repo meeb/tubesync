@@ -396,6 +396,20 @@ class Media(models.Model):
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'formats',
         }
     }
+    STATE_UNKNOWN = 'unknown'
+    STATE_SCHEDULED = 'scheduled'
+    STATE_DOWNLOADING = 'downloading'
+    STATE_DOWNLOADED = 'downloaded'
+    STATE_ERROR = 'error'
+    STATES = (STATE_UNKNOWN, STATE_SCHEDULED, STATE_DOWNLOADING, STATE_DOWNLOADED,
+              STATE_ERROR)
+    STATE_ICONS = {
+        STATE_UNKNOWN: '<i class="far fa-question-circle" title="Unknown download state"></i>',
+        STATE_SCHEDULED: '<i class="far fa-clock" title="Scheduled to download"></i>',
+        STATE_DOWNLOADING: '<i class="fas fa-download" title="Downloading now"></i>',
+        STATE_DOWNLOADED: '<i class="far fa-check-circle" title="Downloaded"></i>',
+        STATE_ERROR: '<i class="fas fa-exclamation-triangle" title="Error downloading"></i>',
+    }
 
     uuid = models.UUIDField(
         _('uuid'),
@@ -649,20 +663,51 @@ class Media(models.Model):
         name = slugify(self.name.replace('&', 'and').replace('+', 'and'))[:50]
         key = self.key.strip()
         fmt = self.source.source_resolution.lower()
-        codecs = []
-        vcodec = self.source.source_vcodec.lower()
-        acodec = self.source.source_acodec.lower()
-        if vcodec:
-            codecs.append(vcodec)
-        if acodec:
-            codecs.append(acodec)
-        codecs = '-'.join(codecs)
+        if self.source.is_audio():
+            codecs = self.source.source_acodec.lower()
+        else:
+            codecs = []
+            vcodec = self.source.source_vcodec.lower()
+            acodec = self.source.source_acodec.lower()
+            if vcodec:
+                codecs.append(vcodec)
+            if acodec:
+                codecs.append(acodec)
+            codecs = '-'.join(codecs)
         ext = self.source.extension
         return f'{datestr}_{source_name}_{name}_{key}-{fmt}-{codecs}.{ext}'
 
     @property
     def filepath(self):
         return self.source.directory_path / self.filename
+
+    @property
+    def thumb_file_exists(self):
+        if not self.thumb:
+            return False
+        return os.path.exists(self.thumb.path)
+
+    @property
+    def media_file_exists(self):
+        if not self.media_file:
+            return False
+        return os.path.exists(self.media_file.path)
+
+    def get_download_state(self, task=None):
+        if self.downloaded:
+            return self.STATE_DOWNLOADED
+        if task:
+            if task.locked_by_pid_running():
+                return self.STATE_DOWNLOADING
+            elif task.has_error():
+                return self.STATE_ERROR
+            else:
+                return self.STATE_SCHEDULED
+        return self.STATE_UNKNOWN
+
+    def get_download_state_icon(self, task=None):
+        state = self.get_download_state(task)
+        return self.STATE_ICONS.get(state, self.STATE_ICONS[self.STATE_UNKNOWN])
 
     def download_media(self):
         format_str = self.get_format_str()

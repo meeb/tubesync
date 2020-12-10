@@ -22,3 +22,8 @@ class ConfirmDeleteSourceForm(forms.Form):
         label=_('Also delete downloaded media'),
         required=False
     )
+
+
+class RedownloadMediaForm(forms.Form):
+
+    pass
