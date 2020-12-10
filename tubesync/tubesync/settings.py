@@ -98,8 +98,9 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
 #MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-SYNC_VIDEO_ROOT = BASE_DIR / 'downloads' / 'video'
-SYNC_AUDIO_ROOT = BASE_DIR / 'downloads' / 'audio'
+DOWNLOAD_ROOT = BASE_DIR / 'downloads'
+DOWNLOAD_VIDEO_DIR = 'video'
+DOWNLOAD_AUDIO_DIR = 'audio'
 SASS_PROCESSOR_ROOT = STATIC_ROOT
 
 
@@ -115,9 +116,9 @@ HEALTHCHECK_ALLOWED_IPS = ('127.0.0.1',)
 
 MAX_ATTEMPTS = 10                           # Number of times tasks will be retried
 MAX_RUN_TIME = 1800                         # Maximum amount of time in seconds a task can run
-BACKGROUND_TASK_RUN_ASYNC = True            # Run tasks async in the background
-BACKGROUND_TASK_ASYNC_THREADS = 2           # Number of async tasks to run at once
-BACKGROUND_TASK_PRIORITY_ORDERING = 'ASC'  # Use 'niceness' task priority ordering
+BACKGROUND_TASK_RUN_ASYNC = False           # Run tasks async in the background
+BACKGROUND_TASK_ASYNC_THREADS = 1           # Number of async tasks to run at once
+BACKGROUND_TASK_PRIORITY_ORDERING = 'ASC'   # Use 'niceness' task priority ordering
 COMPLETED_TASKS_DAYS_TO_KEEP = 30           # Number of days to keep completed tasks
 
 

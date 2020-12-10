@@ -4,6 +4,7 @@
 '''
 
 
+import os
 from django.conf import settings
 from copy import copy
 from common.logger import log
@@ -11,7 +12,6 @@ import youtube_dl
 
 
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
-_defaults.update({'logger': log})
 
 
 class YouTubeError(youtube_dl.utils.DownloadError):
@@ -32,6 +32,7 @@ def get_media_info(url):
         'skip_download': True,
         'forcejson': True,
         'simulate': True,
+        'logger': log
     })
     response = {}
     with youtube_dl.YoutubeDL(opts) as y:
@@ -46,12 +47,37 @@ def download_media(url, media_format, extension, output_file):
     '''
         Downloads a YouTube URL to a file on disk.
     '''
+
+    def hook(event):
+        filename = os.path.basename(event['filename'])
+        if event['status'] == 'error':
+            log.error(f'[youtube-dl] error occured downloading: {filename}')
+        elif event['status'] == 'downloading':
+            p = round((event['downloaded_bytes'] / event['total_bytes']) * 100, -1)
+            if p > hook.download_progress:
+                hook.download_progress = p
+                eta = event.get('_eta_str', '?').strip()
+                percent_done = event.get('_percent_str', '?').strip()
+                speed = event.get('_speed_str', '?').strip()
+                total = event.get('_total_bytes_str', '?').strip()
+                log.info(f'[youtube-dl] downloading: {filename} - {percent_done} of '
+                         f'{total} at {speed}, {eta} remaining')
+        elif event['status'] == 'finished':
+            total_size_str = event.get('_total_bytes_str', '?').strip()
+            elapsed_str = event.get('_elapsed_str', '?').strip()
+            log.info(f'[youtube-dl] finished downloading: {filename} - '
+                     f'{total_size_str} in {elapsed_str}')
+        else:
+            log.warn(f'[youtube-dl] unknown event: {str(event)}')
+    hook.download_progress = 0
+
     opts = copy(_defaults)
     opts.update({
         'format': media_format,
         'merge_output_format': extension,
         'outtmpl': output_file,
         'quiet': True,
+        'progress_hooks': [hook],
     })
     with youtube_dl.YoutubeDL(opts) as y:
         try:

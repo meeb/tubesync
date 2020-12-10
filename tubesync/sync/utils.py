@@ -96,10 +96,8 @@ def file_is_editable(filepath):
     allowed_paths = (
         # Media item thumbnails
         os.path.commonpath([os.path.abspath(str(settings.MEDIA_ROOT))]),
-        # Downloaded video files
-        os.path.commonpath([os.path.abspath(str(settings.SYNC_VIDEO_ROOT))]),
-        # Downloaded audio files
-        os.path.commonpath([os.path.abspath(str(settings.SYNC_AUDIO_ROOT))]),
+        # Downloaded media files
+        os.path.commonpath([os.path.abspath(str(settings.DOWNLOAD_ROOT))]),
     )
     filepath = os.path.abspath(str(filepath))
     if not os.path.isfile(filepath):

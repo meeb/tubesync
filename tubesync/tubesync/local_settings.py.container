@@ -25,5 +25,4 @@ BACKGROUND_TASK_ASYNC_THREADS = int(os.get('TUBESYNC_WORKERS', 2))
 
 
 MEDIA_ROOT = ROOT_DIR / 'config' / 'media'
-SYNC_VIDEO_ROOT = ROOT_DIR / 'downloads' / 'video'
-SYNC_AUDIO_ROOT = ROOT_DIR / 'downloads' / 'audio'
+DOWNLOAD_ROOT = ROOT_DIR / 'downloads'

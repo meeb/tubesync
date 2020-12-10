@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from django.conf import settings
 from django.db import models
+from django.core.files.storage import FileSystemStorage
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from common.errors import NoFormatException
@@ -13,6 +14,9 @@ from .youtube import (get_media_info as get_youtube_media_info,
 from .utils import seconds_to_timestr, parse_media_format
 from .matching import (get_best_combined_format, get_best_audio_format, 
                        get_best_video_format)
+
+
+media_file_storage = FileSystemStorage(location=settings.DOWNLOAD_ROOT)
 
 
 class Source(models.Model):
@@ -295,10 +299,11 @@ class Source(models.Model):
 
     @property
     def directory_path(self):
+        download_dir = Path(media_file_storage.location)
         if self.source_resolution == self.SOURCE_RESOLUTION_AUDIO:
-            return settings.SYNC_AUDIO_ROOT / self.directory
+            return download_dir / settings.DOWNLOAD_AUDIO_DIR / self.directory
         else:
-            return settings.SYNC_VIDEO_ROOT / self.directory
+            return download_dir / settings.DOWNLOAD_VIDEO_DIR / self.directory
 
     def make_directory(self):
         return os.makedirs(self.directory_path, exist_ok=True)
@@ -483,6 +488,7 @@ class Media(models.Model):
         max_length=200,
         blank=True,
         null=True,
+        storage=media_file_storage,
         help_text=_('Media file')
     )
     downloaded = models.BooleanField(
@@ -656,26 +662,29 @@ class Media(models.Model):
 
     @property
     def filename(self):
+        if self.media_file:
+            return os.path.basename(self.media_file.name)
         upload_date = self.upload_date
         dateobj = upload_date if upload_date else self.created
         datestr = dateobj.strftime('%Y-%m-%d')
-        source_name = slugify(self.source.name)
-        name = slugify(self.name.replace('&', 'and').replace('+', 'and'))[:50]
-        key = self.key.strip()
-        fmt = self.source.source_resolution.lower()
-        if self.source.is_audio():
-            codecs = self.source.source_acodec.lower()
+        source_name = slugify(self.source.name).replace('_', '-')
+        name = slugify(self.name.replace('&', 'and').replace('+', 'and'))
+        name = name.replace('_', '-')[:80]
+        key = self.key.strip().replace('_', '-')[:20]
+        fmt = []
+        if self.source.is_audio:
+            fmt.append(self.source.source_acodec.lower())
         else:
-            codecs = []
-            vcodec = self.source.source_vcodec.lower()
-            acodec = self.source.source_acodec.lower()
-            if vcodec:
-                codecs.append(vcodec)
-            if acodec:
-                codecs.append(acodec)
-            codecs = '-'.join(codecs)
+            fmt.append(self.source.source_resolution.lower())
+            fmt.append(self.source.source_vcodec.lower())
+            fmt.append(self.source.source_acodec.lower())
+        if self.source.prefer_60fps:
+            fmt.append('60fps')
+        if self.source.prefer_hdr:
+            fmt.append('hdr')
+        fmt = '-'.join(fmt)
         ext = self.source.extension
-        return f'{datestr}_{source_name}_{name}_{key}-{fmt}-{codecs}.{ext}'
+        return f'{datestr}_{source_name}_{name}_{key}_{fmt}.{ext}'
 
     @property
     def filepath(self):

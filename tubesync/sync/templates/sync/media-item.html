@@ -32,9 +32,13 @@
   <div class="col s12">
     <div class="collection">
       <span class="collection-item">
+        {% if task.locked_by_pid_running %}
+        <i class="fas fa-running"></i> <strong>{{ task }}</strong><br>
+        <i class="far fa-clock"></i> Task started at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+        {% else %}
         <i class="fas fa-stopwatch"></i> <strong>{{ task }}</strong><br>
-        {% if task.instance.index_schedule %}Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>{% endif %}
         <i class="fas fa-redo"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>{% endif %}
+        {% endif %}
       </span>
     </div>
   </div>
@@ -80,6 +84,7 @@
         <td class="hide-on-small-only">Container</td>
         <td><span class="hide-on-med-and-up">Container<br></span><strong>{{ media.downloaded_container|upper }}</strong></td>
       </tr>
+      {% if media.downloaded_video_codec %}
       <tr title="Frames per second in the downloaded file">
         <td class="hide-on-small-only">Downloaded FPS</td>
         <td><span class="hide-on-med-and-up">Downloaded FPS<br></span><strong>{{ media.downloaded_fps }} FPS</strong></td>
@@ -88,6 +93,7 @@
         <td class="hide-on-small-only">Downloaded HDR?</td>
         <td><span class="hide-on-med-and-up">Downloaded HDR?<br></span><strong>{% if media.downloaded_hdr %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
       </tr>
+      {% endif %}
       {% else %}
       <tr title="Can the media be downloaded?">
         <td class="hide-on-small-only">Can download?</td>
@@ -98,12 +104,12 @@
         <td class="hide-on-small-only">Available formats</td>
         <td><span class="hide-on-med-and-up">Available formats<br></span>
           {% for format in media.formats %}
-          <span class="truncate">
+          <div>
             ID: <strong>{{ format.format_id }}</strong>
             {% if format.vcodec|lower != 'none' %}, <strong>{{ format.format_note }} ({{ format.width }}x{{ format.height }})</strong>, fps:<strong>{{ format.fps|lower }}</strong>, video:<strong>{{ format.vcodec }} @{{ format.tbr }}k</strong>{% endif %}
             {% if format.acodec|lower != 'none' %}, audio:<strong>{{ format.acodec }} @{{ format.abr }}k / {{ format.asr }}Hz</strong>{% endif %}
             {% if format.format_id == combined_format or format.format_id == audio_format or format.format_id == video_format %}<strong>(matched)</strong>{% endif %}
-          </span>
+          </div>
           {% empty %}
           Media has no indexed available formats
           {% endfor %}
