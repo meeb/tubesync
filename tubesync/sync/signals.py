@@ -30,21 +30,21 @@ def source_pre_save(sender, instance, **kwargs):
             repeat=instance.index_schedule,
             queue=str(instance.pk),
             priority=5,
-            verbose_name=verbose_name.format(instance.name)
+            verbose_name=verbose_name.format(instance.name),
+            remove_existing_tasks=True
         )
 
 
 @receiver(post_save, sender=Source)
 def source_post_save(sender, instance, created, **kwargs):
-    # Triggered after a source is saved, Create a new task to check the directory exists
-    verbose_name = _('Check download directory exists for source "{}"')
-    check_source_directory_exists(
-        str(instance.pk),
-        priority=0,
-        verbose_name=verbose_name.format(instance.name)
-    )
+    # Check directory exists and create an indexing task for newly created sources
     if created:
-        # Create a new indexing task for newly created sources
+        verbose_name = _('Check download directory exists for source "{}"')
+        check_source_directory_exists(
+            str(instance.pk),
+            priority=0,
+            verbose_name=verbose_name.format(instance.name)
+        )
         delete_task_by_source('sync.tasks.index_source_task', instance.pk)
         log.info(f'Scheduling media indexing for source: {instance.name}')
         verbose_name = _('Index media from source "{}"')
@@ -53,7 +53,8 @@ def source_post_save(sender, instance, created, **kwargs):
             repeat=instance.index_schedule,
             queue=str(instance.pk),
             priority=5,
-            verbose_name=verbose_name.format(instance.name)
+            verbose_name=verbose_name.format(instance.name),
+            remove_existing_tasks=True
         )
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
@@ -102,6 +103,8 @@ def media_post_save(sender, instance, created, **kwargs):
             instance.save()
     post_save.connect(media_post_save, sender=Media)
     # If the media is missing a thumbnail schedule it to be downloaded
+    if not instance.thumb_file_exists:
+        instance.thumb = None
     if not instance.thumb:
         thumbnail_url = instance.thumbnail
         if thumbnail_url:
@@ -113,9 +116,13 @@ def media_post_save(sender, instance, created, **kwargs):
                 thumbnail_url,
                 queue=str(instance.source.pk),
                 priority=10,
-                verbose_name=verbose_name.format(instance.name)
+                verbose_name=verbose_name.format(instance.name),
+                remove_existing_tasks=True
             )
     # If the media has not yet been downloaded schedule it to be downloaded
+    if not instance.media_file_exists:
+        instance.downloaded = False
+        instance.media_file = None
     if not instance.downloaded and instance.can_download and not instance.skip:
         delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
         verbose_name = _('Downloading media for "{}"')
@@ -123,7 +130,8 @@ def media_post_save(sender, instance, created, **kwargs):
             str(instance.pk),
             queue=str(instance.source.pk),
             priority=15,
-            verbose_name=verbose_name.format(instance.name)
+            verbose_name=verbose_name.format(instance.name),
+            remove_existing_tasks=True
         )
 
 

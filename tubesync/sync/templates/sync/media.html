@@ -13,7 +13,7 @@
   {% for m in media %}
   <div class="col s12 m6 l4 xl3">
     <div class="card mediacard">
-      <a href="{% url 'sync:media-item' pk=m.pk %}" class="">
+      <a href="{% url 'sync:media-item' pk=m.pk %}" title="{{ m.source.name }} / {{ m.name }}">
         <div class="card-image">
           <img src="{% if m.thumb %}{% url 'sync:media-thumb' pk=m.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}">
           <span class="card-title truncate">{{ m.source }}<br>

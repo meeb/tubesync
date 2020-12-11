@@ -266,6 +266,11 @@ def download_media(media_id):
     except Media.DoesNotExist:
         # Task triggered but the media no longer exists, do nothing
         return
+    if media.skip:
+        # Media was toggled to be skipped after the task was scheduled
+        log.warn(f'Download task triggeredd media: {media} (UUID: {media.pk}) but it '
+                 f'is now marked to be skipped, not downloading')
+        return
     log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{media.filepath}"')
     format_str, container = media.download_media()
     if os.path.exists(media.filepath):

@@ -143,10 +143,14 @@
     <a href="{% url 'sync:skip-media' pk=media.pk %}" class="btn delete-button">Delete and skip media <i class="fas fa-times-circle"></i></a>
   </div>
 </div>
-{% elif media.skip %}
+{% else %}
 <div class="row">
   <div class="col s12">
-    <a href="{% url 'sync:enable-media' pk=media.pk %}" class="btn">Enable (unskip) media <i class="fas fa-cloud-download-alt"></i></a>
+    {% if media.skip %}
+      <a href="{% url 'sync:enable-media' pk=media.pk %}" class="btn">Enable (unskip) media <i class="fas fa-cloud-download-alt"></i></a>
+    {% else %}
+      <a href="{% url 'sync:skip-media' pk=media.pk %}" class="btn delete-button">Skip media <i class="fas fa-times-circle"></i></a>
+    {% endif %}
   </div>
 </div>
 {% endif %}

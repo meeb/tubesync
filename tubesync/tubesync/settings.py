@@ -119,7 +119,7 @@ MAX_RUN_TIME = 1800                         # Maximum amount of time in seconds 
 BACKGROUND_TASK_RUN_ASYNC = False           # Run tasks async in the background
 BACKGROUND_TASK_ASYNC_THREADS = 1           # Number of async tasks to run at once
 BACKGROUND_TASK_PRIORITY_ORDERING = 'ASC'   # Use 'niceness' task priority ordering
-COMPLETED_TASKS_DAYS_TO_KEEP = 30           # Number of days to keep completed tasks
+COMPLETED_TASKS_DAYS_TO_KEEP = 7            # Number of days to keep completed tasks
 
 
 SOURCES_PER_PAGE = 36

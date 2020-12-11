@@ -37,3 +37,8 @@ class SkipMediaForm(forms.Form):
 class EnableMediaForm(forms.Form):
 
     pass
+
+
+class ResetTasksForm(forms.Form):
+
+    pass

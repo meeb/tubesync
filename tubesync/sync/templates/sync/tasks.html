@@ -14,6 +14,7 @@
     </p>
   </div>
 </div>
+{% include 'infobox.html' with message=message %}
 <div class="row">
   <div class="col s12">
     <h2>{{ running|length }} Running</h2>
@@ -82,6 +83,15 @@
       below to view recent tasks which have completed successfully.
     </p>
     <a href="{% url 'sync:tasks-completed' %}" class="btn"><span class="hide-on-med-and-down">View </span>Completed tasks <i class="fas fa-check-double"></i></a>
+  </div>
+</div>
+<div class="row">
+  <div class="col s12">
+    <h2>Reset</h2>
+    <p>
+      If you need to, you can reset and reschedule all tasks using the button below.
+    </p>
+    <a href="{% url 'sync:reset-tasks' %}" class="btn">Reset tasks <i class="fas fa-history"></i></a>
   </div>
 </div>
 {% endblock %}

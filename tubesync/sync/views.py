@@ -16,11 +16,11 @@ from common.utils import append_uri_params
 from background_task.models import Task, CompletedTask
 from .models import Source, Media
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
-                    SkipMediaForm, EnableMediaForm)
+                    SkipMediaForm, EnableMediaForm, ResetTasksForm)
 from .utils import validate_url, delete_file
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
-                    delete_task_by_media)
+                    delete_task_by_media, index_source_task)
 from . import signals
 from . import youtube
 
@@ -380,6 +380,9 @@ class MediaThumbView(DetailView):
 
 
 class MediaItemView(DetailView):
+    '''
+        A single media item overview page.
+    '''
 
     template_name = 'sync/media-item.html'
     model = Media
@@ -419,6 +422,9 @@ class MediaItemView(DetailView):
 
 
 class MediaRedownloadView(FormView, SingleObjectMixin):
+    '''
+        Confirm that the media file should be deleted and redownloaded.
+    '''
 
     template_name = 'sync/media-redownload.html'
     form_class = RedownloadMediaForm
@@ -461,6 +467,9 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
 
 
 class MediaSkipView(FormView, SingleObjectMixin):
+    '''
+        Confirm that the media file should be deleted and marked to skip.
+    '''
 
     template_name = 'sync/media-skip.html'
     form_class = SkipMediaForm
@@ -500,6 +509,9 @@ class MediaSkipView(FormView, SingleObjectMixin):
 
 
 class MediaEnableView(FormView, SingleObjectMixin):
+    '''
+        Confirm that the media item should be re-enabled (marked as unskipped).
+    '''
 
     template_name = 'sync/media-enable.html'
     form_class = EnableMediaForm
@@ -532,12 +544,25 @@ class TasksView(ListView):
 
     template_name = 'sync/tasks.html'
     context_object_name = 'tasks'
+    messages = {
+        'reset': _('All tasks have been reset'),
+    }
+
+    def __init__(self, *args, **kwargs):
+        self.message = None
+        super().__init__(*args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        message_key = request.GET.get('message', '')
+        self.message = self.messages.get(message_key, '')
+        return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         return Task.objects.all().order_by('run_at')
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
+        data['message'] = self.message
         data['running'] = []
         data['errors'] = []
         data['scheduled'] = []
@@ -610,3 +635,36 @@ class CompletedTasksView(ListView):
             data['message'] = message.format(name=self.filter_source.name)
             data['source'] = self.filter_source
         return data
+
+
+class ResetTasks(FormView):
+    '''
+        Confirm that all tasks should be reset. As all tasks are triggered from
+        signals by checking for files existing etc. this can be done by just deleting
+        all tasks and then calling every Source objects .save() method.
+    '''
+
+    template_name = 'sync/tasks-reset.html'
+    form_class = ResetTasksForm
+
+    def form_valid(self, form):
+        # Delete all tasks
+        Task.objects.all().delete()
+        # Iter all tasks
+        for source in Source.objects.all():
+            # Recreate the initial indexing task
+            verbose_name = _('Index media from source "{}"')
+            index_source_task(
+                str(source.pk),
+                repeat=source.index_schedule,
+                queue=str(source.pk),
+                priority=5,
+                verbose_name=verbose_name.format(source.name)
+            )
+            # This also chains down to call each Media objects .save() as well
+            source.save()
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        url = reverse_lazy('sync:tasks')
+        return append_uri_params(url, {'message': 'reset'})
