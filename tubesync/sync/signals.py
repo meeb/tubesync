@@ -37,7 +37,12 @@ def source_pre_save(sender, instance, **kwargs):
 @receiver(post_save, sender=Source)
 def source_post_save(sender, instance, created, **kwargs):
     # Triggered after a source is saved, Create a new task to check the directory exists
-    check_source_directory_exists(str(instance.pk))
+    verbose_name = _('Check download directory exists for source "{}"')
+    check_source_directory_exists(
+        str(instance.pk),
+        priority=0,
+        verbose_name=verbose_name.format(instance.name)
+    )
     if created:
         # Create a new indexing task for newly created sources
         delete_task_by_source('sync.tasks.index_source_task', instance.pk)
@@ -86,14 +91,16 @@ def task_task_failed(sender, task_id, completed_task, **kwargs):
 def media_post_save(sender, instance, created, **kwargs):
     # Triggered after media is saved, Recalculate the "can_download" flag, this may
     # need to change if the source specifications have been changed
+    post_save.disconnect(media_post_save, sender=Media)
     if instance.get_format_str():
         if not instance.can_download:
             instance.can_download = True
             instance.save()
     else:
         if instance.can_download:
-            instance.can_download = True
+            instance.can_download = False
             instance.save()
+    post_save.connect(media_post_save, sender=Media)
     # If the media is missing a thumbnail schedule it to be downloaded
     if not instance.thumb:
         thumbnail_url = instance.thumbnail
@@ -109,7 +116,7 @@ def media_post_save(sender, instance, created, **kwargs):
                 verbose_name=verbose_name.format(instance.name)
             )
     # If the media has not yet been downloaded schedule it to be downloaded
-    if not instance.downloaded:
+    if not instance.downloaded and instance.can_download and not instance.skip:
         delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
         verbose_name = _('Downloading media for "{}"')
         download_media(

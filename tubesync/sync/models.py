@@ -16,7 +16,7 @@ from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 
 
-media_file_storage = FileSystemStorage(location=settings.DOWNLOAD_ROOT)
+media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT))
 
 
 class Source(models.Model):
@@ -491,16 +491,47 @@ class Media(models.Model):
         storage=media_file_storage,
         help_text=_('Media file')
     )
+    skip = models.BooleanField(
+        _('skip'),
+        db_index=True,
+        default=False,
+        help_text=_('Media will be skipped and not downloaded')
+    )
     downloaded = models.BooleanField(
         _('downloaded'),
         db_index=True,
         default=False,
         help_text=_('Media has been downloaded')
     )
+    download_date = models.DateTimeField(
+        _('download date'),
+        db_index=True,
+        blank=True,
+        null=True,
+        help_text=_('Date and time the download completed')
+    )
+    downloaded_format = models.CharField(
+        _('downloaded format'),
+        max_length=30,
+        blank=True,
+        null=True,
+        help_text=_('Audio codec of the downloaded media')
+    )
+    downloaded_height = models.PositiveIntegerField(
+        _('downloaded height'),
+        blank=True,
+        null=True,
+        help_text=_('Height in pixels of the downloaded media')
+    )
+    downloaded_width = models.PositiveIntegerField(
+        _('downloaded width'),
+        blank=True,
+        null=True,
+        help_text=_('Width in pixels of the downloaded media')
+    )
     downloaded_audio_codec = models.CharField(
         _('downloaded audio codec'),
         max_length=30,
-        db_index=True,
         blank=True,
         null=True,
         help_text=_('Audio codec of the downloaded media')
@@ -508,7 +539,6 @@ class Media(models.Model):
     downloaded_video_codec = models.CharField(
         _('downloaded video codec'),
         max_length=30,
-        db_index=True,
         blank=True,
         null=True,
         help_text=_('Video codec of the downloaded media')
@@ -516,14 +546,12 @@ class Media(models.Model):
     downloaded_container = models.CharField(
         _('downloaded container format'),
         max_length=30,
-        db_index=True,
         blank=True,
         null=True,
         help_text=_('Container format of the downloaded media')
     )
     downloaded_fps = models.PositiveSmallIntegerField(
         _('downloaded fps'),
-        db_index=True,
         blank=True,
         null=True,
         help_text=_('FPS of the downloaded media')
@@ -567,7 +595,7 @@ class Media(models.Model):
 
     def get_best_video_format(self):
         return get_best_video_format(self)
-
+    
     def get_format_str(self):
         '''
             Returns a youtube-dl compatible format string for the best matches
@@ -593,6 +621,55 @@ class Media(models.Model):
                     return False
         return False
     
+    def get_display_format(self, format_str):
+        '''
+            Returns a tuple used in the format component of the output filename. This
+            is the format(s) found by matching. Examples:
+                # Audio and video streams
+                ('1080p', 'vp9', 'opus')
+                # Audio only stream
+                ('opus',)
+                # Audio and video streams with additional flags
+                ('720p', 'avc1', 'mp4a', '60fps', 'hdr')  
+        '''
+        fmt = []
+        # If the download has completed use existing values
+        if self.downloaded:
+            if self.downloaded_format != 'audio':
+                fmt.append(self.downloaded_format.lower())
+                fmt.append(self.downloaded_video_codec.lower())
+            fmt.append(self.downloaded_audio_codec.lower())
+            if self.downloaded_format != 'audio':
+                fmt.append(str(self.downloaded_fps))
+                if self.downloaded_hdr:
+                    fmt.append('hdr')
+            return fmt
+        # Otherwise, calculate from matched format codes
+        vformat = None
+        aformat = None
+        if '+' in format_str:
+            # Seperate audio and video streams
+            vformat_code, aformat_code = format_str.split('+')
+            vformat = self.get_format_by_code(vformat_code)
+            aformat = self.get_format_by_code(aformat_code)
+        else:
+            # Combined stream or audio only
+            cformat = self.get_format_by_code(format_str)
+            aformat = cformat
+            if cformat['vcodec']:
+                # Combined
+                vformat = cformat
+        if vformat:
+            fmt.append(vformat['format'].lower())
+            fmt.append(vformat['vcodec'].lower())
+        fmt.append(aformat['acodec'].lower())
+        if vformat:
+            if vformat['is_60fps']:
+                fmt.append('60fps')
+            if vformat['is_hdr']:
+                fmt.append('hdr')
+        return tuple(fmt)
+
     def get_format_by_code(self, format_code):
         '''
             Matches a format code, such as '22', to a processed format dict.
@@ -671,18 +748,9 @@ class Media(models.Model):
         name = slugify(self.name.replace('&', 'and').replace('+', 'and'))
         name = name.replace('_', '-')[:80]
         key = self.key.strip().replace('_', '-')[:20]
-        fmt = []
-        if self.source.is_audio:
-            fmt.append(self.source.source_acodec.lower())
-        else:
-            fmt.append(self.source.source_resolution.lower())
-            fmt.append(self.source.source_vcodec.lower())
-            fmt.append(self.source.source_acodec.lower())
-        if self.source.prefer_60fps:
-            fmt.append('60fps')
-        if self.source.prefer_hdr:
-            fmt.append('hdr')
-        fmt = '-'.join(fmt)
+        format_str = self.get_format_str()
+        format_tuple = self.get_display_format(format_str)
+        fmt = '-'.join(format_tuple)
         ext = self.source.extension
         return f'{datestr}_{source_name}_{name}_{key}_{fmt}.{ext}'
 
@@ -721,7 +789,7 @@ class Media(models.Model):
     def download_media(self):
         format_str = self.get_format_str()
         if not format_str:
-            raise NoFormatException(f'Cannot download, media "{self.pk}" ({media}) has '
+            raise NoFormatException(f'Cannot download, media "{self.pk}" ({self}) has '
                                     f'no valid format available')
         # Download the media with youtube-dl
         download_youtube_media(self.url, format_str, self.source.extension,

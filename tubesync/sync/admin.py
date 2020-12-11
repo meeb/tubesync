@@ -6,7 +6,8 @@ from .models import Source, Media
 class SourceAdmin(admin.ModelAdmin):
 
     ordering = ('-created',)
-    list_display = ('name', 'get_source_type_display', 'last_crawl', 'has_failed')
+    list_display = ('uuid', 'name', 'source_type', 'last_crawl',
+                    'has_failed')
     readonly_fields = ('uuid', 'created')
     search_fields = ('uuid', 'key', 'name')
 
@@ -15,6 +16,6 @@ class SourceAdmin(admin.ModelAdmin):
 class MediaAdmin(admin.ModelAdmin):
 
     ordering = ('-created',)
-    list_display = ('key', 'source', 'can_download', 'downloaded')
+    list_display = ('uuid', 'key', 'source', 'can_download', 'skip', 'downloaded')
     readonly_fields = ('uuid', 'created')
     search_fields = ('uuid', 'source__key', 'key')

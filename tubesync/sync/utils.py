@@ -161,6 +161,7 @@ def parse_media_format(format_dict):
         'format': format_str,
         'format_verbose': format_dict.get('format', ''),
         'height': format_dict.get('height', 0),
+        'width': format_dict.get('width', 0),
         'vcodec': vcodec,
         'fps': format_dict.get('fps', 0),
         'vbr': format_dict.get('tbr', 0),

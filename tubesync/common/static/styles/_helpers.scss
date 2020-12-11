@@ -18,6 +18,10 @@ strong {
     padding-top: 20px;
 }
 
+.error-text {
+    color: $error-text-colour;
+}
+
 .errors {
     background-color: $box-error-background-colour;
     border-radius: 2px;

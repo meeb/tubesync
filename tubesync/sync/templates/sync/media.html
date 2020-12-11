@@ -18,7 +18,19 @@
           <img src="{% if m.thumb %}{% url 'sync:media-thumb' pk=m.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}">
           <span class="card-title truncate">{{ m.source }}<br>
             <span>{{ m.name }}</span><br>
-            <span>{% if m.can_download %}{% if m.downloaded %}<i class="fas fa-check-circle" title="Downloaded"></i>{% else %}<i class="far fa-clock" title="Waiting to download or downloading"></i>{% endif %} {{ m.published|date:'Y-m-d' }}{% else %}<i class="fas fa-exclamation-triangle"></i> No matching formats{% endif %}</span>
+            <span>
+            {% if m.downloaded %}
+              <i class="fas fa-check-circle" title="Downloaded"></i> {{ m.download_date|date:'Y-m-d' }}
+            {% else %}
+              {% if m.skip %}
+              <span class="error-text"><i class="fas fa-times" title="Skipping media"></i> Skipped</span>
+              {% elif m.can_download %}
+              <i class="far fa-clock" title="Waiting to download or downloading"></i> {{ m.published|date:'Y-m-d' }}
+              {% else %}
+              <span class="error-text"><i class="fas fa-exclamation-triangle" title="No matching formats to download"></i> No matching formats</span>
+              {% endif %}
+            {% endif %}
+            </span>
           </span>
         </div>
       </a>

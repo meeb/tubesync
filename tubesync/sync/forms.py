@@ -27,3 +27,13 @@ class ConfirmDeleteSourceForm(forms.Form):
 class RedownloadMediaForm(forms.Form):
 
     pass
+
+
+class SkipMediaForm(forms.Form):
+
+    pass
+
+
+class EnableMediaForm(forms.Form):
+
+    pass

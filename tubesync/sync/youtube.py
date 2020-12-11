@@ -53,8 +53,8 @@ def download_media(url, media_format, extension, output_file):
         if event['status'] == 'error':
             log.error(f'[youtube-dl] error occured downloading: {filename}')
         elif event['status'] == 'downloading':
-            p = round((event['downloaded_bytes'] / event['total_bytes']) * 100, -1)
-            if p > hook.download_progress:
+            p = round((event['downloaded_bytes'] / event['total_bytes']) * 100)
+            if (p % 5 == 0) and p > hook.download_progress:
                 hook.download_progress = p
                 eta = event.get('_eta_str', '?').strip()
                 percent_done = event.get('_percent_str', '?').strip()

@@ -12,6 +12,7 @@
   </div>
 </div>
 {% if not media.can_download %}{% include 'errorbox.html' with message='Media cannot be downloaded because it has no formats which match the source requirements.' %}{% endif %}
+{% if media.skip %}{% include 'errorbox.html' with message='Media is marked to be skipped and will not be downloaded.' %}{% endif %}
 {% include 'infobox.html' with message=message %}
 <div class="row">
   <div class="col s12 m7">
@@ -63,10 +64,17 @@
         <td class="hide-on-small-only">Fallback</td>
         <td><span class="hide-on-med-and-up">Fallback<br></span><strong>{{ media.source.get_fallback_display }}</strong></td>
       </tr>
+      {% if media.skip %}
+      <tr title="Has the media been downloaded?">
+        <td class="hide-on-small-only">Skipping?</td>
+        <td><span class="hide-on-med-and-up">Skipping?<br></span><strong>{% if media.skip %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
+      {% else %}
       <tr title="Has the media been downloaded?">
         <td class="hide-on-small-only">Downloaded?</td>
         <td><span class="hide-on-med-and-up">Downloaded?<br></span><strong>{% if media.downloaded %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
       </tr>
+      {% endif %}
       {% if media.downloaded %}
       <tr title="The filename the media will be downloaded as">
         <td class="hide-on-small-only">Filename</td>
@@ -106,8 +114,8 @@
           {% for format in media.formats %}
           <div>
             ID: <strong>{{ format.format_id }}</strong>
-            {% if format.vcodec|lower != 'none' %}, <strong>{{ format.format_note }} ({{ format.width }}x{{ format.height }})</strong>, fps:<strong>{{ format.fps|lower }}</strong>, video:<strong>{{ format.vcodec }} @{{ format.tbr }}k</strong>{% endif %}
-            {% if format.acodec|lower != 'none' %}, audio:<strong>{{ format.acodec }} @{{ format.abr }}k / {{ format.asr }}Hz</strong>{% endif %}
+            {% if format.vcodec|lower != 'none' %}, {{ format.format_note }} ({{ format.width }}x{{ format.height }}), fps:{{ format.fps|lower }}, video:{{ format.vcodec }} @{{ format.tbr }}k{% endif %}
+            {% if format.acodec|lower != 'none' %}, audio:{{ format.acodec }} @{{ format.abr }}k / {{ format.asr }}Hz{% endif %}
             {% if format.format_id == combined_format or format.format_id == audio_format or format.format_id == video_format %}<strong>(matched)</strong>{% endif %}
           </div>
           {% empty %}
@@ -128,8 +136,17 @@
 </div>
 {% if media.downloaded %}
 <div class="row">
+  <div class="col s12 l6">
+    <a href="{% url 'sync:redownload-media' pk=media.pk %}" class="btn">Redownload media <i class="fas fa-cloud-download-alt"></i></a>
+  </div>
+  <div class="col s12 l6">
+    <a href="{% url 'sync:skip-media' pk=media.pk %}" class="btn delete-button">Delete and skip media <i class="fas fa-times-circle"></i></a>
+  </div>
+</div>
+{% elif media.skip %}
+<div class="row">
   <div class="col s12">
-    <a href="{% url 'sync:redownload-media' pk=media.pk %}" class="btn">Delete and redownload media <i class="fas fa-cloud-download-alt"></i></a>
+    <a href="{% url 'sync:enable-media' pk=media.pk %}" class="btn">Enable (unskip) media <i class="fas fa-cloud-download-alt"></i></a>
   </div>
 </div>
 {% endif %}

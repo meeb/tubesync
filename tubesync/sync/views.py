@@ -15,7 +15,8 @@ from django.utils.translation import gettext_lazy as _
 from common.utils import append_uri_params
 from background_task.models import Task, CompletedTask
 from .models import Source, Media
-from .forms import ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm
+from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
+                    SkipMediaForm, EnableMediaForm)
 from .utils import validate_url, delete_file
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
@@ -384,6 +385,8 @@ class MediaItemView(DetailView):
     model = Media
     messages = {
         'redownloading': _('Media file has been deleted and scheduled to redownload'),
+        'skipped': _('Media file has been deleted and marked to never download'),
+        'enabled': _('Media has been re-enabled and will be downloaded'),
     }
 
     def __init__(self, *args, **kwargs):
@@ -455,6 +458,70 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
     def get_success_url(self):
         url = reverse_lazy('sync:media-item', kwargs={'pk': self.object.pk})
         return append_uri_params(url, {'message': 'redownloading'})
+
+
+class MediaSkipView(FormView, SingleObjectMixin):
+
+    template_name = 'sync/media-skip.html'
+    form_class = SkipMediaForm
+    model = Media
+
+    def __init__(self, *args, **kwargs):
+        self.object = None
+        super().__init__(*args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        # Delete any active download tasks for the media
+        delete_task_by_media('sync.tasks.download_media', (str(self.object.pk),))
+        # If the media file exists on disk, delete it
+        if self.object.media_file_exists:
+            delete_file(self.object.media_file.path)
+            self.object.media_file = None
+        # Reset all download data
+        self.object.downloaded = False
+        self.object.downloaded_audio_codec = None
+        self.object.downloaded_video_codec = None
+        self.object.downloaded_container = None
+        self.object.downloaded_fps = None
+        self.object.downloaded_hdr = False
+        self.object.downloaded_filesize = None
+        # Mark it to be skipped
+        self.object.skip = True
+        self.object.save()
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        url = reverse_lazy('sync:media-item', kwargs={'pk': self.object.pk})
+        return append_uri_params(url, {'message': 'skipped'})
+
+
+class MediaEnableView(FormView, SingleObjectMixin):
+
+    template_name = 'sync/media-enable.html'
+    form_class = EnableMediaForm
+    model = Media
+
+    def __init__(self, *args, **kwargs):
+        self.object = None
+        super().__init__(*args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        # Mark it as not skipped
+        self.object.skip = False
+        self.object.save()
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        url = reverse_lazy('sync:media-item', kwargs={'pk': self.object.pk})
+        return append_uri_params(url, {'message': 'enabled'})
 
 
 class TasksView(ListView):

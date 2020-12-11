@@ -1,8 +1,8 @@
 from django.urls import path
 from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceView,
                     SourceView, UpdateSourceView, DeleteSourceView, MediaView,
-                    MediaThumbView, MediaItemView, MediaRedownloadView, TasksView,
-                    CompletedTasksView)
+                    MediaThumbView, MediaItemView, MediaRedownloadView, MediaSkipView,
+                    MediaEnableView, TasksView, CompletedTasksView)
 
 
 app_name = 'sync'
@@ -59,6 +59,14 @@ urlpatterns = [
     path('media-redownload/<uuid:pk>',
          MediaRedownloadView.as_view(),
          name='redownload-media'),
+
+    path('media-skip/<uuid:pk>',
+         MediaSkipView.as_view(),
+         name='skip-media'),
+
+    path('media-enable/<uuid:pk>',
+         MediaEnableView.as_view(),
+         name='enable-media'),
 
     # Task URLs
 
