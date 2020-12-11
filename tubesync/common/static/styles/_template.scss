@@ -143,6 +143,29 @@ main {
         }
     }
 
+    .dashcard {
+        text-align: center;
+        h3 {
+            font-size: 2.5rem;
+            padding: 0;
+            margin: 0;
+        }
+        h4 {
+            text-align: left;
+            font-size: 1.5rem;
+            padding: 0 0 0.5rem 0;
+            margin: 0;
+        }
+        .desc {
+            border-bottom: 1px $dash-desc-border solid;
+            padding: 0 0 0.5rem 0;
+            margin:  0 0 0.5rem 0;
+        }
+        .collection-item {
+            text-align: left;
+        }
+    }
+
     .pagination {
         width: 100%;
         padding-top: 1rem;

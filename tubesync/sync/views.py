@@ -7,7 +7,7 @@ from django.views.generic.edit import (FormView, FormMixin, CreateView, UpdateVi
 from django.views.generic.detail import SingleObjectMixin
 from django.http import HttpResponse
 from django.urls import reverse_lazy
-from django.db.models import Count
+from django.db.models import Q, Count, Sum
 from django.forms import ValidationError
 from django.utils.text import slugify
 from django.utils import timezone
@@ -32,8 +32,43 @@ class DashboardView(TemplateView):
 
     template_name = 'sync/dashboard.html'
 
-    def dispatch(self, request, *args, **kwargs):
-        return super().dispatch(request, *args, **kwargs)
+    def get_context_data(self, *args, **kwargs):
+        data = super().get_context_data(*args, **kwargs)
+        data['now'] = timezone.now()
+        # Sources
+        data['num_sources'] = Source.objects.all().count()
+        data['num_video_sources'] = Source.objects.filter(
+            ~Q(source_resolution=Source.SOURCE_RESOLUTION_AUDIO)
+        ).count()
+        data['num_audio_sources'] = data['num_sources'] - data['num_video_sources']
+        data['num_failed_sources'] = Source.objects.filter(has_failed=True).count()
+        # Media
+        data['num_media'] = Media.objects.all().count()
+        data['num_downloaded_media'] = Media.objects.filter(downloaded=True).count()
+        # Tasks
+        data['num_tasks'] = Task.objects.all().count()
+        data['num_completed_tasks'] = CompletedTask.objects.all().count()
+        # Disk usage
+        disk_usage = Media.objects.filter(
+            downloaded=True, downloaded_filesize__isnull=False
+        ).aggregate(Sum('downloaded_filesize'))
+        data['disk_usage_bytes'] = disk_usage['downloaded_filesize__sum']
+        if not data['disk_usage_bytes']:
+            data['disk_usage_bytes'] = 0
+        if data['disk_usage_bytes'] and data['num_downloaded_media']:
+            data['average_bytes_per_media'] = round(data['disk_usage_bytes'] /
+                                                    data['num_downloaded_media'])
+        else:
+            data['average_bytes_per_media'] = 0
+        # Latest downloads
+        data['latest_downloads'] = Media.objects.filter(
+            downloaded=True
+        ).order_by('-download_date')[:10]
+        # Largest downloads
+        data['largest_downloads'] = Media.objects.filter(
+            downloaded=True, downloaded_filesize__isnull=False
+        ).order_by('-downloaded_filesize')[:10]
+        return data
 
 
 class SourcesView(ListView):

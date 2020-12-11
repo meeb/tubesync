@@ -6,6 +6,10 @@ strong {
     white-space: nowrap;
 }
 
+.no-para-margin-top {
+    margin-block-start: 0;
+}
+
 .no-margin-bottom {
     margin-bottom: 0 !important;
 }
