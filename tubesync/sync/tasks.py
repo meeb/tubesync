@@ -21,7 +21,7 @@ from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import NoMediaException, DownloadFailedException
 from .models import Source, Media
-from .utils import get_remote_image, resize_image_to_height
+from .utils import get_remote_image, resize_image_to_height, delete_file
 
 
 def get_hash(task_name, pk):
@@ -127,6 +127,19 @@ def cleanup_completed_tasks():
     CompletedTask.objects.filter(run_at__lt=delta).delete()
 
 
+def cleanup_old_media():
+    for media in Media.objects.filter(download_date__isnull=False):
+        if media.source.delete_old_media and media.source.days_to_keep > 0:
+            delta = timezone.now() - timedelta(days=media.source.days_to_keep)
+            if media.downloaded and media.download_date < delta:
+                # Media was downloaded after the cutoff date, delete it
+                log.info(f'Deleting expired media: {media.source} / {media} '
+                         f'(now older than {media.source.days_to_keep} days / '
+                         f'download_date before {delta})')
+                # .delete() also triggers a pre_delete signal that removes the files
+                media.delete()
+
+
 @background(schedule=0)
 def index_source_task(source_id):
     '''
@@ -165,8 +178,20 @@ def index_source_task(source_id):
         media.source = source
         media.metadata = json.dumps(video)
         upload_date = media.upload_date
+        # Media must have a valid upload date
         if upload_date:
             media.published = timezone.make_aware(upload_date)
+        else:
+            log.error(f'Media has no upload date, skipping: {source} / {media}')
+            continue
+        # If the source has a cut-off check the upload date is within the allowed delta
+        if source.delete_old_media and source.days_to_keep > 0:
+            delta = timezone.now() - timedelta(days=source.days_to_keep)
+            if media.published < delta:
+                # Media was published after the cutoff date, skip it
+                log.warn(f'Media: {source} / {media} is older than '
+                         f'{source.days_to_keep} days, skipping')
+                continue
         try:
             media.save()
             log.info(f'Indexed media: {source} / {media}')
@@ -174,7 +199,8 @@ def index_source_task(source_id):
             log.error(f'Index media failed: {source} / {media} with "{e}"')
     # Tack on a cleanup of old completed tasks
     cleanup_completed_tasks()
-
+    # Tack on a cleanup of old media
+    cleanup_old_media()
 
 
 @background(schedule=0)
@@ -240,12 +266,12 @@ def download_media(media_id):
     except Media.DoesNotExist:
         # Task triggered but the media no longer exists, do nothing
         return
-    log.info(f'Downloading media: {media} (UUID: {media.pk}) to: {media.filepath}')
+    log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{media.filepath}"')
     format_str, container = media.download_media()
     if os.path.exists(media.filepath):
         # Media has been downloaded successfully
         log.info(f'Successfully downloaded media: {media} (UUID: {media.pk}) to: '
-                 f'{media.filepath}')
+                 f'"{media.filepath}"')
         # Link the media file to the object and update info about the download
         media.media_file.name = str(media.filepath)
         media.downloaded = True

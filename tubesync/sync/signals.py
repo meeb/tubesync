@@ -140,3 +140,7 @@ def media_pre_delete(sender, instance, **kwargs):
     if instance.thumb:
         log.info(f'Deleting thumbnail for: {instance} path: {instance.thumb.path}')
         delete_file(instance.thumb.path)
+    # Delete the media file if it exists
+    if instance.media_file:
+        log.info(f'Deleting media for: {instance} path: {instance.media_file.path}')
+        delete_file(instance.media_file.path)
