@@ -20,7 +20,7 @@ from background_task import background
 from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import NoMediaException, DownloadFailedException
-from .models import Source, Media
+from .models import Source, Media, MediaServer
 from .utils import get_remote_image, resize_image_to_height, delete_file
 
 
@@ -312,6 +312,16 @@ def download_media(media_id):
             else:
                 media.downloaded_format = 'audio'
         media.save()
+        # Schedule a task to update media servers
+        for mediaserver in MediaServer.objects.all():
+            verbose_name = _('Request media server rescan for "{}"')
+            rescan_media_server(
+                str(mediaserver.pk),
+                queue=str(instance.source.pk),
+                priority=20,
+                verbose_name=verbose_name.format(mediaserver),
+                remove_existing_tasks=True
+            )
     else:
         # Expected file doesn't exist on disk
         err = (f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
@@ -319,3 +329,17 @@ def download_media(media_id):
         log.error(err)
         # Raising an error here triggers the task to be re-attempted (or fail)
         raise DownloadFailedException(err)
+
+
+@background(schedule=0)
+def rescan_media_server(mediaserver_id):
+    '''
+        Attempts to request a media rescan on a remote media server.
+    '''
+    try:
+        mediaserver = MediaServer.objects.get(pk=media_id)
+    except MediaServer.DoesNotExist:
+        # Task triggered but the media server no longer exists, do nothing
+        return
+    # Request an rescan / update
+    mediaserver.update()

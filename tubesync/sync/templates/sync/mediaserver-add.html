@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block headtitle %}Add a new {{ server_type_name }} media server{% endblock %}
+
+{% block content %}
+<div class="row no-margin-bottom">
+  <div class="col s12">
+    <h1>Add a {{ server_type_name }} media server</h1>
+    <p>
+      You can use this form to add a new {{ server_type_name }} media server. All media
+      servers added will be updated or refreshed every time some media is downloaded.
+    </p>
+    {% if server_help %}{{ server_help|safe }}{% endif %}
+  </div>
+</div>
+<div class="row">
+  <form method="post" action="{% url 'sync:add-mediaserver' server_type='plex' %}" class="col s12 simpleform">
+    {% csrf_token %}
+    {% include 'simpleform.html' with form=form %}
+    <div class="row no-margin-bottom padding-top">
+      <div class="col s12">
+        <button class="btn" type="submit" name="action">Add {{ server_type_name }} server <i class="fas fa-fw fa-server"></i></button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

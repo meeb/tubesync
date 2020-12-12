@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block headtitle %}Media servers{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col s12">
+    <h1 class="truncate">Media servers</h1>
+    <p>
+      Media servers are services like Plex which you may be running on your network. If
+      you add your media server TubeSync will notify your media server to rescan or
+      refresh its libraries every time media is successfully downloaded. Currently,
+      TubeSync only supports Plex.
+    </p>
+  </div>
+</div>
+{% include 'infobox.html' with message=message %}
+<div class="row">
+  <div class="col s12 margin-bottom">
+    <a href="{% url 'sync:add-mediaserver' server_type='plex' %}" class="btn">Add a Plex media server <i class="fas fa-server"></i></a>
+  </div>
+</div>
+<div class="row no-margin-bottom">
+  <div class="col s12">
+    <div class="collection">
+    {% for mediaserver in mediaservers %}
+      <a href="{% url 'sync:mediaserver' pk=mediaserver.pk %}" class="collection-item">
+        {{ mediaserver.icon|safe }} <strong>{{ mediaserver.get_server_type_display }}</strong> server at <strong>{{ mediaserver.url }}</strong>
+      </a>
+    {% empty %}
+      <span class="collection-item no-items"><i class="fas fa-info-circle"></i> You haven't added any media servers.</span>
+    {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

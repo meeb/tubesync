@@ -42,3 +42,37 @@ class EnableMediaForm(forms.Form):
 class ResetTasksForm(forms.Form):
 
     pass
+
+
+class ConfirmDeleteMediaServerForm(forms.Form):
+
+    pass
+
+
+class PlexMediaServerForm(forms.Form):
+
+    host = forms.CharField(
+        label=_('Host name or IP address of the Plex server'),
+        required=True
+    )
+    port = forms.IntegerField(
+        label=_('Port number of the Plex server'),
+        required=True,
+        initial=32400
+    )
+    use_https = forms.BooleanField(
+        label=_('Connect over HTTPS'),
+        required=False,
+        initial=True,
+    )
+    verify_https = forms.BooleanField(
+        label=_('Verify the HTTPS certificate is valid if connecting over HTTPS'),
+        required=False
+    )
+    token = forms.CharField(
+        label=_('Plex token'),
+        required=True
+    )
+    libraries = forms.CharField(
+        label=_('Comma-separated list of Plex library IDs to update, such as "9" or "4,6"')
+    )

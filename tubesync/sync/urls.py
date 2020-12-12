@@ -2,7 +2,9 @@ from django.urls import path
 from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceView,
                     SourceView, UpdateSourceView, DeleteSourceView, MediaView,
                     MediaThumbView, MediaItemView, MediaRedownloadView, MediaSkipView,
-                    MediaEnableView, TasksView, CompletedTasksView, ResetTasks)
+                    MediaEnableView, TasksView, CompletedTasksView, ResetTasks,
+                    MediaServersView, AddMediaServerView, MediaServerView,
+                    DeleteMediaServerView, UpdateMediaServerView)
 
 
 app_name = 'sync'
@@ -81,5 +83,27 @@ urlpatterns = [
     path('tasks-reset',
          ResetTasks.as_view(),
          name='reset-tasks'),
+
+    # Media Server URLs
+
+    path('mediaservers',
+         MediaServersView.as_view(),
+         name='mediaservers'),
+
+    path('mediaserver-add/<slug:server_type>',
+         AddMediaServerView.as_view(),
+         name='add-mediaserver'),
+
+    path('mediaserver/<int:pk>',
+         MediaServerView.as_view(),
+         name='mediaserver'),
+
+    path('mediaserver-delete/<int:pk>',
+         DeleteMediaServerView.as_view(),
+         name='delete-mediaserver'),
+
+    path('mediaserver-update/<int:pk>',
+         UpdateMediaServerView.as_view(),
+         name='update-mediaserver'),
 
 ]

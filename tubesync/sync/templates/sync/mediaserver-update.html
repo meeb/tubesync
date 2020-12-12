@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block headtitle %}Update media server - {{ mediaserver }}{% endblock %}
+
+{% block content %}
+<div class="row no-margin-bottom">
+  <div class="col s12">
+    <h1>Update <strong>{{ mediaserver }}</strong></h1>
+    <p>
+      You can use this form to update your media server details. The details will be
+      validated when you save the form.
+    </p>
+    {% if server_help %}{{ server_help|safe }}{% endif %}
+  </div>
+</div>
+<div class="row">
+  <form method="post" action="{% url 'sync:update-mediaserver' pk=mediaserver.pk %}" class="col s12 simpleform">
+    {% csrf_token %}
+    {% include 'simpleform.html' with form=form %}
+    <div class="row no-margin-bottom padding-top">
+      <div class="col s12">
+        <button class="btn" type="submit" name="action">Update media server <i class="fas fa-pen-square"></i></button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

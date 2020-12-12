@@ -269,22 +269,60 @@ class FrontEndTestCase(TestCase):
             fallback=Source.FALLBACK_FAIL
         )
         # Add some media
+        test_minimal_metadata = '''
+            {
+                "thumbnail":"https://example.com/thumb.jpg",
+                "formats": [{
+                    "format_id":"251",
+                    "player_url":null,
+                    "ext":"webm",
+                    "format_note":"tiny",
+                    "acodec":"opus",
+                    "abr":160,
+                    "asr":48000,
+                    "filesize":6669827,
+                    "fps":null,
+                    "height":null,
+                    "tbr":156.344,
+                    "width":null,
+                    "vcodec":"none",
+                    "format":"251 - audio only (tiny)",
+                    "protocol":"https"
+                },
+                {
+                    "format_id":"248",
+                    "player_url":null,
+                    "ext":"webm",
+                    "height":1080,
+                    "format_note":"1080p",
+                    "vcodec":"vp9",
+                    "asr":null,
+                    "filesize":63659748,
+                    "fps":24,
+                    "tbr":2747.461,
+                    "width":1920,
+                    "acodec":"none",
+                    "format":"248 - 1920x1080 (1080p)",
+                    "protocol":"https"
+                }]
+            } 
+        '''
         test_media1 = Media.objects.create(
             key='mediakey1',
             source=test_source,
-            metadata='{"thumbnail":"https://example.com/thumb.jpg"}',
+            metadata=test_minimal_metadata
         )
         test_media1_pk = str(test_media1.pk)
         test_media2 = Media.objects.create(
             key='mediakey2',
             source=test_source,
-            metadata='{"thumbnail":"https://example.com/thumb.jpg"}',
+            metadata=test_minimal_metadata
         )
         test_media2_pk = str(test_media2.pk)
         test_media3 = Media.objects.create(
             key='mediakey3',
             source=test_source,
-            metadata='{"thumbnail":"https://example.com/thumb.jpg"}',
+            metadata=test_minimal_metadata
         )
         test_media3_pk = str(test_media3.pk)
         # Check the tasks to fetch the media thumbnails have been scheduled
@@ -358,6 +396,13 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         # Completed tasks overview page
         response = c.get('/tasks-completed')
+        self.assertEqual(response.status_code, 200)
+
+
+    def test_mediasevrers(self):
+        # Media servers overview page
+        c = Client()
+        response = c.get('/mediaservers')
         self.assertEqual(response.status_code, 200)
 
 
