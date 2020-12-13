@@ -15,6 +15,8 @@ chown -R app:app /downloads && \
 chmod -R 0755 /downloads && \
 chown -R root:app /app && \
 chmod -R 0750 /app && \
+chown -R app:app /app/common/static && \
+chmod -R 0750 /app/common/static && \
 find /app -type f -exec chmod 640 {} \; && \
 
 # Run migrations
