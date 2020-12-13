@@ -2,6 +2,8 @@ from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+CONFIG_BASE_DIR = BASE_DIR
+DOWNLOADS_BASE_DIR = BASE_DIR
 
 
 VERSION = 0.1
@@ -98,8 +100,8 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
 #MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
-DOWNLOAD_ROOT = BASE_DIR / 'downloads'
+MEDIA_ROOT = CONFIG_BASE_DIR / 'media'
+DOWNLOAD_ROOT = DOWNLOADS_BASE_DIR / 'downloads'
 DOWNLOAD_VIDEO_DIR = 'video'
 DOWNLOAD_AUDIO_DIR = 'audio'
 SASS_PROCESSOR_ROOT = STATIC_ROOT

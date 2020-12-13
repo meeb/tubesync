@@ -5,6 +5,8 @@ from binascii import hexlify
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = Path('/')
+CONFIG_BASE_DIR = ROOT_DIR / 'config'
+DOWNLOADS_BASE_DIR = ROOT_DIR / 'downloads'
 
 
 RANDOM_SECRET = hexlify(os.urandom(32)).decode()
@@ -19,10 +21,10 @@ TIME_ZONE = os.getenv('TZ', 'UTC')
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': ROOT_DIR / 'config' / 'db.sqlite3',
+        'NAME': CONFIG_BASE_DIR / 'db.sqlite3',
     }
 }
 
 
-MEDIA_ROOT = ROOT_DIR / 'config' / 'media'
-DOWNLOAD_ROOT = ROOT_DIR / 'downloads'
+MEDIA_ROOT = CONFIG_BASE_DIR / 'media'
+DOWNLOAD_ROOT = DOWNLOADS_BASE_DIR

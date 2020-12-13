@@ -1,3 +1,4 @@
+import os
 import json
 from base64 import b64decode
 from django.conf import settings
@@ -71,6 +72,12 @@ class DashboardView(TemplateView):
         data['largest_downloads'] = Media.objects.filter(
             downloaded=True, downloaded_filesize__isnull=False
         ).order_by('-downloaded_filesize')[:10]
+        # UID and GID
+        data['uid'] = os.getuid()
+        data['gid'] = os.getgid()
+        # Config and download locations
+        data['config_dir'] = str(settings.CONFIG_BASE_DIR)
+        data['downloads_dir'] = str(settings.DOWNLOAD_ROOT)
         return data
 
 

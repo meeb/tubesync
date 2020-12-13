@@ -19,7 +19,7 @@
   </div>
 </div>
 {% endif %}
-<div class="row no-margin-bottom">
+<div class="row">
   <div class="col s12 m6 xl3">
     <div class="card dashcard">
       <a href="{% url 'sync:sources' %}">
@@ -97,6 +97,33 @@
           </div>
       </div>
     </div>
+  </div>
+</div>
+<div class="row">
+  <div class="col s12">
+    <h2 class="truncate">Runtime infomation</h2>
+  </div>
+</div>
+<div class="row">
+  <div class="col s12">
+    <table class="striped">
+      <tr title="User ID TubeSync is running under">
+        <td class="hide-on-small-only">User ID</td>
+        <td><span class="hide-on-med-and-up">User ID<br></span><strong>{{ uid }}</strong></td>
+      </tr>
+      <tr title="Group ID TubeSync is running under">
+        <td class="hide-on-small-only">Group ID</td>
+        <td><span class="hide-on-med-and-up">Group ID<br></span><strong>{{ gid }}</strong></td>
+      </tr>
+      <tr title="Local directory where configuration data is stored">
+        <td class="hide-on-small-only">Config directory</td>
+        <td><span class="hide-on-med-and-up">Config directory<br></span><strong>{{ config_dir }}</strong></td>
+      </tr>
+      <tr title="Local directory where media will be downloaded to">
+        <td class="hide-on-small-only">Downloads directory</td>
+        <td><span class="hide-on-med-and-up">Downloads directory<br></span><strong>{{ downloads_dir }}</strong></td>
+      </tr>
+    </table>
   </div>
 </div>
 {% endblock %}
