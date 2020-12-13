@@ -150,6 +150,15 @@ def parse_media_format(format_dict):
     except (ValueError, TypeError):
         fps = 0
     height = format_dict.get('height', 0)
+    try:
+        height = int(height)
+    except (ValueError, TypeError):
+        height = 0
+    width = format_dict.get('width', 0)
+    try:
+        width = int(width)
+    except (ValueError, TypeError):
+        width = 0
     format_full = format_dict.get('format_note', '').strip().upper()
     format_str = format_full[:-2] if format_full.endswith('60') else format_full
     format_str = format_str.strip()
@@ -162,7 +171,7 @@ def parse_media_format(format_dict):
     if 'DASH' in format_str:
         is_hls = False
         is_dash = True
-        if height and height > 0:
+        if height > 0:
             height = f'{height}P'
         else:
             format_str = None
@@ -171,7 +180,7 @@ def parse_media_format(format_dict):
         'format': format_str,
         'format_verbose': format_dict.get('format', ''),
         'height': height,
-        'width': format_dict.get('width', 0),
+        'width': width,
         'vcodec': vcodec,
         'fps': format_dict.get('fps', 0),
         'vbr': format_dict.get('tbr', 0),
