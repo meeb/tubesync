@@ -1,32 +1,44 @@
 FROM debian:buster-slim
 
-ARG DEBIAN_FRONTEND="noninteractive"
-
-# Third party software versions
+ARG ARCH="amd64"
+ARG S6_VERSION="2.1.0.2"
 ARG FFMPEG_VERSION="4.3.1"
-ENV FFMPEG_EXPECTED_MD5="ee235393ec7778279144ee6cbdd9eb64"
-ENV FFMPEG_TARBALL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-${FFMPEG_VERSION}-amd64-static.tar.xz"
+
+ENV DEBIAN_FRONTEND="noninteractive" \
+    HOME="/root" \
+    LANGUAGE="en_US.UTF-8" \
+    LANG="en_US.UTF-8" \
+    LC_ALL="en_US.UTF-8" \
+    TERM="xterm" \
+    S6_EXPECTED_SHA256="52460473413601ff7a84ae690b161a074217ddc734990c2cdee9847166cf669e" \
+    S6_DOWNLOAD="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-${ARCH}.tar.gz" \
+    FFMPEG_EXPECTED_SHA256="47d95c0129fba27d051748a442a44a73ce1bd38d1e3f9fe1e9dd7258c7581fa5" \
+    FFMPEG_DOWNLOAD="https://johnvansickle.com/ffmpeg/releases/ffmpeg-${FFMPEG_VERSION}-${ARCH}-static.tar.xz"
 
 # Install third party software
 RUN set -x && \
-    # Install required distro packages
     apt-get update && \
+    apt-get -y --no-install-recommends install locales && \
+    echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
+    locale-gen en_US.UTF-8 && \
+    # Install required distro packages
     apt-get -y --no-install-recommends install curl xz-utils ca-certificates binutils && \
+    # Install s6
+    curl -L ${S6_DOWNLOAD} --output /tmp/s6-overlay-${ARCH}.tar.gz && \
+    sha256sum /tmp/s6-overlay-${ARCH}.tar.gz && \
+    echo "${S6_EXPECTED_SHA256}  /tmp/s6-overlay-${ARCH}.tar.gz" | sha256sum -c - && \
+    tar xzf /tmp/s6-overlay-${ARCH}.tar.gz -C / && \
     # Install ffmpeg
-    curl -L ${FFMPEG_TARBALL} --output /tmp/ffmpeg-${FFMPEG_VERSION}-amd64-static.tar.xz && \
-    echo "${FFMPEG_EXPECTED_MD5}  tmp/ffmpeg-${FFMPEG_VERSION}-amd64-static.tar.xz" | md5sum -c - && \
-    xz --decompress /tmp/ffmpeg-${FFMPEG_VERSION}-amd64-static.tar.xz && \
-    tar -xvf /tmp/ffmpeg-${FFMPEG_VERSION}-amd64-static.tar -C /tmp && \
-    ls -lat /tmp/ffmpeg-4.3.1-amd64-static && \
-    install -v -s -g root -o root -m 0755 -s /tmp/ffmpeg-${FFMPEG_VERSION}-amd64-static/ffmpeg -t /usr/local/bin && \
+    curl -L ${FFMPEG_DOWNLOAD} --output /tmp/ffmpeg-${ARCH}-static.tar.xz && \
+    echo "${FFMPEG_EXPECTED_SHA256}  /tmp/ffmpeg-${ARCH}-static.tar.xz" | sha256sum -c - && \
+    xz --decompress /tmp/ffmpeg-${ARCH}-static.tar.xz && \
+    tar -xvf /tmp/ffmpeg-${ARCH}-static.tar -C /tmp && \
+    install -v -s -g root -o root -m 0755 -s /tmp/ffmpeg-${FFMPEG_VERSION}-${ARCH}-static/ffmpeg -t /usr/local/bin && \
     # Clean up
-    rm -rf /tmp/ffmpeg-${FFMPEG_VERSION}-amd64-static.tar && \
-    rm -rf /tmp/ffmpeg-${FFMPEG_VERSION}-amd64-static && \
+    rm -rf /tmp/s6-overlay-${ARCH}.tar.gz && \
+    rm -rf /tmp/ffmpeg-${ARCH}-static.tar && \
+    rm -rf /tmp/ffmpeg-${FFMPEG_VERSION}-${ARCH}-static && \
     apt-get -y autoremove --purge curl xz-utils binutils
-
-# Defaults
-ARG default_uid="10000"
-ARG default_gid="10000"
 
 # Copy app
 COPY tubesync /app
@@ -35,7 +47,7 @@ COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.
 # Append container bundled software versions
 RUN echo "ffmpeg_version = '${FFMPEG_VERSION}-static'" >> /app/common/third_party_versions.py
 
-# Add Pipfiles
+# Add Pipfile
 COPY Pipfile /app/Pipfile
 COPY Pipfile.lock /app/Pipfile.lock
 
@@ -43,40 +55,27 @@ COPY Pipfile.lock /app/Pipfile.lock
 WORKDIR /app
 
 # Set up the app
-ENV UID="${default_uid}"
-ENV GID="${default_gid}"
 RUN set -x && \
   # Install required distro packages
-  apt-get -y --no-install-recommends install python3 python3-setuptools python3-pip python3-dev gcc make psmisc procps && \
-  # Install wheel which is required for pipenv
-  pip3 --disable-pip-version-check install wheel && \
-  # Then install pipenv
+  apt-get -y install nginx-light && \
+  apt-get -y --no-install-recommends install python3 python3-setuptools python3-pip python3-dev gcc make && \
+  # Install pipenv
   pip3 --disable-pip-version-check install pipenv && \
-  # Create a 'www' user which the workers drop to
-  groupadd -g ${GID} www && \
-  useradd -M -d /app -s /bin/false -u ${UID} -g www www && \
+  # Create a 'app' user which the application will run as
+  groupadd app && \
+  useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
-  pipenv install --system --verbose && \
+  pipenv install --system && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   rm -rf /app/db.sqlite3 && \
-  # Create config, downloads and run dirs we can write to
-  mkdir -p /run/www && \
-  chown -R www:www /run/www && \
-  chmod -R 0700 /run/www && \
+  # Run any required app commands
+  /usr/bin/python3 /app/manage.py compilescss && \
+  /usr/bin/python3 /app/manage.py collectstatic --no-input --link && \
+  # Create config, downloads and run dirs
+  mkdir -p /run/app && \
   mkdir -p /config/media && \
-  chown -R www:www /config && \
-  chmod -R 0755 /config && \
-  mkdir -p /downloads/{audio,video} && \
-  chown -R www:www /downloads && \
-  chmod -R 0755 /downloads && \
-  # Reset permissions
-  mkdir -p /app/static && \
-  chown -R root:www /app && \
-  chown -R www:www /app/common/static && \
-  chown -R www:www /app/static && \
-  chmod -R 0750 /app && \
-  find /app -type f -exec chmod 640 {} \; && \
-  chmod 0750 /app/entrypoint.sh && \
+  mkdir -p /downloads/audio && \
+  mkdir -p /downloads/video && \
   # Clean up
   rm /app/Pipfile && \
   rm /app/Pipfile.lock && \
@@ -94,18 +93,18 @@ RUN set -x && \
   chown root:root /root && \
   chmod 0700 /root
 
+# Copy root
+COPY config/root /
+
 # Create a healthcheck
 HEALTHCHECK --interval=1m --timeout=10s CMD /app/healthcheck.py http://127.0.0.1:8080/healthcheck
-
-# Drop to the www user
-#USER www
 
 # ENVS and ports
 ENV PYTHONPATH "/app:${PYTHONPATH}"
 EXPOSE 8080
 
-# Entrypoint
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Volumes
+VOLUME ["/config", "/downloads"]
 
-# Run gunicorn
-CMD ["/usr/local/bin/gunicorn", "-c", "/app/tubesync/gunicorn.py", "--capture-output", "tubesync.wsgi:application"]
+# Entrypoint, start s6 init
+ENTRYPOINT ["/init"]

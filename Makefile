@@ -26,7 +26,7 @@ container: clean
 
 
 runcontainer:
-	$(docker) run --rm --name $(name) --env-file dev.env --log-opt max-size=50m -ti -p 8080:8080 $(image)
+	$(docker) run --rm --name $(name) --env-file dev.env --log-opt max-size=50m -ti -p 4848:4848 $(image)
 
 
 test:

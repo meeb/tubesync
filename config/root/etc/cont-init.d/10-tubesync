@@ -1,0 +1,22 @@
+#!/usr/bin/with-contenv bash
+
+# Change runtime user UID and GID
+PUID=${PUID:-911}
+PGID=${PGID:-911}
+groupmod -o -g "$PGID" app
+usermod -o -u "$PUID" app
+
+# Reset permissions
+chown -R app:app /run/app && \
+chmod -R 0700 /run/app && \
+chown -R app:app /config && \
+chmod -R 0755 /config && \
+chown -R app:app /downloads && \
+chmod -R 0755 /downloads && \
+chown -R root:app /app && \
+chmod -R 0750 /app && \
+find /app -type f -exec chmod 640 {} \; && \
+
+# Run migrations
+exec s6-setuidgid app \
+    /usr/bin/python3 /app/manage.py migrate

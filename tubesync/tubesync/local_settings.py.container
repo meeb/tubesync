@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from 
+from binascii import hexlify
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -9,19 +9,19 @@ ROOT_DIR = Path('/')
 
 RANDOM_SECRET = hexlify(os.urandom(32)).decode()
 SECRET_KEY = str(os.getenv('DJANGO_SECRET_KEY', RANDOM_SECRET))
-ALLOWED_HOSTS_STR = str(os.getenv('TUBESYNC_HOSTS', 'localhost'))
+ALLOWED_HOSTS_STR = str(os.getenv('TUBESYNC_HOSTS', '127.0.0.1,localhost'))
 ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
+
+
+TIME_ZONE = os.getenv('TZ', 'UTC')
 
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': '/config/db.sqlite3',
+        'NAME': ROOT_DIR / 'config' / 'db.sqlite3',
     }
 }
-
-
-BACKGROUND_TASK_ASYNC_THREADS = int(os.get('TUBESYNC_WORKERS', 2))
 
 
 MEDIA_ROOT = ROOT_DIR / 'config' / 'media'

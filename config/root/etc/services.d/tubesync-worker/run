@@ -1,0 +1,4 @@
+#!/usr/bin/with-contenv bash
+
+exec s6-setuidgid app \
+    /usr/bin/python3 /app/manage.py process_tasks
