@@ -172,7 +172,7 @@ def parse_media_format(format_dict):
         is_hls = False
         is_dash = True
         if height > 0:
-            height = f'{height}P'
+            format_str = f'{height}P'
         else:
             format_str = None
     return {
