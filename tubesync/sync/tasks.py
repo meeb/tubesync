@@ -16,6 +16,7 @@ from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from django.db.utils import IntegrityError
+from django.utils.translation import gettext_lazy as _
 from background_task import background
 from background_task.models import Task, CompletedTask
 from common.logger import log
