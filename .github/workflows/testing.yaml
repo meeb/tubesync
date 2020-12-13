@@ -23,6 +23,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pipenv
-          pipenv install
+          pipenv install --system
       - name: Run Django tests
         run: python3 manage.py test --verbosity=2
