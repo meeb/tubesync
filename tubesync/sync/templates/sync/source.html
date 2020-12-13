@@ -53,7 +53,7 @@
       </tr>
       <tr title="When the source last checked for available media">
         <td class="hide-on-small-only">Last crawl</td>
-        <td><span class="hide-on-med-and-up">Last crawl<br></span><strong>{% if source.last_crawl %}{{ source.last_crawl|date:'Y-m-d H-I-S' }}{% else %}Never{% endif %}</strong></td>
+        <td><span class="hide-on-med-and-up">Last crawl<br></span><strong>{% if source.last_crawl %}{{ source.last_crawl|date:'Y-m-d H:i:s' }}{% else %}Never{% endif %}</strong></td>
       </tr>
       <tr title="Quality and type of media the source will attempt to sync">
         <td class="hide-on-small-only">Source resolution</td>
