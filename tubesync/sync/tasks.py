@@ -319,7 +319,7 @@ def download_media(media_id):
             rescan_media_server(
                 str(mediaserver.pk),
                 queue=str(media.source.pk),
-                priority=20,
+                priority=0,
                 verbose_name=verbose_name.format(mediaserver),
                 remove_existing_tasks=True
             )
