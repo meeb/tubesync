@@ -291,7 +291,10 @@ class SourceView(DetailView):
     template_name = 'sync/source.html'
     model = Source
     messages = {
-        'source-created': _('Your new source has been created'),
+        'source-created': _('Your new source has been created. If you have added a '
+                            'very large source such as a channel with hundreds of '
+                            'videos it can take several minutes for media to start '
+                            'to appear.'),
         'source-updated': _('Your source has been updated.'),
     }
 
