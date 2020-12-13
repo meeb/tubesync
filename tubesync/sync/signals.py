@@ -152,3 +152,16 @@ def media_pre_delete(sender, instance, **kwargs):
     if instance.media_file:
         log.info(f'Deleting media for: {instance} path: {instance.media_file.path}')
         delete_file(instance.media_file.path)
+
+@receiver(post_delete, sender=Media)
+def media_post_delete(sender, instance, **kwargs):
+    # Schedule a task to update media servers
+    for mediaserver in MediaServer.objects.all():
+        log.info(f'Scheduling media server updates')
+        verbose_name = _('Request media server rescan for "{}"')
+        rescan_media_server(
+            str(mediaserver.pk),
+            priority=0,
+            verbose_name=verbose_name.format(mediaserver),
+            remove_existing_tasks=True
+        )
