@@ -13,6 +13,7 @@ RANDOM_SECRET = hexlify(os.urandom(32)).decode()
 SECRET_KEY = str(os.getenv('DJANGO_SECRET_KEY', RANDOM_SECRET))
 ALLOWED_HOSTS_STR = str(os.getenv('TUBESYNC_HOSTS', '127.0.0.1,localhost'))
 ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
+DEBUG = True if os.getenv('TUBESYNC_DEBUG', False) else False
 
 
 TIME_ZONE = os.getenv('TZ', 'UTC')
