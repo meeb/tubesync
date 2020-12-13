@@ -318,7 +318,7 @@ def download_media(media_id):
             verbose_name = _('Request media server rescan for "{}"')
             rescan_media_server(
                 str(mediaserver.pk),
-                queue=str(instance.source.pk),
+                queue=str(media.source.pk),
                 priority=20,
                 verbose_name=verbose_name.format(mediaserver),
                 remove_existing_tasks=True
