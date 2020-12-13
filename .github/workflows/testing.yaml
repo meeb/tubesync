@@ -24,5 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install pipenv
           pipenv install --system
+      - name: Set up Django environment
+        run: cp tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
       - name: Run Django tests
         run: cd tubesync && python3 manage.py test --verbosity=2
