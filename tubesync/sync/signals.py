@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from background_task.signals import task_failed
 from background_task.models import Task
 from common.logger import log
-from .models import Source, Media
+from .models import Source, Media, MediaServer
 from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
                     download_media_thumbnail, map_task_to_instance,
                     check_source_directory_exists, download_media)
