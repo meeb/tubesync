@@ -315,6 +315,7 @@ def download_media(media_id):
         media.save()
         # Schedule a task to update media servers
         for mediaserver in MediaServer.objects.all():
+            log.info(f'Scheduling media server updates')
             verbose_name = _('Request media server rescan for "{}"')
             rescan_media_server(
                 str(mediaserver.pk),
@@ -343,4 +344,5 @@ def rescan_media_server(mediaserver_id):
         # Task triggered but the media server no longer exists, do nothing
         return
     # Request an rescan / update
+    log.info(f'Updating media server: {mediaserver}')
     mediaserver.update()
