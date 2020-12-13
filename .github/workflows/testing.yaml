@@ -1,4 +1,5 @@
 name: Run Django tests for TubeSync
+
 on:
   push:
     branches:
