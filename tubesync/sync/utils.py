@@ -162,7 +162,7 @@ def parse_media_format(format_dict):
     if 'DASH' in format_str:
         is_hls = False
         is_dash = True
-        if height > 0:
+        if height and height > 0:
             height = f'{height}P'
         else:
             format_str = None
