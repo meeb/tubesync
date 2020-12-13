@@ -65,6 +65,12 @@ def download_media(url, media_format, extension, output_file):
                     hook.download_progress = p
                     log.info(f'[youtube-dl] downloading: {filename} - {percent_done} '
                              f'of {total} at {speed}, {eta} remaining')
+            else:
+                # No progress to monitor, just spam every 10 download messages instead
+                hook.download_progress += 1
+                if hook.download_progress % 10 == 0:
+                    log.info(f'[youtube-dl] downloading: {filename} - {percent_done} '
+                                f'of {total} at {speed}, {eta} remaining')
         elif event['status'] == 'finished':
             total_size_str = event.get('_total_bytes_str', '?').strip()
             elapsed_str = event.get('_elapsed_str', '?').strip()
