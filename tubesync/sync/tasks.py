@@ -338,7 +338,7 @@ def rescan_media_server(mediaserver_id):
         Attempts to request a media rescan on a remote media server.
     '''
     try:
-        mediaserver = MediaServer.objects.get(pk=media_id)
+        mediaserver = MediaServer.objects.get(pk=mediaserver_id)
     except MediaServer.DoesNotExist:
         # Task triggered but the media server no longer exists, do nothing
         return
