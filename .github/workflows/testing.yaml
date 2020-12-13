@@ -25,4 +25,4 @@ jobs:
           pip install pipenv
           pipenv install --system
       - name: Run Django tests
-        run: python3 manage.py test --verbosity=2
+        run: cd tubesync && python3 manage.py test --verbosity=2
