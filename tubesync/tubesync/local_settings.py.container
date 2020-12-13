@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from binascii import hexlify
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -9,8 +8,10 @@ CONFIG_BASE_DIR = ROOT_DIR / 'config'
 DOWNLOADS_BASE_DIR = ROOT_DIR / 'downloads'
 
 
-RANDOM_SECRET = hexlify(os.urandom(32)).decode()
-SECRET_KEY = str(os.getenv('DJANGO_SECRET_KEY', RANDOM_SECRET))
+# This is not ever meant to be a public web interface so this isn't too critical
+SECRET_KEY = str(os.getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret'))
+
+
 ALLOWED_HOSTS_STR = str(os.getenv('TUBESYNC_HOSTS', '127.0.0.1,localhost'))
 ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
 DEBUG = True if os.getenv('TUBESYNC_DEBUG', False) else False
