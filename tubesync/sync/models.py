@@ -660,13 +660,6 @@ class Media(models.Model):
                 # Combined
                 vformat = cformat
         if vformat:
-            video_format = vformat['format'].lower()
-            if 'dash' in video_format:
-                height = vformat.get('height', 0)
-                if height > 0:
-                    fmt.append(f'{height}p')
-            else:
-                fmt.append(video_format)
             fmt.append(vformat['format'].lower())
             fmt.append(vformat['vcodec'].lower())
         fmt.append(aformat['acodec'].lower())
