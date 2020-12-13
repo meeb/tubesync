@@ -637,7 +637,13 @@ class Media(models.Model):
         # If the download has completed use existing values
         if self.downloaded:
             if self.downloaded_format != 'audio':
-                fmt.append(self.downloaded_format.lower())
+                video_format = self.downloaded_format.lower()
+                if ' ' in video_format or not video_format.lower().endswith('p'):
+                    height = self.downloaded_height
+                    if height > 0:
+                        fmt.append(f'{height}p')
+                else:
+                    fmt.append(video_format)
                 fmt.append(self.downloaded_video_codec.lower())
             fmt.append(self.downloaded_audio_codec.lower())
             if self.downloaded_format != 'audio':
@@ -661,6 +667,13 @@ class Media(models.Model):
                 # Combined
                 vformat = cformat
         if vformat:
+            video_format = vformat['format'].lower()
+            if ' ' in video_format or not video_format.lower().endswith('p'):
+                height = vformat.get('height', 0)
+                if height > 0:
+                    fmt.append(f'{height}p')
+            else:
+                fmt.append(video_format)
             fmt.append(vformat['format'].lower())
             fmt.append(vformat['vcodec'].lower())
         fmt.append(aformat['acodec'].lower())
