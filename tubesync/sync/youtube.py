@@ -11,12 +11,11 @@ from common.logger import log
 import youtube_dl
 
 
-_youtubedl_cachdir = getattr(settings, 'YOUTUBE_DL_CACHEDIR', None)
+_youtubedl_cachedir = getattr(settings, 'YOUTUBE_DL_CACHEDIR', None)
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
-if _youtubedl_cachdir:
-    _youtubedl_cachdir = str(_youtubedl_cachdir)
-    if os.path.isdir(_youtubedl_cachdir):
-        _defaults['cachedir'] = _youtubedl_cachdir
+if _youtubedl_cachedir:
+    _youtubedl_cachedir = str(_youtubedl_cachedir)
+    _defaults['cachedir'] = _youtubedl_cachedir
 
 
 
