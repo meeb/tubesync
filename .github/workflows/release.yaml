@@ -1,0 +1,22 @@
+name: Release TubeSync
+
+env:
+  IMAGE_NAME: tubesync
+
+on:
+  release
+
+jobs:
+  containerise:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build the container image
+      run: docker build . --tag $IMAGE_NAME
+    - name: Log into GitHub Container Registry
+      run: echo "${{ secrets.REGISTRY_ACCESS_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+    - name: Push image to GitHub Container Registry
+      run: |
+        REF_TAG=ghcr.io/meeb/$IMAGE_NAME:$GITHUB_REF
+        docker tag $IMAGE_NAME $REF_TAG
+        docker push $REF_TAG
