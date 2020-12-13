@@ -8,7 +8,7 @@ from common.logger import log
 from .models import Source, Media, MediaServer
 from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
                     download_media_thumbnail, map_task_to_instance,
-                    check_source_directory_exists, download_media)
+                    check_source_directory_exists, download_media, rescan_media_server)
 from .utils import delete_file
 
 
