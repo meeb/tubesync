@@ -125,8 +125,8 @@ BACKGROUND_TASK_PRIORITY_ORDERING = 'ASC'   # Use 'niceness' task priority order
 COMPLETED_TASKS_DAYS_TO_KEEP = 7            # Number of days to keep completed tasks
 
 
-SOURCES_PER_PAGE = 36
-MEDIA_PER_PAGE = 36
+SOURCES_PER_PAGE = 100
+MEDIA_PER_PAGE = 72
 TASKS_PER_PAGE = 100
 
 
