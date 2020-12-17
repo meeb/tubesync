@@ -62,7 +62,7 @@ currently just Plex, to complete the PVR experience.
 # Installation
 
 TubeSync is designed to be run in a container, such as via Docker or Podman. It also
-works in a Docker Compose stack.
+works in a Docker Compose stack. Only `amd64` is initially supported.
 
 Example (with Docker on *nix):
 
@@ -190,9 +190,10 @@ $ docker logs --follow tubesync
 
 ### 1. Index frequency
 
-It's a good idea to add sources with a low an index frequency as possible. This is the
-duration between indexes of the source. An index is when TubeSync goes off and sees
-which videos available on a channel. Try and keep this as long as possible.
+It's a good idea to add sources with as low an index frequency as possible. This is the
+duration between indexes of the source. An index is when TubeSync checks to see
+what videos available on a channel or playlist to find new media. Try and keep this as
+long as possible, 24 hours if possible.
 
 
 ### 2. Indexing massive channels
@@ -228,8 +229,9 @@ your install is doing check the container logs.
 
 ### Are there alerts when a download is complete?
 
-No, this feature is best served by existing services such as the execelent `tautulli`
-software which can monitor your Plex server and send alerts that way.
+No, this feature is best served by existing services such as the execelent
+[tautulli](https://tautulli.com/) which can monitor your Plex server and send alerts
+that way.
 
 ### There's errors in my "tasks" tab!
 
@@ -251,6 +253,7 @@ Notable libraries and software used:
  * [ffmpeg](https://ffmpeg.org/)
  * [Django Background Tasks](https://github.com/arteria/django-background-tasks/)
  * [django-sass](https://github.com/coderedcorp/django-sass/)
+ * The container bundles with `s6-init` and `nginx`
 
 See the [Pipefile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full list.
 
@@ -271,10 +274,14 @@ can log in at http://localhost:4848/admin
 
 No not at the moment. This could be added later if there is demand for it.
 
-## Does TubeSync support HTTPS?
+### Does TubeSync support HTTPS?
 
 No, you should deploy it behind an HTTPS-capable proxy if you want this (nginx, caddy,
 etc.). Configuration of this is beyond the scope of this README.
+
+### What architectures does the container support?
+
+Just `amd64` for the moment. Others may be made available if there is demand.
 
 
 # Advanced configuration
@@ -308,7 +315,7 @@ installing and running WSGI-based Python web applications before attempting this
 5. Run migrations with `./manage.py migrate`
 6. Collect static files with `./manage.py collectstatic`
 6. Set up your prefered WSGI server, such as `gunicorn` poiting it to the application
-   in `tubesync\tubesync\wsgi.py`
+   in `tubesync/tubesync/wsgi.py`
 7. Set up your proxy server such as `nginx` and forward it to the WSGI server
 8. Check the web interface is working
 9. Run `./manage.py process_tasks` as the background task worker to index and download
