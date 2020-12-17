@@ -241,15 +241,18 @@ media available because you got a channel name wrong) will be shown as errors on
 
 ### What is TubeSync written in?
 
-Python3 using Django, embedding youtube-dl.
+Python3 using Django, embedding youtube-dl. It's pretty much glue between other much
+larger libraries.
 
-Notable libraries used:
+Notable libraries and software used:
 
-`youtube-dl`
-`django-background-tasks`
-`django-sass-processor`
+ * [Django](https://www.djangoproject.com/)
+ * [youtube-dl](https://yt-dl.org/)
+ * [ffmpeg](https://ffmpeg.org/)
+ * [Django Background Tasks](https://github.com/arteria/django-background-tasks/)
+ * [django-sass](https://github.com/coderedcorp/django-sass/)
 
-See `Pipfile` for a full list.
+See the [Pipefile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full list.
 
 ### Can I get access to the full Django admin?
 
