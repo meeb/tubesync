@@ -20,6 +20,7 @@ chmod -R 0750 /app/common/static && \
 chown -R app:app /app/static && \
 chmod -R 0750 /app/static && \
 find /app -type f -exec chmod 640 {} \; && \
+chmod +x /app/healthcheck.py
 
 # Run migrations
 exec s6-setuidgid app \
