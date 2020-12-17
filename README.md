@@ -66,17 +66,34 @@ works in a Docker Compose stack.
 
 Example (with Docker on *nix):
 
+First find your the user ID and group ID you want to run TubeSync as, if you're not
+sure what this is it's probably your current user ID and group ID:
+
 ```bash
-# Create a directory for your TubeSync config
-$ mkdir /some/directory/tubesync-config
-$ mkdir /some/directory/tubesync-downloads
-# Pull a versioned image
-$ docker pull ghcr.io/meeb/tubesync:v0.3
-# Find out your current user ID and group ID
 $ id
 # Example output, in this example, user ID = 1000, group ID = 1000
-# id uid=1000(meeb) gid=1000(meeb) groups=1000(meeb),129(docker)
-# Start the container using your UID and GID
+# id uid=1000(username) gid=1000(username) groups=1000(username),129(docker)
+```
+
+You can find your local timezone name here:
+
+https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+
+If unset, `TZ` defaults to `UTC`.
+
+Next, create the directories you're going to use for config data and downloads:
+
+```bash
+$ mkdir /some/directory/tubesync-config
+$ mkdir /some/directory/tubesync-downloads
+```
+
+Finally, download and run the container:
+
+```bash
+# Pull a versioned image
+$ docker pull ghcr.io/meeb/tubesync:v0.3
+# Start the container using your user ID and group ID
 $ docker run \
   -d \
   --name tubesync \
@@ -89,17 +106,28 @@ $ docker run \
   ghcr.io/meeb/tubesync:v0.3
 ```
 
-You can find your local timezone name here:
-
-https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-
-If unset, `TZ` defaults to `UTC`.
-
 Once running, open `http://localhost:4848` in your browser and you should see the
 TubeSync dashboard. If you do, you can proceed to adding some sources (YouTube channels
 and playlists). If not, check `docker logs tubesync` to see what errors might be
 occuring, typical ones are file permission issues.
 
+Alternatively, for Docker Compose, you can use something like:
+
+```yaml
+  tubesync:
+    image: ghcr.io/meeb/tubesync:v0.3
+    container_name: tubesync
+    restart: unless-stopped
+    ports:
+      - 4848:4848
+    volumes:
+      - /some/directory/tubesync-config:/config
+      - /some/directory/tubesync-downloads:/downloads
+    environment:
+      - TZ=$TIMEZONE
+      - PUID=1000
+      - PGID=1000
+```
 
 # Updating
 
@@ -126,7 +154,7 @@ correct is sufficient to move, back up or migrate your TubeSync install.
 
 Pick your favourite YouTube channels or playlists, pop over to the "sources" tab, click
 whichever add button suits you, enter the URL and validate it. This process extracts
-the key information from the URL and makes sure it's a valid URL, this is the channel
+the key information from the URL and makes sure it's a valid URL. This is the channel
 name for YouTube channels and the playlist ID for YouTube playlists.
 
 You will then be presented with the initial add a source form where you can select
