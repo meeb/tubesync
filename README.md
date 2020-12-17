@@ -20,12 +20,33 @@ hopefully, quite reliable.
 
 # Screenshots
 
+### Dashboard
+
+![TubeSync Dashboard](https://github.com/meeb/tubesync/blob/main/docs/dashboard.png?raw=true)
+
+### Sources overview
+
+![TubeSync sources overview](https://github.com/meeb/tubesync/blob/main/docs/sources.png?raw=true)
+
+### Source details
+
+![TubeSync source details](https://github.com/meeb/tubesync/blob/main/docs/source.png?raw=true)
+
+### Media overview
+
+![TubeSync media overview](https://github.com/meeb/tubesync/blob/main/docs/media.png?raw=true)
+
+### Media details
+
+![TubeSync media-details](https://github.com/meeb/tubesync/blob/main/docs/media-item.png?raw=true)
+
 
 # Requirements
 
 For the easiest installation, you will need an environment to run containers such as
 Docker or Podman. You will also need as much space as you want to allocate to
-downloaded media and thumbnails.
+downloaded media and thumbnails. If you download a lot of media at high resolutions
+this can be very large.
 
 
 # What to expect
