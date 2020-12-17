@@ -32,10 +32,10 @@
         },
         "chardet": {
             "hashes": [
-                "sha256:84ab92ed1c4d4f16916e05906b6b75a6c0fb5db821cc65e70cbd64a3e2a5eaae",
-                "sha256:fc323ffcaeaed0e0a02bf4d117757b98aed530d9ed4531e3e15460124c106691"
+                "sha256:0d6f53a15db4120f2b08c94f11e7d93d2c911ee118b6b30a04ec3ee8310179fa",
+                "sha256:f864054d66fd9118f2e67044ac8981a54775ec5b67aed0441892edb553d21da5"
             ],
-            "version": "==3.0.4"
+            "version": "==4.0.0"
         },
         "django": {
             "hashes": [
@@ -181,11 +181,11 @@
         },
         "requests": {
             "hashes": [
-                "sha256:7f1a0b932f4a60a1a65caa4263921bb7d9ee911957e0ae4a23a6dd08185ad5f8",
-                "sha256:e786fa28d8c9154e6a4de5d46a1d921b8749f8b74e28bde23768e5e16eece998"
+                "sha256:27973dd4a904a4f13b263a19c866c13b92a39ed1c964655f025f3f8d3d75b804",
+                "sha256:c210084e36a42ae6b9219e00e48287def368a26d03a048ddad7bfee44f75871e"
             ],
             "index": "pypi",
-            "version": "==2.25.0"
+            "version": "==2.25.1"
         },
         "rjsmin": {
             "hashes": [
@@ -236,11 +236,11 @@
         },
         "youtube-dl": {
             "hashes": [
-                "sha256:c73c79ccaabb7eabc223b36889ad9d3fbe04433d933312e8752d6a2c2bdc028d",
-                "sha256:cd7a072314ee67472de75a0f770bffc1363be46921c28bfc47a786a5188c417f"
+                "sha256:65968065e66966955dc79fad9251565fcc982566118756da624bd21467f3a04c",
+                "sha256:eaa859f15b6897bec21474b7787dc958118c8088e1f24d4ef1d58eab13188958"
             ],
             "index": "pypi",
-            "version": "==2020.12.5"
+            "version": "==2020.12.14"
         }
     },
     "develop": {}
