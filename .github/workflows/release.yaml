@@ -12,12 +12,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - name: Get tag
+      id: vars
+      run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
     - name: Build the container image
       run: docker build . --tag $IMAGE_NAME
     - name: Log into GitHub Container Registry
       run: echo "${{ secrets.REGISTRY_ACCESS_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
     - name: Push image to GitHub Container Registry
+      env:
+        RELEASE_TAG: ${{ steps.vars.outputs.tag }}
       run: |
-        REF_TAG=ghcr.io/meeb/$IMAGE_NAME:$GITHUB_REF
+        REF_TAG=ghcr.io/meeb/$IMAGE_NAME:$RELEASE_TAG
         docker tag $IMAGE_NAME $REF_TAG
         docker push $REF_TAG
