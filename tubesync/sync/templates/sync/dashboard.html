@@ -24,7 +24,7 @@
     <div class="card dashcard">
       <a href="{% url 'sync:sources' %}">
         <div class="card-content">
-          <h3>{{ num_sources }}</h3>
+          <h3 class="truncate">{{ num_sources }}</h3>
           <div class="desc truncate">source{{ num_sources|pluralize }}</div>
           <div class="truncate"><strong>{{ num_video_sources }}</strong> video, <strong>{{ num_audio_sources }}</strong> audio</div>
         </div>
@@ -35,8 +35,8 @@
     <div class="card dashcard">
       <a href="{% url 'sync:media' %}">
         <div class="card-content">
-          <h3>{{ num_media }}</h3>
-          <div class="desc truncate">media</div>
+          <h3 class="truncate">{{ num_media }}</h3>
+          <div class="desc truncate">media item{{ num_media|pluralize }}</div>
           <div class="truncate"><strong>{{ num_downloaded_media }}</strong> downloaded</div>
         </div>
       </a>
@@ -46,7 +46,7 @@
     <div class="card dashcard">
       <a href="{% url 'sync:tasks' %}">
         <div class="card-content">
-          <h3>{{ num_tasks }}</h3>
+          <h3 class="truncate">{{ num_tasks }}</h3>
           <div class="desc truncate">scheduled task{{ num_tasks|pluralize }}</div>
           <div class="truncate"><strong>{{ num_completed_tasks }}</strong> completed</div>
         </div>
@@ -57,7 +57,7 @@
     <div class="card dashcard">
       <a href="{% url 'sync:media' %}">
         <div class="card-content">
-          <h3>{{ disk_usage_bytes|filesizeformat }}</h3>
+          <h3 class="truncate">{{ disk_usage_bytes|filesizeformat }}</h3>
           <div class="desc truncate">{{ disk_usage_bytes|intcomma }} bytes</div>
           <div class="truncate">Avg. <strong>{{ average_bytes_per_media|filesizeformat }}</strong> per media</div>
         </div>
@@ -67,7 +67,7 @@
   <div class="col s12 l6">
     <div class="card dashcard">
       <div class="card-content">
-        <h4>Latest downloads</h4>
+        <h4 class="truncate">Latest downloads</h4>
         <div class="collection">
         {% for media in latest_downloads %}
           <a href="{% url 'sync:media-item' pk=media.pk %}" class="collection-item">
@@ -84,7 +84,7 @@
   <div class="col s12 l6">
     <div class="card dashcard">
       <div class="card-content">
-        <h4>Largest downloads</h4>
+        <h4 class="truncate">Largest downloads</h4>
         <div class="collection">
           {% for media in largest_downloads %}
             <a href="{% url 'sync:media-item' pk=media.pk %}" class="collection-item">
