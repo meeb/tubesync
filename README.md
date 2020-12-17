@@ -134,7 +134,7 @@ Alternatively, for Docker Compose, you can use something like:
 To update, you can just pull a new version of the container image as they are released.
 
 ```bash
-$ docker pull pull ghcr.io/meeb/tubesync:v[number]
+$ docker pull ghcr.io/meeb/tubesync:v[number]
 ```
 
 Back-end updates such as database migrations should be automatic.
