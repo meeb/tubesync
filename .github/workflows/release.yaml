@@ -4,7 +4,8 @@ env:
   IMAGE_NAME: tubesync
 
 on:
-  release
+  release:
+    types: [published]
 
 jobs:
   containerise:
