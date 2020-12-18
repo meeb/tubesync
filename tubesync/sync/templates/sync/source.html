@@ -89,6 +89,10 @@
         <td class="hide-on-small-only">Fallback</td>
         <td><span class="hide-on-med-and-up">Fallback<br></span><strong>{{ source.get_fallback_display }}</strong></td>
       </tr>
+      <tr title="Should media thumbnails be copied over with the media?">
+        <td class="hide-on-small-only">Copy thumbnails?</td>
+        <td><span class="hide-on-med-and-up">Copy thumbnails?<br></span><strong>{% if source.copy_thumbnails %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
       {% if source.delete_old_media and source.days_to_keep > 0 %}
       <tr title="Days after which your media from this source will be locally deleted">
         <td class="hide-on-small-only">Delete old media</td>
