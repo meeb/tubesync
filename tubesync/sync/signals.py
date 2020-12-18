@@ -1,3 +1,4 @@
+import os
 from django.conf import settings
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
 from django.dispatch import receiver
@@ -152,11 +153,11 @@ def media_pre_delete(sender, instance, **kwargs):
     if instance.media_file:
         filepath = instance.media_file.path
         log.info(f'Deleting media for: {instance} path: {filepath}')
-        delete_file(instance.media_file.path)
+        delete_file(filepath)
         # Delete thumbnail copy if it exists
         barefilepath, fileext = os.path.splitext(filepath)
         thumbpath = f'{barefilepath}.jpg'
-        log.info(f'Copying thumbnail: {instance} path: {thumbpath}')
+        log.info(f'Deleting thumbnail for: {instance} path: {thumbpath}')
         delete_file(thumbpath)
 
 

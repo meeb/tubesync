@@ -7,6 +7,7 @@ from django.conf import settings
 from django.db import models
 from django.core.files.storage import FileSystemStorage
 from django.utils.text import slugify
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.errors import NoFormatException
 from .youtube import (get_media_info as get_youtube_media_info,
@@ -263,6 +264,11 @@ class Source(models.Model):
         return self.ICONS.get(self.source_type)
 
     @property
+    def slugname(self):
+        replaced = self.name.replace('_', '-').replace('&', 'and').replace('+', 'and')
+        return slugify(replaced)[:80]
+
+    @property
     def is_audio(self):
         return self.source_resolution == self.SOURCE_RESOLUTION_AUDIO
 
@@ -335,6 +341,49 @@ class Source(models.Model):
     @property
     def can_fallback(self):
         return self.fallback != self.FALLBACK_FAIL
+
+    @property
+    def example_media_format_dict(self):
+        '''
+            Populates a dict with real-ish and some placeholder data for media name
+            format strings. Used for example filenames and media_format validation.
+        '''
+        fmt = []
+        if self.source_resolution:
+            fmt.append(self.source_resolution)
+        if self.source_vcodec:
+            fmt.append(self.source_vcodec.lower())
+        if self.source_acodec:
+            fmt.append(self.source_acodec.lower())
+        if self.prefer_60fps:
+            fmt.append('60fps')
+        if self.prefer_hdr:
+            fmt.append('hdr')
+        return {
+            'yyyymmdd': timezone.now().strftime('%Y%m%d'),
+            'yyyy_mm_dd': timezone.now().strftime('%Y-%m-%d'),
+            'yyyy': timezone.now().strftime('%Y'),
+            'source': self.slugname,
+            'source_full': self.name,
+            'title': 'some-media-title-name',
+            'title_full': 'Some Media Title Name',
+            'key': 'SoMeUnIqUiD',
+            'format': '-'.join(fmt),
+            'ext': self.extension,
+            'resolution': self.source_resolution if self.source_resolution else '',
+            'height': '720' if self.source_resolution else '',
+            'width': '1280' if self.source_resolution else '',
+            'vcodec': self.source_vcodec.lower() if self.source_vcodec else '',
+            'acodec': self.source_acodec.lower(),
+            'fps': '24' if self.source_resolution else '',
+            'hdr': 'hdr' if self.source_resolution else ''
+        }
+
+    def get_example_media_format(self):
+        try:
+            return self.media_format.format(**self.example_media_format_dict)
+        except Exception:
+            return ''
 
     def index_media(self):
         '''
@@ -645,16 +694,39 @@ class Media(models.Model):
                 ('720p', 'avc1', 'mp4a', '60fps', 'hdr')  
         '''
         fmt = []
+        resolution = ''
+        vcodec = ''
+        acodec = ''
+        height = '0'
+        width = '0'
+        fps = ''
+        hdr = ''
         # If the download has completed use existing values
         if self.downloaded:
+            resolution = f'{self.downloaded_height}p'
             if self.downloaded_format != 'audio':
-                fmt.append(self.downloaded_video_codec.lower())
-            fmt.append(self.downloaded_audio_codec.lower())
+                vcodec = self.downloaded_video_codec.lower()
+                fmt.append(vcodec)
+            acodec = self.downloaded_audio_codec.lower()
+            fmt.append(acodec)
             if self.downloaded_format != 'audio':
-                fmt.append(str(self.downloaded_fps))
+                fps = str(self.downloaded_fps)
+                fmt.append(f'{fps}fps')
                 if self.downloaded_hdr:
-                    fmt.append('hdr')
-            return fmt
+                    hdr = 'hdr'
+                    fmt.append(hdr)
+                height = str(self.downloaded_height)
+                width = str(self.downloaded_width)
+            return {
+                'resolution': resolution,
+                'height': height,
+                'width': width,
+                'vcodec': vcodec,
+                'acodec': acodec,
+                'fps': fps,
+                'hdr': hdr,
+                'format': tuple(fmt),
+            }
         # Otherwise, calculate from matched format codes
         vformat = None
         aformat = None
@@ -671,15 +743,31 @@ class Media(models.Model):
                 # Combined
                 vformat = cformat
         if vformat:
-            fmt.append(vformat['format'].lower())
-            fmt.append(vformat['vcodec'].lower())
-        fmt.append(aformat['acodec'].lower())
+            resolution = vformat['format'].lower()
+            fmt.append(resolution)
+            vcodec = vformat['vcodec'].lower()
+            fmt.append(vcodec)
+        acodec = aformat['acodec'].lower()
+        fmt.append(acodec)
         if vformat:
             if vformat['is_60fps']:
-                fmt.append('60fps')
+                fps = '60fps'
+                fmt.append(fps)
             if vformat['is_hdr']:
-                fmt.append('hdr')
-        return tuple(fmt)
+                hdr = 'hdr'
+                fmt.append(hdr)
+            height = str(vformat['height'])
+            width = str(vformat['width'])
+        return {
+            'resolution': resolution,
+            'height': height,
+            'width': width,
+            'vcodec': vcodec,
+            'acodec': acodec,
+            'fps': fps,
+            'hdr': hdr,
+            'format': tuple(fmt),
+        }
 
     def get_format_by_code(self, format_code):
         '''
@@ -689,6 +777,35 @@ class Media(models.Model):
             if format_code == fmt['id']:
                 return fmt
         return False
+
+    @property
+    def format_dict(self):
+        '''
+            Returns a dict matching the media_format key requirements for this item
+            of media.
+        '''
+        format_str = self.get_format_str()
+        display_format = self.get_display_format(format_str)
+        dateobj = self.upload_date if self.upload_date else self.created
+        return {
+            'yyyymmdd': dateobj.strftime('%Y%m%d'),
+            'yyyy_mm_dd': dateobj.strftime('%Y-%m-%d'),
+            'yyyy': dateobj.strftime('%Y'),
+            'source': self.source.slugname,
+            'source_full': self.source.name,
+            'title': self.slugtitle,
+            'title_full': self.title,
+            'key': self.key,
+            'format': '-'.join(display_format['format']),
+            'ext': self.source.extension,
+            'resolution': display_format['resolution'],
+            'height': display_format['height'],
+            'width': display_format['width'],
+            'vcodec': display_format['vcodec'],
+            'acodec': display_format['acodec'],
+            'fps': display_format['fps'],
+            'hdr': display_format['hdr'],
+        }
 
     @property
     def loaded_metadata(self):
@@ -711,6 +828,11 @@ class Media(models.Model):
     def title(self):
         field = self.get_metadata_field('title')
         return self.loaded_metadata.get(field, '').strip()
+
+    @property
+    def slugtitle(self):
+        replaced = self.title.replace('_', '-').replace('&', 'and').replace('+', 'and')
+        return slugify(replaced)[:80]
 
     @property
     def thumbnail(self):
@@ -750,20 +872,24 @@ class Media(models.Model):
 
     @property
     def filename(self):
+        # If a media_file has been downloaded use its existing name
         if self.media_file:
             return os.path.basename(self.media_file.name)
-        upload_date = self.upload_date
-        dateobj = upload_date if upload_date else self.created
-        datestr = dateobj.strftime('%Y-%m-%d')
-        source_name = slugify(self.source.name).replace('_', '-')
-        name = slugify(self.name.replace('&', 'and').replace('+', 'and'))
-        name = name.replace('_', '-')[:80]
-        key = self.key.strip().replace('_', '-')[:20]
-        format_str = self.get_format_str()
-        format_tuple = self.get_display_format(format_str)
-        fmt = '-'.join(format_tuple)
-        ext = self.source.extension
-        return f'{datestr}_{source_name}_{name}_{key}_{fmt}.{ext}'
+        # Otherwise, create a suitable filename from the source media_format
+        media_format = str(self.source.media_format)
+        media_details = self.format_dict
+        return media_format.format(**media_details)
+
+    @property
+    def directory_path(self):
+        # If a media_file has been downloaded use its existing directory
+        if self.media_file:
+            return os.path.dirname(self.media_file.name)
+        # Otherwise, create a suitable filename from the source media_format
+        media_format = str(self.source.media_format)
+        media_details = self.format_dict
+        dirname = self.source.directory_path / media_format.format(**media_details)
+        return os.path.dirname(str(dirname))
 
     @property
     def filepath(self):

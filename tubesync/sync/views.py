@@ -256,6 +256,11 @@ class AddSourceView(CreateView):
               'index_schedule', 'delete_old_media', 'days_to_keep',
               'source_resolution', 'source_vcodec', 'source_acodec', 'prefer_60fps',
               'prefer_hdr', 'fallback', 'copy_thumbnails')
+    errors = {
+        'invalid_media_format': _('Invalid media format, the media format contains '
+                                  'errors or is empty. Check the table at the end of '
+                                  'this page for valid media name variables'),
+    }
 
     def __init__(self, *args, **kwargs):
         self.prepopulated_data = {}
@@ -281,6 +286,20 @@ class AddSourceView(CreateView):
         for k, v in self.prepopulated_data.items():
             initial[k] = v
         return initial
+
+    def form_valid(self, form):
+        # Perform extra validation to make sure the media_format is valid
+        obj = form.save(commit=False)
+        source_type = form.cleaned_data['media_format']
+        example_media_file = obj.get_example_media_format()
+        if example_media_file == '':
+            form.add_error(
+                'media_format',
+                ValidationError(self.errors['invalid_media_format'])
+            )
+        if form.errors:
+            return super().form_invalid(form)
+        return super().form_valid(form)
 
     def get_success_url(self):
         url = reverse_lazy('sync:source', kwargs={'pk': self.object.pk})
@@ -328,6 +347,25 @@ class UpdateSourceView(UpdateView):
               'index_schedule', 'delete_old_media', 'days_to_keep',
               'source_resolution', 'source_vcodec', 'source_acodec', 'prefer_60fps',
               'prefer_hdr', 'fallback', 'copy_thumbnails')
+    errors = {
+        'invalid_media_format': _('Invalid media format, the media format contains '
+                                  'errors or is empty. Check the table at the end of '
+                                  'this page for valid media name variables'),
+    }
+
+    def form_valid(self, form):
+        # Perform extra validation to make sure the media_format is valid
+        obj = form.save(commit=False)
+        source_type = form.cleaned_data['media_format']
+        example_media_file = obj.get_example_media_format()
+        if example_media_file == '':
+            form.add_error(
+                'media_format',
+                ValidationError(self.errors['invalid_media_format'])
+            )
+        if form.errors:
+            return super().form_invalid(form)
+        return super().form_valid(form)
 
     def get_success_url(self):
         url = reverse_lazy('sync:source', kwargs={'pk': self.object.pk})
@@ -497,8 +535,13 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
             self.object.thumb = None
         # If the media file exists on disk, delete it
         if self.object.media_file_exists:
-            delete_file(self.object.media_file.path)
+            filepath = self.object.media_file.path
+            delete_file(filepath)
             self.object.media_file = None
+            # If the media has an associated thumbnail copied, also delete it
+            barefilepath, fileext = os.path.splitext(filepath)
+            thumbpath = f'{barefilepath}.jpg'
+            delete_file(thumbpath)
         # Reset all download data
         self.object.downloaded = False
         self.object.downloaded_audio_codec = None
@@ -538,8 +581,13 @@ class MediaSkipView(FormView, SingleObjectMixin):
         delete_task_by_media('sync.tasks.download_media', (str(self.object.pk),))
         # If the media file exists on disk, delete it
         if self.object.media_file_exists:
+            filepath = self.object.media_file.path
             delete_file(self.object.media_file.path)
             self.object.media_file = None
+            # If the media has an associated thumbnail copied, also delete it
+            barefilepath, fileext = os.path.splitext(filepath)
+            thumbpath = f'{barefilepath}.jpg'
+            delete_file(thumbpath)
         # Reset all download data
         self.object.downloaded = False
         self.object.downloaded_audio_codec = None
