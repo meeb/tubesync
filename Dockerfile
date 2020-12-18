@@ -13,7 +13,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     S6_EXPECTED_SHA256="52460473413601ff7a84ae690b161a074217ddc734990c2cdee9847166cf669e" \
     S6_DOWNLOAD="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-${ARCH}.tar.gz" \
     FFMPEG_EXPECTED_SHA256="47d95c0129fba27d051748a442a44a73ce1bd38d1e3f9fe1e9dd7258c7581fa5" \
-    FFMPEG_DOWNLOAD="https://johnvansickle.com/ffmpeg/releases/ffmpeg-${FFMPEG_VERSION}-${ARCH}-static.tar.xz"
+    FFMPEG_DOWNLOAD="https://tubesync.sfo2.digitaloceanspaces.com/ffmpeg-${FFMPEG_VERSION}-${ARCH}-static.tar.xz"
+
 
 # Install third party software
 RUN set -x && \
