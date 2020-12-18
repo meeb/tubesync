@@ -21,7 +21,7 @@ hopefully, quite reliable.
 # Latest container image
 
 ```yaml
-ghcr.io/meeb/tubesync:v0.4
+ghcr.io/meeb/tubesync:v0.5
 ```
 
 # Screenshots
@@ -98,7 +98,7 @@ Finally, download and run the container:
 
 ```bash
 # Pull a versioned image
-$ docker pull ghcr.io/meeb/tubesync:v0.4
+$ docker pull ghcr.io/meeb/tubesync:v0.5
 # Start the container using your user ID and group ID
 $ docker run \
   -d \
@@ -109,7 +109,7 @@ $ docker run \
   -v /some/directory/tubesync-config:/config \
   -v /some/directory/tubesync-downloads:/downloads \
   -p 4848:4848 \
-  ghcr.io/meeb/tubesync:v0.4
+  ghcr.io/meeb/tubesync:v0.5
 ```
 
 Once running, open `http://localhost:4848` in your browser and you should see the
@@ -121,7 +121,7 @@ Alternatively, for Docker Compose, you can use something like:
 
 ```yaml
   tubesync:
-    image: ghcr.io/meeb/tubesync:v0.4
+    image: ghcr.io/meeb/tubesync:v0.5
     container_name: tubesync
     restart: unless-stopped
     ports:
