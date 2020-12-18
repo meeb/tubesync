@@ -507,6 +507,12 @@ class FilepathTestCase(TestCase):
         self.source.media_format = 'test-{yyyy}'
         self.assertEqual(self.source.get_example_media_format(),
                          'test-' + timezone.now().strftime('%Y'))
+        self.source.media_format = 'test-{mm}'
+        self.assertEqual(self.source.get_example_media_format(),
+                         'test-' + timezone.now().strftime('%m'))
+        self.source.media_format = 'test-{dd}'
+        self.assertEqual(self.source.get_example_media_format(),
+                         'test-' + timezone.now().strftime('%d'))
         self.source.media_format = 'test-{source}'
         self.assertEqual(self.source.get_example_media_format(),
                          'test-' + self.source.slugname)
