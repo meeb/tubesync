@@ -18,6 +18,7 @@ hands-free as possible, TubeSync has gradual retrying of failures with back-off 
 so media which fails to download will be retried for an extended period making it,
 hopefully, quite reliable.
 
+
 # Latest container image
 
 ```yaml
@@ -196,10 +197,10 @@ $ docker logs --follow tubesync
 
 ### 1. Index frequency
 
-It's a good idea to add sources with as low an index frequency as possible. This is the
-duration between indexes of the source. An index is when TubeSync checks to see
+It's a good idea to add sources with as long of an index frequency as possible. This is
+the duration between indexes of the source. An index is when TubeSync checks to see
 what videos available on a channel or playlist to find new media. Try and keep this as
-long as possible, 24 hours if possible.
+long as possible, up to 24 hours.
 
 
 ### 2. Indexing massive channels
@@ -222,7 +223,7 @@ automatically.
 
 ### Does TubeSync support any other video platforms?
 
-At the moment, no. This is a first release. The library TubeSync uses that does most
+At the moment, no. This is a pre-release. The library TubeSync uses that does most
 of the downloading work, `youtube-dl`, supports many hundreds of video sources so it's
 likely more will be added to TubeSync if there is demand for it.
 
@@ -236,7 +237,7 @@ your install is doing check the container logs.
 ### Are there alerts when a download is complete?
 
 No, this feature is best served by existing services such as the execelent
-[tautulli](https://tautulli.com/) which can monitor your Plex server and send alerts
+[Tautulli](https://tautulli.com/) which can monitor your Plex server and send alerts
 that way.
 
 ### There's errors in my "tasks" tab!
@@ -293,7 +294,7 @@ Just `amd64` for the moment. Others may be made available if there is demand.
 # Advanced configuration
 
 There are a number of other environment variables you can set. These are, mostly,
-**NOT** required to be set in the default container installation, they are mostly
+**NOT** required to be set in the default container installation, they are really only
 useful if you are manually installing TubeSync in some other environment. These are:
 
 | Name              | What                                  | Example                            |
@@ -309,7 +310,7 @@ useful if you are manually installing TubeSync in some other environment. These 
 # Manual, non-containerised, installation
 
 As a relatively normal Django app you can run TubeSync without the container. Beyond
-the following rough guide you are on your own and should be knowledgeable about
+following this rough guide you are on your own and should be knowledgeable about
 installing and running WSGI-based Python web applications before attempting this.
 
 1. Clone or download this repo
