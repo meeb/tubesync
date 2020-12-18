@@ -29,23 +29,23 @@ ghcr.io/meeb/tubesync:v0.5
 
 ### Dashboard
 
-![TubeSync Dashboard](https://github.com/meeb/tubesync/blob/main/docs/dashboard.png?raw=true)
+![TubeSync Dashboard](https://github.com/meeb/tubesync/blob/main/docs/dashboard-v0.5.png?raw=true)
 
 ### Sources overview
 
-![TubeSync sources overview](https://github.com/meeb/tubesync/blob/main/docs/sources.png?raw=true)
+![TubeSync sources overview](https://github.com/meeb/tubesync/blob/main/docs/sources-v0.5.png?raw=true)
 
 ### Source details
 
-![TubeSync source details](https://github.com/meeb/tubesync/blob/main/docs/source.png?raw=true)
+![TubeSync source details](https://github.com/meeb/tubesync/blob/main/docs/source-v0.5.png?raw=true)
 
 ### Media overview
 
-![TubeSync media overview](https://github.com/meeb/tubesync/blob/main/docs/media.png?raw=true)
+![TubeSync media overview](https://github.com/meeb/tubesync/blob/main/docs/media-v0.5.png?raw=true)
 
 ### Media details
 
-![TubeSync media-details](https://github.com/meeb/tubesync/blob/main/docs/media-item.png?raw=true)
+![TubeSync media-details](https://github.com/meeb/tubesync/blob/main/docs/media-item-v0.5.png?raw=true)
 
 
 # Requirements
