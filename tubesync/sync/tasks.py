@@ -11,6 +11,7 @@ import uuid
 from io import BytesIO
 from hashlib import sha1
 from datetime import timedelta
+from shutil import copyfile
 from PIL import Image
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -242,7 +243,7 @@ def download_media_thumbnail(media_id, url):
              f'{width}x{height}: {url}')
     i = resize_image_to_height(i, width, height)
     image_file = BytesIO()
-    i.save(image_file, 'JPEG', quality=80, optimize=True, progressive=True)
+    i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
     image_file.seek(0)
     media.thumb.save(
         'thumb',
@@ -272,17 +273,18 @@ def download_media(media_id):
         log.warn(f'Download task triggeredd media: {media} (UUID: {media.pk}) but it '
                  f'is now marked to be skipped, not downloading')
         return
-    log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{media.filepath}"')
+    filepath = media.filepath
+    log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
     format_str, container = media.download_media()
-    if os.path.exists(media.filepath):
+    if os.path.exists(filepath):
         # Media has been downloaded successfully
         log.info(f'Successfully downloaded media: {media} (UUID: {media.pk}) to: '
-                 f'"{media.filepath}"')
+                 f'"{filepath}"')
         # Link the media file to the object and update info about the download
-        media.media_file.name = str(media.filepath)
+        media.media_file.name = str(filepath)
         media.downloaded = True
         media.download_date = timezone.now()
-        media.downloaded_filesize = os.path.getsize(media.filepath)
+        media.downloaded_filesize = os.path.getsize(filepath)
         media.downloaded_container = container
         if '+' in format_str:
             # Seperate audio and video streams
@@ -313,6 +315,13 @@ def download_media(media_id):
             else:
                 media.downloaded_format = 'audio'
         media.save()
+        # If selected, copy the thumbnail over as well
+        if media.source.copy_thumbnails and media.thumb:
+            barefilepath, fileext = os.path.splitext(filepath)
+            thumbpath = f'{barefilepath}.jpg'
+            log.info(f'Copying media thumbnail from: {media.thumb.path} '
+                     f'to: {thumbpath}')
+            copyfile(media.thumb.path, thumbpath)
         # Schedule a task to update media servers
         for mediaserver in MediaServer.objects.all():
             log.info(f'Scheduling media server updates')

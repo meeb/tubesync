@@ -150,8 +150,15 @@ def media_pre_delete(sender, instance, **kwargs):
         delete_file(instance.thumb.path)
     # Delete the media file if it exists
     if instance.media_file:
-        log.info(f'Deleting media for: {instance} path: {instance.media_file.path}')
+        filepath = instance.media_file.path
+        log.info(f'Deleting media for: {instance} path: {filepath}')
         delete_file(instance.media_file.path)
+        # Delete thumbnail copy if it exists
+        barefilepath, fileext = os.path.splitext(filepath)
+        thumbpath = f'{barefilepath}.jpg'
+        log.info(f'Copying thumbnail: {instance} path: {thumbpath}')
+        delete_file(thumbpath)
+
 
 @receiver(post_delete, sender=Media)
 def media_post_delete(sender, instance, **kwargs):

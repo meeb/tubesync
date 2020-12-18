@@ -234,6 +234,11 @@ class Source(models.Model):
         default=FALLBACK_NEXT_BEST_HD,
         help_text=_('What do do when media in your source resolution and codecs is not available')
     )
+    copy_thumbnails = models.BooleanField(
+        _('copy thumbnails'),
+        default=False,
+        help_text=_('Copy thumbnails with the media, these may be detected and used by some media servers')
+    )
     has_failed = models.BooleanField(
         _('has failed'),
         default=False,
