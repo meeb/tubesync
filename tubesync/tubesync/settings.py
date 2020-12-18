@@ -147,6 +147,9 @@ YOUTUBE_DEFAULTS = {
 }
 
 
+MEDIA_FORMATSTR_DEFAULT = '{yyyymmdd}_{source}_{title}_{key}_{format}.{ext}'
+
+
 try:
     from .local_settings import *
 except ImportError as e:

@@ -252,10 +252,10 @@ class AddSourceView(CreateView):
 
     template_name = 'sync/source-add.html'
     model = Source
-    fields = ('source_type', 'key', 'name', 'directory', 'index_schedule',
-              'delete_old_media', 'days_to_keep', 'source_resolution', 'source_vcodec',
-              'source_acodec', 'prefer_60fps', 'prefer_hdr', 'fallback',
-              'copy_thumbnails')
+    fields = ('source_type', 'key', 'name', 'directory', 'media_format',
+              'index_schedule', 'delete_old_media', 'days_to_keep',
+              'source_resolution', 'source_vcodec', 'source_acodec', 'prefer_60fps',
+              'prefer_hdr', 'fallback', 'copy_thumbnails')
 
     def __init__(self, *args, **kwargs):
         self.prepopulated_data = {}
@@ -324,10 +324,10 @@ class UpdateSourceView(UpdateView):
 
     template_name = 'sync/source-update.html'
     model = Source
-    fields = ('source_type', 'key', 'name', 'directory', 'index_schedule',
-              'delete_old_media', 'days_to_keep', 'source_resolution', 'source_vcodec',
-              'source_acodec', 'prefer_60fps', 'prefer_hdr', 'fallback',
-              'copy_thumbnails')
+    fields = ('source_type', 'key', 'name', 'directory', 'media_format',
+              'index_schedule', 'delete_old_media', 'days_to_keep',
+              'source_resolution', 'source_vcodec', 'source_acodec', 'prefer_60fps',
+              'prefer_hdr', 'fallback', 'copy_thumbnails')
 
     def get_success_url(self):
         url = reverse_lazy('sync:source', kwargs={'pk': self.object.pk})

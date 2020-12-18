@@ -174,6 +174,12 @@ class Source(models.Model):
         unique=True,
         help_text=_('Directory name to save the media into')
     )
+    media_format = models.CharField(
+        _('media format'),
+        max_length=200,
+        default=settings.MEDIA_FORMATSTR_DEFAULT,
+        help_text=_('File format to use for saving files')
+    )
     index_schedule = models.IntegerField(
         _('index schedule'),
         choices=IndexSchedule.choices,
