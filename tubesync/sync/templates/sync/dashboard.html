@@ -71,7 +71,7 @@
         <div class="collection">
         {% for media in latest_downloads %}
           <a href="{% url 'sync:media-item' pk=media.pk %}" class="collection-item">
-            <div class="truncate"><strong>{{ media.name }}</strong> ({{ media.source }})</div>
+            <div class="truncate"><strong>{{ media.name }}</strong></div>
             <div class="truncate"><strong>{{ media.download_date|timesince:now }}</strong> ago from &quot;{{ media.source.name }}&quot;</div>
           </a>
         {% empty %}
@@ -89,7 +89,7 @@
           {% for media in largest_downloads %}
             <a href="{% url 'sync:media-item' pk=media.pk %}" class="collection-item">
               <div class="truncate">{{ media.name }}</div>
-              <div class="truncate"><strong>{{ media.downloaded_filesize|filesizeformat }}</strong>{% if media.downloaded_format %} in {{ media.downloaded_format }}{% endif %}</div>
+              <div class="truncate"><strong>{{ media.downloaded_filesize|filesizeformat }}</strong>{% if media.downloaded_format %} in {{ media.downloaded_format }}{% endif %} from &quot;{{ media.source.name }}&quot;</div>
             </a>
           {% empty %}
             <span class="collection-item">No media has been downloaded.</span>
