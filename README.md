@@ -18,6 +18,12 @@ hands-free as possible, TubeSync has gradual retrying of failures with back-off 
 so media which fails to download will be retried for an extended period making it,
 hopefully, quite reliable.
 
+# Latest container image
+
+```yaml
+ghcr.io/meeb/tubesync:v0.4
+```
+
 # Screenshots
 
 ### Dashboard
@@ -92,7 +98,7 @@ Finally, download and run the container:
 
 ```bash
 # Pull a versioned image
-$ docker pull ghcr.io/meeb/tubesync:v0.3
+$ docker pull ghcr.io/meeb/tubesync:v0.4
 # Start the container using your user ID and group ID
 $ docker run \
   -d \
@@ -103,7 +109,7 @@ $ docker run \
   -v /some/directory/tubesync-config:/config \
   -v /some/directory/tubesync-downloads:/downloads \
   -p 4848:4848 \
-  ghcr.io/meeb/tubesync:v0.3
+  ghcr.io/meeb/tubesync:v0.4
 ```
 
 Once running, open `http://localhost:4848` in your browser and you should see the
@@ -115,7 +121,7 @@ Alternatively, for Docker Compose, you can use something like:
 
 ```yaml
   tubesync:
-    image: ghcr.io/meeb/tubesync:v0.3
+    image: ghcr.io/meeb/tubesync:v0.4
     container_name: tubesync
     restart: unless-stopped
     ports:
@@ -134,7 +140,7 @@ Alternatively, for Docker Compose, you can use something like:
 To update, you can just pull a new version of the container image as they are released.
 
 ```bash
-$ docker pull pull ghcr.io/meeb/tubesync:v[number]
+$ docker pull ghcr.io/meeb/tubesync:v[number]
 ```
 
 Back-end updates such as database migrations should be automatic.
