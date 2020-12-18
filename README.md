@@ -1,6 +1,6 @@
 # TubeSync
 
-**This is a preview release of TubeSync, it may contain the bugs but should be usable**
+**This is a preview release of TubeSync, it may contain bugs but should be usable**
 
 TubeSync is a PVR (personal video recorder) for YouTube. Or, like Sonarr but for
 YouTube (with a built-in download client). It is designed to synchronize channels and
@@ -124,7 +124,7 @@ Alternatively, for Docker Compose, you can use something like:
       - /some/directory/tubesync-config:/config
       - /some/directory/tubesync-downloads:/downloads
     environment:
-      - TZ=$TIMEZONE
+      - TZ=Europe/London
       - PUID=1000
       - PGID=1000
 ```
