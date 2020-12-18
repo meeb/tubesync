@@ -128,10 +128,12 @@ class ValidateSourceView(FormView):
     }
     source_types = {
         'youtube-channel': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+        'youtube-channel-id': Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID,
         'youtube-playlist': Source.SOURCE_TYPE_YOUTUBE_PLAYLIST,
     }
     help_item = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: _('YouTube channel'),
+        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: _('YouTube channel ID'),
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: _('YouTube playlist'),
     }
     help_texts = {
@@ -139,6 +141,13 @@ class ValidateSourceView(FormView):
             'Enter a YouTube channel URL into the box below. A channel URL will be in '
             'the format of <strong>https://www.youtube.com/CHANNELNAME</strong> '
             'where <strong>CHANNELNAME</strong> is the name of the channel you want '
+            'to add.'
+        ),
+        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: _(
+            'Enter a YouTube channel URL by channel ID into the box below. A channel '
+            'URL by channel ID will be in the format of <strong>'
+            'https://www.youtube.com/channel/BiGLoNgUnIqUeId</strong> '
+            'where <strong>BiGLoNgUnIqUeId</strong> is the ID of the channel you want '
             'to add.'
         ),
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: _(
@@ -150,6 +159,8 @@ class ValidateSourceView(FormView):
     }
     help_examples = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/google',
+        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: ('https://www.youtube.com/channel/'
+                                                'UCK8sQmJBp8GCxrOtXWBpyEA'),
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: ('https://www.youtube.com/playlist?list='
                                               'PL590L5WQmH8dpP0RyH5pCfIaDEdt9nk7r')
     }
@@ -157,11 +168,20 @@ class ValidateSourceView(FormView):
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: {
             'scheme': 'https',
             'domain': 'www.youtube.com',
-            'path_regex': '^\/(c\/|channel\/)?([^\/]+)(\/videos)?$',
+            'path_regex': '^\/(c\/)?([^\/]+)(\/videos)?$',
             'path_must_not_match': ('/playlist', '/c/playlist'),
             'qs_args': [],
             'extract_key': ('path_regex', 1),
             'example': 'https://www.youtube.com/SOMECHANNEL'
+        },
+        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: {
+            'scheme': 'https',
+            'domain': 'www.youtube.com',
+            'path_regex': '^\/channel\/([^\/]+)(\/videos)?$',
+            'path_must_not_match': ('/playlist', '/c/playlist'),
+            'qs_args': [],
+            'extract_key': ('path_regex', 0),
+            'example': 'https://www.youtube.com/channel/CHANNELID'
         },
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: {
             'scheme': 'https',
@@ -175,6 +195,7 @@ class ValidateSourceView(FormView):
     }
     prepopulate_fields = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: ('source_type', 'key', 'name', 'directory'),
+        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: ('source_type', 'key'),
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: ('source_type', 'key'),
     }
 

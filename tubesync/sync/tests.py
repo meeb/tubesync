@@ -28,6 +28,7 @@ class FrontEndTestCase(TestCase):
     def test_validate_source(self):
         test_source_types = {
             'youtube-channel': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            'youtube-channel-id': Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID,
             'youtube-playlist': Source.SOURCE_TYPE_YOUTUBE_PLAYLIST,
         }
         test_sources = {
@@ -36,8 +37,6 @@ class FrontEndTestCase(TestCase):
                     'https://www.youtube.com/testchannel',
                     'https://www.youtube.com/c/testchannel',
                     'https://www.youtube.com/c/testchannel/videos',
-                    'https://www.youtube.com/channel/testchannel',
-                    'https://www.youtube.com/channel/testchannel/videos',
                 ),
                 'invalid_schema': (
                     'http://www.youtube.com/c/playlist',
@@ -53,13 +52,37 @@ class FrontEndTestCase(TestCase):
                 ),
                 'invalid_is_playlist': (
                     'https://www.youtube.com/c/playlist',
-                    'https://www.youtube.com/c/playlist',
+                ),
+                'invalid_channel_with_id': (
+                    'https://www.youtube.com/channel/channelid',
+                    'https://www.youtube.com/channel/channelid/videos',
+                ),
+            },
+            'youtube-channel-id': {
+                'valid': (
+                    'https://www.youtube.com/channel/channelid',
+                    'https://www.youtube.com/channel/channelid/videos',
+                ),
+                'invalid_schema': (
+                    'http://www.youtube.com/channel/channelid',
+                    'ftp://www.youtube.com/channel/channelid',
+                ),
+                'invalid_domain': (
+                    'https://www.test.com/channel/channelid',
+                    'https://www.example.com/channel/channelid',
+                ),
+                'invalid_path': (
+                    'https://www.youtube.com/test/invalid',
+                    'https://www.youtube.com/channel/test/invalid',
+                ),
+                'invalid_is_named_channel': (
+                    'https://www.youtube.com/c/testname',
                 ),
             },
             'youtube-playlist': {
                 'valid': (
-                    'https://www.youtube.com/playlist?list=testplaylist'
-                    'https://www.youtube.com/watch?v=testvideo&list=testplaylist'
+                    'https://www.youtube.com/playlist?list=testplaylist',
+                    'https://www.youtube.com/watch?v=testvideo&list=testplaylist',
                 ),
                 'invalid_schema': (
                     'http://www.youtube.com/playlist?list=testplaylist',
@@ -76,6 +99,7 @@ class FrontEndTestCase(TestCase):
                 'invalid_is_channel': (
                     'https://www.youtube.com/testchannel',
                     'https://www.youtube.com/c/testchannel',
+                    'https://www.youtube.com/channel/testchannel',
                 ),
             }
         }
@@ -86,19 +110,21 @@ class FrontEndTestCase(TestCase):
         response = c.get('/source-validate/invalid')
         self.assertEqual(response.status_code, 404)
         for (source_type, tests) in test_sources.items():
-            for test, field in tests.items():
-                source_type_char = test_source_types.get(source_type)
-                data = {'source_url': field, 'source_type': source_type_char}
-                response = c.post(f'/source-validate/{source_type}', data)
-                if test == 'valid':
-                    # Valid source tests should bounce to /source-add
-                    self.assertEqual(response.status_code, 302)
-                    url_parts = urlsplit(response.url)
-                    self.assertEqual(url_parts.path, '/source-add')
-                else:
-                    # Invalid source tests should reload the page with an error message
-                    self.assertEqual(response.status_code, 200)
-                    self.assertIn('<ul class="errorlist">', response.content.decode())
+            for test, urls in tests.items():
+                for url in urls:
+                    source_type_char = test_source_types.get(source_type)
+                    data = {'source_url': url, 'source_type': source_type_char}
+                    response = c.post(f'/source-validate/{source_type}', data)
+                    if test == 'valid':
+                        # Valid source tests should bounce to /source-add
+                        self.assertEqual(response.status_code, 302)
+                        url_parts = urlsplit(response.url)
+                        self.assertEqual(url_parts.path, '/source-add')
+                    else:
+                        # Invalid source tests should reload the page with an error
+                        self.assertEqual(response.status_code, 200)
+                        self.assertIn('<ul class="errorlist">',
+                                      response.content.decode())
 
     def test_add_source_prepopulation(self):
         c = Client()

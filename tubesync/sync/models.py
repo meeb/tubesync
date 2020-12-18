@@ -28,10 +28,13 @@ class Source(models.Model):
     '''
 
     SOURCE_TYPE_YOUTUBE_CHANNEL = 'c'
+    SOURCE_TYPE_YOUTUBE_CHANNEL_ID = 'i'
     SOURCE_TYPE_YOUTUBE_PLAYLIST = 'p'
-    SOURCE_TYPES = (SOURCE_TYPE_YOUTUBE_CHANNEL, SOURCE_TYPE_YOUTUBE_PLAYLIST)
+    SOURCE_TYPES = (SOURCE_TYPE_YOUTUBE_CHANNEL, SOURCE_TYPE_YOUTUBE_CHANNEL_ID,
+                    SOURCE_TYPE_YOUTUBE_PLAYLIST)
     SOURCE_TYPE_CHOICES = (
         (SOURCE_TYPE_YOUTUBE_CHANNEL, _('YouTube channel')),
+        (SOURCE_TYPE_YOUTUBE_CHANNEL_ID, _('YouTube channel by ID')),
         (SOURCE_TYPE_YOUTUBE_PLAYLIST, _('YouTube playlist')),
     )
 
@@ -98,21 +101,25 @@ class Source(models.Model):
     # Fontawesome icons used for the source on the front end
     ICONS = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: '<i class="fab fa-youtube"></i>',
+        SOURCE_TYPE_YOUTUBE_CHANNEL_ID: '<i class="fab fa-youtube"></i>',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: '<i class="fab fa-youtube"></i>',
     }
     # Format to use to display a URL for the source
     URLS = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/c/{key}',
+        SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/channel/{key}',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/playlist?list={key}',
     }
     # Callback functions to get a list of media from the source
     INDEXERS = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: get_youtube_media_info,
+        SOURCE_TYPE_YOUTUBE_CHANNEL_ID: get_youtube_media_info,
         SOURCE_TYPE_YOUTUBE_PLAYLIST: get_youtube_media_info,
     }
     # Field names to find the media ID used as the key when storing media
     KEY_FIELD = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: 'id',
+        SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'id',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'id',
     }
 
@@ -433,32 +440,39 @@ class Media(models.Model):
     # Format to use to display a URL for the media
     URLS = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/watch?v={key}',
+        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/watch?v={key}',
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/watch?v={key}',
     }
     # Maps standardised names to names used in source metdata
     METADATA_FIELDS = {
         'upload_date': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'upload_date',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'upload_date',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'upload_date',
         },
         'title': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'title',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'title',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'title',
         },
         'thumbnail': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'thumbnail',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'thumbnail',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'thumbnail',
         },
         'description': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'description',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'description',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'description',
         },
         'duration': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'duration',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'duration',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'duration',
         },
         'formats': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'formats',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'formats',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'formats',
         }
     }
