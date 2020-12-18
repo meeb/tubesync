@@ -157,7 +157,7 @@ class ValidateSourceView(FormView):
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: {
             'scheme': 'https',
             'domain': 'www.youtube.com',
-            'path_regex': '^\/(c\/)?([^\/]+)$',
+            'path_regex': '^\/(c\/|channel\/)?([^\/]+)(\/videos)?$',
             'path_must_not_match': ('/playlist', '/c/playlist'),
             'qs_args': [],
             'extract_key': ('path_regex', 1),

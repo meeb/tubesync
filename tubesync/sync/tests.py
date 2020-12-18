@@ -35,6 +35,9 @@ class FrontEndTestCase(TestCase):
                 'valid': (
                     'https://www.youtube.com/testchannel',
                     'https://www.youtube.com/c/testchannel',
+                    'https://www.youtube.com/c/testchannel/videos',
+                    'https://www.youtube.com/channel/testchannel',
+                    'https://www.youtube.com/channel/testchannel/videos',
                 ),
                 'invalid_schema': (
                     'http://www.youtube.com/c/playlist',
