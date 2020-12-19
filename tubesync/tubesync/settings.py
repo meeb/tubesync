@@ -41,6 +41,7 @@ MIDDLEWARE = [
 
 
 ROOT_URLCONF = 'tubesync.urls'
+FORCE_SCRIPT_NAME = None
 
 
 TEMPLATES = [

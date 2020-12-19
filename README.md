@@ -297,14 +297,15 @@ There are a number of other environment variables you can set. These are, mostly
 **NOT** required to be set in the default container installation, they are really only
 useful if you are manually installing TubeSync in some other environment. These are:
 
-| Name              | What                                  | Example                            |
-| ----------------- | ------------------------------------- | ---------------------------------- |
-| DJANGO_SECRET_KEY | Django secret key                     | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l   |
-| TUBESYNC_DEBUG    | Enable debugging                      | True                               |
-| TUBESYNC_HOSTS    | Django's ALLOWED_HOSTS                | tubesync.example.com,otherhost.com |
-| GUNICORN_WORKERS  | Number of gunicorn workers to spawn   | 3                                  |
-| LISTEN_HOST       | IP address for gunicorn to listen on  | 127.0.0.1                          |
-| LISTEN_PORT       | Port number for gunicorn to listen on | 8080                               |
+| Name                     | What                                  | Example                            |
+| ------------------------ | ------------------------------------- | ---------------------------------- |
+| DJANGO_SECRET_KEY        | Django's SECRET_KEY                   | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l   |
+| DJANGO_FORCE_SCRIPT_NAME | Django's FORCE_SCRIPT_NAME            | /somepath                          |
+| TUBESYNC_DEBUG           | Enable debugging                      | True                               |
+| TUBESYNC_HOSTS           | Django's ALLOWED_HOSTS                | tubesync.example.com,otherhost.com |
+| GUNICORN_WORKERS         | Number of gunicorn workers to spawn   | 3                                  |
+| LISTEN_HOST              | IP address for gunicorn to listen on  | 127.0.0.1                          |
+| LISTEN_PORT              | Port number for gunicorn to listen on | 8080                               |
 
 
 # Manual, non-containerised, installation

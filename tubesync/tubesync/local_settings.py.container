@@ -15,6 +15,7 @@ SECRET_KEY = str(os.getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret'))
 ALLOWED_HOSTS_STR = str(os.getenv('TUBESYNC_HOSTS', '127.0.0.1,localhost'))
 ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
 DEBUG = True if os.getenv('TUBESYNC_DEBUG', False) else False
+FORCE_SCRIPT_NAME = os.getenv('DJANGO_FORCE_SCRIPT_NAME', None)
 
 
 TIME_ZONE = os.getenv('TZ', 'UTC')
