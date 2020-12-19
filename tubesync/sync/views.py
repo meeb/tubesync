@@ -1011,7 +1011,7 @@ class UpdateMediaServerView(FormView, SingleObjectMixin):
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        data['server_help'] = self.object.help_html
+        data['server_help'] = self.object.get_help_html
         return data
 
     def get_success_url(self):
