@@ -23,7 +23,8 @@ from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import NoMediaException, DownloadFailedException
 from .models import Source, Media, MediaServer
-from .utils import get_remote_image, resize_image_to_height, delete_file
+from .utils import (get_remote_image, resize_image_to_height, delete_file,
+                    write_text_file)
 
 
 def get_hash(task_name, pk):
@@ -317,11 +318,13 @@ def download_media(media_id):
         media.save()
         # If selected, copy the thumbnail over as well
         if media.source.copy_thumbnails and media.thumb:
-            barefilepath, fileext = os.path.splitext(filepath)
-            thumbpath = f'{barefilepath}.jpg'
             log.info(f'Copying media thumbnail from: {media.thumb.path} '
-                     f'to: {thumbpath}')
-            copyfile(media.thumb.path, thumbpath)
+                     f'to: {media.thumbpath}')
+            copyfile(media.thumb.path, media.thumbpath)
+        # If selected, write an NFO file
+        if media.source.write_nfo:
+            log.info(f'Writing media NFO file to: to: {media.nfopath}')
+            write_text_file(media.nfopath, media.nfoxml)
         # Schedule a task to update media servers
         for mediaserver in MediaServer.objects.all():
             log.info(f'Scheduling media server updates')

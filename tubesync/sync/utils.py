@@ -108,6 +108,14 @@ def file_is_editable(filepath):
     return False
 
 
+def write_text_file(filepath, filedata):
+    if not isinstance(filedata, str):
+        raise ValueError(f'filedata must be a str, got "{type(filedata)}"')
+    with open(filepath, 'wt') as f:
+        bytes_written = f.write(filedata)
+    return bytes_written
+
+
 def delete_file(filepath):
     if file_is_editable(filepath):
         return os.remove(filepath)

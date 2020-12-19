@@ -276,7 +276,7 @@ class AddSourceView(CreateView):
     fields = ('source_type', 'key', 'name', 'directory', 'media_format',
               'index_schedule', 'delete_old_media', 'days_to_keep',
               'source_resolution', 'source_vcodec', 'source_acodec', 'prefer_60fps',
-              'prefer_hdr', 'fallback', 'copy_thumbnails')
+              'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo')
     errors = {
         'invalid_media_format': _('Invalid media format, the media format contains '
                                   'errors or is empty. Check the table at the end of '
@@ -334,8 +334,8 @@ class SourceView(DetailView):
     messages = {
         'source-created': _('Your new source has been created. If you have added a '
                             'very large source such as a channel with hundreds of '
-                            'videos it can take several minutes for media to start '
-                            'to appear.'),
+                            'videos it can take several minutes or up to an hour '
+                            'for media to start to appear.'),
         'source-updated': _('Your source has been updated.'),
     }
 
@@ -367,7 +367,7 @@ class UpdateSourceView(UpdateView):
     fields = ('source_type', 'key', 'name', 'directory', 'media_format',
               'index_schedule', 'delete_old_media', 'days_to_keep',
               'source_resolution', 'source_vcodec', 'source_acodec', 'prefer_60fps',
-              'prefer_hdr', 'fallback', 'copy_thumbnails')
+              'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo')
     errors = {
         'invalid_media_format': _('Invalid media format, the media format contains '
                                   'errors or is empty. Check the table at the end of '
@@ -411,7 +411,12 @@ class DeleteSourceView(DeleteView, FormMixin):
             source = self.get_object()
             for media in Media.objects.filter(source=source):
                 if media.media_file:
+                    # Delete the media file
                     delete_file(media.media_file.name)
+                    # Delete thumbnail copy if it exists
+                    delete_file(media.thumbpath)
+                    # Delete NFO file if it exists
+                    delete_file(media.nfopath)
         return super().post(request, *args, **kwargs)
 
     def get_success_url(self):
@@ -556,13 +561,12 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
             self.object.thumb = None
         # If the media file exists on disk, delete it
         if self.object.media_file_exists:
-            filepath = self.object.media_file.path
-            delete_file(filepath)
+            delete_file(self.object.media_file.path)
             self.object.media_file = None
             # If the media has an associated thumbnail copied, also delete it
-            barefilepath, fileext = os.path.splitext(filepath)
-            thumbpath = f'{barefilepath}.jpg'
-            delete_file(thumbpath)
+            delete_file(self.object.thumbpath)
+            # If the media has an associated NFO file with it, also delete it
+            delete_file(self.object.nfopath)
         # Reset all download data
         self.object.downloaded = False
         self.object.downloaded_audio_codec = None
@@ -602,13 +606,12 @@ class MediaSkipView(FormView, SingleObjectMixin):
         delete_task_by_media('sync.tasks.download_media', (str(self.object.pk),))
         # If the media file exists on disk, delete it
         if self.object.media_file_exists:
-            filepath = self.object.media_file.path
             delete_file(self.object.media_file.path)
             self.object.media_file = None
             # If the media has an associated thumbnail copied, also delete it
-            barefilepath, fileext = os.path.splitext(filepath)
-            thumbpath = f'{barefilepath}.jpg'
-            delete_file(thumbpath)
+            delete_file(self.object.thumbpath)
+            # If the media has an associated NFO file with it, also delete it
+            delete_file(self.object.nfopath)
         # Reset all download data
         self.object.downloaded = False
         self.object.downloaded_audio_codec = None

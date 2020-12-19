@@ -1,6 +1,7 @@
 import os
 import uuid
 import json
+from xml.etree import ElementTree
 from datetime import datetime
 from pathlib import Path
 from django.conf import settings
@@ -253,6 +254,11 @@ class Source(models.Model):
         default=False,
         help_text=_('Copy thumbnails with the media, these may be detected and used by some media servers')
     )
+    write_nfo = models.BooleanField(
+        _('write nfo'),
+        default=False,
+        help_text=_('Write an NFO file in XML with the media info, these may be detected and used by some media servers')
+    )
     has_failed = models.BooleanField(
         _('has failed'),
         default=False,
@@ -476,7 +482,38 @@ class Media(models.Model):
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'formats',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'formats',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'formats',
-        }
+        },
+        'categories': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'categories',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'categories',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'categories',
+        },
+        'rating': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'average_rating',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'average_rating',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'average_rating',
+        },
+        'age_limit': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'age_limit',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'age_limit',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'age_limit',
+        },
+        'uploader': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'uploader',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'uploader',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'uploader',
+        },
+        'upvotes': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'like_count',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'like_count',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'like_count',
+        },
+        'downvotes': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'dislike_count',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'dislike_count',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'dislike_count',
+        },
+
     }
     STATE_UNKNOWN = 'unknown'
     STATE_SCHEDULED = 'scheduled'
@@ -884,6 +921,34 @@ class Media(models.Model):
         return '??:??:??'
 
     @property
+    def categories(self):
+        field = self.get_metadata_field('categories')
+        return self.loaded_metadata.get(field, [])
+
+    @property
+    def rating(self):
+        field = self.get_metadata_field('rating')
+        return self.loaded_metadata.get(field, 0)
+
+    @property
+    def votes(self):
+        field = self.get_metadata_field('upvotes')
+        upvotes = self.loaded_metadata.get(field, 0)
+        field = self.get_metadata_field('downvotes')
+        downvotes = self.loaded_metadata.get(field, 0)
+        return upvotes + downvotes
+
+    @property
+    def age_limit(self):
+        field = self.get_metadata_field('age_limit')
+        return self.loaded_metadata.get(field, 0)
+
+    @property
+    def uploader(self):
+        field = self.get_metadata_field('uploader')
+        return self.loaded_metadata.get(field, '')
+
+    @property
     def formats(self):
         field = self.get_metadata_field('formats')
         return self.loaded_metadata.get(field, [])
@@ -897,6 +962,26 @@ class Media(models.Model):
         media_format = str(self.source.media_format)
         media_details = self.format_dict
         return media_format.format(**media_details)
+
+    @property
+    def thumbname(self):
+        filename = self.filename
+        prefix, ext = os.path.splitext(filename)
+        return f'{prefix}.jpg'
+
+    @property
+    def thumbpath(self):
+        return self.source.directory_path / self.thumbname
+
+    @property
+    def nfoname(self):
+        filename = self.filename
+        prefix, ext = os.path.splitext(filename)
+        return f'{prefix}.nfo'
+    
+    @property
+    def nfopath(self):
+        return self.source.directory_path / self.nfoname
 
     @property
     def directory_path(self):
@@ -924,6 +1009,98 @@ class Media(models.Model):
         if not self.media_file:
             return False
         return os.path.exists(self.media_file.path)
+
+    @property
+    def nfoxml(self):
+        '''
+            Returns an NFO formatted (prettified) XML string.
+        '''
+        nfo = ElementTree.Element('episodedetails')
+        nfo.text = '\n  '
+        # title = media metadata title
+        title = nfo.makeelement('title', {})
+        title.text = str(self.name).strip()
+        title.tail = '\n  '
+        nfo.append(title)
+        # showtitle = source name
+        showtitle = nfo.makeelement('showtitle', {})
+        showtitle.text = str(self.source.name).strip()
+        showtitle.tail = '\n  '
+        nfo.append(showtitle)
+        # ratings = media metadata youtube rating
+        value = nfo.makeelement('value', {})
+        value.text = str(self.rating)
+        value.tail = '\n      '
+        votes = nfo.makeelement('votes', {})
+        votes.text = str(self.votes)
+        votes.tail = '\n    '
+        rating_attrs = {'name': 'youtube', 'max': '5', 'default': 'True'}
+        rating = nfo.makeelement('rating', rating_attrs)
+        rating.text = '\n      '
+        rating.append(value)
+        rating.append(votes)
+        rating.tail = '\n  '
+        ratings = nfo.makeelement('ratings', {})
+        ratings.text = '\n    '
+        ratings.append(rating)
+        ratings.tail = '\n  '
+        nfo.append(ratings)
+        # plot = media metadata description
+        plot = nfo.makeelement('plot', {})
+        plot.text = str(self.description).strip()
+        plot.tail = '\n  '
+        nfo.append(plot)
+        # thumb = local path to media thumbnail
+        thumb = nfo.makeelement('thumb', {})
+        thumb.text = self.thumbname if self.source.copy_thumbnails else ''
+        thumb.tail = '\n  '
+        nfo.append(thumb)
+        # mpaa = media metadata age requirement
+        mpaa = nfo.makeelement('mpaa', {})
+        mpaa.text = str(self.age_limit)
+        mpaa.tail = '\n  '
+        nfo.append(mpaa)
+        # runtime = media metadata duration in seconds
+        runtime = nfo.makeelement('runtime', {})
+        runtime.text = str(self.duration)
+        runtime.tail = '\n  '
+        nfo.append(runtime)
+        # id = media key
+        idn = nfo.makeelement('id', {})
+        idn.text = str(self.key).strip()
+        idn.tail = '\n  '
+        nfo.append(idn)
+        # uniqueid = media key
+        uniqueid_attrs = {'type': 'youtube', 'default': 'True'}
+        uniqueid = nfo.makeelement('uniqueid', uniqueid_attrs)
+        uniqueid.text = str(self.key).strip()
+        uniqueid.tail = '\n  '
+        nfo.append(uniqueid)
+        # studio = media metadata uploader
+        studio = nfo.makeelement('studio', {})
+        studio.text = str(self.uploader).strip()
+        studio.tail = '\n  '
+        nfo.append(studio)
+        # aired = media metadata uploaded date
+        aired = nfo.makeelement('aired', {})
+        upload_date = self.upload_date
+        aired.text = upload_date.strftime('%Y-%m-%d') if upload_date else ''
+        aired.tail = '\n  '
+        nfo.append(aired)
+        # dateadded = date and time media was created in tubesync
+        dateadded = nfo.makeelement('dateadded', {})
+        dateadded.text = self.created.strftime('%Y-%m-%d %H:%M:%S')
+        dateadded.tail = '\n  '
+        nfo.append(dateadded)
+        # genre = any media metadata categories if they exist
+        for category_str in self.categories:
+            genre = nfo.makeelement('genre', {})
+            genre.text = str(category_str).strip()
+            genre.tail = '\n  '
+            nfo.append(genre)
+        nfo[-1].tail = '\n'
+        # Return XML tree as a prettified string
+        return ElementTree.tostring(nfo, encoding='utf8', method='xml').decode('utf8')
 
     def get_download_state(self, task=None):
         if self.downloaded:

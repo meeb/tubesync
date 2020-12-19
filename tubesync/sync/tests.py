@@ -6,6 +6,7 @@
 
 
 import logging
+from datetime import datetime
 from urllib.parse import urlsplit
 from django.conf import settings
 from django.test import TestCase, Client
@@ -430,7 +431,6 @@ class FrontEndTestCase(TestCase):
         response = c.get('/tasks-completed')
         self.assertEqual(response.status_code, 200)
 
-
     def test_mediasevrers(self):
         # Media servers overview page
         c = Client()
@@ -588,7 +588,71 @@ class FilepathTestCase(TestCase):
         self.source.media_format = ('{title}_{key}_{resolution}-{height}x{width}-'
                                     '{acodec}-{vcodec}-{fps}fps-{hdr}.{ext}')
         self.assertEqual(test_media.filename,
-                         'no-fancy-stuff_test_720p-720x1280-opus-vp9-30fps-hdr.mkv')
+                         ('no-fancy-stuff-title_test_720p-720x1280-opus'
+                          '-vp9-30fps-hdr.mkv'))
+
+
+class MediaTestCase(TestCase):
+
+    def setUp(self):
+        # Disable general logging for test case
+        logging.disable(logging.CRITICAL)
+        # Add a test source
+        self.source = Source.objects.create(
+            source_type=Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            key='testkey',
+            name='testname',
+            directory='testdirectory',
+            media_format=settings.MEDIA_FORMATSTR_DEFAULT,
+            index_schedule=3600,
+            delete_old_media=False,
+            days_to_keep=14,
+            source_resolution=Source.SOURCE_RESOLUTION_1080P,
+            source_vcodec=Source.SOURCE_VCODEC_VP9,
+            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            prefer_60fps=False,
+            prefer_hdr=False,
+            fallback=Source.FALLBACK_FAIL
+        )
+        # Add some test media
+        self.media = Media.objects.create(
+            key='mediakey',
+            source=self.source,
+            metadata=metadata,
+        )
+        # Fix a created datetime for predictable testing
+        self.media.created = datetime(year=2020, month=1, day=1, hour=1,
+                                      minute=1, second=1)
+
+    def test_nfo(self):
+        expected_nfo = [
+            "<?xml version='1.0' encoding='utf8'?>",
+            '<episodedetails>',
+            '  <title>no fancy stuff title</title>',
+            '  <showtitle>testname</showtitle>',
+            '  <ratings>',
+            '    <rating default="True" max="5" name="youtube">',
+            '      <value>1.2345</value>',
+            '      <votes>579</votes>',
+            '    </rating>',
+            '  </ratings>',
+            '  <plot>no fancy stuff desc</plot>',
+            '  <thumb />',  # media.thumbfile is empty without media existing
+            '  <mpaa>50</mpaa>',
+            '  <runtime>401</runtime>',
+            '  <id>mediakey</id>',
+            '  <uniqueid default="True" type="youtube">mediakey</uniqueid>',
+            '  <studio>test uploader</studio>',
+            '  <aired>2017-09-11</aired>',
+            '  <dateadded>2020-01-01 01:01:01</dateadded>',
+            '  <genre>test category 1</genre>',
+            '  <genre>test category 2</genre>',
+            '</episodedetails>',
+        ]
+        # Compare it line by line
+        test_nfo = self.media.nfoxml.split('\n')
+        for i, line in enumerate(test_nfo):
+            self.assertEqual(line, expected_nfo[i])
 
 
 class FormatMatchingTestCase(TestCase):
