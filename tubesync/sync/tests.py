@@ -532,6 +532,12 @@ class FilepathTestCase(TestCase):
         self.source.media_format = 'test-{format}'
         self.assertEqual(self.source.get_example_media_format(),
                          'test-1080p-vp9-opus')
+        self.source.media_format = 'test-{playlist_index}'
+        self.assertEqual(self.source.get_example_media_format(),
+                         'test-1')
+        self.source.media_format = 'test-{playlist_title}'
+        self.assertEqual(self.source.get_example_media_format(),
+                         'test-Some Playlist Title')
         self.source.media_format = 'test-{ext}'
         self.assertEqual(self.source.get_example_media_format(),
                          'test-' + self.source.extension)

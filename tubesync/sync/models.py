@@ -385,6 +385,8 @@ class Source(models.Model):
             'title_full': 'Some Media Title Name',
             'key': 'SoMeUnIqUiD',
             'format': '-'.join(fmt),
+            'playlist_index': 1,
+            'playlist_title': 'Some Playlist Title',
             'ext': self.extension,
             'resolution': self.source_resolution if self.source_resolution else '',
             'height': '720' if self.source_resolution else '',
@@ -398,7 +400,7 @@ class Source(models.Model):
     def get_example_media_format(self):
         try:
             return self.media_format.format(**self.example_media_format_dict)
-        except Exception:
+        except Exception as e:
             return ''
 
     def index_media(self):
@@ -514,7 +516,16 @@ class Media(models.Model):
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'dislike_count',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'dislike_count',
         },
-
+        'playlist_index': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'playlist_index',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'playlist_index',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'playlist_index',
+        },
+        'playlist_title': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'playlist_title',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'playlist_title',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'playlist_title',
+        },
     }
     STATE_UNKNOWN = 'unknown'
     STATE_SCHEDULED = 'scheduled'
@@ -853,6 +864,8 @@ class Media(models.Model):
             'title_full': self.title,
             'key': self.key,
             'format': '-'.join(display_format['format']),
+            'playlist_index': self.playlist_index,
+            'playlist_title': self.playlist_title,
             'ext': self.source.extension,
             'resolution': display_format['resolution'],
             'height': display_format['height'],
@@ -955,10 +968,17 @@ class Media(models.Model):
         return self.loaded_metadata.get(field, [])
 
     @property
+    def playlist_index(self):
+        field = self.get_metadata_field('playlist_index')
+        return self.loaded_metadata.get(field, 0)
+
+    @property
+    def playlist_title(self):
+        field = self.get_metadata_field('playlist_title')
+        return self.loaded_metadata.get(field, '')
+
+    @property
     def filename(self):
-        # If a media_file has been downloaded use its existing name
-        if self.media_file:
-            return os.path.basename(self.media_file.name)
         # Otherwise, create a suitable filename from the source media_format
         media_format = str(self.source.media_format)
         media_details = self.format_dict
@@ -986,9 +1006,6 @@ class Media(models.Model):
 
     @property
     def directory_path(self):
-        # If a media_file has been downloaded use its existing directory
-        if self.media_file:
-            return os.path.dirname(self.media_file.name)
         # Otherwise, create a suitable filename from the source media_format
         media_format = str(self.source.media_format)
         media_details = self.format_dict
