@@ -2,6 +2,7 @@ import os
 import uuid
 import json
 from xml.etree import ElementTree
+from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 from django.conf import settings
@@ -1034,7 +1035,10 @@ class Media(models.Model):
         votes = nfo.makeelement('votes', {})
         votes.text = str(self.votes)
         votes.tail = '\n    '
-        rating_attrs = {'name': 'youtube', 'max': '5', 'default': 'True'}
+        rating_attrs = OrderedDict()
+        rating_attrs['name'] = 'youtube'
+        rating_attrs['max'] = '5'
+        rating_attrs['default'] = 'True'
         rating = nfo.makeelement('rating', rating_attrs)
         rating.text = '\n      '
         rating.append(value)
@@ -1071,7 +1075,9 @@ class Media(models.Model):
         idn.tail = '\n  '
         nfo.append(idn)
         # uniqueid = media key
-        uniqueid_attrs = {'type': 'youtube', 'default': 'True'}
+        uniqueid_attrs = OrderedDict()
+        uniqueid_attrs['type'] = 'youtube'
+        uniqueid_attrs['default'] = 'True'
         uniqueid = nfo.makeelement('uniqueid', uniqueid_attrs)
         uniqueid.text = str(self.key).strip()
         uniqueid.tail = '\n  '
