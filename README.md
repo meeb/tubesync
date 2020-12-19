@@ -25,6 +25,9 @@ hopefully, quite reliable.
 ghcr.io/meeb/tubesync:v0.6
 ```
 
+**NOTE: the `:latest` tag does exist, but will contain in-development commits and may
+be broken. Use at your own risk.**
+
 # Screenshots
 
 ### Dashboard
