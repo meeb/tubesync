@@ -8,6 +8,7 @@
 import logging
 from datetime import datetime
 from urllib.parse import urlsplit
+from xml.etree import ElementTree
 from django.conf import settings
 from django.test import TestCase, Client
 from django.utils import timezone
@@ -649,10 +650,18 @@ class MediaTestCase(TestCase):
             '  <genre>test category 2</genre>',
             '</episodedetails>',
         ]
-        # Compare it line by line
-        test_nfo = self.media.nfoxml.split('\n')
-        for i, line in enumerate(test_nfo):
-            self.assertEqual(line, expected_nfo[i])
+        expected_tree = ElementTree.fromstring('\n'.join(expected_nfo))
+        nfo_tree = ElementTree.fromstring(self.media.nfoxml)
+        # Check each node with attribs in expected_tree is present in test_nfo
+        for expected_node in expected_tree:
+            # Ignore checking <genre>, only tag we may have multiple of
+            if expected_node.tag == 'genre':
+                continue
+            # Find the same node in the NFO XML tree
+            nfo_node = nfo_tree.find(expected_node.tag)
+            self.assertEqual(expected_node.attrib, nfo_node.attrib)
+            self.assertEqual(expected_node.tag, nfo_node.tag)
+            self.assertEqual(expected_node.text, nfo_node.text)
 
 
 class FormatMatchingTestCase(TestCase):
