@@ -51,6 +51,12 @@
         <td class="hide-on-small-only">Example filename</td>
         <td><span class="hide-on-med-and-up">Example filename<br></span><strong>{{ source.get_example_media_format }}</strong></td>
       </tr>
+      {% if source.download_cap > 0 %}
+      <tr title="Do not download videos older than this cap">
+        <td class="hide-on-small-only">Download cap</td>
+        <td><span class="hide-on-med-and-up">Download cap<br></span><strong>{{ source.get_download_cap_display }}</strong></td>
+      </tr>
+      {% endif %}
       <tr title="Schedule of how often to index the source for new media">
         <td class="hide-on-small-only">Index schedule</td>
         <td><span class="hide-on-med-and-up">Index schedule<br></span><strong>{{ source.get_index_schedule_display }}</strong></td>

@@ -3,7 +3,7 @@ import uuid
 import json
 from xml.etree import ElementTree
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from django.conf import settings
 from django.db import models
@@ -125,6 +125,18 @@ class Source(models.Model):
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'id',
     }
 
+    class CapChoices(models.IntegerChoices):
+        CAP_NOCAP = 0, _('No cap')
+        CAP_7DAYS = 604800, _('1 week (7 days)')
+        CAP_30DAYS = 2592000, _('1 month (30 days)')
+        CAP_90DAYS = 7776000, _('3 months (90 days)')
+        CAP_6MONTHS = 15552000, _('6 months (180 days)')
+        CAP_1YEAR = 31536000, _('1 year (365 days)')
+        CAP_2YEARs = 63072000, _('2 years (730 days)')
+        CAP_3YEARs = 94608000, _('3 years (1095 days)')
+        CAP_5YEARs = 157680000, _('5 years (1825 days)')
+        CAP_10YEARS = 315360000, _('10 years (3650 days)')
+
     class IndexSchedule(models.IntegerChoices):
         EVERY_HOUR = 3600, _('Every hour')
         EVERY_2_HOURS = 7200, _('Every 2 hours')
@@ -196,6 +208,12 @@ class Source(models.Model):
         db_index=True,
         default=IndexSchedule.EVERY_6_HOURS,
         help_text=_('Schedule of how often to index the source for new media')
+    )
+    download_cap = models.IntegerField(
+        _('download cap'),
+        choices=CapChoices.choices,
+        default=CapChoices.CAP_NOCAP,
+        help_text=_('Do not download media older than this capped date')
     )
     delete_old_media = models.BooleanField(
         _('delete old media'),
@@ -289,6 +307,14 @@ class Source(models.Model):
     @property
     def is_video(self):
         return not self.is_audio
+
+    @property
+    def download_cap_date(self):
+        delta = self.download_cap
+        if delta > 0:
+            return timezone.now() - timedelta(seconds=delta)
+        else:
+            return False
 
     @property
     def extension(self):

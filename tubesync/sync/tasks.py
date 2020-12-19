@@ -187,6 +187,14 @@ def index_source_task(source_id):
         else:
             log.error(f'Media has no upload date, skipping: {source} / {media}')
             continue
+        # If the source has a download cap date check the upload date is allowed
+        max_cap_age = source.download_cap_date
+        if max_cap_age:
+            if media.published < max_cap_age:
+                # Media was published after the cap date, skip it
+                log.warn(f'Media: {source} / {media} is older than cap age '
+                         f'{max_cap_age}, skipping')
+                continue
         # If the source has a cut-off check the upload date is within the allowed delta
         if source.delete_old_media and source.days_to_keep > 0:
             delta = timezone.now() - timedelta(days=source.days_to_keep)

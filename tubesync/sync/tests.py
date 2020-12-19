@@ -163,6 +163,7 @@ class FrontEndTestCase(TestCase):
             'name': 'testname',
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
+            'download_cap': 0,
             'index_schedule': 3600,
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -203,6 +204,7 @@ class FrontEndTestCase(TestCase):
             'name': 'testname',
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
+            'download_cap': 0,
             'index_schedule': Source.IndexSchedule.EVERY_HOUR,
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -231,6 +233,7 @@ class FrontEndTestCase(TestCase):
             'name': 'testname',
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
+            'download_cap': 0,
             'index_schedule': Source.IndexSchedule.EVERY_2_HOURS,  # changed
             'delete_old_media': False,
             'days_to_keep': 14,
