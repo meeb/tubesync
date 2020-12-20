@@ -213,6 +213,14 @@ every hour" or similar short interval it's entirely possible your TubeSync insta
 spend its entire time just indexing the massive channel over and over again without
 downloading any media. Check your tasks for the status of your TubeSync install.
 
+If you add a significant amount of "work" due to adding many large channels you may
+need to increase the number of background workers by setting the `TUBESYNC_WORKERS`
+environment variable. Try around ~4 at most, although the absolute maximum allowed is 8.
+
+**Be nice.** it's likely entirely possible your IP address could get throttled by the
+source if you try and crawl extremely large amounts very quickly. **Try and be polite
+with the smallest amount of indexing and concurrent downloads possible for your needs.**
+
 
 # FAQ
 
@@ -300,15 +308,16 @@ There are a number of other environment variables you can set. These are, mostly
 **NOT** required to be set in the default container installation, they are really only
 useful if you are manually installing TubeSync in some other environment. These are:
 
-| Name                     | What                                  | Example                            |
-| ------------------------ | ------------------------------------- | ---------------------------------- |
-| DJANGO_SECRET_KEY        | Django's SECRET_KEY                   | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l   |
-| DJANGO_FORCE_SCRIPT_NAME | Django's FORCE_SCRIPT_NAME            | /somepath                          |
-| TUBESYNC_DEBUG           | Enable debugging                      | True                               |
-| TUBESYNC_HOSTS           | Django's ALLOWED_HOSTS                | tubesync.example.com,otherhost.com |
-| GUNICORN_WORKERS         | Number of gunicorn workers to spawn   | 3                                  |
-| LISTEN_HOST              | IP address for gunicorn to listen on  | 127.0.0.1                          |
-| LISTEN_PORT              | Port number for gunicorn to listen on | 8080                               |
+| Name                     | What                                                         | Example                            |
+| ------------------------ | ------------------------------------------------------------ | ---------------------------------- |
+| DJANGO_SECRET_KEY        | Django's SECRET_KEY                                          | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l   |
+| DJANGO_FORCE_SCRIPT_NAME | Django's FORCE_SCRIPT_NAME                                   | /somepath                          |
+| TUBESYNC_DEBUG           | Enable debugging                                             | True                               |
+| TUBESYNC_WORKERS         | Number of background workers, default is 2, max allowed is 8 | 2                                  |
+| TUBESYNC_HOSTS           | Django's ALLOWED_HOSTS                                       | tubesync.example.com,otherhost.com |
+| GUNICORN_WORKERS         | Number of gunicorn workers to spawn                          | 3                                  |
+| LISTEN_HOST              | IP address for gunicorn to listen on                         | 127.0.0.1                          |
+| LISTEN_PORT              | Port number for gunicorn to listen on                        | 8080                               |
 
 
 # Manual, non-containerised, installation
