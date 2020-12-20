@@ -315,7 +315,7 @@ def download_media(media_id):
             media.downloaded_audio_codec = cformat['acodec']
             if cformat['vcodec']:
                 # Combined
-                media.downloaded_format = vformat['format']
+                media.downloaded_format = cformat['format']
                 media.downloaded_height = cformat['height']
                 media.downloaded_width = cformat['width']
                 media.downloaded_video_codec = cformat['vcodec']
