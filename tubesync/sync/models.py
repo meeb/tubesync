@@ -200,7 +200,28 @@ class Source(models.Model):
         _('media format'),
         max_length=200,
         default=settings.MEDIA_FORMATSTR_DEFAULT,
-        help_text=_('File format to use for saving files')
+        help_text=_("""File format to use for saving files
+Valid options:
+    'yyyymmdd': 20210201,
+    'yyyy_mm_dd': 2021-02-01,
+    'yyyy': 2021,
+    'mm': 02,
+    'dd': 01,
+    'source': <Example here>,
+    'source_full': <Example here>,
+    'title': <Example here>,
+    'title_full': <Example here>,
+    'key': <Example here>,
+    'playlist_index': 1,
+    'playlist_title': <Example here>,
+    'ext': mp4,
+    'resolution': 1280x720,
+    'height': 720,
+    'width': 1280,
+    'vcodec': h264,
+    'acodec': mp3,
+    'fps': 24,
+    'hdr': <Example here>""")
     )
     index_schedule = models.IntegerField(
         _('index schedule'),
