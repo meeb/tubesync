@@ -200,7 +200,7 @@ class Source(models.Model):
         _('media format'),
         max_length=200,
         default=settings.MEDIA_FORMATSTR_DEFAULT,
-        help_text=_('File format to use for saving files')
+        help_text=_('File format to use for saving files, detailed options at bottom of page.')
     )
     index_schedule = models.IntegerField(
         _('index schedule'),
