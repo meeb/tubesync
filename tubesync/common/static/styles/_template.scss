@@ -5,6 +5,13 @@ html {
     color: $text-colour;
 }
 
+body {
+    display: flex;
+    min-height: 100vh;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
 header {
 
     background-color: $header-background-colour;

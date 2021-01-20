@@ -16,32 +16,36 @@
 
   <body>
 
-    <header>
-      <div class="container">
-        <a href="{% url 'sync:dashboard' %}">
-          {% include 'tubesync.svg' with width='3rem' height='3rem' %}
-          <h1>TubeSync</h1>
-        </a>
-      </div>
-    </header>
+    <div class="app">
 
-    <nav>
-      <div class="container">
-        <ul>
-          <li><a href="{% url 'sync:dashboard' %}"><i class="fas fa-fw fa-th-large"></i><span class="hide-on-med-and-down"> Dashboard</span></a></li>
-          <li><a href="{% url 'sync:sources' %}"><i class="fas fa-fw fa-play"></i><span class="hide-on-med-and-down"> Sources</span></a></li>
-          <li><a href="{% url 'sync:media' %}"><i class="fas fa-fw fa-film"></i><span class="hide-on-med-and-down"> Media</span></a></li>
-          <li><a href="{% url 'sync:tasks' %}"><i class="far fa-fw fa-clock"></i><span class="hide-on-med-and-down"> Tasks</span></a></li>
-          <li><a href="{% url 'sync:mediaservers' %}"><i class="fas fa-fw fa-stream"></i><span class="hide-on-med-and-down"> Media Servers</span></a></li>
-        </ul>
-      </div>
-    </nav>
+      <header>
+        <div class="container">
+          <a href="{% url 'sync:dashboard' %}">
+            {% include 'tubesync.svg' with width='3rem' height='3rem' %}
+            <h1>TubeSync</h1>
+          </a>
+        </div>
+      </header>
 
-    <main>
-      <div class="container">
-        {% block content %}{% endblock %}
-      </div>
-    </main>
+      <nav>
+        <div class="container">
+          <ul>
+            <li><a href="{% url 'sync:dashboard' %}"><i class="fas fa-fw fa-th-large"></i><span class="hide-on-med-and-down"> Dashboard</span></a></li>
+            <li><a href="{% url 'sync:sources' %}"><i class="fas fa-fw fa-play"></i><span class="hide-on-med-and-down"> Sources</span></a></li>
+            <li><a href="{% url 'sync:media' %}"><i class="fas fa-fw fa-film"></i><span class="hide-on-med-and-down"> Media</span></a></li>
+            <li><a href="{% url 'sync:tasks' %}"><i class="far fa-fw fa-clock"></i><span class="hide-on-med-and-down"> Tasks</span></a></li>
+            <li><a href="{% url 'sync:mediaservers' %}"><i class="fas fa-fw fa-stream"></i><span class="hide-on-med-and-down"> Media Servers</span></a></li>
+          </ul>
+        </div>
+      </nav>
+
+      <main>
+        <div class="container">
+          {% block content %}{% endblock %}
+        </div>
+      </main>
+
+    </div>
 
     <footer>
       <div class="container">
