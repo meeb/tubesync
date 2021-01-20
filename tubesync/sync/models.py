@@ -839,8 +839,9 @@ class Media(models.Model):
             fmt.append(resolution)
             vcodec = vformat['vcodec'].lower()
             fmt.append(vcodec)
-        acodec = aformat['acodec'].lower()
-        fmt.append(acodec)
+        if aformat:
+            acodec = aformat['acodec'].lower()
+            fmt.append(acodec)
         if vformat:
             if vformat['is_60fps']:
                 fps = '60fps'

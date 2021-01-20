@@ -66,7 +66,7 @@ def get_best_audio_format(media):
     # No codecs matched
     if media.source.can_fallback:
         # Can fallback, find the next highest bitrate non-matching codec
-        return False, audio_formats[0]
+        return False, audio_formats[0]['id']
     else:
         # Can't fallback
         return False, False
