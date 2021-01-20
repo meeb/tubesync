@@ -14,3 +14,13 @@ def append_uri_params(uri, params):
     uri = str(uri)
     qs = urlencode(params)
     return urlunsplit(('', '', uri, qs, ''))
+
+
+def clean_filename(filename):
+    if not isinstance(filename, str):
+        raise ValueError(f'filename must be a str, got {type(filename)}')
+    to_scrub = '<>\/:*?"|'
+    for char in to_scrub:
+        filename = filename.replace(char, '')
+    filename = ''.join([c for c in filename if ord(c) > 30])
+    return ' '.join(filename.split())

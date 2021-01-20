@@ -12,6 +12,7 @@ from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.errors import NoFormatException
+from common.utils import clean_filename
 from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media)
 from .utils import seconds_to_timestr, parse_media_format
@@ -887,7 +888,7 @@ class Media(models.Model):
             'source': self.source.slugname,
             'source_full': self.source.name,
             'title': self.slugtitle,
-            'title_full': self.title,
+            'title_full': clean_filename(self.title),
             'key': self.key,
             'format': '-'.join(display_format['format']),
             'playlist_index': self.playlist_index,
@@ -1005,7 +1006,7 @@ class Media(models.Model):
 
     @property
     def filename(self):
-        # Otherwise, create a suitable filename from the source media_format
+        # Create a suitable filename from the source media_format
         media_format = str(self.source.media_format)
         media_details = self.format_dict
         return media_format.format(**media_details)
