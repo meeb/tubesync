@@ -8,8 +8,9 @@ from background_task.models import Task
 from common.logger import log
 from .models import Source, Media, MediaServer
 from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
-                    download_media_thumbnail, map_task_to_instance,
-                    check_source_directory_exists, download_media, rescan_media_server)
+                    download_media_thumbnail, download_media_metadata,
+                    map_task_to_instance, check_source_directory_exists,
+                    download_media, rescan_media_server)
 from .utils import delete_file
 
 
@@ -93,16 +94,27 @@ def task_task_failed(sender, task_id, completed_task, **kwargs):
 def media_post_save(sender, instance, created, **kwargs):
     # Triggered after media is saved, Recalculate the "can_download" flag, this may
     # need to change if the source specifications have been changed
-    post_save.disconnect(media_post_save, sender=Media)
-    if instance.get_format_str():
-        if not instance.can_download:
-            instance.can_download = True
-            instance.save()
-    else:
-        if instance.can_download:
-            instance.can_download = False
-            instance.save()
-    post_save.connect(media_post_save, sender=Media)
+    if instance.metadata:
+        post_save.disconnect(media_post_save, sender=Media)
+        if instance.get_format_str():
+            if not instance.can_download:
+                instance.can_download = True
+                instance.save()
+        else:
+            if instance.can_download:
+                instance.can_download = False
+                instance.save()
+        post_save.connect(media_post_save, sender=Media)
+    # If the media is missing metadata schedule it to be downloaded
+    if not instance.metadata:
+        log.info(f'Scheduling task to download metadata for: {instance.url}')
+        verbose_name = _('Downloading metadata for "{}"')
+        download_media_metadata(
+            str(instance.pk),
+            priority=10,
+            verbose_name=verbose_name.format(instance.pk),
+            remove_existing_tasks=True
+        )
     # If the media is missing a thumbnail schedule it to be downloaded
     if not instance.thumb_file_exists:
         instance.thumb = None

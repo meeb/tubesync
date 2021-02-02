@@ -24,8 +24,10 @@
             {% else %}
               {% if m.skip %}
               <span class="error-text"><i class="fas fa-times" title="Skipping media"></i> Skipped</span>
+              {% elif not m.has_metadata %}
+              <i class="far fa-clock" title="Waiting for metadata"></i> Fetching metadata
               {% elif m.can_download %}
-              <i class="far fa-clock" title="Waiting to download or downloading"></i> {{ m.published|date:'Y-m-d' }}
+              <i class="far fa-clock" title="Waiting to download or downloading"></i> Downloading
               {% else %}
               <span class="error-text"><i class="fas fa-exclamation-triangle" title="No matching formats to download"></i> No matching formats</span>
               {% endif %}

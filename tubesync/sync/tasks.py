@@ -179,30 +179,6 @@ def index_source_task(source_id):
         except Media.DoesNotExist:
             media = Media(key=key)
         media.source = source
-        media.metadata = json.dumps(video)
-        upload_date = media.upload_date
-        # Media must have a valid upload date
-        if upload_date:
-            media.published = timezone.make_aware(upload_date)
-        else:
-            log.error(f'Media has no upload date, skipping: {source} / {media}')
-            continue
-        # If the source has a download cap date check the upload date is allowed
-        max_cap_age = source.download_cap_date
-        if max_cap_age:
-            if media.published < max_cap_age:
-                # Media was published after the cap date, skip it
-                log.warn(f'Media: {source} / {media} is older than cap age '
-                         f'{max_cap_age}, skipping')
-                continue
-        # If the source has a cut-off check the upload date is within the allowed delta
-        if source.delete_old_media and source.days_to_keep > 0:
-            delta = timezone.now() - timedelta(days=source.days_to_keep)
-            if media.published < delta:
-                # Media was published after the cutoff date, skip it
-                log.warn(f'Media: {source} / {media} is older than '
-                         f'{source.days_to_keep} days, skipping')
-                continue
         try:
             media.save()
             log.info(f'Indexed media: {source} / {media}')
@@ -232,6 +208,56 @@ def check_source_directory_exists(source_id):
         # Try and create it
         log.info(f'Creating directory: {source.directory_path}')
         source.make_directory()
+
+
+@background(schedule=0)
+def download_media_metadata(media_id):
+    '''
+        Downloads the metadata for a media item.
+    '''
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist:
+        # Task triggered but the media no longer exists, do nothing
+        log.error(f'Task download_media_metadata(pk={media_id}) called but no '
+                  f'media exists with ID: {media_id}')
+        return
+    source = media.source
+    metadata = media.index_metadata()
+    media.metadata = json.dumps(metadata)
+    upload_date = media.upload_date
+    # Media must have a valid upload date
+    if upload_date:
+        media.published = timezone.make_aware(upload_date)
+    else:
+        log.error(f'Media has no upload date, skipping: {source} / {media}')
+        media.skip = True
+    # If the source has a download cap date check the upload date is allowed
+    max_cap_age = source.download_cap_date
+    if max_cap_age:
+        if media.published < max_cap_age:
+            # Media was published after the cap date, skip it
+            log.warn(f'Media: {source} / {media} is older than cap age '
+                        f'{max_cap_age}, skipping')
+            media.skip = True
+    # If the source has a cut-off check the upload date is within the allowed delta
+    if source.delete_old_media and source.days_to_keep > 0:
+        delta = timezone.now() - timedelta(days=source.days_to_keep)
+        if media.published < delta:
+            # Media was published after the cutoff date, skip it
+            log.warn(f'Media: {source} / {media} is older than '
+                        f'{source.days_to_keep} days, skipping')
+            media.skip = True
+    # Check we can download the media item
+    if not media.skip:
+        if media.get_format_str():
+            media.can_download = True
+        else:
+            media.can_download = False
+    # Save the media
+    media.save()
+    log.info(f'Saved {len(media.metadata)} bytes of metadata for: '
+             f'{source} / {media_id}')
 
 
 @background(schedule=0)

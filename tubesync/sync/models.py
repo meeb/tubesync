@@ -113,6 +113,12 @@ class Source(models.Model):
         SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/channel/{key}',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/playlist?list={key}',
     }
+    # Format used to create indexable URLs
+    INDEX_URLS = {
+        SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/c/{key}/videos',
+        SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/channel/{key}/videos',
+        SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/playlist?list={key}',
+    }
     # Callback functions to get a list of media from the source
     INDEXERS = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: get_youtube_media_info,
@@ -341,9 +347,18 @@ class Source(models.Model):
         url = obj.URLS.get(source_type)
         return url.format(key=key)
 
+    @classmethod
+    def create_index_url(obj, source_type, key):
+        url = obj.INDEX_URLS.get(source_type)
+        return url.format(key=key)
+
     @property
     def url(self):
         return Source.create_url(self.source_type, self.key)
+
+    @property
+    def index_url(self):
+        return Source.create_index_url(self.source_type, self.key)
 
     @property
     def format_summary(self):
@@ -437,25 +452,8 @@ class Source(models.Model):
         indexer = self.INDEXERS.get(self.source_type, None)
         if not callable(indexer):
             raise Exception(f'Source type f"{self.source_type}" has no indexer')
-        response = indexer(self.url)
-
-        # Account for nested playlists, such as a channel of playlists of playlists
-        def _recurse_playlists(playlist):
-            videos = []
-            if not playlist:
-                return videos
-            entries = playlist.get('entries', [])
-            for entry in entries:
-                if not entry:
-                    continue
-                subentries = entry.get('entries', [])
-                if subentries:
-                    videos = videos + _recurse_playlists(entry)
-                else:
-                    videos.append(entry)
-            return videos
-
-        return _recurse_playlists(response)
+        response = indexer(self.index_url)
+        return response.get('entries', [])
 
 
 def get_media_thumb_path(instance, filename):
@@ -480,6 +478,12 @@ class Media(models.Model):
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/watch?v={key}',
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/watch?v={key}',
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/watch?v={key}',
+    }
+    # Callback functions to get a list of media from the source
+    INDEXERS = {
+        Source.SOURCE_TYPE_YOUTUBE_CHANNEL: get_youtube_media_info,
+        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: get_youtube_media_info,
+        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: get_youtube_media_info,
     }
     # Maps standardised names to names used in source metdata
     METADATA_FIELDS = {
@@ -905,6 +909,10 @@ class Media(models.Model):
         }
 
     @property
+    def has_metadata(self):
+        return self.metadata is not None
+
+    @property
     def loaded_metadata(self):
         try:
             return json.loads(self.metadata)
@@ -1179,6 +1187,16 @@ class Media(models.Model):
                                str(self.filepath))
         # Return the download paramaters
         return format_str, self.source.extension
+
+    def index_metadata(self):
+        '''
+            Index the media metadata returning a dict of info.
+        '''
+        indexer = self.INDEXERS.get(self.source.source_type, None)
+        if not callable(indexer):
+            raise Exception(f'Meida with source type f"{self.source.source_type}" '
+                            f'has no indexer')
+        return indexer(self.url)
 
 
 class MediaServer(models.Model):

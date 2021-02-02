@@ -109,7 +109,7 @@
       {% else %}
       <tr title="Can the media be downloaded?">
         <td class="hide-on-small-only">Can download?</td>
-        <td><span class="hide-on-med-and-up">Can download?<br></span><strong>{% if youtube_dl_format %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+        <td><span class="hide-on-med-and-up">Can download?<br></span><strong>{% if media.can_download %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
       </tr>
       {% endif %}
       <tr title="The available media formats">

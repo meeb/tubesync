@@ -37,7 +37,8 @@ def get_media_info(url):
         'skip_download': True,
         'forcejson': True,
         'simulate': True,
-        'logger': log
+        'logger': log,
+        'extract_flat': True,
     })
     response = {}
     with youtube_dl.YoutubeDL(opts) as y:
