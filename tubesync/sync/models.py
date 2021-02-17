@@ -984,8 +984,12 @@ class Media(models.Model):
     def votes(self):
         field = self.get_metadata_field('upvotes')
         upvotes = self.loaded_metadata.get(field, 0)
+        if not isinstance(upvotes, int):
+            upvotes = 0
         field = self.get_metadata_field('downvotes')
         downvotes = self.loaded_metadata.get(field, 0)
+        if not isinstance(downvotes, int):
+            downvotes = 0
         return upvotes + downvotes
 
     @property
