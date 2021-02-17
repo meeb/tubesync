@@ -114,6 +114,9 @@ Disallow: /
 '''.strip()
 
 
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+
 HEALTHCHECK_FIREWALL = True
 HEALTHCHECK_ALLOWED_IPS = ('127.0.0.1',)
 
