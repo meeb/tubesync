@@ -181,8 +181,10 @@ main {
             display: inline-block;
             font-weight: bold;
             text-decoration: none;
-            padding: 5px 10px 5px 10px;
-            margin: 0 3px 0 3px;
+            padding: 5px 8px 4px 8px;
+            margin: 0 3px 6px 3px;
+            min-width: 40px;
+            min-height: 40px;
             background-color: $pagination-background-colour;
             color: $pagination-text-colour;
             border: 2px $pagination-border-colour solid;

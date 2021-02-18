@@ -131,7 +131,7 @@ COMPLETED_TASKS_DAYS_TO_KEEP = 7            # Number of days to keep completed t
 
 
 SOURCES_PER_PAGE = 100
-MEDIA_PER_PAGE = 72
+MEDIA_PER_PAGE = 144
 TASKS_PER_PAGE = 100
 
 
