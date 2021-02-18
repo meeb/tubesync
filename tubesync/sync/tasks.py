@@ -238,7 +238,7 @@ def download_media_metadata(media_id):
         if media.published < max_cap_age:
             # Media was published after the cap date, skip it
             log.warn(f'Media: {source} / {media} is older than cap age '
-                        f'{max_cap_age}, skipping')
+                     f'{max_cap_age}, skipping')
             media.skip = True
     # If the source has a cut-off check the upload date is within the allowed delta
     if source.delete_old_media and source.days_to_keep > 0:
@@ -246,7 +246,7 @@ def download_media_metadata(media_id):
         if media.published < delta:
             # Media was published after the cutoff date, skip it
             log.warn(f'Media: {source} / {media} is older than '
-                        f'{source.days_to_keep} days, skipping')
+                     f'{source.days_to_keep} days, skipping')
             media.skip = True
     # Check we can download the media item
     if not media.skip:

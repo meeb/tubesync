@@ -203,6 +203,8 @@ and less common features:
 
 ![Import existing media into TubeSync](https://github.com/meeb/tubesync/blob/main/docs/import-existing-media.md)
 
+![Sync or create missing metadata files](https://github.com/meeb/tubesync/blob/main/docs/create-missing-metadata.md)
+
 
 # Warnings
 
