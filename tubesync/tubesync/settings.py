@@ -152,7 +152,7 @@ YOUTUBE_DEFAULTS = {
 }
 
 
-MEDIA_FORMATSTR_DEFAULT = '{yyyymmdd}_{source}_{title}_{key}_{format}.{ext}'
+MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'
 
 
 try:
