@@ -453,6 +453,8 @@ class Source(models.Model):
         if not callable(indexer):
             raise Exception(f'Source type f"{self.source_type}" has no indexer')
         response = indexer(self.index_url)
+        if not isinstance(response, dict):
+            return []
         return response.get('entries', [])
 
 
