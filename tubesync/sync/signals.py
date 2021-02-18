@@ -136,7 +136,8 @@ def media_post_save(sender, instance, created, **kwargs):
     if not instance.media_file_exists:
         instance.downloaded = False
         instance.media_file = None
-    if not instance.downloaded and instance.can_download and not instance.skip:
+    if (not instance.downloaded and instance.can_download and not instance.skip
+        and instance.source.download_media):
         delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
         verbose_name = _('Downloading media for "{}"')
         download_media(

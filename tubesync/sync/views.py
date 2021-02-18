@@ -274,9 +274,9 @@ class AddSourceView(CreateView):
     template_name = 'sync/source-add.html'
     model = Source
     fields = ('source_type', 'key', 'name', 'directory', 'media_format',
-              'index_schedule', 'download_cap', 'delete_old_media', 'days_to_keep',
-              'source_resolution', 'source_vcodec', 'source_acodec', 'prefer_60fps',
-              'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo')
+              'index_schedule', 'download_media', 'download_cap', 'delete_old_media',
+              'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
+              'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo')
     errors = {
         'invalid_media_format': _('Invalid media format, the media format contains '
                                   'errors or is empty. Check the table at the end of '
@@ -365,9 +365,9 @@ class UpdateSourceView(UpdateView):
     template_name = 'sync/source-update.html'
     model = Source
     fields = ('source_type', 'key', 'name', 'directory', 'media_format',
-              'index_schedule', 'download_cap', 'delete_old_media', 'days_to_keep',
-              'source_resolution', 'source_vcodec', 'source_acodec', 'prefer_60fps',
-              'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo')
+              'index_schedule', 'download_media', 'download_cap', 'delete_old_media',
+              'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
+              'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo')
     errors = {
         'invalid_media_format': _('Invalid media format, the media format contains '
                                   'errors or is empty. Check the table at the end of '

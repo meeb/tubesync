@@ -308,6 +308,17 @@ def download_media(media_id):
         log.warn(f'Download task triggeredd media: {media} (UUID: {media.pk}) but it '
                  f'is now marked to be skipped, not downloading')
         return
+    if media.downloaded and media.media_file:
+        # Media has been marked as downloaded before the download_media task was fired,
+        # skip it
+        log.warn(f'Download task triggeredd media: {media} (UUID: {media.pk}) but it '
+                 f'has already been marked as downloaded, not downloading again')
+        return
+    if not media.source.download_media:
+        log.warn(f'Download task triggeredd media: {media} (UUID: {media.pk}) but the '
+                 f'source {media.source} has since been marked to not download media, '
+                 f'not downloading')
+        return
     filepath = media.filepath
     log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
     format_str, container = media.download_media()

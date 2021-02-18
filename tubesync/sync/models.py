@@ -101,6 +101,11 @@ class Source(models.Model):
         (FALLBACK_NEXT_BEST_HD, _('Get next best resolution but at least HD'))
     )
 
+    EXTENSION_M4A = 'm4a'
+    EXTENSION_OGG = 'ogg'
+    EXTENSION_MKV = 'mkv'
+    EXTENSIONS = (EXTENSION_M4A, EXTENSION_OGG, EXTENSION_MKV)
+
     # Fontawesome icons used for the source on the front end
     ICONS = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: '<i class="fab fa-youtube"></i>',
@@ -215,6 +220,11 @@ class Source(models.Model):
         db_index=True,
         default=IndexSchedule.EVERY_6_HOURS,
         help_text=_('Schedule of how often to index the source for new media')
+    )
+    download_media = models.BooleanField(
+        _('download media'),
+        default=True,
+        help_text=_('Download media from this source, if not selected the source will only be indexed')
     )
     download_cap = models.IntegerField(
         _('download cap'),
@@ -334,13 +344,13 @@ class Source(models.Model):
         '''
         if self.is_audio:
             if self.source_acodec == self.SOURCE_ACODEC_MP4A:
-                return 'm4a'
+                return self.EXTENSION_M4A
             elif self.source_acodec == self.SOURCE_ACODEC_OPUS:
-                return 'ogg'
+                return self.EXTENSION_OGG
             else:
                 raise ValueError('Unable to choose audio extension, uknown acodec')
         else:
-            return 'mkv'
+            return self.EXTENSION_MKV
 
     @classmethod
     def create_url(obj, source_type, key):
@@ -564,14 +574,18 @@ class Media(models.Model):
     STATE_SCHEDULED = 'scheduled'
     STATE_DOWNLOADING = 'downloading'
     STATE_DOWNLOADED = 'downloaded'
+    STATE_SKIPPED = 'skipped'
+    STATE_DISABLED_AT_SOURCE = 'source-disabled'
     STATE_ERROR = 'error'
     STATES = (STATE_UNKNOWN, STATE_SCHEDULED, STATE_DOWNLOADING, STATE_DOWNLOADED,
-              STATE_ERROR)
+              STATE_SKIPPED, STATE_DISABLED_AT_SOURCE, STATE_ERROR)
     STATE_ICONS = {
         STATE_UNKNOWN: '<i class="far fa-question-circle" title="Unknown download state"></i>',
         STATE_SCHEDULED: '<i class="far fa-clock" title="Scheduled to download"></i>',
         STATE_DOWNLOADING: '<i class="fas fa-download" title="Downloading now"></i>',
         STATE_DOWNLOADED: '<i class="far fa-check-circle" title="Downloaded"></i>',
+        STATE_SKIPPED: '<i class="fas fa-exclamation-circle" title="Skipped"></i>',
+        STATE_DISABLED_AT_SOURCE: '<i class="fas fa-stop-circle" title="Media downloading disabled at source"></i>',
         STATE_ERROR: '<i class="fas fa-exclamation-triangle" title="Error downloading"></i>',
     }
 
@@ -1177,6 +1191,10 @@ class Media(models.Model):
                 return self.STATE_ERROR
             else:
                 return self.STATE_SCHEDULED
+        if self.skip:
+            return self.STATE_SKIPPED
+        if not self.source.download_media:
+            return self.STATE_DISABLED_AT_SOURCE
         return self.STATE_UNKNOWN
 
     def get_download_state_icon(self, task=None):

@@ -24,6 +24,8 @@
             {% else %}
               {% if m.skip %}
               <span class="error-text"><i class="fas fa-times" title="Skipping media"></i> Skipped</span>
+              {% elif not m.source.download_media %}
+              <span class="error-text"><i class="fas fa-times" title="Not downloading media for this source"></i> Disabled at source</span>
               {% elif not m.has_metadata %}
               <i class="far fa-clock" title="Waiting for metadata"></i> Fetching metadata
               {% elif m.can_download %}

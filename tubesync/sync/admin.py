@@ -7,7 +7,7 @@ class SourceAdmin(admin.ModelAdmin):
 
     ordering = ('-created',)
     list_display = ('uuid', 'name', 'source_type', 'last_crawl',
-                    'has_failed')
+                    'download_media', 'has_failed')
     readonly_fields = ('uuid', 'created')
     search_fields = ('uuid', 'key', 'name')
 

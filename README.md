@@ -196,6 +196,14 @@ $ docker logs --follow tubesync
 ```
 
 
+# Advanced usage guides
+
+Once you're happy using TubeSync there are some advanced usage guides for more complex
+and less common features:
+
+![Import existing media into TubeSync](https://github.com/meeb/tubesync/blob/main/docs/import-existing-media.md)
+
+
 # Warnings
 
 ### 1. Index frequency
