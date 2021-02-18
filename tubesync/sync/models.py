@@ -931,7 +931,10 @@ class Media(models.Model):
     @property
     def loaded_metadata(self):
         try:
-            return json.loads(self.metadata)
+            data = json.loads(self.metadata)
+            if not isinstance(data, dict):
+                return {}
+            return data
         except Exception as e:
             return {}
 
@@ -968,7 +971,10 @@ class Media(models.Model):
     @property
     def upload_date(self):
         field = self.get_metadata_field('upload_date')
-        upload_date_str = self.loaded_metadata.get(field, '').strip()
+        try:
+            upload_date_str = self.loaded_metadata.get(field, '').strip()
+        except (AttributeError, ValueError) as e:
+            return None
         try:
             return datetime.strptime(upload_date_str, '%Y%m%d')
         except (AttributeError, ValueError) as e:
