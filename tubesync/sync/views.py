@@ -438,6 +438,7 @@ class MediaView(ListView):
 
     def __init__(self, *args, **kwargs):
         self.filter_source = None
+        self.show_skipped = False
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
@@ -447,13 +448,22 @@ class MediaView(ListView):
                 self.filter_source = Source.objects.get(pk=filter_by)
             except Source.DoesNotExist:
                 self.filter_source = None
+        show_skipped = request.GET.get('show_skipped', '').strip()
+        if show_skipped == 'yes':
+            self.show_skipped = True
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         if self.filter_source:
-            q = Media.objects.filter(source=self.filter_source)
+            if self.show_skipped:
+                q = Media.objects.filter(source=self.filter_source)
+            else:
+                q = Media.objects.filter(source=self.filter_source, skip=False)
         else:
-            q = Media.objects.all()
+            if self.show_skipped:
+                q = Media.objects.all()
+            else:
+                q = Media.objects.filter(skip=False)
         return q.order_by('-published', '-created')
 
     def get_context_data(self, *args, **kwargs):
@@ -464,6 +474,7 @@ class MediaView(ListView):
             message = str(self.messages.get('filter', ''))
             data['message'] = message.format(name=self.filter_source.name)
             data['source'] = self.filter_source
+        data['show_skipped'] = self.show_skipped
         return data
 
 

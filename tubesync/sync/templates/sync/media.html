@@ -4,8 +4,15 @@
 
 {% block content %}
 <div class="row">
-  <div class="col s12">
+  <div class="col s12 m9">
     <h1 class="truncate">Media</h1>
+  </div>
+  <div class="col s12 m3">
+    {% if show_skipped %}
+    <a href="{% url 'sync:media' %}" class="btn"><i class="far fa-eye-slash"></i> Hide skipped media</a>
+    {% else %}
+    <a href="{% url 'sync:media' %}?show_skipped=yes" class="btn"><i class="far fa-eye"></i> Show skipped media</a>
+    {% endif %}
   </div>
 </div>
 {% include 'infobox.html' with message=message %}
@@ -48,5 +55,5 @@
   </div>
   {% endfor %}
 </div>
-{% include 'pagination.html' with pagination=sources.paginator filter=source.pk %}
+{% include 'pagination.html' with pagination=sources.paginator filter=source.pk show_skipped=show_skipped %}
 {% endblock %}
