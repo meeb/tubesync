@@ -76,3 +76,6 @@ on the directory the media file is inside.
 
 Edit your source and re-enable / tick the "download media" option. This will allow
 TubeSync to download any missing media you did not manually import.
+
+Note that TubeSync will still get screenshots write `nfo` files etc. for files you
+manually import if enabled at the source level.
