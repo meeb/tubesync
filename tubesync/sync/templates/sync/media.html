@@ -9,9 +9,9 @@
   </div>
   <div class="col s12 m3">
     {% if show_skipped %}
-    <a href="{% url 'sync:media' %}" class="btn"><i class="far fa-eye-slash"></i> Hide skipped media</a>
+    <a href="{% url 'sync:media' %}{% if source %}?filter={{ source.pk }}{% endif %}" class="btn"><i class="far fa-eye-slash"></i> Hide skipped media</a>
     {% else %}
-    <a href="{% url 'sync:media' %}?show_skipped=yes" class="btn"><i class="far fa-eye"></i> Show skipped media</a>
+    <a href="{% url 'sync:media' %}?show_skipped=yes{% if source %}&filter={{ source.pk }}{% endif %}" class="btn"><i class="far fa-eye"></i> Show skipped media</a>
     {% endif %}
   </div>
 </div>
