@@ -10,7 +10,7 @@ from django.views.generic.detail import SingleObjectMixin
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.db import IntegrityError
-from django.db.models import Q, Count, Sum
+from django.db.models import Q, Count, Sum, When, Case
 from django.forms import ValidationError
 from django.utils.text import slugify
 from django.utils import timezone
@@ -104,7 +104,10 @@ class SourcesView(ListView):
 
     def get_queryset(self):
         all_sources = Source.objects.all().order_by('name')
-        return all_sources.annotate(media_count=Count('media_source'))
+        return all_sources.annotate(
+            media_count=Count('media_source'),
+            downloaded_count=Count(Case(When(media_source__downloaded=True, then=1)))
+        )
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)

@@ -30,7 +30,7 @@
         {% if source.has_failed %}
         <span class="error-text"><i class="fas fa-exclamation-triangle"></i> <strong>Source has permanent failures</strong></span>
         {% else %}
-        <strong>{{ source.media_count }}</strong> media items{% if source.delete_old_media and source.days_to_keep > 0 %}, keep {{ source.days_to_keep }} days of media{% endif %}
+        <strong>{{ source.media_count }}</strong> media items, <strong>{{ source.downloaded_count }}</strong> downloaded{% if source.delete_old_media and source.days_to_keep > 0 %}, keeping {{ source.days_to_keep }} days of media{% endif %}
         {% endif %}
       </a>
     {% empty %}
