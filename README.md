@@ -382,7 +382,7 @@ installing and running WSGI-based Python web applications before attempting this
    `tubesync/tubesync/local_settings.py` and edit it as appropriate
 5. Run migrations with `./manage.py migrate`
 6. Collect static files with `./manage.py collectstatic`
-6. Set up your prefered WSGI server, such as `gunicorn` poiting it to the application
+6. Set up your prefered WSGI server, such as `gunicorn` pointing it to the application
    in `tubesync/tubesync/wsgi.py`
 7. Set up your proxy server such as `nginx` and forward it to the WSGI server
 8. Check the web interface is working
