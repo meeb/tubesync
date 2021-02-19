@@ -139,6 +139,40 @@ Alternatively, for Docker Compose, you can use something like:
       - PGID=1000
 ```
 
+
+## Optional authentication
+
+If you want to enable a basic username and password to be required to access the
+TubeSync dashboard you can set them with the following environment variables:
+
+```bash
+HTTP_USER
+HTTP_PASS
+```
+
+For example in the `docker run ...` line add in:
+
+```bash
+...
+-e HTTP_USER=some-username \
+-e HTTP_PASS=some-secure-password \
+...
+```
+
+Or in your Docker Compose file you would add in:
+
+```yaml
+...
+    environment:
+      - HTTP_USER=some-username
+      - HTTP_PASS=some-secure-password
+...
+```
+
+When BOTH `HTTP_USER` and `HTTP_PASS` are set then basic HTTP authentication will be
+enabled.
+
+
 # Updating
 
 To update, you can just pull a new version of the container image as they are released.
@@ -300,7 +334,9 @@ can log in at http://localhost:4848/admin
 
 ### Are there user accounts or multi-user support?
 
-No not at the moment. This could be added later if there is demand for it.
+There is support for basic HTTP authentication by setting the `HTTP_USER` and
+`HTTP_PASS` environment variables. There is not support for multi-user or user
+management.
 
 ### Does TubeSync support HTTPS?
 
@@ -328,6 +364,8 @@ useful if you are manually installing TubeSync in some other environment. These 
 | GUNICORN_WORKERS         | Number of gunicorn workers to spawn                          | 3                                  |
 | LISTEN_HOST              | IP address for gunicorn to listen on                         | 127.0.0.1                          |
 | LISTEN_PORT              | Port number for gunicorn to listen on                        | 8080                               |
+| HTTP_USER                | Sets the username for HTTP basic authentication              | some-username                      |
+| HTTP_PASS                | Sets the password for HTTP basic authentication              | some-secure-password               |
 
 
 # Manual, non-containerised, installation

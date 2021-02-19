@@ -37,6 +37,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'common.middleware.MaterializeDefaultFieldsMiddleware',
+    'common.middleware.BasicAuthMiddleware',
 ]
 
 
@@ -115,6 +116,12 @@ Disallow: /
 
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+
+BASICAUTH_DISABLE = True
+BASICAUTH_REALM = 'Authenticate to TubeSync'
+BASICAUTH_ALWAYS_ALLOW_URIS = ('/healthcheck',)
+BASICAUTH_USERS = {}
 
 
 HEALTHCHECK_FIREWALL = True

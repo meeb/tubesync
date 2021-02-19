@@ -17,6 +17,7 @@ httptools = "*"
 youtube-dl = "*"
 django-background-tasks = "*"
 requests = "*"
+django-basicauth = "*"
 
 [requires]
 python_version = "3"
