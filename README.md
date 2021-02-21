@@ -142,8 +142,9 @@ Alternatively, for Docker Compose, you can use something like:
 
 ## Optional authentication
 
-If you want to enable a basic username and password to be required to access the
-TubeSync dashboard you can set them with the following environment variables:
+Available in `v1.0` (or `:latest`)and later. If you want to enable a basic username and
+password to be required to access the TubeSync dashboard you can set them with the
+following environment variables:
 
 ```bash
 HTTP_USER
