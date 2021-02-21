@@ -239,6 +239,8 @@ and less common features:
 
 ![Sync or create missing metadata files](https://github.com/meeb/tubesync/blob/main/docs/create-missing-metadata.md)
 
+![Reset tasks from the command line](https://github.com/meeb/tubesync/blob/main/docs/reset-tasks.md)
+
 
 # Warnings
 
