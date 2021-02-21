@@ -1,6 +1,8 @@
 from django.core.management.base import BaseCommand, CommandError
+from django.utils.translation import gettext_lazy as _
 from background_task.models import Task
 from sync.models import Source
+from sync.tasks import index_source_task
 
 
 from common.logger import log
