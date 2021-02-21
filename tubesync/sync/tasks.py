@@ -10,7 +10,7 @@ import math
 import uuid
 from io import BytesIO
 from hashlib import sha1
-from datetime import timedelta
+from datetime import timedelta, datetime
 from shutil import copyfile
 from PIL import Image
 from django.conf import settings
@@ -242,12 +242,17 @@ def download_media_metadata(media_id):
             media.skip = True
     # If the source has a cut-off check the upload date is within the allowed delta
     if source.delete_old_media and source.days_to_keep > 0:
-        delta = timezone.now() - timedelta(days=source.days_to_keep)
-        if media.published < delta:
-            # Media was published after the cutoff date, skip it
-            log.warn(f'Media: {source} / {media} is older than '
-                     f'{source.days_to_keep} days, skipping')
+        if not isinstance(media.published, datetime):
+            # Media has no known published date or incomplete metadata
+            log.warn(f'Media: {source} / {media} has no published date, skipping')
             media.skip = True
+        else:
+            delta = timezone.now() - timedelta(days=source.days_to_keep)
+            if media.published < delta:
+                # Media was published after the cutoff date, skip it
+                log.warn(f'Media: {source} / {media} is older than '
+                         f'{source.days_to_keep} days, skipping')
+                media.skip = True
     # Check we can download the media item
     if not media.skip:
         if media.get_format_str():
