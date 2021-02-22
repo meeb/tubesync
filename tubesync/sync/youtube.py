@@ -46,6 +46,11 @@ def get_media_info(url):
             response = y.extract_info(url, download=False)
         except youtube_dl.utils.DownloadError as e:
             raise YouTubeError(f'Failed to extract_info for "{url}": {e}') from e
+    if not response:
+        raise YouTubeError(f'Failed to extract_info for "{url}": No metadata was '
+                           f'returned by youtube-dl, check for error messages in the '
+                           f'logs above. This task will be retried later with an '
+                           f'exponential backoff.')
     return response
 
 
