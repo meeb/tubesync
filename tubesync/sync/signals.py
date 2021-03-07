@@ -93,18 +93,47 @@ def task_task_failed(sender, task_id, completed_task, **kwargs):
 
 @receiver(post_save, sender=Media)
 def media_post_save(sender, instance, created, **kwargs):
-    # Triggered after media is saved, Recalculate the "can_download" flag, this may
+    # Triggered after media is saved
+    cap_changed = False
+    can_download_changed = False
+    # Reset the skip flag if the download cap has changed if the media has not 
+    # already been downloaded
+    if not instance.downloaded:
+        max_cap_age = instance.source.download_cap_date
+        if max_cap_age:
+            if instance.published > max_cap_age and instance.skip:
+                # Media was published after the cap date but is set to be skipped
+                log.info(f'Media: {instance.source} / {instance} has a valid '
+                         f'publishing date, marking to be unskipped')
+                instance.skip = False
+                cap_changed = True
+            elif instance.published <= max_cap_age and not instance.skip:
+                log.info(f'Media: {instance.source} / {instance} is too old for the '
+                        f'download cap date, marking to be skipped')
+                instance.skip = True
+                cap_changed = True
+        else:
+            if instance.skip:
+                # Media marked to be skipped but source download cap removed
+                log.info(f'Media: {instance.source} / {instance} has a valid '
+                         f'publishing date, marking to be unskipped')
+                instance.skip = False
+                cap_changed = True
+    # Recalculate the "can_download" flag, this may
     # need to change if the source specifications have been changed
     if instance.metadata:
-        post_save.disconnect(media_post_save, sender=Media)
         if instance.get_format_str():
             if not instance.can_download:
                 instance.can_download = True
-                instance.save()
+                can_download_changed = True
         else:
             if instance.can_download:
                 instance.can_download = False
-                instance.save()
+                can_download_changed = True
+    # Save the instance if any changes were required
+    if cap_changed or can_download_changed:
+        post_save.disconnect(media_post_save, sender=Media)
+        instance.save()
         post_save.connect(media_post_save, sender=Media)
     # If the media is missing metadata schedule it to be downloaded
     if not instance.metadata:
