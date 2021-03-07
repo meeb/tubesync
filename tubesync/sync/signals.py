@@ -47,17 +47,18 @@ def source_post_save(sender, instance, created, **kwargs):
             priority=0,
             verbose_name=verbose_name.format(instance.name)
         )
-        delete_task_by_source('sync.tasks.index_source_task', instance.pk)
-        log.info(f'Scheduling media indexing for source: {instance.name}')
-        verbose_name = _('Index media from source "{}"')
-        index_source_task(
-            str(instance.pk),
-            repeat=instance.index_schedule,
-            queue=str(instance.pk),
-            priority=5,
-            verbose_name=verbose_name.format(instance.name),
-            remove_existing_tasks=True
-        )
+        if instance.index_schedule > 0:
+            delete_task_by_source('sync.tasks.index_source_task', instance.pk)
+            log.info(f'Scheduling media indexing for source: {instance.name}')
+            verbose_name = _('Index media from source "{}"')
+            index_source_task(
+                str(instance.pk),
+                repeat=instance.index_schedule,
+                queue=str(instance.pk),
+                priority=5,
+                verbose_name=verbose_name.format(instance.name),
+                remove_existing_tasks=True
+            )
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
     for media in Media.objects.filter(source=instance):

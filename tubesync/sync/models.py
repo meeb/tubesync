@@ -158,6 +158,9 @@ class Source(models.Model):
         EVERY_6_HOURS = 21600, _('Every 6 hours')
         EVERY_12_HOURS = 43200, _('Every 12 hours')
         EVERY_24_HOURS = 86400, _('Every 24 hours')
+        EVERY_3_DAYS = 259200, _('Every 3 days')
+        EVERY_7_DAYS = 604800, _('Every 7 days')
+        NEVER = 0, _('Never')
 
     uuid = models.UUIDField(
         _('uuid'),
@@ -218,7 +221,7 @@ class Source(models.Model):
         _('index schedule'),
         choices=IndexSchedule.choices,
         db_index=True,
-        default=IndexSchedule.EVERY_6_HOURS,
+        default=IndexSchedule.EVERY_24_HOURS,
         help_text=_('Schedule of how often to index the source for new media')
     )
     download_media = models.BooleanField(
