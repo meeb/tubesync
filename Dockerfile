@@ -2,7 +2,7 @@ FROM debian:buster-slim
 
 ARG ARCH="amd64"
 ARG S6_VERSION="2.2.0.3"
-ARG FFMPEG_VERSION="4.3.1"
+ARG FFMPEG_VERSION="4.3.2"
 
 ENV DEBIAN_FRONTEND="noninteractive" \
     HOME="/root" \
@@ -12,7 +12,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     TERM="xterm" \
     S6_EXPECTED_SHA256="a7076cf205b331e9f8479bbb09d9df77dbb5cd8f7d12e9b74920902e0c16dd98" \
     S6_DOWNLOAD="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-${ARCH}.tar.gz" \
-    FFMPEG_EXPECTED_SHA256="47d95c0129fba27d051748a442a44a73ce1bd38d1e3f9fe1e9dd7258c7581fa5" \
+    FFMPEG_EXPECTED_SHA256="34bffcd0b58695e3ee5eba2573b37f06cb5088050733ca96265815f58bd61d35" \
     FFMPEG_DOWNLOAD="https://tubesync.sfo2.digitaloceanspaces.com/ffmpeg-${FFMPEG_VERSION}-${ARCH}-static.tar.xz"
 
 
