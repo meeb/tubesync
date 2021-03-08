@@ -344,21 +344,25 @@ class FrontEndTestCase(TestCase):
                 }]
             } 
         '''
+        past_date = timezone.make_aware(datetime(year=2000, month=1, day=1))
         test_media1 = Media.objects.create(
             key='mediakey1',
             source=test_source,
+            published=past_date,
             metadata=test_minimal_metadata
         )
         test_media1_pk = str(test_media1.pk)
         test_media2 = Media.objects.create(
             key='mediakey2',
             source=test_source,
+            published=past_date,
             metadata=test_minimal_metadata
         )
         test_media2_pk = str(test_media2.pk)
         test_media3 = Media.objects.create(
             key='mediakey3',
             source=test_source,
+            published=past_date,
             metadata=test_minimal_metadata
         )
         test_media3_pk = str(test_media3.pk)
