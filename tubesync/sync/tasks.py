@@ -325,7 +325,7 @@ def download_media(media_id):
                  f'not downloading')
         return
     max_cap_age = media.source.download_cap_date
-    published = instance.published
+    published = media.published
     if max_cap_age and published:
         if published <= max_cap_age:
             log.warn(f'Download task triggered media: {media} (UUID: {media.pk}) but '
