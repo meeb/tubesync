@@ -100,25 +100,37 @@ def media_post_save(sender, instance, created, **kwargs):
     # already been downloaded
     if not instance.downloaded:
         max_cap_age = instance.source.download_cap_date
-        if max_cap_age:
-            if instance.published > max_cap_age and instance.skip:
-                # Media was published after the cap date but is set to be skipped
-                log.info(f'Media: {instance.source} / {instance} has a valid '
-                         f'publishing date, marking to be unskipped')
-                instance.skip = False
-                cap_changed = True
-            elif instance.published <= max_cap_age and not instance.skip:
-                log.info(f'Media: {instance.source} / {instance} is too old for the '
-                        f'download cap date, marking to be skipped')
-                instance.skip = True
-                cap_changed = True
+        published = instance.published
+        if not published:
+            log.warn(f'Media: {instance.source} / {instance} has no published date '
+                     f'set, marking to be skipped')
+            instance.skip = True
+            cap_changed = True
         else:
-            if instance.skip:
-                # Media marked to be skipped but source download cap removed
-                log.info(f'Media: {instance.source} / {instance} has a valid '
-                         f'publishing date, marking to be unskipped')
-                instance.skip = False
-                cap_changed = True
+            if max_cap_age:
+                if instance.published > max_cap_age and instance.skip:
+                    # Media was published after the cap date but is set to be skipped
+                    log.info(f'Media: {instance.source} / {instance} has a valid '
+                            f'publishing date, marking to be unskipped')
+                    instance.skip = False
+                    cap_changed = True
+                elif instance.published <= max_cap_age and not instance.skip:
+                    log.info(f'Media: {instance.source} / {instance} is too old for '
+                            f'the download cap date, marking to be skipped')
+                    instance.skip = True
+                    cap_changed = True
+            else:
+                if instance.skip:
+                    # Media marked to be skipped but source download cap removed
+                    log.info(f'Media: {instance.source} / {instance} has a valid '
+                            f'publishing date, marking to be unskipped')
+                    instance.skip = False
+                    cap_changed = True
+    # Save the instance if any changes were required
+    if cap_changed or can_download_changed:
+        post_save.disconnect(media_post_save, sender=Media)
+        instance.save()
+        post_save.connect(media_post_save, sender=Media)
     # Recalculate the "can_download" flag, this may
     # need to change if the source specifications have been changed
     if instance.metadata:
@@ -130,11 +142,6 @@ def media_post_save(sender, instance, created, **kwargs):
             if instance.can_download:
                 instance.can_download = False
                 can_download_changed = True
-    # Save the instance if any changes were required
-    if cap_changed or can_download_changed:
-        post_save.disconnect(media_post_save, sender=Media)
-        instance.save()
-        post_save.connect(media_post_save, sender=Media)
     # If the media is missing metadata schedule it to be downloaded
     if not instance.metadata:
         log.info(f'Scheduling task to download metadata for: {instance.url}')

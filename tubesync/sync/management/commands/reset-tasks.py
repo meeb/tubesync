@@ -19,6 +19,7 @@ class Command(BaseCommand):
         # Iter all tasks
         for source in Source.objects.all():
             # Recreate the initial indexing task
+            log.info(f'Resetting tasks for source: {source}')
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(source.pk),
