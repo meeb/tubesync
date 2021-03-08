@@ -101,7 +101,7 @@ def media_post_save(sender, instance, created, **kwargs):
     if not instance.downloaded:
         max_cap_age = instance.source.download_cap_date
         published = instance.published
-        if not published:
+        if not published and not instance.skip:
             log.warn(f'Media: {instance.source} / {instance} has no published date '
                      f'set, marking to be skipped')
             instance.skip = True
