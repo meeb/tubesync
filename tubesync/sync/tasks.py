@@ -175,7 +175,7 @@ def index_source_task(source_id):
             # Video has no unique key (ID), it can't be indexed
             continue
         try:
-            media = Media.objects.get(key=key)
+            media = Media.objects.get(key=key, source=source)
         except Media.DoesNotExist:
             media = Media(key=key)
         media.source = source
