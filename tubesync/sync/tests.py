@@ -1165,14 +1165,14 @@ class FormatMatchingTestCase(TestCase):
             ('2160p', 'VP9', False, True): (True, '337'),              # Exact match, hdr
             ('2160p', 'VP9', True, False): (True, '315'),              # Exact match, 60fps
             ('2160p', 'VP9', True, True): (True, '337'),               # Exact match, 60fps+hdr
-            ('4320P', 'AVC1', False, False): (False, False),
-            ('4320P', 'AVC1', False, True): (False, False),
-            ('4320P', 'AVC1', True, False): (False, False),
-            ('4320P', 'AVC1', True, True): (False, False),
-            ('4320P', 'VP9', False, False): (False, False),
-            ('4320P', 'VP9', False, True): (False, False),
-            ('4320P', 'VP9', True, False): (True, '272'),              # Exact match, 60fps
-            ('4320P', 'VP9', True, True): (False, False),
+            ('4320p', 'AVC1', False, False): (False, False),
+            ('4320p', 'AVC1', False, True): (False, False),
+            ('4320p', 'AVC1', True, False): (False, False),
+            ('4320p', 'AVC1', True, True): (False, False),
+            ('4320p', 'VP9', False, False): (False, False),
+            ('4320p', 'VP9', False, True): (False, False),
+            ('4320p', 'VP9', True, False): (True, '272'),              # Exact match, 60fps
+            ('4320p', 'VP9', True, True): (False, False),
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
@@ -1371,14 +1371,14 @@ class FormatMatchingTestCase(TestCase):
             ('2160p', 'VP9', False, True): (True, '337'),              # Exact match, hdr
             ('2160p', 'VP9', True, False): (True, '315'),              # Exact match, 60fps
             ('2160p', 'VP9', True, True): (True, '337'),               # Exact match, 60fps+hdr
-            ('4320P', 'AVC1', False, False): (False, '272'),           # Fallback, 60fps, switched to VP9 (no 4320P AVC1, no other 8k streams)
-            ('4320P', 'AVC1', False, True): (False, '272'),            # Fallback, 60fps, switched to VP9 (no 4320P AVC1, no other 8k streams)
-            ('4320P', 'AVC1', True, False): (False, '272'),            # Fallback, 60fps, switched to VP9 (no 4320P AVC1, no other 8k streams)
-            ('4320P', 'AVC1', True, True): (False, '272'),             # Fallback, 60fps, switched to VP9 (no 4320P AVC1, no other 8k streams)
-            ('4320P', 'VP9', False, False): (False, '272'),            # Fallback, 60fps (no other 8k streams)
-            ('4320P', 'VP9', False, True): (False, '272'),             # Fallback, 60fps (no other 8k streams)
-            ('4320P', 'VP9', True, False): (True, '272'),              # Exact match, 60fps
-            ('4320P', 'VP9', True, True): (False, '272'),              # Fallback, 60fps (no other 8k streams)
+            ('4320p', 'AVC1', False, False): (False, '272'),           # Fallback, 60fps, switched to VP9 (no 4320p AVC1, no other 8k streams)
+            ('4320p', 'AVC1', False, True): (False, '272'),            # Fallback, 60fps, switched to VP9 (no 4320p AVC1, no other 8k streams)
+            ('4320p', 'AVC1', True, False): (False, '272'),            # Fallback, 60fps, switched to VP9 (no 4320p AVC1, no other 8k streams)
+            ('4320p', 'AVC1', True, True): (False, '272'),             # Fallback, 60fps, switched to VP9 (no 4320p AVC1, no other 8k streams)
+            ('4320p', 'VP9', False, False): (False, '272'),            # Fallback, 60fps (no other 8k streams)
+            ('4320p', 'VP9', False, True): (False, '272'),             # Fallback, 60fps (no other 8k streams)
+            ('4320p', 'VP9', True, False): (True, '272'),              # Exact match, 60fps
+            ('4320p', 'VP9', True, True): (False, '272'),              # Fallback, 60fps (no other 8k streams)
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
