@@ -53,9 +53,12 @@ so this is up to you to work out.
 
 You need to provide the database connection details to TubeSync via an environment
 variable. The environment variable name is `DATABASE_CONNECTION` and the format is the
-standard URL-style string. Example are:
+standard URL-style string. Examples are:
 
 `postgresql://tubesync:password@localhost:5432/tubesync`
+
+and
+
 `mysql://tubesync:password@localhost:3306/tubesync`
 
 ### 3. Start TubeSync and check the logs
