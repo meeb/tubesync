@@ -20,3 +20,10 @@ class DownloadFailedException(Exception):
         exist.
     '''
     pass
+
+
+class DatabaseConnectionError(Exception):
+    '''
+        Raised when parsing or initially connecting to a database.
+    '''
+    pass

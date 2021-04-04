@@ -18,6 +18,8 @@ youtube-dl = "*"
 django-background-tasks = "*"
 requests = "*"
 django-basicauth = "*"
+psycopg2-binary = "*"
+mysqlclient = "*"
 
 [requires]
 python_version = "3"

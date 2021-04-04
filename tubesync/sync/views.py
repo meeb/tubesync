@@ -78,6 +78,7 @@ class DashboardView(TemplateView):
         # Config and download locations
         data['config_dir'] = str(settings.CONFIG_BASE_DIR)
         data['downloads_dir'] = str(settings.DOWNLOAD_ROOT)
+        data['database_connection'] = settings.DATABASE_CONNECTION_STR
         return data
 
 

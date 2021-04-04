@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+from common.logger import log
+from common.utils import parse_database_connection_string
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,12 +23,31 @@ FORCE_SCRIPT_NAME = os.getenv('DJANGO_FORCE_SCRIPT_NAME', None)
 TIME_ZONE = os.getenv('TZ', 'UTC')
 
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': CONFIG_BASE_DIR / 'db.sqlite3',
+database_dict = {}
+database_connection_env = os.getenv('DATABASE_CONNECTION', '')
+if database_connection_env:
+    database_dict = parse_database_connection_string(database_connection_env)
+
+
+if database_dict:
+    log.info(f'Using database connection: {database_dict["ENGINE"]}://'
+             f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
+             f'{database_dict["PORT"]}/{database_dict["NAME"]}')
+    DATABASES = {
+        'default': database_dict,
     }
-}
+    DATABASE_CONNECTION_STR = (f'{database_dict["DRIVER"]} at "{database_dict["HOST"]}:'
+                               f'{database_dict["PORT"]}" database '
+                               f'"{database_dict["NAME"]}"')
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': CONFIG_BASE_DIR / 'db.sqlite3',
+        }
+    }
+    DATABASE_CONNECTION_STR = f'sqlite at "{DATABASES["default"]["NAME"]}"'
+
 
 DEFAULT_THREADS = 1
 MAX_BACKGROUND_TASK_ASYNC_THREADS = 8

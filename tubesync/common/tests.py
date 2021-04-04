@@ -2,6 +2,8 @@ import os.path
 from django.conf import settings
 from django.test import TestCase, Client
 from .testutils import prevent_request_warnings
+from .utils import parse_database_connection_string
+from .errors import DatabaseConnectionError
 
 
 class ErrorPageTestCase(TestCase):
@@ -61,3 +63,40 @@ class CommonStaticTestCase(TestCase):
         favicon_real_path = os.path.join(os.sep.join(root_parts),
                                          os.sep.join(url_parts))
         self.assertTrue(os.path.exists(favicon_real_path))
+
+
+class DatabaseConnectionTestCase(TestCase):
+
+    def test_parse_database_connection_string(self):
+        database_dict = parse_database_connection_string(
+            'postgresql://tubesync:password@localhost:5432/tubesync')
+        database_dict = parse_database_connection_string(
+            'mysql://tubesync:password@localhost:3306/tubesync')
+        # Invalid driver
+        with self.assertRaises(DatabaseConnectionError):
+            parse_database_connection_string(
+                'test://tubesync:password@localhost:5432/tubesync')
+        # No username
+        with self.assertRaises(DatabaseConnectionError):
+            parse_database_connection_string(
+                'postgresql://password@localhost:5432/tubesync')
+        # No database name
+        with self.assertRaises(DatabaseConnectionError):
+            parse_database_connection_string(
+                'postgresql://tubesync:password@5432')
+        # Invalid port
+        with self.assertRaises(DatabaseConnectionError):
+            parse_database_connection_string(
+                'postgresql://tubesync:password@localhost:test/tubesync')
+        # Invalid port
+        with self.assertRaises(DatabaseConnectionError):
+            parse_database_connection_string(
+                'postgresql://tubesync:password@localhost:65537/tubesync')
+        # Invalid username or password
+        with self.assertRaises(DatabaseConnectionError):
+            parse_database_connection_string(
+                'postgresql://tubesync:password:test@localhost:5432/tubesync')
+        # Invalid database name
+        with self.assertRaises(DatabaseConnectionError):
+            parse_database_connection_string(
+                'postgresql://tubesync:password@localhost:5432/tubesync/test')
