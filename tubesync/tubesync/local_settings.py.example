@@ -16,6 +16,7 @@ DATABASES = {
         'NAME': CONFIG_BASE_DIR / 'db.sqlite3',
     }
 }
+DATABASE_CONNECTION_STR = f'sqlite at "{DATABASES["default"]["NAME"]}"'
 
 
 DOWNLOAD_ROOT = DOWNLOADS_BASE_DIR / 'downloads'
