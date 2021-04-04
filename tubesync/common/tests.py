@@ -70,8 +70,30 @@ class DatabaseConnectionTestCase(TestCase):
     def test_parse_database_connection_string(self):
         database_dict = parse_database_connection_string(
             'postgresql://tubesync:password@localhost:5432/tubesync')
+        self.assertEqual(database_dict,
+            {
+                'DRIVER': 'postgresql',
+                'ENGINE': 'django.db.backends.postgresql',
+                'USER': 'tubesync',
+                'PASSWORD': 'password',
+                'HOST': 'localhost',
+                'PORT': 5432,
+                'NAME': 'tubesync',
+            }
+        )
         database_dict = parse_database_connection_string(
             'mysql://tubesync:password@localhost:3306/tubesync')
+        self.assertEqual(database_dict,
+            {
+                'DRIVER': 'mysql',
+                'ENGINE': 'django.db.backends.mysql',
+                'USER': 'tubesync',
+                'PASSWORD': 'password',
+                'HOST': 'localhost',
+                'PORT': 3306,
+                'NAME': 'tubesync',
+            }
+        )
         # Invalid driver
         with self.assertRaises(DatabaseConnectionError):
             parse_database_connection_string(
