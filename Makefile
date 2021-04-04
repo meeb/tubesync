@@ -30,4 +30,4 @@ runcontainer:
 
 
 test:
-	$(python) app/manage.py test --verbosity=2
+	cd tubesync && $(python) manage.py test --verbosity=2 && cd ..
