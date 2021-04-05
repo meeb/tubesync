@@ -24,7 +24,7 @@ $ docker exec -ti tubesync python3 /app/manage.py dumpdata > some-file.json
 Then change you database backend over, then use
 
 ```bash
-$ docker exec -ti tubesync python3 /app/manage.py loaddata some-file.json
+$ cat some-file.json | docker exec -ti tubesync python3 /app/manage.py loaddata --format=json -
 ```
 
 As detailed in the Django documentation:
