@@ -75,18 +75,19 @@
         },
         "django-compressor": {
             "hashes": [
-                "sha256:57ac0a696d061e5fc6fbc55381d2050f353b973fb97eee5593f39247bc0f30af",
-                "sha256:d2ed1c6137ddaac5536233ec0a819e14009553fee0a869bea65d03e5285ba74f"
+                "sha256:3358077605c146fdcca5f9eaffb50aa5dbe15f238f8854679115ebf31c0415e0",
+                "sha256:f8313f59d5e65712fc28787d084fe834997c9dfa92d064a1a3ec3d3366594d04"
             ],
             "index": "pypi",
-            "version": "==2.4"
+            "version": "==2.4.1"
         },
         "django-sass-processor": {
             "hashes": [
-                "sha256:cb90efee38cd7b0fe727c78d8993ad7804de33f40328200dfc1a481307ef0466"
+                "sha256:1f043180c47754018e803a77da003377f5ea6558de57cd6946eb27a32e9c16a2",
+                "sha256:dcaad47c591a2d52689c1bd209259e922e902d886293f0d5c9e0d1a4eb85eda2"
             ],
             "index": "pypi",
-            "version": "==1.0.0"
+            "version": "==1.0.1"
         },
         "gunicorn": {
             "hashes": [
@@ -309,11 +310,11 @@
         },
         "youtube-dl": {
             "hashes": [
-                "sha256:34a034d9b2062e428710d4cd6365db7a64cd388e51a3f9ab74058179c95d8654",
-                "sha256:5031125b13c92d23197adbe5d20f7a0a03befc510cabbfccb757703b7e35c140"
+                "sha256:22d385ea9887291764c3bd434554e44154f5e0935cde868b429d151415e1e3b2",
+                "sha256:e29b452b231581ba6d493af71ea4af5cc9d1d889b77b99ceccebbf180fc24758"
             ],
             "index": "pypi",
-            "version": "==2021.4.7"
+            "version": "==2021.4.17"
         }
     },
     "develop": {}
