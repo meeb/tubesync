@@ -79,6 +79,7 @@ def parse_database_connection_string(database_connection_string):
         'PASSWORD': password,
         'HOST': hostname,
         'PORT': port,
+        'CONN_MAX_AGE': 300,
     }
 
 
