@@ -18,6 +18,12 @@ def parse_database_connection_string(database_connection_string):
         'postgresql': 'django.db.backends.postgresql',
         'mysql': 'django.db.backends.mysql',
     }
+    backend_options = {
+        'postgresql': {},
+        'mysql': {
+            'charset': 'utf8mb4',
+        }
+    }
     try:
         parts = urlparse(str(database_connection_string))
     except Exception as e:
@@ -80,6 +86,7 @@ def parse_database_connection_string(database_connection_string):
         'HOST': hostname,
         'PORT': port,
         'CONN_MAX_AGE': 300,
+        'OPTIONS': backend_options.get(driver),
     }
 
 
