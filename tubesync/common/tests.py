@@ -80,6 +80,7 @@ class DatabaseConnectionTestCase(TestCase):
                 'PORT': 5432,
                 'NAME': 'tubesync',
                 'CONN_MAX_AGE': 300,
+                'OPTIONS': {},
             }
         )
         database_dict = parse_database_connection_string(
@@ -94,6 +95,7 @@ class DatabaseConnectionTestCase(TestCase):
                 'PORT': 3306,
                 'NAME': 'tubesync',
                 'CONN_MAX_AGE': 300,
+                'OPTIONS': {'charset': 'utf8mb4'}
             }
         )
         # Invalid driver
