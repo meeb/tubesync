@@ -61,6 +61,14 @@ and
 
 `mysql://tubesync:password@localhost:3306/tubesync`
 
+*Important note:* For MySQL databases make SURE you create the tubesync database with
+`utf8mb4` encoding, like:
+
+`CREATE DATABASE tubesync CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;`
+
+Without `utf8mb4` encoding things like emojis in video titles (or any extended UTF8
+characters) can cause issues.
+
 ### 3. Start TubeSync and check the logs
 
 Once you start TubeSync with the new database connection you should see the folling log
