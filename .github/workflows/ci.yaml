@@ -36,8 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - name: Create a new container builder
+      run: docker buildx create --name builder && docker buildx use builder
     - name: Build the container image
-      run: docker buildx build --platform linux/arm/v7,linux/arm64/v8,linux/amd64 --tag $IMAGE_NAME .
+      run: docker buildx build --platform linux/arm/v7,linux/arm64,linux/amd64 --tag $IMAGE_NAME .
     - name: Log into GitHub Container Registry
       run: echo "${{ secrets.REGISTRY_ACCESS_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
     - name: Push image to GitHub Container Registry
