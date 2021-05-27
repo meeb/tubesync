@@ -48,6 +48,6 @@ jobs:
         file: ./Dockerfile
         platforms: linux/amd64
         push: true
-        tags: ghcr.io/meeb/$IMAGE_NAME:latest
-        cache-from: type=registry,ref=ghcr.io/meeb/$IMAGE_NAME:latest
+        tags: ghcr.io/meeb/tubesync:latest
+        cache-from: type=registry,ref=ghcr.io/meeb/tubesync:latest
         cache-to: type=inline
