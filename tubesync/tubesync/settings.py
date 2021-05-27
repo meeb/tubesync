@@ -159,6 +159,7 @@ YOUTUBE_DEFAULTS = {
     'age_limit': 99,        # 'Age in years' to spoof
     'ignoreerrors': True,   # Skip on errors (such as unavailable videos in playlists)
     'cachedir': False,      # Disable on-disk caching
+    'addmetadata': True,    # Embed metadata during postprocessing where available
 }
 
 
