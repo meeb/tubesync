@@ -171,3 +171,7 @@ except ImportError as e:
     import sys
     sys.stderr.write(f'Unable to import local_settings: {e}\n')
     sys.exit(1)
+
+
+from .dbutils import patch_ensure_connection
+patch_ensure_connection()
