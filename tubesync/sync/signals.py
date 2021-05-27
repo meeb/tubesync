@@ -130,11 +130,6 @@ def media_post_save(sender, instance, created, **kwargs):
                             f'publishing date, marking to be unskipped')
                     instance.skip = False
                     cap_changed = True
-    # Save the instance if any changes were required
-    if cap_changed or can_download_changed:
-        post_save.disconnect(media_post_save, sender=Media)
-        instance.save()
-        post_save.connect(media_post_save, sender=Media)
     # Recalculate the "can_download" flag, this may
     # need to change if the source specifications have been changed
     if instance.metadata:
@@ -146,6 +141,11 @@ def media_post_save(sender, instance, created, **kwargs):
             if instance.can_download:
                 instance.can_download = False
                 can_download_changed = True
+    # Save the instance if any changes were required
+    if cap_changed or can_download_changed:
+        post_save.disconnect(media_post_save, sender=Media)
+        instance.save()
+        post_save.connect(media_post_save, sender=Media)
     # If the media is missing metadata schedule it to be downloaded
     if not instance.metadata:
         log.info(f'Scheduling task to download metadata for: {instance.url}')
