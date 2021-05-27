@@ -46,6 +46,8 @@ jobs:
       with:
         platforms: linux/amd64
         push: true
-        tags: ghcr.io/meeb/tubesync:latest
-        cache-from: type=registry,ref=ghcr.io/meeb/tubesync:latest
+        tags: ghcr.io/meeb/${{ env.IMAGE_NAME }}:latest
+        cache-from: type=registry,ref=ghcr.io/meeb/${{ env.IMAGE_NAME }}:latest
         cache-to: type=inline
+        build-args: |
+          IMAGE_NAME=${{ env.IMAGE_NAME }}
