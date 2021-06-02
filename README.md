@@ -12,7 +12,7 @@ media server, then TubeSync is for you. Internally, TubeSync is a web interface 
 on `youtube-dl` and `ffmpeg` with a task scheduler.
 
 There are several other web interfaces to YouTube and `youtube-dl` all with varying
-features and implemenations. TubeSync's largest difference is full PVR experience of
+features and implementations. TubeSync's largest difference is full PVR experience of
 updating media servers and better selection of media formats. Additionally, to be as
 hands-free as possible, TubeSync has gradual retrying of failures with back-off timers
 so media which fails to download will be retried for an extended period making it,
