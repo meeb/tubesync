@@ -60,7 +60,7 @@ RUN set -x && \
   apt-get update && \
   # Install required distro packages
   apt-get -y install nginx-light && \
-  apt-get -y --no-install-recommends install python3 python3-setuptools python3-pip python3-dev gcc make default-libmysqlclient-dev libmariadb3 postgresql-common libpq-dev && \
+  apt-get -y --no-install-recommends install python3 python3-setuptools python3-pip python3-dev gcc make default-libmysqlclient-dev libmariadb3 postgresql-common libpq-dev libpq5 && \
   # Install pipenv
   pip3 --disable-pip-version-check install pipenv && \
   # Create a 'app' user which the application will run as
