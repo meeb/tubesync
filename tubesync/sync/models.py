@@ -818,6 +818,20 @@ class Media(models.Model):
         hdr = ''
         # If the download has completed use existing values
         if self.downloaded:
+            # Check if there's any stored meta data at all
+            if (not self.downloaded_video_codec and \
+                not self.downloaded_audio_codec):
+                # Marked as downloaded but no metadata, imported?
+                return {
+                    'resolution': resolution,
+                    'height': height,
+                    'width': width,
+                    'vcodec': vcodec,
+                    'acodec': acodec,
+                    'fps': fps,
+                    'hdr': hdr,
+                    'format': tuple(fmt),
+                }
             resolution = f'{self.downloaded_height}p'
             if self.downloaded_format != 'audio':
                 vcodec = self.downloaded_video_codec.lower()
