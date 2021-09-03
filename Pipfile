@@ -20,6 +20,7 @@ requests = "*"
 django-basicauth = "*"
 psycopg2-binary = "*"
 mysqlclient = "*"
+yt-dlp = "*"
 
 [requires]
 python_version = "3"
