@@ -60,9 +60,23 @@ RUN set -x && \
   apt-get update && \
   # Install required distro packages
   apt-get -y install nginx-light && \
-  apt-get -y --no-install-recommends install python3 python3-setuptools python3-pip python3-dev gcc make default-libmysqlclient-dev libmariadb3 postgresql-common libpq-dev libpq5 && \
+  apt-get -y --no-install-recommends install \
+    python3 \
+    python3-setuptools \
+    python3-pip \
+    python3-dev \
+    gcc \
+    make \
+    default-libmysqlclient-dev \
+    libmariadb3 \
+    postgresql-common \
+    libpq-dev \
+    libpq5 \
+    libjpeg-dev \
+    zlib1g-dev \
+    libwebp-dev && \
   # Install pipenv
-  pip3 --disable-pip-version-check install pipenv && \
+  pip3 --disable-pip-version-check install wheel pipenv && \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
@@ -83,7 +97,17 @@ RUN set -x && \
   rm /app/Pipfile.lock && \
   pipenv --clear && \
   pip3 --disable-pip-version-check uninstall -y pipenv wheel virtualenv && \
-  apt-get -y autoremove --purge python3-pip python3-dev gcc make default-libmysqlclient-dev postgresql-common libpq-dev && \
+  apt-get -y autoremove --purge \
+    python3-pip \
+    python3-dev \
+    gcc \
+    make \
+    default-libmysqlclient-dev \
+    postgresql-common \
+    libpq-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    libwebp-dev && \
   apt-get -y autoremove && \
   apt-get -y autoclean && \
   rm -rf /var/lib/apt/lists/* && \
