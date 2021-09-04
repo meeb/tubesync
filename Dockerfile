@@ -72,6 +72,7 @@ RUN set -x && \
     postgresql-common \
     libpq-dev \
     libpq5 \
+    libjpeg62-turbo \
     libjpeg-dev \
     zlib1g-dev \
     libwebp-dev && \
