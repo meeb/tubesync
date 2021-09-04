@@ -440,7 +440,6 @@ class Source(models.Model):
             'title_full': 'Some Media Title Name',
             'key': 'SoMeUnIqUiD',
             'format': '-'.join(fmt),
-            'playlist_index': 1,
             'playlist_title': 'Some Playlist Title',
             'ext': self.extension,
             'resolution': self.source_resolution if self.source_resolution else '',
@@ -561,11 +560,6 @@ class Media(models.Model):
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'dislike_count',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'dislike_count',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'dislike_count',
-        },
-        'playlist_index': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'playlist_index',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'playlist_index',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'playlist_index',
         },
         'playlist_title': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'playlist_title',
@@ -929,7 +923,6 @@ class Media(models.Model):
             'title_full': clean_filename(self.title),
             'key': self.key,
             'format': '-'.join(display_format['format']),
-            'playlist_index': self.playlist_index,
             'playlist_title': self.playlist_title,
             'ext': self.source.extension,
             'resolution': display_format['resolution'],
@@ -1045,11 +1038,6 @@ class Media(models.Model):
     def formats(self):
         field = self.get_metadata_field('formats')
         return self.loaded_metadata.get(field, [])
-
-    @property
-    def playlist_index(self):
-        field = self.get_metadata_field('playlist_index')
-        return self.loaded_metadata.get(field, 0)
 
     @property
     def playlist_title(self):
