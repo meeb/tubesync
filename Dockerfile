@@ -73,6 +73,7 @@ RUN set -x && \
     libpq-dev \
     libpq5 \
     libjpeg62-turbo \
+    libwebp6 \
     libjpeg-dev \
     zlib1g-dev \
     libwebp-dev && \
