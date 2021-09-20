@@ -9,9 +9,9 @@ downloaded.
 
 If you want to watch YouTube videos in particular quality or settings from your local
 media server, then TubeSync is for you. Internally, TubeSync is a web interface wrapper
-on `youtube-dl` and `ffmpeg` with a task scheduler.
+on `yt-dlp` and `ffmpeg` with a task scheduler.
 
-There are several other web interfaces to YouTube and `youtube-dl` all with varying
+There are several other web interfaces to YouTube and `yt-dlp` all with varying
 features and implementations. TubeSync's largest difference is full PVR experience of
 updating media servers and better selection of media formats. Additionally, to be as
 hands-free as possible, TubeSync has gradual retrying of failures with back-off timers
@@ -281,7 +281,7 @@ automatically.
 ### Does TubeSync support any other video platforms?
 
 At the moment, no. This is a pre-release. The library TubeSync uses that does most
-of the downloading work, `youtube-dl`, supports many hundreds of video sources so it's
+of the downloading work, `yt-dlp`, supports many hundreds of video sources so it's
 likely more will be added to TubeSync if there is demand for it.
 
 ### Is there a progress bar?
@@ -307,13 +307,13 @@ media available because you got a channel name wrong) will be shown as errors on
 
 ### What is TubeSync written in?
 
-Python3 using Django, embedding youtube-dl. It's pretty much glue between other much
+Python3 using Django, embedding yt-dlp. It's pretty much glue between other much
 larger libraries.
 
 Notable libraries and software used:
 
  * [Django](https://www.djangoproject.com/)
- * [youtube-dl](https://yt-dl.org/)
+ * [yt-dlp](https://github.com/yt-dlp/yt-dlp)
  * [ffmpeg](https://ffmpeg.org/)
  * [Django Background Tasks](https://github.com/arteria/django-background-tasks/)
  * [django-sass](https://github.com/coderedcorp/django-sass/)
