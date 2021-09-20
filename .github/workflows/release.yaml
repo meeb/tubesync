@@ -13,9 +13,6 @@ jobs:
     steps:
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v1
-    - name: Get tag
-      id: vars
-      run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v1
     - name: Log into GitHub Container Registry
@@ -30,4 +27,4 @@ jobs:
         cache-to: type=inline
         build-args: |
           IMAGE_NAME=${{ env.IMAGE_NAME }}
-          RELEASE_TAG=${{ steps.vars.outputs.tag }}
+          RELEASE_TAG=${{ github.event.release.tag_name }}
