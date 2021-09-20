@@ -22,6 +22,7 @@ from background_task import background
 from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import NoMediaException, DownloadFailedException
+from common.utils import json_serial
 from .models import Source, Media, MediaServer
 from .utils import (get_remote_image, resize_image_to_height, delete_file,
                     write_text_file)
@@ -224,7 +225,7 @@ def download_media_metadata(media_id):
         return
     source = media.source
     metadata = media.index_metadata()
-    media.metadata = json.dumps(metadata)
+    media.metadata = json.dumps(metadata, default=json_serial)
     upload_date = media.upload_date
     # Media must have a valid upload date
     if upload_date:

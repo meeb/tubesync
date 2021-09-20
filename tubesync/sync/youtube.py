@@ -8,7 +8,7 @@ import os
 from django.conf import settings
 from copy import copy
 from common.logger import log
-import youtube_dl
+import yt_dlp
 
 
 _youtubedl_cachedir = getattr(settings, 'YOUTUBE_DL_CACHEDIR', None)
@@ -19,7 +19,7 @@ if _youtubedl_cachedir:
 
 
 
-class YouTubeError(youtube_dl.utils.DownloadError):
+class YouTubeError(yt_dlp.utils.DownloadError):
     '''
         Generic wrapped error for all errors that could be raised by youtube-dl.
     '''
@@ -41,10 +41,10 @@ def get_media_info(url):
         'extract_flat': True,
     })
     response = {}
-    with youtube_dl.YoutubeDL(opts) as y:
+    with yt_dlp.YoutubeDL(opts) as y:
         try:
             response = y.extract_info(url, download=False)
-        except youtube_dl.utils.DownloadError as e:
+        except yt_dlp.utils.DownloadError as e:
             raise YouTubeError(f'Failed to extract_info for "{url}": {e}') from e
     if not response:
         raise YouTubeError(f'Failed to extract_info for "{url}": No metadata was '
@@ -99,9 +99,9 @@ def download_media(url, media_format, extension, output_file):
         'quiet': True,
         'progress_hooks': [hook],
     })
-    with youtube_dl.YoutubeDL(opts) as y:
+    with yt_dlp.YoutubeDL(opts) as y:
         try:
             return y.download([url])
-        except youtube_dl.utils.DownloadError as e:
+        except yt_dlp.utils.DownloadError as e:
             raise YouTubeError(f'Failed to download for "{url}": {e}') from e
     return False

@@ -1,7 +1,7 @@
-from youtube_dl import version as yt_version
+from yt_dlp import version as yt_dlp_version
 
 
-youtube_dl_version = str(yt_version.__version__)
+yt_dlp_version = str(yt_dlp_version.__version__)
 ffmpeg_version = '(shared install)'
 
 

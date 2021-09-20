@@ -1,4 +1,6 @@
+from datetime import datetime
 from urllib.parse import urlunsplit, urlencode, urlparse
+from yt_dlp.utils import LazyList
 from .errors import DatabaseConnectionError
 
 
@@ -113,3 +115,11 @@ def clean_filename(filename):
         filename = filename.replace(char, '')
     filename = ''.join([c for c in filename if ord(c) > 30])
     return ' '.join(filename.split())
+
+
+def json_serial(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, LazyList):
+        return list(obj)
+    raise TypeError(f'Type {type(obj)} is not json_serial()-able')
