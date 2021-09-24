@@ -1,6 +1,7 @@
 import json
 from django.core.management.base import BaseCommand, CommandError
 from sync.youtube import get_media_info
+from common.utils import json_serial
 
 
 class Command(BaseCommand):
@@ -14,5 +15,6 @@ class Command(BaseCommand):
         url = options['url']
         self.stdout.write(f'Showing information for URL: {url}')
         info = get_media_info(url)
-        self.stdout.write(json.dumps(info, indent=4, sort_keys=True))
+        d = json.dumps(info, indent=4, sort_keys=True, default=json_serial)
+        self.stdout.write(d)
         self.stdout.write('Done')
