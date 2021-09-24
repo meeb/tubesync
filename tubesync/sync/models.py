@@ -655,7 +655,7 @@ class Media(models.Model):
     media_file = models.FileField(
         _('media file'),
         upload_to=get_media_file_path,
-        max_length=200,
+        max_length=255,
         blank=True,
         null=True,
         storage=media_file_storage,
