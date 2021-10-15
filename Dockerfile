@@ -2,7 +2,6 @@ FROM debian:bullseye-slim
 
 ARG ARCH="amd64"
 ARG S6_VERSION="2.2.0.3"
-ARG FFMPEG_VERSION="4.3.2"
 
 ENV DEBIAN_FRONTEND="noninteractive" \
     HOME="/root" \
@@ -11,9 +10,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     LC_ALL="en_US.UTF-8" \
     TERM="xterm" \
     S6_EXPECTED_SHA256="a7076cf205b331e9f8479bbb09d9df77dbb5cd8f7d12e9b74920902e0c16dd98" \
-    S6_DOWNLOAD="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-${ARCH}.tar.gz" \
-    FFMPEG_EXPECTED_SHA256="34bffcd0b58695e3ee5eba2573b37f06cb5088050733ca96265815f58bd61d35" \
-    FFMPEG_DOWNLOAD="https://tubesync.sfo2.digitaloceanspaces.com/ffmpeg-${FFMPEG_VERSION}-${ARCH}-static.tar.xz"
+    S6_DOWNLOAD="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-${ARCH}.tar.gz"
 
 
 # Install third party software
@@ -23,30 +20,19 @@ RUN set -x && \
     echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
     locale-gen en_US.UTF-8 && \
     # Install required distro packages
-    apt-get -y --no-install-recommends install curl xz-utils ca-certificates binutils && \
+    apt-get -y --no-install-recommends install curl ca-certificates binutils && \
     # Install s6
     curl -L ${S6_DOWNLOAD} --output /tmp/s6-overlay-${ARCH}.tar.gz && \
     sha256sum /tmp/s6-overlay-${ARCH}.tar.gz && \
     echo "${S6_EXPECTED_SHA256}  /tmp/s6-overlay-${ARCH}.tar.gz" | sha256sum -c - && \
     tar xzf /tmp/s6-overlay-${ARCH}.tar.gz -C / && \
-    # Install ffmpeg
-    curl -L ${FFMPEG_DOWNLOAD} --output /tmp/ffmpeg-${ARCH}-static.tar.xz && \
-    echo "${FFMPEG_EXPECTED_SHA256}  /tmp/ffmpeg-${ARCH}-static.tar.xz" | sha256sum -c - && \
-    xz --decompress /tmp/ffmpeg-${ARCH}-static.tar.xz && \
-    tar -xvf /tmp/ffmpeg-${ARCH}-static.tar -C /tmp && \
-    install -v -s -g root -o root -m 0755 -s /tmp/ffmpeg-${FFMPEG_VERSION}-${ARCH}-static/ffmpeg -t /usr/local/bin && \
     # Clean up
     rm -rf /tmp/s6-overlay-${ARCH}.tar.gz && \
-    rm -rf /tmp/ffmpeg-${ARCH}-static.tar && \
-    rm -rf /tmp/ffmpeg-${FFMPEG_VERSION}-${ARCH}-static && \
-    apt-get -y autoremove --purge curl xz-utils binutils
+    apt-get -y autoremove --purge curl binutils
 
 # Copy app
 COPY tubesync /app
 COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
-
-# Append container bundled software versions
-RUN echo "ffmpeg_version = '${FFMPEG_VERSION}-static'" >> /app/common/third_party_versions.py
 
 # Add Pipfile
 COPY Pipfile /app/Pipfile
@@ -76,7 +62,8 @@ RUN set -x && \
     libwebp6 \
     libjpeg-dev \
     zlib1g-dev \
-    libwebp-dev && \
+    libwebp-dev \
+    ffmpeg && \
   # Install pipenv
   pip3 --disable-pip-version-check install wheel pipenv && \
   # Create a 'app' user which the application will run as
@@ -120,6 +107,11 @@ RUN set -x && \
   mkdir -p /root && \
   chown root:root /root && \
   chmod 0700 /root
+
+# Append software versions
+RUN set -x && \
+  FFMPEG_VERSION=$(/usr/bin/ffmpeg -version | head -n 1 | awk '{ print $3 }') && \
+  echo "ffmpeg_version = '${FFMPEG_VERSION}'" >> /app/common/third_party_versions.py
 
 # Copy root
 COPY config/root /
