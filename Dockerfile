@@ -1,4 +1,4 @@
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 
 ARG ARCH="amd64"
 ARG S6_VERSION="2.2.0.3"
