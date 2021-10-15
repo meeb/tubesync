@@ -428,12 +428,15 @@ class Source(models.Model):
             fmt.append('60fps')
         if self.prefer_hdr:
             fmt.append('hdr')
+        now = timezone.now()
         return {
-            'yyyymmdd': timezone.now().strftime('%Y%m%d'),
-            'yyyy_mm_dd': timezone.now().strftime('%Y-%m-%d'),
-            'yyyy': timezone.now().strftime('%Y'),
-            'mm': timezone.now().strftime('%m'),
-            'dd': timezone.now().strftime('%d'),
+            'yyyymmdd': now.strftime('%Y%m%d'),
+            'yyyy_mm_dd': now.strftime('%Y-%m-%d'),
+            'yyyy': now.strftime('%Y'),
+            'mm': now.strftime('%m'),
+            'dd': now.strftime('%d'),
+            'hh': now.strftime('%H'),
+            'min': now.strftime('%M'),
             'source': self.slugname,
             'source_full': self.name,
             'title': 'some-media-title-name',
@@ -917,6 +920,8 @@ class Media(models.Model):
             'yyyy': dateobj.strftime('%Y'),
             'mm': dateobj.strftime('%m'),
             'dd': dateobj.strftime('%d'),
+            'hh': dateobj.strftime('%H'),
+            'min': dateobj.strftime('%M'),
             'source': self.source.slugname,
             'source_full': self.source.name,
             'title': self.slugtitle,

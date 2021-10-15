@@ -491,7 +491,7 @@ class FilepathTestCase(TestCase):
             metadata=metadata,
         )
 
-    def test_source_dirname(self):
+    def test_source_media_format(self):
         # Check media format validation is working
         # Empty
         self.source.media_format = ''
@@ -521,6 +521,12 @@ class FilepathTestCase(TestCase):
         self.source.media_format = 'test-{dd}'
         self.assertEqual(self.source.get_example_media_format(),
                          'test-' + timezone.now().strftime('%d'))
+        self.source.media_format = 'test-{hh}'
+        self.assertEqual(self.source.get_example_media_format(),
+                         'test-' + timezone.now().strftime('%H'))
+        self.source.media_format = 'test-{min}'
+        self.assertEqual(self.source.get_example_media_format(),
+                         'test-' + timezone.now().strftime('%M'))
         self.source.media_format = 'test-{source}'
         self.assertEqual(self.source.get_example_media_format(),
                          'test-' + self.source.slugname)
