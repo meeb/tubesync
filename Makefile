@@ -8,17 +8,17 @@ all: clean build
 
 
 dev:
-	$(python) app/manage.py runserver
+	$(python) tubesync/manage.py runserver
 
 
 build:
-	mkdir -p app/media
-	mkdir -p app/static
-	$(python) app/manage.py collectstatic --noinput
+	mkdir -p tubesync/media
+	mkdir -p tubesync/static
+	$(python) tubesync/manage.py collectstatic --noinput
 
 
 clean:
-	rm -rf app/static
+	rm -rf tubesync/static
 
 
 container: clean
