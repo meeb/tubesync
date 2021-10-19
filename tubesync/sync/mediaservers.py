@@ -124,7 +124,7 @@ class PlexMediaServer(MediaServer):
         # Seems we have a valid library sections page, get the library IDs
         remote_libraries = {}
         try:
-            for parent in parsed_response.getiterator('MediaContainer'):
+            for parent in parsed_response.iter('MediaContainer'):
                 for d in parent:
                     library_id = d.attrib['key']
                     library_name = d.attrib['title']
