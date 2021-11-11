@@ -400,11 +400,11 @@
         },
         "yt-dlp": {
             "hashes": [
-                "sha256:4900fdfffa3de0b09a74f3d7fe98e4d5e21f3ce74db0c106c942614f2ebc3368",
-                "sha256:a24b9666bd2234149e4da8c4f16bb8e5f746c29428d12ee04fc1c11b5247a307"
+                "sha256:9c3d85fdeeac3d61cfc85fd72d55fe6b63fcf1d19d05e2841cf2e544922ed157",
+                "sha256:f0ad6ae2e2838b608df2fd125f2a777a7ad832d3e757ee6d4583b84b21e44388"
             ],
             "index": "pypi",
-            "version": "==2021.10.22"
+            "version": "==2021.11.10.1"
         }
     },
     "develop": {}
