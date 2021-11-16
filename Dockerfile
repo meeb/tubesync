@@ -63,7 +63,8 @@ RUN set -x && \
     libjpeg-dev \
     zlib1g-dev \
     libwebp-dev \
-    ffmpeg && \
+    ffmpeg \
+    redis-server && \
   # Install pipenv
   pip3 --disable-pip-version-check install wheel pipenv && \
   # Create a 'app' user which the application will run as
