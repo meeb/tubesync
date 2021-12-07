@@ -327,7 +327,7 @@ Notable libraries and software used:
  * [django-sass](https://github.com/coderedcorp/django-sass/)
  * The container bundles with `s6-init`, `nginx` and redis
 
-See the [Pipefile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full list.
+See the [Pipfile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full list.
 
 ### Can I get access to the full Django admin?
 
