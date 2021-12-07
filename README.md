@@ -69,9 +69,13 @@ currently just Plex, to complete the PVR experience.
 # Installation
 
 TubeSync is designed to be run in a container, such as via Docker or Podman. It also
-works in a Docker Compose stack. Only `amd64` is initially supported.
+works in a Docker Compose stack. Only `amd64` architecture is supported for now.
 
-Example (with Docker on *nix):
+
+### Prerequisites
+
+
+#### Find your user id
 
 First find your the user ID and group ID you want to run TubeSync as, if you're not
 sure what this is it's probably your current user ID and group ID:
@@ -82,20 +86,23 @@ $ id
 # id uid=1000(username) gid=1000(username) groups=1000(username),129(docker)
 ```
 
-You can find your local timezone name here:
 
-https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+#### Choose your timezone
 
-If unset, `TZ` defaults to `UTC`.
+The timezone can be set using the TZ environment, here's a [list of available timezones](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). The default timezone is UTC.
 
-Next, create the directories you're going to use for config data and downloads:
+
+#### Create data directories
+
+The directories used for downloads and configuration will have to be created first. Choose where you want to store the files and create the two directories using mkdir:
 
 ```bash
 $ mkdir /some/directory/tubesync-config
 $ mkdir /some/directory/tubesync-downloads
 ```
 
-Finally, download and run the container:
+
+### Install using Docker
 
 ```bash
 # Pull image
@@ -118,7 +125,8 @@ TubeSync dashboard. If you do, you can proceed to adding some sources (YouTube c
 and playlists). If not, check `docker logs tubesync` to see what errors might be
 occuring, typical ones are file permission issues.
 
-Alternatively, for Docker Compose, you can use something like:
+
+### Install using Docker Compose
 
 ```yaml
   tubesync:
@@ -137,11 +145,12 @@ Alternatively, for Docker Compose, you can use something like:
 ```
 
 
-## Optional authentication
+### Optional authentication
 
-Available in `v1.0` (or `:latest`)and later. If you want to enable a basic username and
-password to be required to access the TubeSync dashboard you can set them with the
-following environment variables:
+> Available in `v1.0` (or `latest`) and later.
+
+If you want to enable a basic authentication using username and password to access
+the TubeSync dashboard you can set them with the following environment variables:
 
 ```bash
 HTTP_USER
@@ -167,11 +176,10 @@ Or in your Docker Compose file you would add in:
 ...
 ```
 
-When BOTH `HTTP_USER` and `HTTP_PASS` are set then basic HTTP authentication will be
-enabled.
+Only when **both** `HTTP_USER` and `HTTP_PASS` are set then basic HTTP authentication will be enabled.
 
 
-# Updating
+### Updating
 
 To update, you can just pull a new version of the container image as they are released.
 
@@ -182,7 +190,7 @@ $ docker pull ghcr.io/meeb/tubesync:v[number]
 Back-end updates such as database migrations should be automatic.
 
 
-# Moving, backing up, etc.
+### Moving, backing up, etc.
 
 TubeSync, when running in its default container, stores thumbnails, cache and its
 SQLite database into the `/config` directory and wherever you've mapped that to on your
@@ -317,7 +325,7 @@ Notable libraries and software used:
  * [ffmpeg](https://ffmpeg.org/)
  * [Django Background Tasks](https://github.com/arteria/django-background-tasks/)
  * [django-sass](https://github.com/coderedcorp/django-sass/)
- * The container bundles with `s6-init` and `nginx`
+ * The container bundles with `s6-init`, `nginx` and redis
 
 See the [Pipefile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full list.
 
