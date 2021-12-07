@@ -2,4 +2,18 @@
 
 cd /
 
-/usr/sbin/nginx
+# run this service only once
+s6-svc -O /var/run/s6/services/nginx
+
+/usr/sbin/nginx -g "daemon on;"
+
+/app/healthcheck.py http://127.0.0.1:8080/healthcheck
+exitcode=$?
+
+while [ $exitcode -ne 0 ]; do
+    sleep 1;
+    /app/healthcheck.py http://127.0.0.1:8080/healthcheck
+    exitcode=$?
+done
+
+echo "Nginx entered a running state and is serving tubesync on port 4848"
