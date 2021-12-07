@@ -23,7 +23,7 @@ def do_heatlhcheck(url):
         response = requests.get(url, headers=headers, timeout=TIMEOUT)
         return response.status_code == 200
     except requests.exceptions.RequestException:
-        return false
+        return False
 
 
 if __name__ == '__main__':
