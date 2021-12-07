@@ -18,9 +18,12 @@ TIMEOUT = 5  # Seconds
 
 
 def do_heatlhcheck(url):
-    headers = {'User-Agent': 'healthcheck'}
-    response = requests.get(url, headers=headers, timeout=TIMEOUT)
-    return response.status_code == 200
+    try:
+        headers = {'User-Agent': 'healthcheck'}
+        response = requests.get(url, headers=headers, timeout=TIMEOUT)
+        return response.status_code == 200
+    except requests.exceptions.RequestException:
+        return false
 
 
 if __name__ == '__main__':
