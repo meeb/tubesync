@@ -7,16 +7,16 @@ YouTube (with a built-in download client). It is designed to synchronize channel
 playlists from YouTube to local directories and update your media server once media is
 downloaded.
 
-If you want to watch YouTube videos in particular quality or settings from your local
-media server, then TubeSync is for you. Internally, TubeSync is a web interface wrapper
-on `yt-dlp` and `ffmpeg` with a task scheduler.
+If you want to watch YouTube videos, in a particular quality, from your local media server
+then TubeSync is for you. Internally, TubeSync is a web interface wrapper on `yt-dlp`
+and `ffmpeg` with a task scheduler.
 
 There are several other web interfaces to YouTube and `yt-dlp` all with varying
-features and implementations. TubeSync's largest difference is full PVR experience of
-updating media servers and better selection of media formats. Additionally, to be as
-hands-free as possible, TubeSync has gradual retrying of failures with back-off timers
-so media which fails to download will be retried for an extended period making it,
-hopefully, quite reliable.
+features and implementations. TubeSync's main difference is the full PVR experience of
+updating media servers and better selection of media formats. In an effort to be as
+*hands-free* as possible TubeSync includes gradually retrying failed tasks using
+back-off timers. Meaning media which fails to download will be retried for an extended
+period making it, hopefully, quite reliable.
 
 
 # Latest container image
@@ -50,26 +50,26 @@ ghcr.io/meeb/tubesync:latest
 
 # Requirements
 
-For the easiest installation, you will need an environment to run containers such as
-Docker or Podman. You will also need as much space as you want to allocate to
-downloaded media and thumbnails. If you download a lot of media at high resolutions
-this can be very large.
+It's easiest to use a environment like Docker or Podman. Obviously each downloaded
+video takes space and this needs to be available. If you download a lot of media at
+high resolutions this can be a hundreds of gigabytes. Manual installation is
+[documented at the bottom of this readme](#manual-non-containerised-installation).
 
 
 # What to expect
 
-Once running, TubeSync will download media to a specified directory. Inside this
-directory will be a `video` and `audio` subdirectories. All media which only has an
-audio stream (such as music) will download to the `audio` directory. All media with a
-video stream will be downloaded to the `video` directory. All administration of
-TubeSync is performed via a web interface. You can optionally add a media server,
-currently just Plex, to complete the PVR experience.
+Once running, TubeSync will download media to a specified directory, for docker this is
+`/downloads`. Inside this directory the `video` and `audio` subdirectories will be created.
+All media which only has an audio stream will download to the `audio` directory.
+All media that includes a video stream will be downloaded to the `video` directory.
+All administration of TubeSync is performed via a web interface. Optionally you can add
+a media server to complete the PVR experience (for now only Plex is supported).
 
 
 # Installation
 
 TubeSync is designed to be run in a container, such as via Docker or Podman. It also
-works in a Docker Compose stack. Only `amd64` architecture is supported for now.
+works in a Docker Compose stack. Only the `amd64` architecture is supported for now.
 
 
 ### Prerequisites
@@ -192,44 +192,48 @@ Back-end updates such as database migrations should be automatic.
 
 ### Moving, backing up, etc.
 
-TubeSync, when running in its default container, stores thumbnails, cache and its
-SQLite database into the `/config` directory and wherever you've mapped that to on your
-file system. Just copying or moving this directory and making sure the permissions are
-correct is sufficient to move, back up or migrate your TubeSync install.
+When TubeSync is running in its default container thumbnails, cache and the
+SQLite database are stored in the `/config` directory. This directory should
+be mapped on your host file system. Simply copying or moving this directory
+and making sure the permissions are correct is sufficient to move, back up
+or migrate your TubeSync install.
 
 
 # Using TubeSync
 
-### 1. Add some sources
+### 1. Add a source (or multiple)
 
-Pick your favourite YouTube channels or playlists, pop over to the "sources" tab, click
-whichever add button suits you, enter the URL and validate it. This process extracts
-the key information from the URL and makes sure it's a valid URL. This is the channel
-name for YouTube channels and the playlist ID for YouTube playlists.
+Pick your favourite YouTube channels or playlists and copy the url from the browser.
+In TubeSync go to the **`sources`** tab and click the type of content you want to add,
+enter the URL and validate it. This process extracts the key information from the URL
+and makes sure it's a valid URL.
 
-You will then be presented with the initial add a source form where you can select
+<!-- This is the channel name for YouTube channels and the playlist ID for YouTube playlists.
+really not sure what you are trying to say here -->
+
+You will then be presented with the initial add a source form. Here you can select
 all the features you want, such as how often you want to index your source and the
-quality of the media you want to download. Once happy, click "add source".
+quality of the media you want to download. Once happy, click **`add source`**.
 
 
-### 2. Wait
+### 2. Let TubeSync download
 
 That's about it. All other actions are automatic and performed on timers by scheduled
-tasks. You can see what your TubeSync instance is doing on the "tasks" tab.
+tasks. You can see what your TubeSync instance is doing on the **`tasks`** tab.
 
-As media is indexed and downloaded it will appear in the "media" tab.
+As media is indexed and downloaded it will appear in the **`media`** tab.
 
 
 ### 3. Media Server updating
 
 Currently TubeSync supports Plex as a media server. You can add your local Plex server
-under the "media servers" tab.
+under the **`media servers`** tab.
 
 
 # Logging and debugging
 
-TubeSync outputs useful logs, errors and debugging information to the console. You can
-view these with:
+TubeSync outputs useful logs, errors and debugging information to the console. The logs can
+be viewed like this:
 
 ```bash
 $ docker logs --follow tubesync
@@ -252,28 +256,28 @@ and less common features:
 
 # Warnings
 
-### 1. Index frequency
+### 1. Index interval
 
-It's a good idea to add sources with as long of an index frequency as possible. This is
-the duration between indexes of the source. An index is when TubeSync checks to see
-what videos available on a channel or playlist to find new media. Try and keep this as
-long as possible, up to 24 hours.
+It's recommended to add sources with an index interval as long as possible. This is
+the duration between indexing the source for newly added videos. The default indexing
+interval is 24 hours.
 
 
 ### 2. Indexing massive channels
 
-If you add a massive (several thousand videos) channel to TubeSync and choose "index
-every hour" or similar short interval it's entirely possible your TubeSync install may
-spend its entire time just indexing the massive channel over and over again without
-downloading any media. Check your tasks for the status of your TubeSync install.
+If you add a massive (several thousand videos) channel or playlist to TubeSync
+and choose **`index every hour`** or similar short interval it's entirely possible
+TubeSync may spend its entire time just indexing the massive amount of videos
+over and over again without downloading any media. Check your tasks for the status
+of your TubeSync install.
 
-If you add a significant amount of "work" due to adding many large channels you may
+If you add a significant amount of *work* due to adding many large channels you may
 need to increase the number of background workers by setting the `TUBESYNC_WORKERS`
-environment variable. Try around ~4 at most, although the absolute maximum allowed is 8.
+environment variable. Try around 4 at most, although the absolute maximum allowed is 8.
 
-**Be nice.** it's likely entirely possible your IP address could get throttled by the
-source if you try and crawl extremely large amounts very quickly. **Try and be polite
-with the smallest amount of indexing and concurrent downloads possible for your needs.**
+**Be nice.** it's possible your IP address could get throttled by the source if you try and crawl
+extremely large amounts very quickly. **Try and be polite with the smallest amount of
+indexing and concurrent downloads possible for your needs.**
 
 
 # FAQ
@@ -283,27 +287,26 @@ with the smallest amount of indexing and concurrent downloads possible for your 
 No, TubeSync is designed to repeatedly scan and download new media from channels or
 playlists. If you want to download single videos the best suggestion would be to create
 your own playlist, add the playlist to TubeSync and then add single videos to your
-playlist as you browse about YouTube. Your "favourites" playlist of videos will download
-automatically.
+playlist as you browse about YouTube. Newly added video's to that playlist will
+be downloaded automatically.
 
 ### Does TubeSync support any other video platforms?
 
-At the moment, no. This is a pre-release. The library TubeSync uses that does most
-of the downloading work, `yt-dlp`, supports many hundreds of video sources so it's
-likely more will be added to TubeSync if there is demand for it.
+At the moment, no. This is a pre-release. However, TubeSync uses
+a library, `yt-dlp`, that supports downloading from hundreds of different video sources.
+So it's likelymore will be added to TubeSync if there is demand for it.
 
 ### Is there a progress bar?
 
 No, in fact, there is no JavaScript at all in the web interface at the moment. TubeSync
-is designed to be more set-and-forget than something you watch download. You can see
+is designed to be more set-and-forget than something you watch download. <!-- the last sentence is a bit odd, needs clarification/better wording --> You can see
 what active tasks are being run in the "tasks" tab and if you want to see exactly what
-your install is doing check the container logs.
+your install is doing check the container logs. 
 
 ### Are there alerts when a download is complete?
 
 No, this feature is best served by existing services such as the execelent
-[Tautulli](https://tautulli.com/) which can monitor your Plex server and send alerts
-that way.
+[Tautulli](https://tautulli.com/) which can monitor your Plex server and send alerts that way.
 
 ### There's errors in my "tasks" tab!
 
@@ -313,7 +316,7 @@ interrupted and will be tried again later. Sources with permanet errors (such as
 media available because you got a channel name wrong) will be shown as errors on the
 "sources" tab.
 
-### What is TubeSync written in?
+### Which language is TubeSync written in?
 
 Python3 using Django, embedding yt-dlp. It's pretty much glue between other much
 larger libraries.
@@ -331,8 +334,8 @@ See the [Pipfile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full
 
 ### Can I get access to the full Django admin?
 
-Yes, although pretty much all operations are available through the front end interface
-and you can probably break things by playing in the admin. If you still want to access
+Yes, although pretty much all operations are available through the front-end interface
+and you could break things by playing in the admin area. If you still want to access
 it you can run:
 
 ```bash
@@ -345,15 +348,15 @@ can log in at http://localhost:4848/admin
 ### Are there user accounts or multi-user support?
 
 There is support for basic HTTP authentication by setting the `HTTP_USER` and
-`HTTP_PASS` environment variables. There is not support for multi-user or user
+`HTTP_PASS` environment variables. There is no support for multi-user or user
 management.
 
 ### Does TubeSync support HTTPS?
 
-No, you should deploy it behind an HTTPS-capable proxy if you want this (nginx, caddy,
-etc.). Configuration of this is beyond the scope of this README.
+Yes, but only when using a proxy like nginx, caddy, etc. Configuration of this
+is beyond the scope of this README.
 
-### What architectures does the container support?
+### Which architectures are supported in Docker?
 
 Just `amd64` for the moment. Others may be made available if there is demand.
 
