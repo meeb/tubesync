@@ -117,6 +117,9 @@ RUN set -x && \
 # Copy root
 COPY config/root /
 
+# Link nginx log files to stdout and stderr
+RUN ln -sf /dev/stdout /var/log/nginx/access.log && ln -sf /dev/stderr /var/log/nginx/error.log
+
 # Create a healthcheck
 HEALTHCHECK --interval=1m --timeout=10s CMD /app/healthcheck.py http://127.0.0.1:8080/healthcheck
 
