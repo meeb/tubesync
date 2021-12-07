@@ -328,7 +328,10 @@ Notable libraries and software used:
  * [ffmpeg](https://ffmpeg.org/)
  * [Django Background Tasks](https://github.com/arteria/django-background-tasks/)
  * [django-sass](https://github.com/coderedcorp/django-sass/)
- * The container bundles with `s6-init`, `nginx` and redis
+ * The container bundles with `s6-init`, `nginx`
+<!-- and redis
+Redis seems to be installed and started but not used, might just be me
+-->
 
 See the [Pipfile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full list.
 
