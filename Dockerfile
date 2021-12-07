@@ -43,76 +43,76 @@ WORKDIR /app
 
 # Set up the app
 RUN set -x && \
-  apt-get update && \
-  # Install required distro packages
-  apt-get -y install nginx-light && \
-  apt-get -y --no-install-recommends install \
-    python3 \
-    python3-setuptools \
-    python3-pip \
-    python3-dev \
-    gcc \
-    make \
-    default-libmysqlclient-dev \
-    libmariadb3 \
-    postgresql-common \
-    libpq-dev \
-    libpq5 \
-    libjpeg62-turbo \
-    libwebp6 \
-    libjpeg-dev \
-    zlib1g-dev \
-    libwebp-dev \
-    ffmpeg \
-    redis-server && \
-  # Install pipenv
-  pip3 --disable-pip-version-check install wheel pipenv && \
-  # Create a 'app' user which the application will run as
-  groupadd app && \
-  useradd -M -d /app -s /bin/false -g app app && \
-  # Install non-distro packages
-  pipenv install --system && \
-  # Make absolutely sure we didn't accidentally bundle a SQLite dev database
-  rm -rf /app/db.sqlite3 && \
-  # Run any required app commands
-  /usr/bin/python3 /app/manage.py compilescss && \
-  /usr/bin/python3 /app/manage.py collectstatic --no-input --link && \
-  # Create config, downloads and run dirs
-  mkdir -p /run/app && \
-  mkdir -p /config/media && \
-  mkdir -p /downloads/audio && \
-  mkdir -p /downloads/video && \
-  # Clean up
-  rm /app/Pipfile && \
-  rm /app/Pipfile.lock && \
-  pipenv --clear && \
-  pip3 --disable-pip-version-check uninstall -y pipenv wheel virtualenv && \
-  apt-get -y autoremove --purge \
-    python3-pip \
-    python3-dev \
-    gcc \
-    make \
-    default-libmysqlclient-dev \
-    postgresql-common \
-    libpq-dev \
-    libjpeg-dev \
-    zlib1g-dev \
-    libwebp-dev && \
-  apt-get -y autoremove && \
-  apt-get -y autoclean && \
-  rm -rf /var/lib/apt/lists/* && \
-  rm -rf /var/cache/apt/* && \
-  rm -rf /tmp/* && \
-  # Pipenv leaves a bunch of stuff in /root, as we're not using it recreate it
-  rm -rf /root && \
-  mkdir -p /root && \
-  chown root:root /root && \
-  chmod 0700 /root
+    apt-get update && \
+    # Install required distro packages
+    apt-get -y install nginx-light && \
+    apt-get -y --no-install-recommends install \
+        python3 \
+        python3-setuptools \
+        python3-pip \
+        python3-dev \
+        gcc \
+        make \
+        default-libmysqlclient-dev \
+        libmariadb3 \
+        postgresql-common \
+        libpq-dev \
+        libpq5 \
+        libjpeg62-turbo \
+        libwebp6 \
+        libjpeg-dev \
+        zlib1g-dev \
+        libwebp-dev \
+        ffmpeg \
+        redis-server && \
+    # Install pipenv
+    pip3 --disable-pip-version-check install wheel pipenv && \
+    # Create a 'app' user which the application will run as
+    groupadd app && \
+    useradd -M -d /app -s /bin/false -g app app && \
+    # Install non-distro packages
+    pipenv install --system && \
+    # Make absolutely sure we didn't accidentally bundle a SQLite dev database
+    rm -rf /app/db.sqlite3 && \
+    # Run any required app commands
+    /usr/bin/python3 /app/manage.py compilescss && \
+    /usr/bin/python3 /app/manage.py collectstatic --no-input --link && \
+    # Create config, downloads and run dirs
+    mkdir -p /run/app && \
+    mkdir -p /config/media && \
+    mkdir -p /downloads/audio && \
+    mkdir -p /downloads/video && \
+    # Clean up
+    rm /app/Pipfile && \
+    rm /app/Pipfile.lock && \
+    pipenv --clear && \
+    pip3 --disable-pip-version-check uninstall -y pipenv wheel virtualenv && \
+    apt-get -y autoremove --purge \
+        python3-pip \
+        python3-dev \
+        gcc \
+        make \
+        default-libmysqlclient-dev \
+        postgresql-common \
+        libpq-dev \
+        libjpeg-dev \
+        zlib1g-dev \
+        libwebp-dev && \
+    apt-get -y autoremove && \
+    apt-get -y autoclean && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /var/cache/apt/* && \
+    rm -rf /tmp/* && \
+    # Pipenv leaves a bunch of stuff in /root, as we're not using it recreate it
+    rm -rf /root && \
+    mkdir -p /root && \
+    chown root:root /root && \
+    chmod 0700 /root
 
 # Append software versions
 RUN set -x && \
-  FFMPEG_VERSION=$(/usr/bin/ffmpeg -version | head -n 1 | awk '{ print $3 }') && \
-  echo "ffmpeg_version = '${FFMPEG_VERSION}'" >> /app/common/third_party_versions.py
+    FFMPEG_VERSION=$(/usr/bin/ffmpeg -version | head -n 1 | awk '{ print $3 }') && \
+    echo "ffmpeg_version = '${FFMPEG_VERSION}'" >> /app/common/third_party_versions.py
 
 # Copy root
 COPY config/root /
