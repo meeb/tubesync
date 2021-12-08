@@ -16,7 +16,7 @@ SECRET_KEY = str(os.getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret'))
 
 ALLOWED_HOSTS_STR = os.getenv('TUBESYNC_HOSTS', '')
 CSRF_TRUSTED_ORIGINS = ALLOWED_HOSTS_STR.split(',')
-ALLOWED_HOSTS = [127.0.0.1]
+ALLOWED_HOSTS = ['127.0.0.1']
 
 
 if len(ALLOWED_HOSTS_STR) > 0:
