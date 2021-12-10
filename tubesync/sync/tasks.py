@@ -235,7 +235,7 @@ def download_media_metadata(media_id):
         media.skip = True
     # If the source has a download cap date check the upload date is allowed
     max_cap_age = source.download_cap_date
-    if max_cap_age:
+    if media.published and max_cap_age:
         if media.published < max_cap_age:
             # Media was published after the cap date, skip it
             log.warn(f'Media: {source} / {media} is older than cap age '
