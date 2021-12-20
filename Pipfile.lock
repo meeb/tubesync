@@ -86,11 +86,11 @@
         },
         "django-compressor": {
             "hashes": [
-                "sha256:12958fd95b4135cae7b704deeeb5c26da12692b85a2765f1bd30a70c05d5825c",
-                "sha256:68955b7baffc3607a4dc44523dcff622238121b307f46fecddaeb8de986ca086"
+                "sha256:89f7ba86777b30672c2f9c7557bf2aff87c5890903c73b1fa3ae38acd143e855",
+                "sha256:c4a87bf65f9a534cfaf1c321a000a229c24e50c6d62ba6ab089482db42e819d9"
             ],
             "index": "pypi",
-            "version": "==3.0"
+            "version": "==3.1"
         },
         "django-sass-processor": {
             "hashes": [
