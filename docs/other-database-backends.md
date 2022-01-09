@@ -13,18 +13,18 @@ become an issue.
 TubeSync supports SQLite (the automatic default) as well as PostgreSQL, MySQL and
 MariaDB. For MariaDB just follow the MySQL instructions as the driver is the same.
 
-You should a blank install of TubeSync. Migrating to a new database will reset your
-database. If you are comfortable with Django you can export and re-import existing
-database data with:
+You should start with a blank install of TubeSync. Migrating to a new database will
+reset your database. If you are comfortable with Django you can export and re-import
+existing database data with:
 
 ```bash
-$ docker exec -ti tubesync python3 /app/manage.py dumpdata > some-file.json
+$ docker exec -i tubesync python3 /app/manage.py dumpdata > some-file.json
 ```
 
 Then change you database backend over, then use
 
 ```bash
-$ cat some-file.json | docker exec -ti tubesync python3 /app/manage.py loaddata --format=json -
+$ cat some-file.json | docker exec -i tubesync python3 /app/manage.py loaddata --format=json -
 ```
 
 As detailed in the Django documentation:
