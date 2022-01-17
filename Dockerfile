@@ -122,7 +122,7 @@ HEALTHCHECK --interval=1m --timeout=10s CMD /app/healthcheck.py http://127.0.0.1
 
 # ENVS and ports
 ENV PYTHONPATH "/app:${PYTHONPATH}"
-EXPOSE 8080
+EXPOSE 4848
 
 # Volumes
 VOLUME ["/config", "/downloads"]
