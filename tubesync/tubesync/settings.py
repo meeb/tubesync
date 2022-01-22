@@ -161,6 +161,7 @@ YOUTUBE_DEFAULTS = {
     'cachedir': False,      # Disable on-disk caching
     'addmetadata': True,    # Embed metadata during postprocessing where available
 }
+COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 
 
 MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'

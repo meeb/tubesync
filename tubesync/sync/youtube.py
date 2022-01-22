@@ -26,13 +26,23 @@ class YouTubeError(yt_dlp.utils.DownloadError):
     pass
 
 
+def get_yt_opts():
+    opts = copy(_defaults)
+    cookie_file = settings.COOKIES_FILE
+    if cookie_file.is_file():
+        cookie_file_path = str(cookie_file.resolve())
+        log.info(f'[youtube-dl] using cookies.txt from: {cookie_file_path}')
+        opts.update({'cookiefile': cookie_file_path})
+    return opts
+
+
 def get_media_info(url):
     '''
         Extracts information from a YouTube URL and returns it as a dict. For a channel
         or playlist this returns a dict of all the videos on the channel or playlist
         as well as associated metadata.
     '''
-    opts = copy(_defaults)
+    opts = get_yt_opts()
     opts.update({
         'skip_download': True,
         'forcejson': True,
@@ -91,7 +101,7 @@ def download_media(url, media_format, extension, output_file):
             log.warn(f'[youtube-dl] unknown event: {str(event)}')
     hook.download_progress = 0
 
-    opts = copy(_defaults)
+    opts = get_yt_opts()
     opts.update({
         'format': media_format,
         'merge_output_format': extension,
