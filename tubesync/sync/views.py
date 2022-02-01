@@ -280,7 +280,7 @@ class AddSourceView(CreateView):
     fields = ('source_type', 'key', 'name', 'directory', 'media_format',
               'index_schedule', 'download_media', 'download_cap', 'delete_old_media',
               'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
-              'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo')
+              'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo', 'write_json')
     errors = {
         'invalid_media_format': _('Invalid media format, the media format contains '
                                   'errors or is empty. Check the table at the end of '
@@ -371,7 +371,7 @@ class UpdateSourceView(UpdateView):
     fields = ('source_type', 'key', 'name', 'directory', 'media_format',
               'index_schedule', 'download_media', 'download_cap', 'delete_old_media',
               'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
-              'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo')
+              'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo', 'write_json')
     errors = {
         'invalid_media_format': _('Invalid media format, the media format contains '
                                   'errors or is empty. Check the table at the end of '
@@ -421,6 +421,8 @@ class DeleteSourceView(DeleteView, FormMixin):
                     delete_file(media.thumbpath)
                     # Delete NFO file if it exists
                     delete_file(media.nfopath)
+                    # Delete JSON file if it exists
+                    delete_file(media.jsonpath)
         return super().post(request, *args, **kwargs)
 
     def get_success_url(self):
