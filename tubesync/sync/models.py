@@ -298,6 +298,11 @@ class Source(models.Model):
         default=False,
         help_text=_('Write an NFO file in XML with the media info, these may be detected and used by some media servers')
     )
+    write_json = models.BooleanField(
+        _('write json'),
+        default=False,
+        help_text=_('Write a JSON file with the media info, these may be detected and used by some media servers')
+    )
     has_failed = models.BooleanField(
         _('has failed'),
         default=False,
@@ -1073,6 +1078,16 @@ class Media(models.Model):
         return self.source.directory_path / self.nfoname
 
     @property
+    def jsonname(self):
+        filename = os.path.basename(self.media_file.path)
+        prefix, ext = os.path.splitext(filename)
+        return f'{prefix}.info.json'
+    
+    @property
+    def jsonpath(self):
+        return self.source.directory_path / self.jsonname
+
+    @property
     def directory_path(self):
         # Otherwise, create a suitable filename from the source media_format
         media_format = str(self.source.media_format)
@@ -1220,7 +1235,7 @@ class Media(models.Model):
                                     f'no valid format available')
         # Download the media with youtube-dl
         download_youtube_media(self.url, format_str, self.source.extension,
-                               str(self.filepath))
+                               str(self.filepath), self.source.write_json)
         # Return the download paramaters
         return format_str, self.source.extension
 
