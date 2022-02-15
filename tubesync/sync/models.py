@@ -1000,7 +1000,9 @@ class Media(models.Model):
     def duration(self):
         field = self.get_metadata_field('duration')
         duration = self.loaded_metadata.get(field, 0)
-        if not isinstance(duration, int):
+        try:
+            duration = int(duration)
+        except ValueError:
             duration = 0
         return duration
 
