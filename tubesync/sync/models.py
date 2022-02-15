@@ -999,7 +999,10 @@ class Media(models.Model):
     @property
     def duration(self):
         field = self.get_metadata_field('duration')
-        return int(self.loaded_metadata.get(field, 0))
+        duration = self.loaded_metadata.get(field, 0)
+        if not isinstance(duration, int):
+            duration = 0
+        return duration
 
     @property
     def duration_formatted(self):
