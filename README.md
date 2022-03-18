@@ -360,7 +360,7 @@ useful if you are manually installing TubeSync in some other environment. These 
 | DJANGO_FORCE_SCRIPT_NAME | Django's FORCE_SCRIPT_NAME                                   | /somepath                            |
 | TUBESYNC_DEBUG           | Enable debugging                                             | True                                 |
 | TUBESYNC_WORKERS         | Number of background workers, default is 2, max allowed is 8 | 2                                    |
-| TUBESYNC_HOSTS           | Django's ALLOWED_HOSTS                                       | tubesync.example.com,otherhost.com   |
+| TUBESYNC_HOSTS           | Django's ALLOWED_HOSTS, defaults to `*`                      | tubesync.example.com,otherhost.com   |
 | GUNICORN_WORKERS         | Number of gunicorn workers to spawn                          | 3                                    |
 | LISTEN_HOST              | IP address for gunicorn to listen on                         | 127.0.0.1                            |
 | LISTEN_PORT              | Port number for gunicorn to listen on                        | 8080                                 |
