@@ -52,7 +52,7 @@ def map_task_to_instance(task):
         Source: 'sync:source',
         Media: 'sync:media-item',
     }
-    # Unpack 
+    # Unpack
     task_func, task_args_str = task.task_name, task.task_params
     model = TASK_MAP.get(task_func, None)
     if not model:

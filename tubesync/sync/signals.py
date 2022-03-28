@@ -96,7 +96,7 @@ def media_post_save(sender, instance, created, **kwargs):
     # Triggered after media is saved
     cap_changed = False
     can_download_changed = False
-    # Reset the skip flag if the download cap has changed if the media has not 
+    # Reset the skip flag if the download cap has changed if the media has not
     # already been downloaded
     if not instance.downloaded:
         max_cap_age = instance.source.download_cap_date

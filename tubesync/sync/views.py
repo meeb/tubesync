@@ -630,6 +630,7 @@ class MediaSkipView(FormView, SingleObjectMixin):
             # If the media has an associated NFO file with it, also delete it
             delete_file(self.object.nfopath)
         # Reset all download data
+        self.object.metadata = None
         self.object.downloaded = False
         self.object.downloaded_audio_codec = None
         self.object.downloaded_video_codec = None
