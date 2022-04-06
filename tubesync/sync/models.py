@@ -691,7 +691,7 @@ class Media(models.Model):
         max_length=30,
         blank=True,
         null=True,
-        help_text=_('Audio codec of the downloaded media')
+        help_text=_('Video format (resolution) of the downloaded media')
     )
     downloaded_height = models.PositiveIntegerField(
         _('downloaded height'),
@@ -832,7 +832,10 @@ class Media(models.Model):
                     'hdr': hdr,
                     'format': tuple(fmt),
                 }
-            resolution = f'{self.downloaded_height}p'
+            if self.downloaded_format:
+                resolution = self.downloaded_format.lower()
+            elif self.downloaded_height:
+                resolution = f'{self.downloaded_height}p'
             if self.downloaded_format != 'audio':
                 vcodec = self.downloaded_video_codec.lower()
                 fmt.append(vcodec)
@@ -1064,7 +1067,10 @@ class Media(models.Model):
 
     @property
     def thumbname(self):
-        filename = self.filename
+        if self.downloaded and self.media_file:
+            filename = os.path.basename(self.media_file.path)
+        else:
+            filename = self.filename
         prefix, ext = os.path.splitext(filename)
         return f'{prefix}.jpg'
 
@@ -1074,7 +1080,10 @@ class Media(models.Model):
 
     @property
     def nfoname(self):
-        filename = self.filename
+        if self.downloaded and self.media_file:
+            filename = os.path.basename(self.media_file.path)
+        else:
+            filename = self.filename
         prefix, ext = os.path.splitext(filename)
         return f'{prefix}.nfo'
     
@@ -1084,7 +1093,10 @@ class Media(models.Model):
 
     @property
     def jsonname(self):
-        filename = os.path.basename(self.media_file.path)
+        if self.downloaded and self.media_file:
+            filename = os.path.basename(self.media_file.path)
+        else:
+            filename = self.filename
         prefix, ext = os.path.splitext(filename)
         return f'{prefix}.info.json'
     
