@@ -445,6 +445,7 @@ class MediaView(ListView):
     def __init__(self, *args, **kwargs):
         self.filter_source = None
         self.show_skipped = False
+        self.only_skipped = False
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
@@ -457,17 +458,25 @@ class MediaView(ListView):
         show_skipped = request.GET.get('show_skipped', '').strip()
         if show_skipped == 'yes':
             self.show_skipped = True
+        if not self.show_skipped:
+            only_skipped = request.GET.get('only_skipped', '').strip()
+            if only_skipped == 'yes':
+                self.only_skipped = True
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         if self.filter_source:
             if self.show_skipped:
                 q = Media.objects.filter(source=self.filter_source)
+            elif self.only_skipped:
+                q = Media.objects.filter(source=self.filter_source, skip=True)
             else:
                 q = Media.objects.filter(source=self.filter_source, skip=False)
         else:
             if self.show_skipped:
                 q = Media.objects.all()
+            elif self.only_skipped:
+                q = Media.objects.filter(skip=True)
             else:
                 q = Media.objects.filter(skip=False)
         return q.order_by('-published', '-created')
@@ -481,6 +490,7 @@ class MediaView(ListView):
             data['message'] = message.format(name=self.filter_source.name)
             data['source'] = self.filter_source
         data['show_skipped'] = self.show_skipped
+        data['only_skipped'] = self.only_skipped
         return data
 
 
