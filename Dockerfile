@@ -1,14 +1,6 @@
 FROM debian:bullseye-slim
 
 ARG TARGETPLATFORM
-ARG ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "amd64"  ;; \
-  "linux/arm64")   echo "aarch64" ;; \
-  *)               echo ""        ;; esac)
-ARG ARCH44=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "amd64"  ;; \
-  "linux/arm64")   echo "aarch64" ;; \
-  *)               echo ""        ;; esac)
 ARG S6_VERSION="2.2.0.3"
 
 ENV DEBIAN_FRONTEND="noninteractive" \
@@ -16,8 +8,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
   LANGUAGE="en_US.UTF-8" \
   LANG="en_US.UTF-8" \
   LC_ALL="en_US.UTF-8" \
-  TERM="xterm" \
-  S6_DOWNLOAD="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-${ARCH}.tar.gz"
+  TERM="xterm"
 
 # Install third party software
 RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
@@ -27,6 +18,10 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   export S6_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "a7076cf205b331e9f8479bbb09d9df77dbb5cd8f7d12e9b74920902e0c16dd98"  ;; \
   "linux/arm64")   echo "84f585a100b610124bb80e441ef2dc2d68ac2c345fd393d75a6293e0951ccfc5" ;; \
+  *)               echo ""        ;; esac) && \
+  export S6_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
+  "linux/amd64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-amd64.tar.gz"  ;; \
+  "linux/arm64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.gz" ;; \
   *)               echo ""        ;; esac) && \
   echo "Building for arch: ${ARCH}|${ARCH44}, downloading S6 from: ${S6_DOWNLOAD}}, expecting S6 SHA256: ${S6_EXPECTED_SHA256}" && \
   set -x && \
