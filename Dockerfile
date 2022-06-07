@@ -1,10 +1,14 @@
 FROM debian:bullseye-slim
 
 ARG TARGETPLATFORM
-# ARG ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
-#   "linux/amd64")   echo "amd64"  ;; \
-#   "linux/arm64")   echo "aarch64" ;; \
-#   *)               echo ""        ;; esac)
+ARG ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
+  "linux/amd64")   echo "amd64"  ;; \
+  "linux/arm64")   echo "aarch64" ;; \
+  *)               echo ""        ;; esac)
+ARG ARCH44=$(case ${TARGETPLATFORM:-linux/amd64} in \
+  "linux/amd64")   echo "amd64"  ;; \
+  "linux/arm64")   echo "aarch64" ;; \
+  *)               echo ""        ;; esac)
 ARG S6_VERSION="2.2.0.3"
 
 ENV DEBIAN_FRONTEND="noninteractive" \
@@ -24,7 +28,7 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "a7076cf205b331e9f8479bbb09d9df77dbb5cd8f7d12e9b74920902e0c16dd98"  ;; \
   "linux/arm64")   echo "84f585a100b610124bb80e441ef2dc2d68ac2c345fd393d75a6293e0951ccfc5" ;; \
   *)               echo ""        ;; esac) && \
-  echo "Building for arch: ${ARCH}, expecting S6 SHA256: ${S6_EXPECTED_SHA256}" && \
+  echo "Building for arch: ${ARCH}|${ARCH44}, downloading S6 from: ${S6_DOWNLOAD}}, expecting S6 SHA256: ${S6_EXPECTED_SHA256}" && \
   set -x && \
   apt-get update && \
   apt-get -y --no-install-recommends install locales && \
