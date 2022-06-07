@@ -44,6 +44,9 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
 COPY tubesync /app
 COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
 
+# Copy over pip.conf to use piwheels
+COPY pip.conf /etc/pip.conf
+
 # Add Pipfile
 COPY Pipfile /app/Pipfile
 COPY Pipfile.lock /app/Pipfile.lock
@@ -62,6 +65,7 @@ RUN set -x && \
   python3-pip \
   python3-dev \
   gcc \
+  g++ \
   make \
   default-libmysqlclient-dev \
   libmariadb3 \
@@ -101,6 +105,7 @@ RUN set -x && \
   python3-pip \
   python3-dev \
   gcc \
+  g++ \
   make \
   default-libmysqlclient-dev \
   postgresql-common \
