@@ -26,8 +26,8 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/meeb/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
-          # cache-from: type=registry,ref=ghcr.io/meeb/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
-          # cache-to: type=inline
+          tags: ghcr.io/${{ github.actor }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.actor }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          cache-to: type=inline
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
