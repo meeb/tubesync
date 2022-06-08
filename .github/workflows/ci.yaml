@@ -35,19 +35,24 @@ jobs:
   containerise:
     runs-on: ubuntu-latest
     steps:
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v1
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
-    - name: Log into GitHub Container Registry
-      run: echo "${{ secrets.REGISTRY_ACCESS_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
-    - name: Build and push
-      uses: docker/build-push-action@v2
-      with:
-        platforms: linux/amd64
-        push: true
-        tags: ghcr.io/meeb/${{ env.IMAGE_NAME }}:latest
-        cache-from: type=registry,ref=ghcr.io/meeb/${{ env.IMAGE_NAME }}:latest
-        cache-to: type=inline
-        build-args: |
-          IMAGE_NAME=${{ env.IMAGE_NAME }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Log into GitHub Container Registry
+        run: echo "${{ secrets.REGISTRY_ACCESS_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Lowercase github username for ghcr
+        id: string
+        uses: ASzc/change-string-case-action@v1
+        with:
+          string: ${{ github.actor }}
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=registry,ref=ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
+          cache-to: type=inline
+          build-args: |
+            IMAGE_NAME=${{ env.IMAGE_NAME }}

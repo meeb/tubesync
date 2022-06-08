@@ -1,38 +1,51 @@
 FROM debian:bullseye-slim
 
-ARG ARCH="amd64"
+ARG TARGETPLATFORM
 ARG S6_VERSION="2.2.0.3"
 
 ENV DEBIAN_FRONTEND="noninteractive" \
-    HOME="/root" \
-    LANGUAGE="en_US.UTF-8" \
-    LANG="en_US.UTF-8" \
-    LC_ALL="en_US.UTF-8" \
-    TERM="xterm" \
-    S6_EXPECTED_SHA256="a7076cf205b331e9f8479bbb09d9df77dbb5cd8f7d12e9b74920902e0c16dd98" \
-    S6_DOWNLOAD="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-${ARCH}.tar.gz"
-
+  HOME="/root" \
+  LANGUAGE="en_US.UTF-8" \
+  LANG="en_US.UTF-8" \
+  LC_ALL="en_US.UTF-8" \
+  TERM="xterm"
 
 # Install third party software
-RUN set -x && \
-    apt-get update && \
-    apt-get -y --no-install-recommends install locales && \
-    echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
-    locale-gen en_US.UTF-8 && \
-    # Install required distro packages
-    apt-get -y --no-install-recommends install curl ca-certificates binutils && \
-    # Install s6
-    curl -L ${S6_DOWNLOAD} --output /tmp/s6-overlay-${ARCH}.tar.gz && \
-    sha256sum /tmp/s6-overlay-${ARCH}.tar.gz && \
-    echo "${S6_EXPECTED_SHA256}  /tmp/s6-overlay-${ARCH}.tar.gz" | sha256sum -c - && \
-    tar xzf /tmp/s6-overlay-${ARCH}.tar.gz -C / && \
-    # Clean up
-    rm -rf /tmp/s6-overlay-${ARCH}.tar.gz && \
-    apt-get -y autoremove --purge curl binutils
+RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
+  "linux/amd64")   echo "amd64"  ;; \
+  "linux/arm64")   echo "aarch64" ;; \
+  *)               echo ""        ;; esac) && \
+  export S6_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
+  "linux/amd64")   echo "a7076cf205b331e9f8479bbb09d9df77dbb5cd8f7d12e9b74920902e0c16dd98"  ;; \
+  "linux/arm64")   echo "84f585a100b610124bb80e441ef2dc2d68ac2c345fd393d75a6293e0951ccfc5" ;; \
+  *)               echo ""        ;; esac) && \
+  export S6_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
+  "linux/amd64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-amd64.tar.gz"  ;; \
+  "linux/arm64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.gz" ;; \
+  *)               echo ""        ;; esac) && \
+  echo "Building for arch: ${ARCH}|${ARCH44}, downloading S6 from: ${S6_DOWNLOAD}}, expecting S6 SHA256: ${S6_EXPECTED_SHA256}" && \
+  set -x && \
+  apt-get update && \
+  apt-get -y --no-install-recommends install locales && \
+  echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
+  locale-gen en_US.UTF-8 && \
+  # Install required distro packages
+  apt-get -y --no-install-recommends install curl ca-certificates binutils && \
+  # Install s6
+  curl -L ${S6_DOWNLOAD} --output /tmp/s6-overlay-${ARCH}.tar.gz && \
+  sha256sum /tmp/s6-overlay-${ARCH}.tar.gz && \
+  echo "${S6_EXPECTED_SHA256}  /tmp/s6-overlay-${ARCH}.tar.gz" | sha256sum -c - && \
+  tar xzf /tmp/s6-overlay-${ARCH}.tar.gz -C / && \
+  # Clean up
+  rm -rf /tmp/s6-overlay-${ARCH}.tar.gz && \
+  apt-get -y autoremove --purge curl binutils
 
 # Copy app
 COPY tubesync /app
 COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
+
+# Copy over pip.conf to use piwheels
+COPY pip.conf /etc/pip.conf
 
 # Add Pipfile
 COPY Pipfile /app/Pipfile
@@ -47,24 +60,25 @@ RUN set -x && \
   # Install required distro packages
   apt-get -y install nginx-light && \
   apt-get -y --no-install-recommends install \
-    python3 \
-    python3-setuptools \
-    python3-pip \
-    python3-dev \
-    gcc \
-    make \
-    default-libmysqlclient-dev \
-    libmariadb3 \
-    postgresql-common \
-    libpq-dev \
-    libpq5 \
-    libjpeg62-turbo \
-    libwebp6 \
-    libjpeg-dev \
-    zlib1g-dev \
-    libwebp-dev \
-    ffmpeg \
-    redis-server && \
+  python3 \
+  python3-setuptools \
+  python3-pip \
+  python3-dev \
+  gcc \
+  g++ \
+  make \
+  default-libmysqlclient-dev \
+  libmariadb3 \
+  postgresql-common \
+  libpq-dev \
+  libpq5 \
+  libjpeg62-turbo \
+  libwebp6 \
+  libjpeg-dev \
+  zlib1g-dev \
+  libwebp-dev \
+  ffmpeg \
+  redis-server && \
   # Install pipenv
   pip3 --disable-pip-version-check install wheel pipenv && \
   # Create a 'app' user which the application will run as
@@ -88,16 +102,17 @@ RUN set -x && \
   pipenv --clear && \
   pip3 --disable-pip-version-check uninstall -y pipenv wheel virtualenv && \
   apt-get -y autoremove --purge \
-    python3-pip \
-    python3-dev \
-    gcc \
-    make \
-    default-libmysqlclient-dev \
-    postgresql-common \
-    libpq-dev \
-    libjpeg-dev \
-    zlib1g-dev \
-    libwebp-dev && \
+  python3-pip \
+  python3-dev \
+  gcc \
+  g++ \
+  make \
+  default-libmysqlclient-dev \
+  postgresql-common \
+  libpq-dev \
+  libjpeg-dev \
+  zlib1g-dev \
+  libwebp-dev && \
   apt-get -y autoremove && \
   apt-get -y autoclean && \
   rm -rf /var/lib/apt/lists/* && \
