@@ -32,7 +32,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.actor }}${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          cache-from: type=registry,ref=ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
           cache-to: type=inline
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
