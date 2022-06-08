@@ -69,7 +69,8 @@ currently just Plex, to complete the PVR experience.
 # Installation
 
 TubeSync is designed to be run in a container, such as via Docker or Podman. It also
-works in a Docker Compose stack. Only `amd64` is initially supported.
+works in a Docker Compose stack. `amd64` (most desktop PCs and servers) and `arm64`
+(modern ARM computers, such as the Rasperry Pi 3 or later) are supported.
 
 Example (with Docker on *nix):
 
