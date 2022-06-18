@@ -22,6 +22,3 @@ mysqlclient = "*"
 yt-dlp = "*"
 redis = "*"
 hiredis = "*"
-
-[requires]
-python_version = "3"
