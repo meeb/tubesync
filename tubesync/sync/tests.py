@@ -21,7 +21,7 @@ class FrontEndTestCase(TestCase):
     def setUp(self):
         # Disable general logging for test case
         logging.disable(logging.CRITICAL)
-    
+
     def test_dashboard(self):
         c = Client()
         response = c.get('/')
