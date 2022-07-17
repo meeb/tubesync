@@ -2,7 +2,7 @@ import os.path
 from django.conf import settings
 from django.test import TestCase, Client
 from .testutils import prevent_request_warnings
-from .utils import parse_database_connection_string
+from .utils import parse_database_connection_string, clean_filename
 from .errors import DatabaseConnectionError
 
 
@@ -65,7 +65,7 @@ class CommonStaticTestCase(TestCase):
         self.assertTrue(os.path.exists(favicon_real_path))
 
 
-class DatabaseConnectionTestCase(TestCase):
+class UtilsTestCase(TestCase):
 
     def test_parse_database_connection_string(self):
         database_dict = parse_database_connection_string(
@@ -126,3 +126,12 @@ class DatabaseConnectionTestCase(TestCase):
         with self.assertRaises(DatabaseConnectionError):
             parse_database_connection_string(
                 'postgresql://tubesync:password@localhost:5432/tubesync/test')
+
+    def test_clean_filename(self):
+        self.assertEqual(clean_filename('a'), 'a')
+        self.assertEqual(clean_filename('a\t'), 'a')
+        self.assertEqual(clean_filename('a\n'), 'a')
+        self.assertEqual(clean_filename('a a'), 'a a')
+        self.assertEqual(clean_filename('a  a'), 'a  a')
+        self.assertEqual(clean_filename('a\t\t\ta'), 'a   a')
+        self.assertEqual(clean_filename('a\t\t\ta\t\t\t'), 'a   a')
