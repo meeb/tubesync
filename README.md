@@ -74,7 +74,7 @@ works in a Docker Compose stack. `amd64` (most desktop PCs and servers) and `arm
 
 Example (with Docker on *nix):
 
-First find your the user ID and group ID you want to run TubeSync as, if you're not
+First find the user ID and group ID you want to run TubeSync as, if you're not
 sure what this is it's probably your current user ID and group ID:
 
 ```bash
@@ -117,7 +117,7 @@ $ docker run \
 Once running, open `http://localhost:4848` in your browser and you should see the
 TubeSync dashboard. If you do, you can proceed to adding some sources (YouTube channels
 and playlists). If not, check `docker logs tubesync` to see what errors might be
-occuring, typical ones are file permission issues.
+occurring, typical ones are file permission issues.
 
 Alternatively, for Docker Compose, you can use something like:
 
@@ -149,7 +149,7 @@ HTTP_USER
 HTTP_PASS
 ```
 
-For example in the `docker run ...` line add in:
+For example, in the `docker run ...` line add in:
 
 ```bash
 ...
@@ -292,15 +292,15 @@ your install is doing check the container logs.
 
 ### Are there alerts when a download is complete?
 
-No, this feature is best served by existing services such as the execelent
+No, this feature is best served by existing services such as the excellent 
 [Tautulli](https://tautulli.com/) which can monitor your Plex server and send alerts
 that way.
 
-### There's errors in my "tasks" tab!
+### There are errors in my "tasks" tab!
 
 You only really need to worry about these if there is a permanent failure. Some errors
-are temproary and will be retried for you automatically, such as a download got
-interrupted and will be tried again later. Sources with permanet errors (such as no
+are temporary and will be retried for you automatically, such as a download got
+interrupted and will be tried again later. Sources with permanent errors (such as no
 media available because you got a channel name wrong) will be shown as errors on the
 "sources" tab.
 
@@ -322,7 +322,7 @@ See the [Pipefile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a ful
 
 ### Can I get access to the full Django admin?
 
-Yes, although pretty much all operations are available through the front end interface
+Yes, although pretty much all operations are available through the front-end interface
 and you can probably break things by playing in the admin. If you still want to access
 it you can run:
 
@@ -373,7 +373,7 @@ useful if you are manually installing TubeSync in some other environment. These 
 # Manual, non-containerised, installation
 
 As a relatively normal Django app you can run TubeSync without the container. Beyond
-following this rough guide you are on your own and should be knowledgeable about
+following this rough guide, you are on your own and should be knowledgeable about
 installing and running WSGI-based Python web applications before attempting this.
 
 1. Clone or download this repo
@@ -396,7 +396,7 @@ installing and running WSGI-based Python web applications before attempting this
 
 # Tests
 
-There is a moderately comprehensive test suite focussing on the custom media format
+There is a moderately comprehensive test suite focusing on the custom media format
 matching logic and that the front-end interface works. You can run it via Django:
 
 ```bash
