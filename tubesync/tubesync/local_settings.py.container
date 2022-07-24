@@ -8,6 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = Path('/')
 CONFIG_BASE_DIR = ROOT_DIR / 'config'
 DOWNLOADS_BASE_DIR = ROOT_DIR / 'downloads'
+STATIC_URL = str(os.getenv('DJANGO_STATIC_URL', '/static/'))
 
 
 # This is not ever meant to be a public web interface so this isn't too critical
