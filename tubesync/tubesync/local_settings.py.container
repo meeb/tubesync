@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urljoin
 from common.logger import log
 from common.utils import parse_database_connection_string
 
@@ -8,7 +9,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = Path('/')
 CONFIG_BASE_DIR = ROOT_DIR / 'config'
 DOWNLOADS_BASE_DIR = ROOT_DIR / 'downloads'
+DJANGO_URL_PREFIX = os.getenv('DJANGO_URL_PREFIX', None)
 STATIC_URL = str(os.getenv('DJANGO_STATIC_URL', '/static/'))
+if DJANGO_URL_PREFIX and STATIC_URL:
+    STATIC_URL = urljoin(DJANGO_URL_PREFIX, STATIC_URL[1:])
 
 
 # This is not ever meant to be a public web interface so this isn't too critical
@@ -18,7 +22,7 @@ SECRET_KEY = str(os.getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret'))
 ALLOWED_HOSTS_STR = str(os.getenv('TUBESYNC_HOSTS', '*'))
 ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
 DEBUG = True if os.getenv('TUBESYNC_DEBUG', False) else False
-FORCE_SCRIPT_NAME = os.getenv('DJANGO_FORCE_SCRIPT_NAME', None)
+FORCE_SCRIPT_NAME = os.getenv('DJANGO_FORCE_SCRIPT_NAME', DJANGO_URL_PREFIX)
 
 
 TIME_ZONE = os.getenv('TZ', 'UTC')

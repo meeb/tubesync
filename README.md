@@ -358,8 +358,7 @@ useful if you are manually installing TubeSync in some other environment. These 
 | Name                     | What                                                         | Example                              |
 | ------------------------ | ------------------------------------------------------------ | ------------------------------------ |
 | DJANGO_SECRET_KEY        | Django's SECRET_KEY                                          | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l     |
-| DJANGO_FORCE_SCRIPT_NAME | Django's FORCE_SCRIPT_NAME                                   | /somepath/                           |
-| DJANGO_STATIC_URL        | Django's STATIC_URL (set with FORCE_SCRIPT_NAME)             | /somepath/static/                    |
+| DJANGO_URL_PREFIX        | Run TubeSync in a sub-URL on the web server                  | /somepath/                           |
 | TUBESYNC_DEBUG           | Enable debugging                                             | True                                 |
 | TUBESYNC_WORKERS         | Number of background workers, default is 2, max allowed is 8 | 2                                    |
 | TUBESYNC_HOSTS           | Django's ALLOWED_HOSTS, defaults to `*`                      | tubesync.example.com,otherhost.com   |
