@@ -21,5 +21,5 @@ def application(environ, start_response):
         environ['SCRIPT_NAME'] = script_name
         path_info = environ['PATH_INFO']
         if path_info.startswith(script_name) and not path_info.startswith(static_url):
-            environ['PATH_INFO'] = path_info[len(script_name):]
+            environ['PATH_INFO'] = path_info[len(script_name) - 1:]
     return _application(environ, start_response)
