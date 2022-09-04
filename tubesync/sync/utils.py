@@ -14,9 +14,9 @@ def validate_url(url, validator):
         Validate a URL against a dict of validation requirements. Returns an extracted
         part of the URL if the URL is valid, if invalid raises a ValidationError.
     '''
-    valid_scheme, valid_netloc, valid_path, invalid_paths, valid_query, \
+    valid_scheme, valid_netlocs, valid_path, invalid_paths, valid_query, \
         extract_parts = (
-            validator['scheme'], validator['domain'], validator['path_regex'],
+            validator['scheme'], validator['domains'], validator['path_regex'],
             validator['path_must_not_match'], validator['qs_args'],
             validator['extract_key']
     )
@@ -25,8 +25,8 @@ def validate_url(url, validator):
     if url_scheme != valid_scheme:
         raise ValidationError(f'invalid scheme "{url_scheme}" must be "{valid_scheme}"')
     url_netloc = str(url_parts.netloc).strip().lower()
-    if url_netloc != valid_netloc:
-        raise ValidationError(f'invalid domain "{url_netloc}" must be "{valid_netloc}"')
+    if url_netloc not in valid_netlocs:
+        raise ValidationError(f'invalid domain "{url_netloc}" must be one of "{valid_netlocs}"')
     url_path = str(url_parts.path).strip()
     matches = re.findall(valid_path, url_path)
     if not matches:

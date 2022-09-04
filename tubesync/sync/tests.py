@@ -36,6 +36,9 @@ class FrontEndTestCase(TestCase):
         test_sources = {
             'youtube-channel': {
                 'valid': (
+                    'https://m.youtube.com/testchannel',
+                    'https://m.youtube.com/c/testchannel',
+                    'https://m.youtube.com/c/testchannel/videos',
                     'https://www.youtube.com/testchannel',
                     'https://www.youtube.com/c/testchannel',
                     'https://www.youtube.com/c/testchannel/videos',
@@ -47,6 +50,7 @@ class FrontEndTestCase(TestCase):
                 'invalid_domain': (
                     'https://www.test.com/c/testchannel',
                     'https://www.example.com/c/testchannel',
+                    'https://n.youtube.com/c/testchannel',
                 ),
                 'invalid_path': (
                     'https://www.youtube.com/test/invalid',
@@ -62,6 +66,8 @@ class FrontEndTestCase(TestCase):
             },
             'youtube-channel-id': {
                 'valid': (
+                    'https://m.youtube.com/channel/channelid',
+                    'https://m.youtube.com/channel/channelid/videos',
                     'https://www.youtube.com/channel/channelid',
                     'https://www.youtube.com/channel/channelid/videos',
                 ),
@@ -72,6 +78,7 @@ class FrontEndTestCase(TestCase):
                 'invalid_domain': (
                     'https://www.test.com/channel/channelid',
                     'https://www.example.com/channel/channelid',
+                    'https://n.youtube.com/channel/channelid',
                 ),
                 'invalid_path': (
                     'https://www.youtube.com/test/invalid',
@@ -83,6 +90,8 @@ class FrontEndTestCase(TestCase):
             },
             'youtube-playlist': {
                 'valid': (
+                    'https://m.youtube.com/playlist?list=testplaylist',
+                    'https://m.youtube.com/watch?v=testvideo&list=testplaylist',
                     'https://www.youtube.com/playlist?list=testplaylist',
                     'https://www.youtube.com/watch?v=testvideo&list=testplaylist',
                 ),
@@ -93,6 +102,7 @@ class FrontEndTestCase(TestCase):
                 'invalid_domain': (
                     'https://www.test.com/playlist?list=testplaylist',
                     'https://www.example.com/playlist?list=testplaylist',
+                    'https://n.youtube.com/playlist?list=testplaylist',
                 ),
                 'invalid_path': (
                     'https://www.youtube.com/notplaylist?list=testplaylist',

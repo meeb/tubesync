@@ -171,7 +171,7 @@ class ValidateSourceView(FormView):
     validation_urls = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: {
             'scheme': 'https',
-            'domain': 'www.youtube.com',
+            'domains': ('m.youtube.com', 'www.youtube.com'),
             'path_regex': '^\/(c\/)?([^\/]+)(\/videos)?$',
             'path_must_not_match': ('/playlist', '/c/playlist'),
             'qs_args': [],
@@ -180,7 +180,7 @@ class ValidateSourceView(FormView):
         },
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: {
             'scheme': 'https',
-            'domain': 'www.youtube.com',
+            'domains': ('m.youtube.com', 'www.youtube.com'),
             'path_regex': '^\/channel\/([^\/]+)(\/videos)?$',
             'path_must_not_match': ('/playlist', '/c/playlist'),
             'qs_args': [],
@@ -189,7 +189,7 @@ class ValidateSourceView(FormView):
         },
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: {
             'scheme': 'https',
-            'domain': 'www.youtube.com',
+            'domains': ('m.youtube.com', 'www.youtube.com'),
             'path_regex': '^\/(playlist|watch)$',
             'path_must_not_match': (),
             'qs_args': ('list',),
