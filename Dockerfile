@@ -23,6 +23,14 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-amd64.tar.gz"  ;; \
   "linux/arm64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.gz" ;; \
   *)               echo ""        ;; esac) && \
+  export FFMPEG_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
+  "linux/amd64")   echo "b81c8b5ae1eb42db1001689682c52d2c02fbecdd2683598412678d3d3918bbd0"  ;; \
+  "linux/arm64")   echo "627b1f31c5f5feb76ce78b39afd233f5faf615bc43b52a783b3bd17586c69ec0" ;; \
+  *)               echo ""        ;; esac) && \
+  export FFMPEG_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
+  "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"  ;; \
+  "linux/arm64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz" ;; \
+  *)               echo ""        ;; esac) && \
   echo "Building for arch: ${ARCH}|${ARCH44}, downloading S6 from: ${S6_DOWNLOAD}}, expecting S6 SHA256: ${S6_EXPECTED_SHA256}" && \
   set -x && \
   apt-get update && \
@@ -30,15 +38,22 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
   locale-gen en_US.UTF-8 && \
   # Install required distro packages
-  apt-get -y --no-install-recommends install curl ca-certificates binutils && \
+  apt-get -y --no-install-recommends install curl ca-certificates binutils xz-utils && \
   # Install s6
   curl -L ${S6_DOWNLOAD} --output /tmp/s6-overlay-${ARCH}.tar.gz && \
   sha256sum /tmp/s6-overlay-${ARCH}.tar.gz && \
-  echo "${S6_EXPECTED_SHA256}  /tmp/s6-overlay-${ARCH}.tar.gz" | sha256sum -c - && \
+  echo "${S6_EXPECTED_SHA256} /tmp/s6-overlay-${ARCH}.tar.gz" | sha256sum -c - && \
   tar xzf /tmp/s6-overlay-${ARCH}.tar.gz -C / && \
+  echo "Building for arch: ${ARCH}|${ARCH44}, downloading FFMPEG from: ${FFMPEG_DOWNLOAD}, expecting FFMPEG SHA256: ${FFMPEG_EXPECTED_SHA256}" && \
+  curl -L ${FFMPEG_DOWNLOAD} --output /tmp/ffmpeg-${ARCH}.tar.xz && \
+  sha256sum /tmp/ffmpeg-${ARCH}.tar.xz && \
+  echo "${FFMPEG_EXPECTED_SHA256}  /tmp/ffmpeg-${ARCH}.tar.xz" | sha256sum -c - && \
+  tar -xf /tmp/ffmpeg-${ARCH}.tar.xz --strip-components=2 --no-anchored -C /usr/local/bin/ "ffmpeg" && \
+  tar -xf /tmp/ffmpeg-${ARCH}.tar.xz --strip-components=2 --no-anchored -C /usr/local/bin/ "ffprobe" && \
   # Clean up
   rm -rf /tmp/s6-overlay-${ARCH}.tar.gz && \
-  apt-get -y autoremove --purge curl binutils
+  rm -rf /tmp/ffmpeg-${ARCH}.tar.xz && \
+  apt-get -y autoremove --purge curl binutils xz-utils
 
 # Copy app
 COPY tubesync /app
@@ -77,7 +92,6 @@ RUN set -x && \
   libjpeg-dev \
   zlib1g-dev \
   libwebp-dev \
-  ffmpeg \
   redis-server && \
   # Install pipenv
   pip3 --disable-pip-version-check install wheel pipenv && \
@@ -126,7 +140,7 @@ RUN set -x && \
 
 # Append software versions
 RUN set -x && \
-  FFMPEG_VERSION=$(/usr/bin/ffmpeg -version | head -n 1 | awk '{ print $3 }') && \
+  FFMPEG_VERSION=$(/usr/local/bin/ffmpeg -version | head -n 1 | awk '{ print $3 }') && \
   echo "ffmpeg_version = '${FFMPEG_VERSION}'" >> /app/common/third_party_versions.py
 
 # Copy root
