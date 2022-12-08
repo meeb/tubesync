@@ -277,6 +277,11 @@ def download_media_thumbnail(media_id, url):
     except Media.DoesNotExist:
         # Task triggered but the media no longer exists, do nothing
         return
+    if media.skip:
+        # Media was toggled to be skipped after the task was scheduled
+        log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
+                 f'it is now marked to be skipped, not downloading thumbnail')
+        return
     width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
     height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
     i = get_remote_image(url)
