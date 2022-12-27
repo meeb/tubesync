@@ -686,6 +686,25 @@ class MediaEnableView(FormView, SingleObjectMixin):
         return append_uri_params(url, {'message': 'enabled'})
 
 
+class MediaContent(DetailView):
+    '''
+        Redirect to nginx to download the file
+    '''
+    model = Media
+
+    def __init__(self, *args, **kwargs):
+        self.object = None
+        super().__init__(*args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+
+        headers = {
+            'X-Accel-Redirect': self.object.media_file.url,
+        }
+        return HttpResponse(headers=headers)
+
+
 class TasksView(ListView):
     '''
         A list of tasks queued to be completed. This is, for example, scraping for new

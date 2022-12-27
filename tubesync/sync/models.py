@@ -21,7 +21,7 @@ from .matching import (get_best_combined_format, get_best_audio_format,
 from .mediaservers import PlexMediaServer
 
 
-media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT))
+media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 
 
 class Source(models.Model):
