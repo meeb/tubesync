@@ -416,7 +416,7 @@ class DeleteSourceView(DeleteView, FormMixin):
             for media in Media.objects.filter(source=source):
                 if media.media_file:
                     # Delete the media file
-                    delete_file(media.media_file.name)
+                    delete_file(media.media_file.path)
                     # Delete thumbnail copy if it exists
                     delete_file(media.thumbpath)
                     # Delete NFO file if it exists
