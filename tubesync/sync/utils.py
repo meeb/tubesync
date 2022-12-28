@@ -199,3 +199,61 @@ def parse_media_format(format_dict):
         'is_hls': is_hls,
         'is_dash': is_dash,
     }
+
+
+def parse_twitch_media_format(format_dict):
+    '''
+        This parser primarily adapts the format dict returned by youtube-dl into a
+        standard form used by the matchers in matching.py. If youtube-dl changes
+        any internals, update it here.
+    '''
+    vcodec_full = format_dict.get('vcodec', '')
+    vcodec_parts = vcodec_full.split('.')
+    if len(vcodec_parts) > 0:
+        vcodec = vcodec_parts[0].strip().upper()
+    else:
+        vcodec = None
+    if vcodec == 'NONE':
+        vcodec = None
+    acodec_full = format_dict.get('acodec', '')
+    acodec_parts = acodec_full.split('.')
+    if len(acodec_parts) > 0:
+        acodec = acodec_parts[0].strip().upper()
+    else:
+        acodec = None
+    if acodec == 'NONE':
+        acodec = None
+    try:
+        fps = int(format_dict.get('fps', 0))
+    except (ValueError, TypeError):
+        fps = 0
+        if format_dict.get('format_id').endswith('p60'):
+            fps = 60
+    height = format_dict.get('height', 0)
+    try:
+        height = int(height)
+    except (ValueError, TypeError):
+        height = 0
+    width = format_dict.get('width', 0)
+    try:
+        width = int(width)
+    except (ValueError, TypeError):
+        width = 0
+
+    format_full = format_dict.get('format_note', '').strip().upper()
+    return {
+        'id': format_dict.get('format_id', ''),
+        'format': f'{height}P',
+        'format_verbose': format_dict.get('format', ''),
+        'height': height,
+        'width': width,
+        'vcodec': vcodec,
+        'fps': fps,
+        'vbr': format_dict.get('tbr', 0),
+        'acodec': acodec,
+        'abr': format_dict.get('abr', 0),
+        'is_60fps': fps > 50,
+        'is_hdr': False,
+        'is_hls': True,
+        'is_dash': False,
+    }

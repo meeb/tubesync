@@ -157,11 +157,13 @@ class ValidateSourceView(FormView):
         'youtube-channel': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
         'youtube-channel-id': Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID,
         'youtube-playlist': Source.SOURCE_TYPE_YOUTUBE_PLAYLIST,
+        'twitch-channel': Source.SOURCE_TYPE_TWITCH_CHANNEL,
     }
     help_item = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: _('YouTube channel'),
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: _('YouTube channel ID'),
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: _('YouTube playlist'),
+        Source.SOURCE_TYPE_TWITCH_CHANNEL: _('Twitch channel'),
     }
     help_texts = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: _(
@@ -183,13 +185,20 @@ class ValidateSourceView(FormView):
             'BiGLoNgUnIqUeId</strong> where <strong>BiGLoNgUnIqUeId</strong> is the '
             'unique ID of the playlist you want to add.'
         ),
+        Source.SOURCE_TYPE_TWITCH_CHANNEL: _(
+            'Enter a Twitch channel URL into the box below. The URL will be '
+            'in the format of <strong>https://www.twitch.tv/ChannelId/videos'
+            '</strong> where <strong>ChannelId</strong> is the '
+            'is the channel you want to add.'
+        ),
     }
     help_examples = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/google',
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: ('https://www.youtube.com/channel/'
                                                 'UCK8sQmJBp8GCxrOtXWBpyEA'),
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: ('https://www.youtube.com/playlist?list='
-                                              'PL590L5WQmH8dpP0RyH5pCfIaDEdt9nk7r')
+                                              'PL590L5WQmH8dpP0RyH5pCfIaDEdt9nk7r'),
+        Source.SOURCE_TYPE_TWITCH_CHANNEL: ('https://www.twitch.tv/twitch/videos')
     }
     validation_urls = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: {
@@ -219,11 +228,21 @@ class ValidateSourceView(FormView):
             'extract_key': ('qs_args', 'list'),
             'example': 'https://www.youtube.com/playlist?list=PLAYLISTID'
         },
+        Source.SOURCE_TYPE_TWITCH_CHANNEL: {
+            'scheme': 'https',
+            'domains': ('www.twitch.tv',),
+            'path_regex': '^\/([^\/]+)(\/videos)?$',
+            'path_must_not_match': (),
+            'qs_args': [],
+            'extract_key': ('path_regex', 0),
+            'example': 'https://www.twitch.tv/twitch/videos'
+        },
     }
     prepopulate_fields = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: ('source_type', 'key', 'name', 'directory'),
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: ('source_type', 'key'),
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: ('source_type', 'key'),
+        Source.SOURCE_TYPE_TWITCH_CHANNEL: ('source_type', 'key', 'name', 'directory'),
     }
 
     def __init__(self, *args, **kwargs):
@@ -305,13 +324,30 @@ class EditSourceMixin:
                                   'errors or is empty. Check the table at the end of '
                                   'this page for valid media name variables'),
         'dir_outside_dlroot': _('You cannot specify a directory outside of the '
-                                'base directory (%BASEDIR%)')
+                                'base directory (%BASEDIR%)'),
+        'not_twitch_vcodec': _('Twitch only supports AVC1 source video codec'),
+        'not_twitch_acodec': _('Twitch only supports MP4A source audio codec')
     }
 
     def form_valid(self, form: Form):
         # Perform extra validation to make sure the media_format is valid
         obj = form.save(commit=False)
-        source_type = form.cleaned_data['media_format']
+        source_type = form.cleaned_data['source_type']
+        source_vcodec = form.cleaned_data['source_vcodec']
+        source_acodec = form.cleaned_data['source_acodec']
+
+        if source_type == Source.SOURCE_TYPE_TWITCH_CHANNEL and source_vcodec != Source.SOURCE_VCODEC_AVC1:
+            form.add_error(
+                'source_vcodec',
+                ValidationError(self.errors['not_twitch_vcodec'])
+            )
+
+        if source_type == Source.SOURCE_TYPE_TWITCH_CHANNEL and source_acodec != Source.SOURCE_ACODEC_MP4A:
+            form.add_error(
+                'source_acodec',
+                ValidationError(self.errors['not_twitch_acodec'])
+            )
+
         example_media_file = obj.get_example_media_format()
         
         if example_media_file == '':

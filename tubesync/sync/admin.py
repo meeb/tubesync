@@ -16,9 +16,13 @@ class SourceAdmin(admin.ModelAdmin):
 class MediaAdmin(admin.ModelAdmin):
 
     ordering = ('-created',)
-    list_display = ('uuid', 'key', 'source', 'can_download', 'skip', 'downloaded')
+    list_display = ('uuid', 'key', 'source', 'can_download', 'skip', 'is_live', 'downloaded')
     readonly_fields = ('uuid', 'created')
     search_fields = ('uuid', 'source__key', 'key')
+
+    @admin.display(boolean=True)
+    def is_live(self, obj):
+        return obj.is_live
 
 
 @admin.register(MediaServer)

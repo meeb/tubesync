@@ -64,6 +64,16 @@ def get_media_info(url):
     return response
 
 
+def get_twitch_media_info(url):
+    '''
+        Format Twitch id's to match the id key used in urls
+    '''
+    response = get_media_info(url)
+    for entry in response['entries']:
+        entry['id'] = entry['id'].lstrip('v')
+    return response
+
+
 def download_media(url, media_format, extension, output_file, info_json, 
                    sponsor_categories="all", 
                    embed_thumbnail=False, embed_metadata=False, skip_sponsors=True):

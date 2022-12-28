@@ -1,8 +1,10 @@
+from datetime import timedelta
 import os
 from django.conf import settings
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
 from background_task.signals import task_failed
 from background_task.models import Task
 from common.logger import log
@@ -150,20 +152,28 @@ def media_post_save(sender, instance, created, **kwargs):
         post_save.disconnect(media_post_save, sender=Media)
         instance.save()
         post_save.connect(media_post_save, sender=Media)
-    # If the media is missing metadata schedule it to be downloaded
-    if not instance.metadata:
-        log.info(f'Scheduling task to download metadata for: {instance.url}')
+    # If the media is missing metadata schedule it to be downloaded,
+    # or refresh it if it was live during last run
+    if not instance.metadata or instance.is_live:
+        kwargs = {}
+        if instance.is_live:
+            kwargs['schedule'] = timedelta(hours=1)
+
+            log.info(f'Recheduling task to download metadata for live stream in 1h: {instance.url}')
+        else:
+            log.info(f'Scheduling task to download metadata for: {instance.url}')
         verbose_name = _('Downloading metadata for "{}"')
         download_media_metadata(
             str(instance.pk),
             priority=10,
             verbose_name=verbose_name.format(instance.pk),
-            remove_existing_tasks=True
+            remove_existing_tasks=True,
+            **kwargs
         )
     # If the media is missing a thumbnail schedule it to be downloaded
     if not instance.thumb_file_exists:
         instance.thumb = None
-    if not instance.thumb:
+    if not instance.thumb and not instance.is_live:
         thumbnail_url = instance.thumbnail
         if thumbnail_url:
             log.info(f'Scheduling task to download thumbnail for: {instance.name} '
@@ -177,12 +187,13 @@ def media_post_save(sender, instance, created, **kwargs):
                 verbose_name=verbose_name.format(instance.name),
                 remove_existing_tasks=True
             )
+
     # If the media has not yet been downloaded schedule it to be downloaded
     if not instance.media_file_exists:
         instance.downloaded = False
         instance.media_file = None
     if (not instance.downloaded and instance.can_download and not instance.skip
-        and instance.source.download_media):
+        and instance.source.download_media and not instance.is_live):
         delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
         verbose_name = _('Downloading media for "{}"')
         download_media(

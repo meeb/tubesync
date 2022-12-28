@@ -14,8 +14,9 @@ from django.utils.translation import gettext_lazy as _
 from common.errors import NoFormatException
 from common.utils import clean_filename
 from .youtube import (get_media_info as get_youtube_media_info,
-                      download_media as download_youtube_media)
-from .utils import seconds_to_timestr, parse_media_format
+                      download_media as download_youtube_media,
+                      get_twitch_media_info)
+from .utils import seconds_to_timestr, parse_media_format, parse_twitch_media_format
 from .matching import (get_best_combined_format, get_best_audio_format, 
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
@@ -32,12 +33,14 @@ class Source(models.Model):
     SOURCE_TYPE_YOUTUBE_CHANNEL = 'c'
     SOURCE_TYPE_YOUTUBE_CHANNEL_ID = 'i'
     SOURCE_TYPE_YOUTUBE_PLAYLIST = 'p'
+    SOURCE_TYPE_TWITCH_CHANNEL = 't'
     SOURCE_TYPES = (SOURCE_TYPE_YOUTUBE_CHANNEL, SOURCE_TYPE_YOUTUBE_CHANNEL_ID,
-                    SOURCE_TYPE_YOUTUBE_PLAYLIST)
+                    SOURCE_TYPE_YOUTUBE_PLAYLIST, SOURCE_TYPE_TWITCH_CHANNEL)
     SOURCE_TYPE_CHOICES = (
         (SOURCE_TYPE_YOUTUBE_CHANNEL, _('YouTube channel')),
         (SOURCE_TYPE_YOUTUBE_CHANNEL_ID, _('YouTube channel by ID')),
         (SOURCE_TYPE_YOUTUBE_PLAYLIST, _('YouTube playlist')),
+        (SOURCE_TYPE_TWITCH_CHANNEL, _('Twitch channel')),
     )
 
     SOURCE_RESOLUTION_360P = '360p'
@@ -151,30 +154,35 @@ class Source(models.Model):
         SOURCE_TYPE_YOUTUBE_CHANNEL: '<i class="fab fa-youtube"></i>',
         SOURCE_TYPE_YOUTUBE_CHANNEL_ID: '<i class="fab fa-youtube"></i>',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: '<i class="fab fa-youtube"></i>',
+        SOURCE_TYPE_TWITCH_CHANNEL: '<i class="fab fa-twitch"></i>',
     }
     # Format to use to display a URL for the source
     URLS = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/c/{key}',
         SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/channel/{key}',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/playlist?list={key}',
+        SOURCE_TYPE_TWITCH_CHANNEL: 'https://www.twitch.tv/{key}/videos',
     }
     # Format used to create indexable URLs
     INDEX_URLS = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/c/{key}/videos',
         SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/channel/{key}/videos',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/playlist?list={key}',
+        SOURCE_TYPE_TWITCH_CHANNEL: 'https://www.twitch.tv/{key}/videos?filter=all&sort=time',
     }
     # Callback functions to get a list of media from the source
     INDEXERS = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: get_youtube_media_info,
         SOURCE_TYPE_YOUTUBE_CHANNEL_ID: get_youtube_media_info,
         SOURCE_TYPE_YOUTUBE_PLAYLIST: get_youtube_media_info,
+        SOURCE_TYPE_TWITCH_CHANNEL: get_twitch_media_info,
     }
     # Field names to find the media ID used as the key when storing media
     KEY_FIELD = {
         SOURCE_TYPE_YOUTUBE_CHANNEL: 'id',
         SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'id',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'id',
+        SOURCE_TYPE_TWITCH_CHANNEL: 'id',
     }
 
     class CapChoices(models.IntegerChoices):
@@ -546,12 +554,21 @@ class Media(models.Model):
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/watch?v={key}',
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/watch?v={key}',
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/watch?v={key}',
+        Source.SOURCE_TYPE_TWITCH_CHANNEL: 'https://www.twitch.tv/videos/{key}',
     }
     # Callback functions to get a list of media from the source
     INDEXERS = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: get_youtube_media_info,
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: get_youtube_media_info,
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: get_youtube_media_info,
+        Source.SOURCE_TYPE_TWITCH_CHANNEL: get_youtube_media_info,
+    }
+    # Callback functions to get a list of media from the source
+    FORMAT_PARSER = {
+        Source.SOURCE_TYPE_YOUTUBE_CHANNEL: parse_media_format,
+        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: parse_media_format,
+        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: parse_media_format,
+        Source.SOURCE_TYPE_TWITCH_CHANNEL: parse_twitch_media_format,
     }
     # Maps standardised names to names used in source metdata
     METADATA_FIELDS = {
@@ -559,16 +576,19 @@ class Media(models.Model):
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'upload_date',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'upload_date',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'upload_date',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'upload_date',
         },
         'title': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'title',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'title',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'title',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'title',
         },
         'thumbnail': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'thumbnail',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'thumbnail',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'thumbnail',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'thumbnail',
         },
         'description': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'description',
@@ -579,46 +599,61 @@ class Media(models.Model):
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'duration',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'duration',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'duration',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'duration',
         },
         'formats': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'formats',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'formats',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'formats',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'formats',
         },
         'categories': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'categories',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'categories',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'categories',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'categories',
         },
         'rating': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'average_rating',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'average_rating',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'average_rating',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'average_rating',
         },
         'age_limit': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'age_limit',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'age_limit',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'age_limit',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'age_limit',
         },
         'uploader': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'uploader',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'uploader',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'uploader',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'uploader',
         },
         'upvotes': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'like_count',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'like_count',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'like_count',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'like_count',
         },
         'downvotes': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'dislike_count',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'dislike_count',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'dislike_count',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'dislike_count',
         },
         'playlist_title': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'playlist_title',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'playlist_title',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'playlist_title',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'playlist_title',
+        },
+        'is_live': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'is_live',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'is_live',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'is_live',
+            Source.SOURCE_TYPE_TWITCH_CHANNEL: 'is_live',
         },
     }
     STATE_UNKNOWN = 'unknown'
@@ -626,6 +661,7 @@ class Media(models.Model):
     STATE_DOWNLOADING = 'downloading'
     STATE_DOWNLOADED = 'downloaded'
     STATE_SKIPPED = 'skipped'
+    STATE_LIVE = 'live'
     STATE_DISABLED_AT_SOURCE = 'source-disabled'
     STATE_ERROR = 'error'
     STATES = (STATE_UNKNOWN, STATE_SCHEDULED, STATE_DOWNLOADING, STATE_DOWNLOADED,
@@ -638,6 +674,7 @@ class Media(models.Model):
         STATE_SKIPPED: '<i class="fas fa-exclamation-circle" title="Skipped"></i>',
         STATE_DISABLED_AT_SOURCE: '<i class="fas fa-stop-circle" title="Media downloading disabled at source"></i>',
         STATE_ERROR: '<i class="fas fa-exclamation-triangle" title="Error downloading"></i>',
+        STATE_LIVE: '<i class="fas fa-clock" title="Live, download postponed"></i>',
     }
 
     uuid = models.UUIDField(
@@ -798,6 +835,13 @@ class Media(models.Model):
         null=True,
         help_text=_('Size of the downloaded media in bytes')
     )
+    last_crawl = models.DateTimeField(
+        _('last crawl'),
+        db_index=True,
+        null=True,
+        blank=True,
+        help_text=_('Date and time the metadata of the media was last crawled')
+    )
 
     def __str__(self):
         return self.key
@@ -814,8 +858,9 @@ class Media(models.Model):
         return fields.get(self.source.source_type, '')
 
     def iter_formats(self):
+        parser = self.FORMAT_PARSER.get(self.source.source_type)
         for fmt in self.formats:
-            yield parse_media_format(fmt)
+            yield parser(fmt)
 
     def get_best_combined_format(self):
         return get_best_combined_format(self)
@@ -1018,13 +1063,20 @@ class Media(models.Model):
 
     @property
     def description(self):
+        if self.source.source_type == Source.SOURCE_TYPE_TWITCH_CHANNEL:
+            chapters = self.loaded_metadata.get('chapters', [])
+            descriptions = [chapter['title'] for chapter in chapters]
+            return ' - '.join(descriptions)
+
         field = self.get_metadata_field('description')
-        return self.loaded_metadata.get(field, '').strip()
+        description = self.loaded_metadata.get(field) or ''
+        return description.strip()
 
     @property
     def title(self):
         field = self.get_metadata_field('title')
-        return self.loaded_metadata.get(field, '').strip()
+        title = self.loaded_metadata.get(field) or ''
+        return title.strip()
 
     @property
     def slugtitle(self):
@@ -1034,7 +1086,8 @@ class Media(models.Model):
     @property
     def thumbnail(self):
         field = self.get_metadata_field('thumbnail')
-        return self.loaded_metadata.get(field, '').strip()
+        thumbnail = self.loaded_metadata.get(field) or ''
+        return thumbnail.strip()
 
     @property
     def name(self):
@@ -1208,6 +1261,13 @@ class Media(models.Model):
             return 'video/mp4'
 
     @property
+    def is_live(self):
+        field = self.get_metadata_field('is_live')
+        is_live = self.loaded_metadata.get(field)
+        is_live = True if is_live else False
+        return is_live
+
+    @property
     def nfoxml(self):
         '''
             Returns an NFO formatted (prettified) XML string.
@@ -1318,6 +1378,8 @@ class Media(models.Model):
             return self.STATE_SKIPPED
         if not self.source.download_media:
             return self.STATE_DISABLED_AT_SOURCE
+        if self.is_live:
+            return self.STATE_LIVE
         return self.STATE_UNKNOWN
 
     def get_download_state_icon(self, task=None):
