@@ -1266,7 +1266,7 @@ class Media(models.Model):
         '''
         indexer = self.INDEXERS.get(self.source.source_type, None)
         if not callable(indexer):
-            raise Exception(f'Meida with source type f"{self.source.source_type}" '
+            raise Exception(f'Media with source type f"{self.source.source_type}" '
                             f'has no indexer')
         return indexer(self.url)
 
