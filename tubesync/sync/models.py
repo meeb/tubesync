@@ -477,7 +477,11 @@ class Source(models.Model):
         response = indexer(self.index_url)
         if not isinstance(response, dict):
             return []
-        return response.get('entries', [])
+        entries = response.get('entries', [])
+
+        if settings.MAX_ENTRIES_PROCESSING:
+            entries = entries[:settings.MAX_ENTRIES_PROCESSING]
+        return entries
 
 
 def get_media_thumb_path(instance, filename):
