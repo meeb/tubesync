@@ -9,6 +9,12 @@
     {% if media.title %}<h2 class="truncate"><strong>{{ media.title }}</strong></h2>{% endif %}
     <p class="truncate"><strong><a href="{{ media.url }}" target="_blank"><i class="fas fa-link"></i> {{ media.url }}</a></strong></p>
     <p class="truncate">Downloading to: <strong>{{ media.source.directory_path }}</strong></p>
+    {% if download_state == 'downloaded' %}
+    <video controls style="width: 100%">
+      <source src="{% url 'sync:media-content' pk=media.pk %}">
+    </video>
+    <p class="truncate"><a href="{% url 'sync:media-content' pk=media.pk %}" download="{{ media.filename }}">Download</a></p>
+    {% endif %}
   </div>
 </div>
 {% if not media.can_download %}{% include 'errorbox.html' with message='Media cannot be downloaded because it has no formats which match the source requirements.' %}{% endif %}

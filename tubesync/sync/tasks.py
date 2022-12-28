@@ -341,7 +341,7 @@ def download_media(media_id):
         log.info(f'Successfully downloaded media: {media} (UUID: {media.pk}) to: '
                  f'"{filepath}"')
         # Link the media file to the object and update info about the download
-        media.media_file.name = str(filepath)
+        media.media_file.name = str(media.source.type_directory_path / media.filename)
         media.downloaded = True
         media.download_date = timezone.now()
         media.downloaded_filesize = os.path.getsize(filepath)
