@@ -477,7 +477,11 @@ class Source(models.Model):
         response = indexer(self.index_url)
         if not isinstance(response, dict):
             return []
-        return response.get('entries', [])
+        entries = response.get('entries', [])
+
+        if settings.MAX_ENTRIES_PROCESSING:
+            entries = entries[:settings.MAX_ENTRIES_PROCESSING]
+        return entries
 
 
 def get_media_thumb_path(instance, filename):
@@ -866,7 +870,7 @@ class Media(models.Model):
         # Otherwise, calculate from matched format codes
         vformat = None
         aformat = None
-        if '+' in format_str:
+        if format_str and '+' in format_str:
             # Seperate audio and video streams
             vformat_code, aformat_code = format_str.split('+')
             vformat = self.get_format_by_code(vformat_code)
@@ -875,7 +879,7 @@ class Media(models.Model):
             # Combined stream or audio only
             cformat = self.get_format_by_code(format_str)
             aformat = cformat
-            if cformat['vcodec']:
+            if cformat and cformat['vcodec']:
                 # Combined
                 vformat = cformat
         if vformat:
@@ -1266,7 +1270,7 @@ class Media(models.Model):
         '''
         indexer = self.INDEXERS.get(self.source.source_type, None)
         if not callable(indexer):
-            raise Exception(f'Meida with source type f"{self.source.source_type}" '
+            raise Exception(f'Media with source type f"{self.source.source_type}" '
                             f'has no indexer')
         return indexer(self.url)
 

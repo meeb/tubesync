@@ -138,7 +138,7 @@ BACKGROUND_TASK_ASYNC_THREADS = 1           # Number of async tasks to run at on
 MAX_BACKGROUND_TASK_ASYNC_THREADS = 8       # For sanity reasons
 BACKGROUND_TASK_PRIORITY_ORDERING = 'ASC'   # Use 'niceness' task priority ordering
 COMPLETED_TASKS_DAYS_TO_KEEP = 7            # Number of days to keep completed tasks
-
+MAX_ENTRIES_PROCESSING = 0                  # Number of videos to process on source refresh (0 for no limit)
 
 SOURCES_PER_PAGE = 100
 MEDIA_PER_PAGE = 144

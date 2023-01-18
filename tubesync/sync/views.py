@@ -269,13 +269,7 @@ class ValidateSourceView(FormView):
         return append_uri_params(url, fields)
 
 
-class AddSourceView(CreateView):
-    '''
-        Adds a new source, optionally takes some initial data querystring values to
-        prepopulate some of the more unclear values.
-    '''
-
-    template_name = 'sync/source-add.html'
+class EditSourceMixin:
     model = Source
     fields = ('source_type', 'key', 'name', 'directory', 'media_format',
               'index_schedule', 'download_media', 'download_cap', 'delete_old_media',
@@ -286,6 +280,29 @@ class AddSourceView(CreateView):
                                   'errors or is empty. Check the table at the end of '
                                   'this page for valid media name variables'),
     }
+
+    def form_valid(self, form):
+        # Perform extra validation to make sure the media_format is valid
+        obj = form.save(commit=False)
+        source_type = form.cleaned_data['media_format']
+        example_media_file = obj.get_example_media_format()
+        if example_media_file == '':
+            form.add_error(
+                'media_format',
+                ValidationError(self.errors['invalid_media_format'])
+            )
+        if form.errors:
+            return super().form_invalid(form)
+        return super().form_valid(form)
+
+
+class AddSourceView(EditSourceMixin, CreateView):
+    '''
+        Adds a new source, optionally takes some initial data querystring values to
+        prepopulate some of the more unclear values.
+    '''
+
+    template_name = 'sync/source-add.html'
 
     def __init__(self, *args, **kwargs):
         self.prepopulated_data = {}
@@ -311,20 +328,6 @@ class AddSourceView(CreateView):
         for k, v in self.prepopulated_data.items():
             initial[k] = v
         return initial
-
-    def form_valid(self, form):
-        # Perform extra validation to make sure the media_format is valid
-        obj = form.save(commit=False)
-        source_type = form.cleaned_data['media_format']
-        example_media_file = obj.get_example_media_format()
-        if example_media_file == '':
-            form.add_error(
-                'media_format',
-                ValidationError(self.errors['invalid_media_format'])
-            )
-        if form.errors:
-            return super().form_invalid(form)
-        return super().form_valid(form)
 
     def get_success_url(self):
         url = reverse_lazy('sync:source', kwargs={'pk': self.object.pk})
@@ -364,33 +367,9 @@ class SourceView(DetailView):
         return data
 
 
-class UpdateSourceView(UpdateView):
+class UpdateSourceView(EditSourceMixin, UpdateView):
 
     template_name = 'sync/source-update.html'
-    model = Source
-    fields = ('source_type', 'key', 'name', 'directory', 'media_format',
-              'index_schedule', 'download_media', 'download_cap', 'delete_old_media',
-              'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
-              'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo', 'write_json')
-    errors = {
-        'invalid_media_format': _('Invalid media format, the media format contains '
-                                  'errors or is empty. Check the table at the end of '
-                                  'this page for valid media name variables'),
-    }
-
-    def form_valid(self, form):
-        # Perform extra validation to make sure the media_format is valid
-        obj = form.save(commit=False)
-        source_type = form.cleaned_data['media_format']
-        example_media_file = obj.get_example_media_format()
-        if example_media_file == '':
-            form.add_error(
-                'media_format',
-                ValidationError(self.errors['invalid_media_format'])
-            )
-        if form.errors:
-            return super().form_invalid(form)
-        return super().form_valid(form)
 
     def get_success_url(self):
         url = reverse_lazy('sync:source', kwargs={'pk': self.object.pk})
@@ -416,7 +395,7 @@ class DeleteSourceView(DeleteView, FormMixin):
             for media in Media.objects.filter(source=source):
                 if media.media_file:
                     # Delete the media file
-                    delete_file(media.media_file.name)
+                    delete_file(media.media_file.path)
                     # Delete thumbnail copy if it exists
                     delete_file(media.thumbpath)
                     # Delete NFO file if it exists
