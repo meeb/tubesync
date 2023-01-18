@@ -1,0 +1,3 @@
+#!/command/execlineb -P
+
+/etc/s6-overlay/s6-rc.d/tubesync-init/run

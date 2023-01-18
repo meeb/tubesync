@@ -1,7 +1,9 @@
 FROM debian:bullseye-slim
 
 ARG TARGETPLATFORM
-ARG S6_VERSION="2.2.0.3"
+ARG S6_VERSION="3.1.2.1"
+ARG FFMPEG_DATE="autobuild-2023-01-03-12-55"
+ARG FFMPEG_VERSION="109474-gc94988a781"
 
 ENV DEBIAN_FRONTEND="noninteractive" \
   HOME="/root" \
@@ -15,22 +17,24 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "amd64"  ;; \
   "linux/arm64")   echo "aarch64" ;; \
   *)               echo ""        ;; esac) && \
-  export S6_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "a7076cf205b331e9f8479bbb09d9df77dbb5cd8f7d12e9b74920902e0c16dd98"  ;; \
-  "linux/arm64")   echo "84f585a100b610124bb80e441ef2dc2d68ac2c345fd393d75a6293e0951ccfc5" ;; \
+  export S6_ARCH_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
+  "linux/amd64")   echo "6019b6b06cfdbb1d1cd572d46b9b158a4904fd19ca59d374de4ddaaa6a3727d5" ;; \
+  "linux/arm64")   echo "e73f9a021b64f88278830742149c14ef8a52331102881ba025bf32a66a0e7c78" ;; \
   *)               echo ""        ;; esac) && \
-  export S6_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-amd64.tar.gz"  ;; \
-  "linux/arm64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.gz" ;; \
+  export S6_DOWNLOAD_ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
+  "linux/amd64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-x86_64.tar.xz"   ;; \
+  "linux/arm64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.xz" ;; \
   *)               echo ""        ;; esac) && \
   export FFMPEG_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "b81c8b5ae1eb42db1001689682c52d2c02fbecdd2683598412678d3d3918bbd0"  ;; \
-  "linux/arm64")   echo "627b1f31c5f5feb76ce78b39afd233f5faf615bc43b52a783b3bd17586c69ec0" ;; \
+  "linux/amd64")   echo "ed9059668e4a6dac9bde122a775f52ad08cbb90df3658f8c1e328477c13c242e" ;; \
+  "linux/arm64")   echo "dd1375bd351d38ea1cc3efd68a998699366e28bd9b90df65d11af2b9121746b7" ;; \
   *)               echo ""        ;; esac) && \
   export FFMPEG_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"  ;; \
-  "linux/arm64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz" ;; \
+  "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linux64-gpl.tar.xz"   ;; \
+  "linux/arm64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linuxarm64-gpl.tar.xz" ;; \
   *)               echo ""        ;; esac) && \
+  export S6_NOARCH_EXPECTED_SHA256="cee89d3eeabdfe15239b2c5c3581d9352d2197d4fd23bba3f1e64bf916ccf496" && \
+  export S6_DOWNLOAD_NOARCH="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-noarch.tar.xz" && \
   echo "Building for arch: ${ARCH}|${ARCH44}, downloading S6 from: ${S6_DOWNLOAD}}, expecting S6 SHA256: ${S6_EXPECTED_SHA256}" && \
   set -x && \
   apt-get update && \
@@ -40,10 +44,13 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   # Install required distro packages
   apt-get -y --no-install-recommends install curl ca-certificates binutils xz-utils && \
   # Install s6
-  curl -L ${S6_DOWNLOAD} --output /tmp/s6-overlay-${ARCH}.tar.gz && \
-  sha256sum /tmp/s6-overlay-${ARCH}.tar.gz && \
-  echo "${S6_EXPECTED_SHA256} /tmp/s6-overlay-${ARCH}.tar.gz" | sha256sum -c - && \
-  tar xzf /tmp/s6-overlay-${ARCH}.tar.gz -C / && \
+  curl -L ${S6_DOWNLOAD_NOARCH} --output /tmp/s6-overlay-noarch.tar.xz && \
+  echo "${S6_NOARCH_EXPECTED_SHA256}  /tmp/s6-overlay-noarch.tar.xz" | sha256sum -c - && \
+  tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
+  curl -L ${S6_DOWNLOAD_ARCH} --output /tmp/s6-overlay-${ARCH}.tar.xz && \
+  echo "${S6_ARCH_EXPECTED_SHA256}  /tmp/s6-overlay-${ARCH}.tar.xz" | sha256sum -c - && \
+  tar -C / -Jxpf /tmp/s6-overlay-${ARCH}.tar.xz && \
+  # Install ffmpeg
   echo "Building for arch: ${ARCH}|${ARCH44}, downloading FFMPEG from: ${FFMPEG_DOWNLOAD}, expecting FFMPEG SHA256: ${FFMPEG_EXPECTED_SHA256}" && \
   curl -L ${FFMPEG_DOWNLOAD} --output /tmp/ffmpeg-${ARCH}.tar.xz && \
   sha256sum /tmp/ffmpeg-${ARCH}.tar.xz && \
@@ -64,7 +71,6 @@ COPY pip.conf /etc/pip.conf
 
 # Add Pipfile
 COPY Pipfile /app/Pipfile
-COPY Pipfile.lock /app/Pipfile.lock
 
 # Switch workdir to the the app
 WORKDIR /app
@@ -99,7 +105,7 @@ RUN set -x && \
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
-  pipenv install --system && \
+  pipenv install --system --skip-lock && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   rm -rf /app/db.sqlite3 && \
   # Run any required app commands
@@ -112,7 +118,6 @@ RUN set -x && \
   mkdir -p /downloads/video && \
   # Clean up
   rm /app/Pipfile && \
-  rm /app/Pipfile.lock && \
   pipenv --clear && \
   pip3 --disable-pip-version-check uninstall -y pipenv wheel virtualenv && \
   apt-get -y autoremove --purge \
@@ -136,7 +141,7 @@ RUN set -x && \
   rm -rf /root && \
   mkdir -p /root && \
   chown root:root /root && \
-  chmod 0700 /root
+  chmod 0755 /root
 
 # Append software versions
 RUN set -x && \

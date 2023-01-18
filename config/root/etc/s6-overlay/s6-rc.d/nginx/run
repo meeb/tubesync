@@ -1,0 +1,5 @@
+#!/command/with-contenv bash
+
+cd /
+
+/usr/sbin/nginx
