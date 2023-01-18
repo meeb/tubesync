@@ -27,7 +27,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pipenv
-          pipenv install --system
+          pipenv install --system --skip-lock
       - name: Set up Django environment
         run: cp tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
       - name: Run Django tests
