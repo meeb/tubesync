@@ -1137,6 +1137,16 @@ class Media(models.Model):
         return os.path.exists(self.media_file.path)
 
     @property
+    def content_type(self):
+        if not self.downloaded:
+            return 'video/mp4'
+        vcodec = self.downloaded_video_codec.lower()
+        if vcodec == 'vp9':
+            return 'video/webm'
+        else:
+            return 'video/mp4'
+
+    @property
     def nfoxml(self):
         '''
             Returns an NFO formatted (prettified) XML string.

@@ -677,8 +677,8 @@ class MediaContent(DetailView):
 
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()
-
         headers = {
+            'Content-Type': self.object.content_type,
             'X-Accel-Redirect': self.object.media_file.url,
         }
         return HttpResponse(headers=headers)

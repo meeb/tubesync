@@ -13,7 +13,7 @@
     <video controls style="width: 100%">
       <source src="{% url 'sync:media-content' pk=media.pk %}">
     </video>
-    <p class="truncate"><a href="{% url 'sync:media-content' pk=media.pk %}" download="{{ media.filename }}">Download</a></p>
+    <p class="truncate"><a href="{% url 'sync:media-content' pk=media.pk %}" download="{{ media.filename }}"><strong><i class="fas fa-download"></i> Download</strong></a></p>
     {% endif %}
   </div>
 </div>
