@@ -11,7 +11,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
   LANG="en_US.UTF-8" \
   LC_ALL="en_US.UTF-8" \
   TERM="xterm" \
-  S6_CMD_WAIT_FOR_SERVICES_MAXTIME="60000"
+  S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
 
 # Install third party software
 RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
