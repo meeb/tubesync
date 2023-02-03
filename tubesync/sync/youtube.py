@@ -64,7 +64,7 @@ def get_media_info(url):
     return response
 
 
-def download_media(url, media_format, extension, output_file, info_json):
+def download_media(url, media_format, extension, output_file, info_json, sponsor_categories="all"):
     '''
         Downloads a YouTube URL to a file on disk.
     '''
@@ -108,7 +108,15 @@ def download_media(url, media_format, extension, output_file, info_json):
         'outtmpl': output_file,
         'quiet': True,
         'progress_hooks': [hook],
-        'writeinfojson': info_json
+        'writeinfojson': info_json,
+        'postprocessors': [{
+            'key': 'SponsorBlock',
+            'categories': [sponsor_categories]
+        },{
+            'key': 'FFmpegMetadata',
+            'add_chapters': True,
+            'add_metadata': True
+        }]
     })
     with yt_dlp.YoutubeDL(opts) as y:
         try:
