@@ -350,6 +350,10 @@ etc.). Configuration of this is beyond the scope of this README.
 
 Just `amd64` for the moment. Others may be made available if there is demand.
 
+### The pipenv install fails with "Locking failed"!
+
+Make sure that you have `mysql_config` or `mariadb_config` available, as required by the python module `mysqlclient`. On Debian-based systems this is usually found in the package `libmysqlclient-dev`
+
 
 # Advanced configuration
 
