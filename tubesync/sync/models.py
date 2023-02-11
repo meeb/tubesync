@@ -1140,7 +1140,11 @@ class Media(models.Model):
     def content_type(self):
         if not self.downloaded:
             return 'video/mp4'
-        vcodec = self.downloaded_video_codec.lower()
+        vcodec = self.downloaded_video_codec
+        if vcodec is None:
+            return 'audio/ogg'
+
+        vcodec = vcodec.lower()
         if vcodec == 'vp9':
             return 'video/webm'
         else:
