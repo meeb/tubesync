@@ -1,8 +1,10 @@
 import os
 import json
 from base64 import b64decode
+import pathlib
+import sys
 from django.conf import settings
-from django.http import Http404
+from django.http import FileResponse, Http404, HttpResponseNotFound
 from django.views.generic import TemplateView, ListView, DetailView
 from django.views.generic.edit import (FormView, FormMixin, CreateView, UpdateView,
                                        DeleteView)
@@ -694,11 +696,38 @@ class MediaContent(DetailView):
 
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()
-        headers = {
-            'Content-Type': self.object.content_type,
-            'X-Accel-Redirect': self.object.media_file.url,
-        }
-        return HttpResponse(headers=headers)
+        # development direct file stream - DO NOT USE PRODUCTIVLY
+        if settings.DEBUG and 'runserver' in sys.argv:
+            # get media URL
+            pth = self.object.media_file.url
+            # remove "/media-data/"
+            pth = pth.split("/media-data/",1)[1]
+            # remove "/" (incase of absolute path)
+            pth = pth.split(str(settings.DOWNLOAD_ROOT).lstrip("/"),1)
+
+            # if we do not have a "/" at the beginning, it is not a absolute path...
+            if len(pth) > 1:
+                pth = pth[1]
+            else:
+                pth = pth[0]
+            
+            
+            # build final path
+            filepth = pathlib.Path(str(settings.DOWNLOAD_ROOT) + pth)
+            
+            if filepth.exists():
+                # return file
+                response = FileResponse(open(filepth,'rb'))
+                return response
+            else:
+                return HttpResponseNotFound()
+            
+        else:
+            headers = {
+                'Content-Type': self.object.content_type,
+                'X-Accel-Redirect': self.object.media_file.url,
+            }
+            return HttpResponse(headers=headers)
 
 
 class TasksView(ListView):
