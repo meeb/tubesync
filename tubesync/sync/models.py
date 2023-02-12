@@ -1142,7 +1142,18 @@ class Media(models.Model):
             return 'video/mp4'
         vcodec = self.downloaded_video_codec
         if vcodec is None:
-            return 'audio/ogg'
+            acodec = self.downloaded_audio_codec
+            if acodec is None:
+                raise TypeError() # nothing here.
+            
+            acodec = acodec.lower()
+            if acodec == "mp4a":
+                return "audio/mp4"
+            elif acodec == "opus":
+                return "audio/opus"
+            else:
+                # fall-fall-back.
+                return 'audio/ogg'
 
         vcodec = vcodec.lower()
         if vcodec == 'vp9':
