@@ -7,12 +7,14 @@ from django.views.generic import TemplateView, ListView, DetailView
 from django.views.generic.edit import (FormView, FormMixin, CreateView, UpdateView,
                                        DeleteView)
 from django.views.generic.detail import SingleObjectMixin
+from django.core.exceptions import SuspiciousFileOperation
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.db import IntegrityError
 from django.db.models import Q, Count, Sum, When, Case
-from django.forms import ValidationError
+from django.forms import Form, ValidationError
 from django.utils.text import slugify
+from django.utils._os import safe_join
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.utils import append_uri_params
@@ -279,20 +281,35 @@ class EditSourceMixin:
         'invalid_media_format': _('Invalid media format, the media format contains '
                                   'errors or is empty. Check the table at the end of '
                                   'this page for valid media name variables'),
+        'dir_outside_dlroot': _('You cannot specify a directory outside of the '
+                                'base directory (%BASEDIR%)')
     }
 
-    def form_valid(self, form):
+    def form_valid(self, form: Form):
         # Perform extra validation to make sure the media_format is valid
         obj = form.save(commit=False)
         source_type = form.cleaned_data['media_format']
         example_media_file = obj.get_example_media_format()
+        
         if example_media_file == '':
             form.add_error(
                 'media_format',
                 ValidationError(self.errors['invalid_media_format'])
             )
+
+        # Check for suspicious file path(s)
+        try:
+            targetCheck = form.cleaned_data['directory']+"/.virt"
+            newdir = safe_join(settings.DOWNLOAD_ROOT,targetCheck)
+        except SuspiciousFileOperation:
+            form.add_error(
+                'directory',
+                ValidationError(self.errors['dir_outside_dlroot'].replace("%BASEDIR%",str(settings.DOWNLOAD_ROOT)))
+            )
+
         if form.errors:
             return super().form_invalid(form)
+
         return super().form_valid(form)
 
 
