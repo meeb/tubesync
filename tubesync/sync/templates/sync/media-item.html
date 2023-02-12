@@ -10,9 +10,14 @@
     <p class="truncate"><strong><a href="{{ media.url }}" target="_blank"><i class="fas fa-link"></i> {{ media.url }}</a></strong></p>
     <p class="truncate">Downloading to: <strong>{{ media.source.directory_path }}</strong></p>
     {% if download_state == 'downloaded' %}
+    {% if media.source.is_audio %}
+    <audio controls src="{% url 'sync:media-content' pk=media.pk %}"></audio>
+    {% else %}
     <video controls style="width: 100%">
       <source src="{% url 'sync:media-content' pk=media.pk %}">
     </video>
+    {% endif %}
+
     <p class="truncate"><a href="{% url 'sync:media-content' pk=media.pk %}" download="{{ media.filename }}"><strong><i class="fas fa-download"></i> Download</strong></a></p>
     {% endif %}
   </div>
