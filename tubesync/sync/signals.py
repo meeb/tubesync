@@ -93,6 +93,10 @@ def task_task_failed(sender, task_id, completed_task, **kwargs):
 
 @receiver(post_save, sender=Media)
 def media_post_save(sender, instance, created, **kwargs):
+    # If the media is skipped manually, bail.
+    if instance.manual_skip:
+        return
+
     # Triggered after media is saved
     cap_changed = False
     can_download_changed = False

@@ -36,8 +36,10 @@
             {% if m.downloaded %}
               <i class="fas fa-check-circle" title="Downloaded"></i> {{ m.download_date|date:'Y-m-d' }}
             {% else %}
-              {% if m.skip %}
-              <span class="error-text"><i class="fas fa-times" title="Skipping media"></i> Skipped</span>
+              {% if m.manual_skip %}
+              <span class="error-text"><i class="fas fa-times" title="Skipping media"></i> Manually skipped</span>
+              {% elif m.skip %}
+              <span class="error-text"><i class="fas fa-times" title="Skipping media"></i> Skipped by system</span>
               {% elif not m.source.download_media %}
               <span class="error-text"><i class="fas fa-times" title="Not downloading media for this source"></i> Disabled at source</span>
               {% elif not m.has_metadata %}
