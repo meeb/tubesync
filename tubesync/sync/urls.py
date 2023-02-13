@@ -28,6 +28,10 @@ urlpatterns = [
          ValidateSourceView.as_view(),
          name='validate-source'),
 
+    path('source-sync-now/<uuid:pk>',
+         SourcesView.as_view(),
+         name='source-sync-now'),
+
     path('source-add',
          AddSourceView.as_view(),
          name='add-source'),

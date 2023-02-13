@@ -17,3 +17,13 @@ html {
     visibility: visible;
     opacity: 1;
 }
+
+.flex-collection-container {
+    display: flex !important;
+    align-items: center;
+}
+
+.flex-grow {
+    flex-grow: 1;
+}
+  

@@ -4,7 +4,7 @@ from base64 import b64decode
 import pathlib
 import sys
 from django.conf import settings
-from django.http import FileResponse, Http404, HttpResponseNotFound
+from django.http import FileResponse, Http404, HttpResponseNotFound, HttpResponseRedirect
 from django.views.generic import TemplateView, ListView, DetailView
 from django.views.generic.edit import (FormView, FormMixin, CreateView, UpdateView,
                                        DeleteView)
@@ -96,7 +96,26 @@ class SourcesView(ListView):
     paginate_by = settings.SOURCES_PER_PAGE
     messages = {
         'source-deleted': _('Your selected source has been deleted.'),
+        'source-refreshed': _('The source has been scheduled to be synced now.')
     }
+
+    def get(self, *args, **kwargs):
+        if args[0].path.startswith("/source-sync-now/"):
+            sobj = Source.objects.get(pk=kwargs["pk"])
+            if sobj is None:
+                return HttpResponseNotFound()
+            
+            verbose_name = _('Index media from source "{}" once')
+            index_source_task(
+                str(sobj.pk),
+                queue=str(sobj.pk),
+                repeat=0,
+                verbose_name=verbose_name.format(sobj.name))
+            url = reverse_lazy('sync:sources')
+            url = append_uri_params(url, {'message': 'source-refreshed'})
+            return HttpResponseRedirect(url)
+        else:
+            return super().get(self, *args, **kwargs)    
 
     def __init__(self, *args, **kwargs):
         self.message = None

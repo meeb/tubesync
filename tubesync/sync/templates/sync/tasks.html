@@ -66,7 +66,7 @@
       {% for task in scheduled %}
         <a href="{% url task.url pk=task.instance.pk %}" class="collection-item">
           <i class="fas fa-stopwatch"></i> <strong>{{ task }}</strong><br>
-          {% if task.instance.index_schedule %}Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>{% endif %}
+          {% if task.instance.index_schedule and task.repeat > 0 %}Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>{% endif %}
           <i class="fas fa-redo"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>{% endif %}
         </a>
       {% empty %}
