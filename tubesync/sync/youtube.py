@@ -64,7 +64,9 @@ def get_media_info(url):
     return response
 
 
-def download_media(url, media_format, extension, output_file, info_json, sponsor_categories="all", embed_thumbnail=False, embed_metadata=False, skip_sponsors=True):
+def download_media(url, media_format, extension, output_file, info_json, 
+                   sponsor_categories="all", 
+                   embed_thumbnail=False, embed_metadata=False, skip_sponsors=True):
     '''
         Downloads a YouTube URL to a file on disk.
     '''
@@ -122,13 +124,13 @@ def download_media(url, media_format, extension, output_file, info_json, sponsor
 
     opts = get_yt_opts()
     if embed_thumbnail:
-        ytopts['postprocessors'].push({'key': 'EmbedThumbnail'})
+        ytopts['postprocessors'].append({'key': 'EmbedThumbnail'})
     if embed_metadata:
-        ffmdopt["embed-metadata"] = True
+        ffmdopt["add_metadata"] = True
     if skip_sponsors:
-        ytopts['postprocessors'].push(sbopt)
+        ytopts['postprocessors'].append(sbopt)
     
-    ytopts['postprocessors'].push(ffmdopt)
+    ytopts['postprocessors'].append(ffmdopt)
         
     opts.update(ytopts)
         
