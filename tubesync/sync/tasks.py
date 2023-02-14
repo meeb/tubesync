@@ -153,7 +153,6 @@ def index_source_task(source_id):
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist:
         # Task triggered but the Source has been deleted, delete the task
-        delete_index_source_task(source_id)
         return
     # Reset any errors
     source.has_failed = False
@@ -202,7 +201,6 @@ def check_source_directory_exists(source_id):
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist:
         # Task triggered but the Source has been deleted, delete the task
-        delete_index_source_task(source_id)
         return
     # Check the source output directory exists
     if not source.directory_exists():
