@@ -297,7 +297,9 @@ class EditSourceMixin:
     fields = ('source_type', 'key', 'name', 'directory', 'media_format',
               'index_schedule', 'download_media', 'download_cap', 'delete_old_media',
               'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
-              'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo', 'write_json')
+              'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_thumbnails', 'write_nfo', 
+              'write_json', 'embed_metadata', 'embed_thumbnail', 'enable_sponsorblock',
+              'sponsorblock_categories')
     errors = {
         'invalid_media_format': _('Invalid media format, the media format contains '
                                   'errors or is empty. Check the table at the end of '

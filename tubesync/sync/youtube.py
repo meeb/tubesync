@@ -64,7 +64,7 @@ def get_media_info(url):
     return response
 
 
-def download_media(url, media_format, extension, output_file, info_json, sponsor_categories="all"):
+def download_media(url, media_format, extension, output_file, info_json, sponsor_categories="all", embed_thumbnail=False, embed_metadata=False, skip_sponsors=True):
     '''
         Downloads a YouTube URL to a file on disk.
     '''
@@ -101,23 +101,37 @@ def download_media(url, media_format, extension, output_file, info_json, sponsor
             log.warn(f'[youtube-dl] unknown event: {str(event)}')
     hook.download_progress = 0
 
-    opts = get_yt_opts()
-    opts.update({
+    ytopts = {
         'format': media_format,
         'merge_output_format': extension,
         'outtmpl': output_file,
         'quiet': True,
         'progress_hooks': [hook],
         'writeinfojson': info_json,
-        'postprocessors': [{
+        'postprocessors': []
+    }
+    sbopt = {
             'key': 'SponsorBlock',
             'categories': [sponsor_categories]
-        },{
-            'key': 'FFmpegMetadata',
+        }
+    ffmdopt = {
+        'key': 'FFmpegMetadata',
             'add_chapters': True,
             'add_metadata': True
-        }]
-    })
+    }
+
+    opts = get_yt_opts()
+    if embed_thumbnail:
+        ytopts['postprocessors'].push({'key': 'EmbedThumbnail'})
+    if embed_metadata:
+        ffmdopt["embed-metadata"] = True
+    if skip_sponsors:
+        ytopts['postprocessors'].push(sbopt)
+    
+    ytopts['postprocessors'].push(ffmdopt)
+        
+    opts.update(ytopts)
+        
     with yt_dlp.YoutubeDL(opts) as y:
         try:
             return y.download([url])
