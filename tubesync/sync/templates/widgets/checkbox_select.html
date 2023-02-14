@@ -1,5 +1,5 @@
-{% for group, options, index in widget.optgroups %}
-    {% for option in options %}
-        {% include option.template_name with option=option %}
-    {% endfor%}
+</label>
+{% for option in widget.multipleChoiceProperties %}
+    {% include option.template_name with option=option %}
 {% endfor %}
+<label>

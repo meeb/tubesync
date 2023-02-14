@@ -2,6 +2,6 @@
     <label for="{{ option.value }}">{{option.label}}</label>-->
 
 <label>
-    <input type="{{ option.type }}" name="{{ option.name }}" value="{{ option.value }}" id="{{ option.value }}">
+    <input type="{{ option.type }}" name="{{ option.name }}" value="{{ option.value }}" id="{{ option.value }}" {% if option.checked %}checked{% endif %}>
     <span>{{option.label}}</span>
 </label>

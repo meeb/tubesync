@@ -1,4 +1,5 @@
 import os
+from typing import Any, Optional, Dict
 import uuid
 import json
 from xml.etree import ElementTree
@@ -7,7 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from django.conf import settings
 from django.db import models
-from django.forms import MultipleChoiceField,  CheckboxSelectMultiple
+from django.forms import MultipleChoiceField,  CheckboxSelectMultiple, Field, TypedMultipleChoiceField
 from django.core.files.storage import FileSystemStorage
 from django.utils.text import slugify
 from django.utils import timezone
@@ -24,37 +25,44 @@ from .mediaservers import PlexMediaServer
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 
-class CommaSepField(models.Field):
-    "Implements comma-separated storage of lists"
-
-    def __init__(self, separator=",", *args, **kwargs):
-        self.separator = separator
-        super().__init__(*args, **kwargs)
-
-    def deconstruct(self):
-        name, path, args, kwargs = super().deconstruct()
-        # Only include kwarg if it's not the default
-        if self.separator != ",":
-            kwargs['separator'] = self.separator
-        return name, path, args, kwargs
-
-
 class CustomCheckboxSelectMultiple(CheckboxSelectMultiple):
     template_name = 'widgets/checkbox_select.html'
     option_template_name = 'widgets/checkbox_option.html'
 
-class CommaSepChoiceField(CommaSepField):
+    def get_context(self, name: str, value: Any, attrs) -> Dict[str, Any]:
+        ctx = super().get_context(name, value, attrs)['widget']
+        ctx["multipleChoiceProperties"] = []
+        for _group, options, _index in ctx["optgroups"]:
+            for option in options:
+                if not isinstance(value,list) and ( option["value"] in value.selected_choices or ( value.allow_all and value.all_choice in value.selected_choices ) ):
+                    checked = True
+                else:
+                    checked = False
+
+                ctx["multipleChoiceProperties"].append({
+                    "template_name": option["template_name"],
+                    "type": option["type"],
+                    "value": option["value"],
+                    "label": option["label"],
+                    "name": option["name"],
+                    "checked": checked})
+
+        return { 'widget': ctx }
+
+class CommaSepChoiceField(models.Field):
     "Implements comma-separated storage of lists"
 
-    def __init__(self, separator=",", possible_choices=(("","")), *args, **kwargs):
-        print(">",separator, possible_choices, args, kwargs)
+    def __init__(self, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, *args, **kwargs):
+        self.separator = separator
         self.possible_choices = possible_choices
-        super().__init__(separator=separator, *args, **kwargs)
+        self.selected_choices = []
+        self.allow_all = allow_all
+        self.all_label = all_label
+        self.all_choice = all_choice
+        super().__init__(*args, **kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
-        print("<",name,path,args,kwargs)
-        # Only include kwarg if it's not the default
         if self.separator != ",":
             kwargs['separator'] = self.separator
         kwargs['possible_choices'] = self.possible_choices
@@ -63,24 +71,53 @@ class CommaSepChoiceField(CommaSepField):
     def db_type(self, _connection):
         return 'char(1024)'
 
-    def get_choices(self):
+    def get_my_choices(self):
         choiceArray = []
         if self.possible_choices is None:
             return choiceArray
+        if self.allow_all:
+            choiceArray.append((self.all_choice, _(self.all_label)))
+
         for t in self.possible_choices:
             choiceArray.append(t)
+        
         return choiceArray
 
     def formfield(self, **kwargs):
         # This is a fairly standard way to set up some defaults
         # while letting the caller override them.
-        print(self.choices)
         defaults = {'form_class': MultipleChoiceField, 
-                    'choices': self.get_choices,
-                    'widget': CustomCheckboxSelectMultiple}
+                    'choices': self.get_my_choices,
+                    'widget': CustomCheckboxSelectMultiple,
+                    'label': '',
+                    'required': False}
         defaults.update(kwargs)
         #del defaults.required
         return super().formfield(**defaults)
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        # Only include kwarg if it's not the default
+        if self.separator != ",":
+            kwargs['separator'] = self.separator
+        return name, path, args, kwargs
+
+    def from_db_value(self, value, expr, conn):
+        if value is None:
+            self.selected_choices = []
+        else:
+            self.selected_choices = value.split(",")
+
+        return self
+
+    def get_prep_value(self, value):
+        if value is None:
+            return ""
+        if not isinstance(value,list):
+            print("?! CommaSepChoiceField -> ",value)
+            return ""
+
+        return ",".join(value)
 
 class Source(models.Model):
     '''
@@ -167,7 +204,6 @@ class Source(models.Model):
 
     # as stolen from: https://wiki.sponsor.ajay.app/w/Types / https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/postprocessor/sponsorblock.py
     SPONSORBLOCK_CATEGORIES_CHOICES = (
-        ('all', 'All'),
         ('sponsor', 'Sponsor'),
         ('intro', 'Intermission/Intro Animation'),
         ('outro', 'Endcards/Credits'),
@@ -179,8 +215,13 @@ class Source(models.Model):
     )
     
     sponsorblock_categories = CommaSepChoiceField(
+            _(''),
             possible_choices=SPONSORBLOCK_CATEGORIES_CHOICES,
-            default="all"
+            all_choice="all",
+            allow_all=True,
+            all_label="(all options)",
+            default="all",
+            help_text=_("Select the sponsorblocks you want to enforce")
         )
 
     embed_metadata = models.BooleanField(
@@ -1386,7 +1427,9 @@ class Media(models.Model):
                                     f'no valid format available')
         # Download the media with youtube-dl
         download_youtube_media(self.url, format_str, self.source.extension,
-                               str(self.filepath), self.source.write_json)
+                               str(self.filepath), self.source.write_json, 
+                               self.source.sponsorblock_categories, self.source.embed_thumbnail,
+                               self.source.embed_metadata, self.source.enable_sponsorblock)
         # Return the download paramaters
         return format_str, self.source.extension
 
