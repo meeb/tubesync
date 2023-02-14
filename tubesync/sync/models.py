@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from django.conf import settings
 from django.db import models
+from django.forms import MultipleChoiceField,  CheckboxSelectMultiple
 from django.core.files.storage import FileSystemStorage
 from django.utils.text import slugify
 from django.utils import timezone
@@ -23,6 +24,63 @@ from .mediaservers import PlexMediaServer
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 
+class CommaSepField(models.Field):
+    "Implements comma-separated storage of lists"
+
+    def __init__(self, separator=",", *args, **kwargs):
+        self.separator = separator
+        super().__init__(*args, **kwargs)
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        # Only include kwarg if it's not the default
+        if self.separator != ",":
+            kwargs['separator'] = self.separator
+        return name, path, args, kwargs
+
+
+class CustomCheckboxSelectMultiple(CheckboxSelectMultiple):
+    template_name = 'widgets/checkbox_select.html'
+    option_template_name = 'widgets/checkbox_option.html'
+
+class CommaSepChoiceField(CommaSepField):
+    "Implements comma-separated storage of lists"
+
+    def __init__(self, separator=",", possible_choices=(("","")), *args, **kwargs):
+        print(">",separator, possible_choices, args, kwargs)
+        self.possible_choices = possible_choices
+        super().__init__(separator=separator, *args, **kwargs)
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        print("<",name,path,args,kwargs)
+        # Only include kwarg if it's not the default
+        if self.separator != ",":
+            kwargs['separator'] = self.separator
+        kwargs['possible_choices'] = self.possible_choices
+        return name, path, args, kwargs
+
+    def db_type(self, _connection):
+        return 'char(1024)'
+
+    def get_choices(self):
+        choiceArray = []
+        if self.possible_choices is None:
+            return choiceArray
+        for t in self.possible_choices:
+            choiceArray.append(t)
+        return choiceArray
+
+    def formfield(self, **kwargs):
+        # This is a fairly standard way to set up some defaults
+        # while letting the caller override them.
+        print(self.choices)
+        defaults = {'form_class': MultipleChoiceField, 
+                    'choices': self.get_choices,
+                    'widget': CustomCheckboxSelectMultiple}
+        defaults.update(kwargs)
+        #del defaults.required
+        return super().formfield(**defaults)
 
 class Source(models.Model):
     '''
@@ -105,6 +163,43 @@ class Source(models.Model):
     EXTENSION_OGG = 'ogg'
     EXTENSION_MKV = 'mkv'
     EXTENSIONS = (EXTENSION_M4A, EXTENSION_OGG, EXTENSION_MKV)
+
+
+    # as stolen from: https://wiki.sponsor.ajay.app/w/Types / https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/postprocessor/sponsorblock.py
+    SPONSORBLOCK_CATEGORIES_CHOICES = (
+        ('all', 'All'),
+        ('sponsor', 'Sponsor'),
+        ('intro', 'Intermission/Intro Animation'),
+        ('outro', 'Endcards/Credits'),
+        ('selfpromo', 'Unpaid/Self Promotion'),
+        ('preview', 'Preview/Recap'),
+        ('filler', 'Filler Tangent'),
+        ('interaction', 'Interaction Reminder'),
+        ('music_offtopic', 'Non-Music Section'),
+    )
+    
+    sponsorblock_categories = CommaSepChoiceField(
+            possible_choices=SPONSORBLOCK_CATEGORIES_CHOICES,
+            default="all"
+        )
+
+    embed_metadata = models.BooleanField(
+        _('embed metadata'),
+        default=False,
+        help_text=_('Embed metadata from source into file')
+    )
+    embed_thumbnail = models.BooleanField(
+        _('embed thumbnail'),
+        default=False,
+        help_text=_('Embed thumbnail into the file')
+    )
+
+    enable_sponsorblock = models.BooleanField(
+        _('enable sponsorblock'),
+        default=True,
+        help_text=_('Use SponsorBlock?')
+    )
+
 
     # Fontawesome icons used for the source on the front end
     ICONS = {

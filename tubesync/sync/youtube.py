@@ -64,7 +64,7 @@ def get_media_info(url):
     return response
 
 
-def download_media(url, media_format, extension, output_file, info_json, sponsor_categories="all"):
+def download_media(url, media_format, extension, output_file, info_json, sponsor_categories="all", embed_thumbnail=False, embed_metadata=False, skip_sponsors=True):
     '''
         Downloads a YouTube URL to a file on disk.
     '''
