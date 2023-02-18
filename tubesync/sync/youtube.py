@@ -102,11 +102,7 @@ def download_media(url, media_format, extension, output_file, info_json,
         else:
             log.warn(f'[youtube-dl] unknown event: {str(event)}')
     hook.download_progress = 0
-    # Pending configuration options from PR #338
-    #postprocessors.append({
-    #    'key': 'SponsorBlock',
-    #    'categories': [sponsor_categories]
-    #})
+
     opts = get_yt_opts()
     opts.update({
         'format': media_format,
@@ -118,13 +114,13 @@ def download_media(url, media_format, extension, output_file, info_json,
         'postprocessors': []
     }
     sbopt = {
-            'key': 'SponsorBlock',
-            'categories': [sponsor_categories]
-        }
+        'key': 'SponsorBlock',
+        'categories': [sponsor_categories]
+    }
     ffmdopt = {
         'key': 'FFmpegMetadata',
-            'add_chapters': True,
-            'add_metadata': True
+        'add_chapters': True,
+        'add_metadata': True
     }
 
     opts = get_yt_opts()
