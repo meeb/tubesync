@@ -34,7 +34,7 @@ class CustomCheckboxSelectMultiple(CheckboxSelectMultiple):
         ctx["multipleChoiceProperties"] = []
         for _group, options, _index in ctx["optgroups"]:
             for option in options:
-                if not isinstance(value,list) and ( option["value"] in value.selected_choices or ( value.allow_all and value.all_choice in value.selected_choices ) ):
+                if not isinstance(value,str) and not isinstance(value,list) and ( option["value"] in value.selected_choices or ( value.allow_all and value.all_choice in value.selected_choices ) ):
                     checked = True
                 else:
                     checked = False
@@ -114,10 +114,19 @@ class CommaSepChoiceField(models.Field):
         if value is None:
             return ""
         if not isinstance(value,list):
-            print("?! CommaSepChoiceField -> ",value)
             return ""
 
-        return ",".join(value)
+        if self.all_choice not in value:
+            return ",".join(value)
+        else:
+            return self.all_choice
+
+    def get_text_for_value(self, val):
+        fval = [i for i in self.possible_choices if i[0] == val]
+        if len(fval) <= 0:
+            return []
+        else:
+            return fval[0][1]
 
 class Source(models.Model):
     '''

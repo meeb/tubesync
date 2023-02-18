@@ -130,6 +130,39 @@
         <td class="hide-on-small-only">UUID</td>
         <td><span class="hide-on-med-and-up">UUID<br></span><strong>{{ source.uuid }}</strong></td>
       </tr>
+      <tr title="{{ _('Embedding thumbnail?') }}">
+        <td class="hide-on-small-only">{{ _("Embed thumbnail?") }}:</td>
+        <td><span class="hide-on-med-and-up">{{ _("Embed thumbnail?") }}<br></span><strong><i class="fas {% if source.embed_thumbnail %}fa-check{% else %}fa-times{% endif %}"></i></strong></td>
+      </tr>
+      <tr title="{{ _('Embedding metadata?') }}">
+        <td class="hide-on-small-only">{{ _("Embed metadata?") }}:</td>
+        <td><span class="hide-on-med-and-up">{{ _("Embed metadata?") }}<br></span><strong><i class="fas {% if source.embed_metadata %}fa-check{% else %}fa-times{% endif %}"></i></strong></td>
+      </tr>
+
+      <tr title="{{ _('Is sponsorblock enabled?') }}">
+        <td class="hide-on-small-only">{{ _("SponsorBlock?") }}:</td>
+        <td><span class="hide-on-med-and-up">{{ _("Sponsorblock enabled?") }}<br></span><strong><i class="fas {% if source.enable_sponsorblock %}fa-check{% else %}fa-times{% endif %}"></i></strong></td>
+      </tr>
+
+      {% if source.enable_sponsorblock %}
+      <tr title="{{ _('SponsorBlock: What to block?') }}">
+        <td class="hide-on-small-only">{{ _("What blocked?") }}:</td>
+        <td><span class="hide-on-med-and-up">{{ _("What blocked?") }}<br></span><strong>
+          {% if source.sponsorblock_categories.all_choice in source.sponsorblock_categories.selected_choices %}
+            {% for k,v in source.sponsorblock_categories.possible_choices %}
+              {{ v }}: <i class="fas fa-check"></i><BR>
+            {% endfor %}
+          {% else %}
+            {% for c in source.sponsorblock_categories.selected_choices %} 
+              {% for k,v in source.sponsorblock_categories.possible_choices %}
+                {% if k == c %} {{ v }}: <i class="fas fa-check"></i><BR>{% endif %}
+              {% endfor %}
+            {% endfor %}
+          {% endif %}
+        </strong></td>
+      </tr>
+      {% endif %}
+      
     </table>
   </div>
 </div>
