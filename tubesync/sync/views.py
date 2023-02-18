@@ -488,16 +488,16 @@ class MediaView(ListView):
             if self.show_skipped:
                 q = Media.objects.filter(source=self.filter_source)
             elif self.only_skipped:
-                q = Media.objects.filter(source=self.filter_source, skip=True)
+                q = Media.objects.filter(Q(source=self.filter_source) & (Q(skip=True) | Q(manual_skip=True)))
             else:
-                q = Media.objects.filter(source=self.filter_source, skip=False)
+                q = Media.objects.filter(Q(source=self.filter_source) & (Q(skip=False) & Q(manual_skip=False)))
         else:
             if self.show_skipped:
                 q = Media.objects.all()
             elif self.only_skipped:
-                q = Media.objects.filter(skip=True)
+                q = Media.objects.filter(Q(skip=True)|Q(manual_skip=True))
             else:
-                q = Media.objects.filter(skip=False)
+                q = Media.objects.filter(Q(skip=False)&Q(manual_skip=False))
         return q.order_by('-published', '-created')
 
     def get_context_data(self, *args, **kwargs):
@@ -669,6 +669,7 @@ class MediaSkipView(FormView, SingleObjectMixin):
         self.object.downloaded_filesize = None
         # Mark it to be skipped
         self.object.skip = True
+        self.object.manual_skip = True
         self.object.save()
         return super().form_valid(form)
 
@@ -697,6 +698,7 @@ class MediaEnableView(FormView, SingleObjectMixin):
     def form_valid(self, form):
         # Mark it as not skipped
         self.object.skip = False
+        self.object.manual_skip = False
         self.object.save()
         return super().form_valid(form)
 

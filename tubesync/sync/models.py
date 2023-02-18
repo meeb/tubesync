@@ -815,7 +815,13 @@ class Media(models.Model):
         _('skip'),
         db_index=True,
         default=False,
-        help_text=_('Media will be skipped and not downloaded')
+        help_text=_('INTERNAL FLAG - Media will be skipped and not downloaded')
+    )
+    manual_skip = models.BooleanField(
+        _('manual_skip'),
+        db_index=True,
+        default=False,
+        help_text=_('Media marked as "skipped", won\' be downloaded')
     )
     downloaded = models.BooleanField(
         _('downloaded'),

@@ -22,8 +22,11 @@
     {% endif %}
   </div>
 </div>
-{% if not media.can_download %}{% include 'errorbox.html' with message='Media cannot be downloaded because it has no formats which match the source requirements.' %}{% endif %}
-{% if media.skip %}{% include 'errorbox.html' with message='Media is marked to be skipped and will not be downloaded.' %}{% endif %}
+{% if media.manual_skip %}{% include 'errorbox.html' with message='Media is marked to be skipped and will not be downloaded.' %}
+{% else %}
+  {% if not media.can_download %}{% include 'errorbox.html' with message='Media cannot be downloaded because it has no formats which match the source requirements.' %}{% endif %}
+  {% if media.skip %}{% include 'errorbox.html' with message='This media may be skipped due to error(s).' %}{% endif %}
+{% endif %}
 {% include 'infobox.html' with message=message %}
 <div class="row">
   <div class="col s12 m7">
@@ -167,10 +170,10 @@
 {% else %}
 <div class="row">
   <div class="col s12">
-    {% if media.skip %}
-      <a href="{% url 'sync:enable-media' pk=media.pk %}" class="btn">Enable (unskip) media <i class="fas fa-cloud-download-alt"></i></a>
+    {% if media.manual_skip %}
+      <a href="{% url 'sync:enable-media' pk=media.pk %}" class="btn">Unskip media (manually) <i class="fas fa-cloud-download-alt"></i></a>
     {% else %}
-      <a href="{% url 'sync:skip-media' pk=media.pk %}" class="btn delete-button">Skip media <i class="fas fa-times-circle"></i></a>
+      <a href="{% url 'sync:skip-media' pk=media.pk %}" class="btn delete-button">Manually mark media to be skipped <i class="fas fa-times-circle"></i></a>
     {% endif %}
   </div>
 </div>
