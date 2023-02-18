@@ -100,7 +100,17 @@ def download_media(url, media_format, extension, output_file, info_json, sponsor
         else:
             log.warn(f'[youtube-dl] unknown event: {str(event)}')
     hook.download_progress = 0
-
+    postprocessors = []
+    postprocessors.append({
+        'key': 'FFmpegMetadata',
+        'add_chapters': True,
+        'add_metadata': True
+    })
+    # Pending configuration options from PR #338
+    #postprocessors.append({
+    #    'key': 'SponsorBlock',
+    #    'categories': [sponsor_categories]
+    #})
     opts = get_yt_opts()
     opts.update({
         'format': media_format,
@@ -109,14 +119,7 @@ def download_media(url, media_format, extension, output_file, info_json, sponsor
         'quiet': True,
         'progress_hooks': [hook],
         'writeinfojson': info_json,
-        'postprocessors': [{
-            'key': 'SponsorBlock',
-            'categories': [sponsor_categories]
-        },{
-            'key': 'FFmpegMetadata',
-            'add_chapters': True,
-            'add_metadata': True
-        }]
+        'postprocessors': postprocessors,
     })
     with yt_dlp.YoutubeDL(opts) as y:
         try:
