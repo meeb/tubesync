@@ -7,7 +7,7 @@ import sync.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0014_alter_media_media_file'),
+        ('sync', '0015_auto_20230213_0603'),
     ]
 
     operations = [
