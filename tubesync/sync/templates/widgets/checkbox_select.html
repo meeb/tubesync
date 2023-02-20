@@ -1,0 +1,5 @@
+</label>
+{% for option in widget.multipleChoiceProperties %}
+    {% include option.template_name with option=option %}
+{% endfor %}
+<label>

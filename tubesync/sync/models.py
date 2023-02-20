@@ -19,10 +19,9 @@ from .utils import seconds_to_timestr, parse_media_format
 from .matching import (get_best_combined_format, get_best_audio_format, 
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
-
+from .fields import CommaSepChoiceField
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
-
 
 class Source(models.Model):
     '''
@@ -105,6 +104,47 @@ class Source(models.Model):
     EXTENSION_OGG = 'ogg'
     EXTENSION_MKV = 'mkv'
     EXTENSIONS = (EXTENSION_M4A, EXTENSION_OGG, EXTENSION_MKV)
+
+
+    # as stolen from: https://wiki.sponsor.ajay.app/w/Types / https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/postprocessor/sponsorblock.py
+    SPONSORBLOCK_CATEGORIES_CHOICES = (
+        ('sponsor', 'Sponsor'),
+        ('intro', 'Intermission/Intro Animation'),
+        ('outro', 'Endcards/Credits'),
+        ('selfpromo', 'Unpaid/Self Promotion'),
+        ('preview', 'Preview/Recap'),
+        ('filler', 'Filler Tangent'),
+        ('interaction', 'Interaction Reminder'),
+        ('music_offtopic', 'Non-Music Section'),
+    )
+    
+    sponsorblock_categories = CommaSepChoiceField(
+            _(''),
+            possible_choices=SPONSORBLOCK_CATEGORIES_CHOICES,
+            all_choice="all",
+            allow_all=True,
+            all_label="(all options)",
+            default="all",
+            help_text=_("Select the sponsorblocks you want to enforce")
+        )
+
+    embed_metadata = models.BooleanField(
+        _('embed metadata'),
+        default=False,
+        help_text=_('Embed metadata from source into file')
+    )
+    embed_thumbnail = models.BooleanField(
+        _('embed thumbnail'),
+        default=False,
+        help_text=_('Embed thumbnail into the file')
+    )
+
+    enable_sponsorblock = models.BooleanField(
+        _('enable sponsorblock'),
+        default=True,
+        help_text=_('Use SponsorBlock?')
+    )
+
 
     # Fontawesome icons used for the source on the front end
     ICONS = {
@@ -1291,7 +1331,9 @@ class Media(models.Model):
                                     f'no valid format available')
         # Download the media with youtube-dl
         download_youtube_media(self.url, format_str, self.source.extension,
-                               str(self.filepath), self.source.write_json)
+                               str(self.filepath), self.source.write_json, 
+                               self.source.sponsorblock_categories, self.source.embed_thumbnail,
+                               self.source.embed_metadata, self.source.enable_sponsorblock)
         # Return the download paramaters
         return format_str, self.source.extension
 
