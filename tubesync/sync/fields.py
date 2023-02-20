@@ -49,7 +49,7 @@ class CommaSepChoiceField(models.Field):
         return name, path, args, kwargs
 
     def db_type(self, _connection):
-        return 'char(1024)'
+        return 'TextField'
 
     def get_my_choices(self):
         choiceArray = []
