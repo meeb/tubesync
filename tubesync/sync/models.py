@@ -1059,7 +1059,7 @@ class Media(models.Model):
         duration = self.loaded_metadata.get(field, 0)
         try:
             duration = int(duration)
-        except ValueError:
+        except (TypeError, ValueError):
             duration = 0
         return duration
 
