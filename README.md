@@ -361,19 +361,20 @@ There are a number of other environment variables you can set. These are, mostly
 **NOT** required to be set in the default container installation, they are really only
 useful if you are manually installing TubeSync in some other environment. These are:
 
-| Name                     | What                                                         | Example                              |
-| ------------------------ | ------------------------------------------------------------ | ------------------------------------ |
-| DJANGO_SECRET_KEY        | Django's SECRET_KEY                                          | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l     |
-| DJANGO_URL_PREFIX        | Run TubeSync in a sub-URL on the web server                  | /somepath/                           |
-| TUBESYNC_DEBUG           | Enable debugging                                             | True                                 |
-| TUBESYNC_WORKERS         | Number of background workers, default is 2, max allowed is 8 | 2                                    |
-| TUBESYNC_HOSTS           | Django's ALLOWED_HOSTS, defaults to `*`                      | tubesync.example.com,otherhost.com   |
-| GUNICORN_WORKERS         | Number of gunicorn workers to spawn                          | 3                                    |
-| LISTEN_HOST              | IP address for gunicorn to listen on                         | 127.0.0.1                            |
-| LISTEN_PORT              | Port number for gunicorn to listen on                        | 8080                                 |
-| HTTP_USER                | Sets the username for HTTP basic authentication              | some-username                        |
-| HTTP_PASS                | Sets the password for HTTP basic authentication              | some-secure-password                 |
-| DATABASE_CONNECTION      | Optional external database connection details                | mysql://user:pass@host:port/database |
+| Name                        | What                                                         | Example                              |
+| --------------------------- | ------------------------------------------------------------ | ------------------------------------ |
+| DJANGO_SECRET_KEY           | Django's SECRET_KEY                                          | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l     |
+| DJANGO_URL_PREFIX           | Run TubeSync in a sub-URL on the web server                  | /somepath/                           |
+| TUBESYNC_DEBUG              | Enable debugging                                             | True                                 |
+| TUBESYNC_WORKERS            | Number of background workers, default is 2, max allowed is 8 | 2                                    |
+| TUBESYNC_HOSTS              | Django's ALLOWED_HOSTS, defaults to `*`                      | tubesync.example.com,otherhost.com   |
+| TUBESYNC_RESET_DOWNLOAD_DIR | Toggle resetting `/downloads` permissions, defaults to True  | True
+| GUNICORN_WORKERS            | Number of gunicorn workers to spawn                          | 3                                    |
+| LISTEN_HOST                 | IP address for gunicorn to listen on                         | 127.0.0.1                            |
+| LISTEN_PORT                 | Port number for gunicorn to listen on                        | 8080                                 |
+| HTTP_USER                   | Sets the username for HTTP basic authentication              | some-username                        |
+| HTTP_PASS                   | Sets the password for HTTP basic authentication              | some-secure-password                 |
+| DATABASE_CONNECTION         | Optional external database connection details                | mysql://user:pass@host:port/database |
 
 
 # Manual, non-containerised, installation
