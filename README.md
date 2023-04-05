@@ -241,6 +241,7 @@ and less common features:
  * [Reset tasks from the command line](https://github.com/meeb/tubesync/blob/main/docs/reset-tasks.md)
  * [Using PostgreSQL, MySQL or MariaDB as database backends](https://github.com/meeb/tubesync/blob/main/docs/other-database-backends.md)
  * [Using cookies](https://github.com/meeb/tubesync/blob/main/docs/using-cookies.md)
+ * [Reset metadata](https://github.com/meeb/tubesync/blob/main/docs/reset-metadata.md)
 
 
 # Warnings
