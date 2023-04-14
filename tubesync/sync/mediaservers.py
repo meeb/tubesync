@@ -44,7 +44,9 @@ class PlexMediaServer(MediaServer):
              '<p>The <strong>libraries</strong> is a comma-separated list of Plex '
              'library or section IDs, you can find out how to get your library or '
              'section IDs <a href="https://support.plex.tv/articles/201242707-plex-'
-             'media-scanner-via-command-line/#toc-1" target="_blank">here</a>.</p>')
+             'media-scanner-via-command-line/#toc-1" target="_blank">here</a> or '
+             '<a href="https://www.plexopedia.com/plex-media-server/api/server/libraries/" '
+             'target="_blank">here</a></p>.')
 
     def make_request(self, uri='/', params={}):
         headers = {'User-Agent': 'TubeSync'}
