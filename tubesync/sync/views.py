@@ -70,7 +70,7 @@ class DashboardView(TemplateView):
             data['average_bytes_per_media'] = 0
         # Latest downloads
         data['latest_downloads'] = Media.objects.filter(
-            downloaded=True
+            downloaded=True, downloaded_filesize__isnull=False
         ).order_by('-download_date')[:10]
         # Largest downloads
         data['largest_downloads'] = Media.objects.filter(
