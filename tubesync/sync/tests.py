@@ -6,7 +6,7 @@
 
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlsplit
 from xml.etree import ElementTree
 from django.conf import settings
@@ -14,6 +14,7 @@ from django.test import TestCase, Client
 from django.utils import timezone
 from background_task.models import Task
 from .models import Source, Media
+from .tasks import cleanup_old_media
 
 
 class FrontEndTestCase(TestCase):
@@ -1397,3 +1398,32 @@ class FormatMatchingTestCase(TestCase):
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
             self.assertEqual(match_type, expeceted_match_type)
+
+
+class TasksTestCase(TestCase):
+    def setUp(self):
+        # Disable general logging for test case
+        logging.disable(logging.CRITICAL)
+
+    def test_delete_old_media(self):
+        src1 = Source.objects.create(key='aaa', name='aaa', directory='/tmp/a', delete_old_media=False, days_to_keep=14)
+        src2 = Source.objects.create(key='bbb', name='bbb', directory='/tmp/b', delete_old_media=True, days_to_keep=14)
+
+        now = timezone.now()
+
+        m11 = Media.objects.create(source=src1, downloaded=True, key='a11', download_date=now - timedelta(days=5))
+        m12 = Media.objects.create(source=src1, downloaded=True, key='a12', download_date=now - timedelta(days=25))
+        m13 = Media.objects.create(source=src1, downloaded=False, key='a13')
+
+        m21 = Media.objects.create(source=src2, downloaded=True, key='a21', download_date=now - timedelta(days=5))
+        m22 = Media.objects.create(source=src2, downloaded=True, key='a22', download_date=now - timedelta(days=25))
+        m23 = Media.objects.create(source=src2, downloaded=False, key='a23')
+
+        self.assertEquals(src1.media_source.all().count(), 3)
+        self.assertEquals(src2.media_source.all().count(), 3)
+
+        cleanup_old_media()
+
+        self.assertEquals(src1.media_source.all().count(), 3)
+        self.assertEquals(src2.media_source.all().count(), 2)
+        self.assertEquals(Media.objects.filter(pk=m22.pk).exists(), False)
