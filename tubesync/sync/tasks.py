@@ -132,16 +132,14 @@ def cleanup_completed_tasks():
 
 
 def cleanup_old_media():
-    for media in Media.objects.filter(download_date__isnull=False):
-        if media.source.delete_old_media and media.source.days_to_keep > 0:
-            delta = timezone.now() - timedelta(days=media.source.days_to_keep)
-            if media.downloaded and media.download_date < delta:
-                # Media was downloaded after the cutoff date, delete it
-                log.info(f'Deleting expired media: {media.source} / {media} '
-                         f'(now older than {media.source.days_to_keep} days / '
-                         f'download_date before {delta})')
-                # .delete() also triggers a pre_delete signal that removes the files
-                media.delete()
+    for source in Source.objects.filter(delete_old_media=True, days_to_keep__gt=0):
+        delta = timezone.now() - timedelta(days=source.days_to_keep)
+        for media in source.media_source.filter(downloaded=True, download_date__lt=delta):
+            log.info(f'Deleting expired media: {source} / {media} '
+                     f'(now older than {source.days_to_keep} days / '
+                     f'download_date before {delta})')
+            # .delete() also triggers a pre_delete signal that removes the files
+            media.delete()
 
 
 @background(schedule=0)
