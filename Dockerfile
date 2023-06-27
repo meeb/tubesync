@@ -1,9 +1,9 @@
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 ARG TARGETPLATFORM
 ARG S6_VERSION="3.1.2.1"
-ARG FFMPEG_DATE="autobuild-2023-05-03-12-37"
-ARG FFMPEG_VERSION="110465-g0e580806d8"
+ARG FFMPEG_DATE="autobuild-2023-06-27-14-11"
+ARG FFMPEG_VERSION="111281-g285c7f6f6b"
 
 ENV DEBIAN_FRONTEND="noninteractive" \
   HOME="/root" \
@@ -27,8 +27,8 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/arm64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.xz" ;; \
   *)               echo ""        ;; esac) && \
   export FFMPEG_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "cfc81468bc62706639045c13c54a7074ffda7aa0a6fa774505de93c602c298e9" ;; \
-  "linux/arm64")   echo "d9a0244c8d239b8409d84f4b8a465842b611855e8b409a527b54c8c748efc27e" ;; \
+  "linux/amd64")   echo "3c45eccd2f0231ac951b71cd548d3457fac7cc27d5efb2b46ff660d138827fb7" ;; \
+  "linux/arm64")   echo "fefd11bb88ad8775ad6a4c8a32a5b4d90448aaf1b36c30246017fb09605d9d1d" ;; \
   *)               echo ""        ;; esac) && \
   export FFMPEG_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linux64-gpl.tar.xz"   ;; \
@@ -83,30 +83,30 @@ RUN set -x && \
   apt-get -y install nginx-light && \
   apt-get -y --no-install-recommends install \
   python3 \
-  python3-setuptools \
-  python3-pip \
   python3-dev \
+  python3-pip \
+  python3-wheel \
+  pipenv \
   gcc \
   g++ \
   make \
+  pkgconf \
   default-libmysqlclient-dev \
   libmariadb3 \
   postgresql-common \
   libpq-dev \
   libpq5 \
   libjpeg62-turbo \
-  libwebp6 \
+  libwebp7 \
   libjpeg-dev \
   zlib1g-dev \
   libwebp-dev \
   redis-server && \
-  # Install pipenv
-  pip3 --disable-pip-version-check install wheel pipenv && \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
-  pipenv install --system --skip-lock && \
+  PIPENV_VERBOSITY=64 pipenv install --system --skip-lock && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   rm -rf /app/db.sqlite3 && \
   # Run any required app commands
@@ -120,7 +120,6 @@ RUN set -x && \
   # Clean up
   rm /app/Pipfile && \
   pipenv --clear && \
-  pip3 --disable-pip-version-check uninstall -y pipenv wheel virtualenv && \
   apt-get -y autoremove --purge \
   python3-pip \
   python3-dev \
