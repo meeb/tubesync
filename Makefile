@@ -31,3 +31,7 @@ runcontainer:
 
 test: build
 	cd tubesync && $(python) manage.py test --verbosity=2 && cd ..
+
+
+shell:
+	cd tubesync && $(python) manage.py shell
