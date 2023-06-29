@@ -465,11 +465,14 @@ metadata_60fps_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_60
 metadata_60fps = open(metadata_60fps_filepath, 'rt').read()
 metadata_60fps_hdr_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_60fps_hdr.json'
 metadata_60fps_hdr = open(metadata_60fps_hdr_filepath, 'rt').read()
+metadata_20230629_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_2023-06-29.json'
+metadata_20230629 = open(metadata_20230629_filepath, 'rt').read()
 all_test_metadata = {
     'boring': metadata,
     'hdr': metadata_hdr,
     '60fps': metadata_60fps,
     '60fps+hdr': metadata_60fps_hdr,
+    '20230629': metadata_20230629,
 }
 
 
@@ -1398,6 +1401,69 @@ class FormatMatchingTestCase(TestCase):
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
             self.assertEqual(match_type, expeceted_match_type)
+
+    def test_metadata_20230629(self):
+        self.media.metadata = all_test_metadata['20230629']
+        expected_matches = {
+            # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
+            ('360p', 'AVC1', False, True): (False, '134'),             # Fallback match, no hdr
+            ('360p', 'AVC1', True, False): (False, '134'),             # Fallback match, no 60fps
+            ('360p', 'AVC1', True, True): (False, '332'),              # Fallback match, 60fps+hdr, switched to VP9
+            ('360p', 'VP9', False, False): (True, '243'),              # Exact match
+            ('360p', 'VP9', False, True): (True, '332'),               # Exact match, hdr
+            ('360p', 'VP9', True, False): (False, '332'),              # Fallback match, 60fps, extra hdr
+            ('360p', 'VP9', True, True): (True, '332'),                # Exact match, 60fps+hdr
+            ('480p', 'AVC1', False, False): (True, '135'),             # Exact match
+            ('480p', 'AVC1', False, True): (False, '135'),             # Fallback match, no hdr
+            ('480p', 'AVC1', True, False): (False, '135'),             # Fallback match, no 60fps
+            ('480p', 'AVC1', True, True): (False, '333'),              # Fallback match, 60fps+hdr, switched to VP9
+            ('480p', 'VP9', False, False): (True, '244'),              # Exact match
+            ('480p', 'VP9', False, True): (True, '333'),               # Exact match, hdr
+            ('480p', 'VP9', True, False): (False, '333'),              # Fallback match, 60fps, extra hdr
+            ('480p', 'VP9', True, True): (True, '333'),                # Exact match, 60fps+hdr
+            ('720p', 'AVC1', False, False): (True, '136'),             # Exact match
+            ('720p', 'AVC1', False, True): (False, '136'),             # Fallback match, no hdr
+            ('720p', 'AVC1', True, False): (True, '298'),              # Exact match, 60fps
+            ('720p', 'AVC1', True, True): (False, '334'),              # Fallback match, 60fps+hdr, switched to VP9
+            ('720p', 'VP9', False, False): (True, '247'),              # Exact match
+            ('720p', 'VP9', False, True): (True, '334'),               # Exact match, hdr
+            ('720p', 'VP9', True, False): (True, '302'),               # Exact match, 60fps
+            ('720p', 'VP9', True, True): (True, '334'),                # Exact match, 60fps+hdr
+            ('1440p', 'AVC1', False, False): (False, '308'),           # Fallback match, 60fps, switched to VP9 (no 1440p AVC1)
+            ('1440p', 'AVC1', False, True): (False, '336'),            # Fallback match, 60fps+hdr, switched to VP9 (no 1440p AVC1)
+            ('1440p', 'AVC1', True, False): (False, '308'),            # Fallback match, 60fps, switched to VP9 (no 1440p AVC1)
+            ('1440p', 'AVC1', True, True): (False, '336'),             # Fallback match, 60fps+hdr, switched to VP9 (no 1440p AVC1)
+            ('1440p', 'VP9', False, False): (False, '308'),            # Fallback, 60fps
+            ('1440p', 'VP9', False, True): (True, '336'),              # Exact match, hdr
+            ('1440p', 'VP9', True, False): (True, '308'),              # Exact match, 60fps
+            ('1440p', 'VP9', True, True): (True, '336'),               # Exact match, 60fps+hdr
+            ('2160p', 'AVC1', False, False): (False, '315'),           # Fallback, 60fps, switched to VP9 (no 2160p AVC1)
+            ('2160p', 'AVC1', False, True): (False, '337'),            # Fallback match, 60fps+hdr, switched to VP9 (no 2160p AVC1)
+            ('2160p', 'AVC1', True, False): (False, '315'),            # Fallback, switched to VP9 (no 2160p AVC1)
+            ('2160p', 'AVC1', True, True): (False, '337'),             # Fallback match, 60fps+hdr, switched to VP9 (no 2160p AVC1)
+            ('2160p', 'VP9', False, False): (False, '315'),            # Fallback, 60fps
+            ('2160p', 'VP9', False, True): (True, '337'),              # Exact match, hdr
+            ('2160p', 'VP9', True, False): (True, '315'),              # Exact match, 60fps
+            ('2160p', 'VP9', True, True): (True, '337'),               # Exact match, 60fps+hdr
+            ('4320p', 'AVC1', False, False): (False, '272'),           # Fallback, 60fps, switched to VP9 (no 4320p AVC1, no other 8k streams)
+            ('4320p', 'AVC1', False, True): (False, '272'),            # Fallback, 60fps, switched to VP9 (no 4320p AVC1, no other 8k streams)
+            ('4320p', 'AVC1', True, False): (False, '272'),            # Fallback, 60fps, switched to VP9 (no 4320p AVC1, no other 8k streams)
+            ('4320p', 'AVC1', True, True): (False, '272'),             # Fallback, 60fps, switched to VP9 (no 4320p AVC1, no other 8k streams)
+            ('4320p', 'VP9', False, False): (False, '272'),            # Fallback, 60fps (no other 8k streams)
+            ('4320p', 'VP9', False, True): (False, '272'),             # Fallback, 60fps (no other 8k streams)
+            ('4320p', 'VP9', True, False): (True, '272'),              # Exact match, 60fps
+            ('4320p', 'VP9', True, True): (False, '272'),              # Fallback, 60fps (no other 8k streams)
+        }
+        for params, expected in expected_matches.items():
+            resolution, vcodec, prefer_60fps, prefer_hdr = params
+            expeceted_match_type, expected_format_code = expected
+            self.source.source_resolution = resolution
+            self.source.source_vcodec = vcodec
+            self.source.prefer_60fps = prefer_60fps
+            self.source.prefer_hdr = prefer_hdr
+            # The aim here is to execute the matching code to find error paths, specific testing isn't required
+            self.media.get_best_video_format()
+            self.media.get_best_audio_format()
 
 
 class TasksTestCase(TestCase):

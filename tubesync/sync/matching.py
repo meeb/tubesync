@@ -53,6 +53,8 @@ def get_best_audio_format(media):
         # If the format has a video stream, skip it
         if fmt['vcodec'] is not None:
             continue
+        if not fmt['acodec']:
+            continue
         audio_formats.append(fmt)
     audio_formats = list(reversed(sorted(audio_formats, key=lambda k: k['abr'])))
     if not audio_formats:
@@ -87,6 +89,8 @@ def get_best_video_format(media):
     for fmt in media.iter_formats():
         # If the format has an audio stream, skip it
         if fmt['acodec'] is not None:
+            continue
+        if not fmt['vcodec']:
             continue
         if media.source.source_resolution.strip().upper() == fmt['format']:
             video_formats.append(fmt)
