@@ -78,7 +78,7 @@ def resize_image_to_height(image, width, height):
     if scaled_width < width:
         # Width too small, stretch it
         scaled_width = width
-    image = image.resize((scaled_width, height), Image.ANTIALIAS)
+    image = image.resize((scaled_width, height), Image.LANCZOS)
     if scaled_width > width:
         # Width too large, crop it
         delta = scaled_width - width
