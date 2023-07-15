@@ -2,8 +2,8 @@ FROM debian:bookworm-slim
 
 ARG TARGETPLATFORM
 ARG S6_VERSION="3.1.2.1"
-ARG FFMPEG_DATE="autobuild-2023-06-27-14-11"
-ARG FFMPEG_VERSION="111281-g285c7f6f6b"
+ARG FFMPEG_DATE="autobuild-2023-07-14-14-08"
+ARG FFMPEG_VERSION="111432-g374184a4dc"
 
 ENV DEBIAN_FRONTEND="noninteractive" \
   HOME="/root" \
@@ -27,8 +27,8 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/arm64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.xz" ;; \
   *)               echo ""        ;; esac) && \
   export FFMPEG_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "3c45eccd2f0231ac951b71cd548d3457fac7cc27d5efb2b46ff660d138827fb7" ;; \
-  "linux/arm64")   echo "fefd11bb88ad8775ad6a4c8a32a5b4d90448aaf1b36c30246017fb09605d9d1d" ;; \
+  "linux/amd64")   echo "10ddbe37da24a64b891e4ba52dae7ab790aa9b410886f097a425106246471879" ;; \
+  "linux/arm64")   echo "a6345af97ea7506d50324d499bf621708e639095ba5a6b1373b1f3f116e5daad" ;; \
   *)               echo ""        ;; esac) && \
   export FFMPEG_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linux64-gpl.tar.xz"   ;; \
