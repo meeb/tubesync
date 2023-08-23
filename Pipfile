@@ -19,7 +19,7 @@ django-background-tasks = "*"
 django-basicauth = "*"
 psycopg2-binary = "*"
 mysqlclient = "*"
-yt-dlp = "*"
+yt-dlp = "~=2023.7.6"
 redis = "*"
 hiredis = "*"
 requests = {extras = ["socks"], version = "*"}
