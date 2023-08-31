@@ -103,7 +103,8 @@ class Source(models.Model):
     EXTENSION_M4A = 'm4a'
     EXTENSION_OGG = 'ogg'
     EXTENSION_MKV = 'mkv'
-    EXTENSIONS = (EXTENSION_M4A, EXTENSION_OGG, EXTENSION_MKV)
+    EXTENSION_MP4 = 'mp4'
+    EXTENSIONS = (EXTENSION_M4A, EXTENSION_OGG, EXTENSION_MKV, EXTENSION_MP4)
 
 
     # as stolen from: https://wiki.sponsor.ajay.app/w/Types / https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/postprocessor/sponsorblock.py
@@ -398,7 +399,7 @@ class Source(models.Model):
             else:
                 raise ValueError('Unable to choose audio extension, uknown acodec')
         else:
-            return self.EXTENSION_MKV
+            return self.EXTENSION_MP4
 
     @classmethod
     def create_url(obj, source_type, key):

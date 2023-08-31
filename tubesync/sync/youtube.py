@@ -73,6 +73,10 @@ def download_media(url, media_format, extension, output_file, info_json,
 
     def hook(event):
         filename = os.path.basename(event['filename'])
+    
+        if event.get('downloaded_bytes') is None or event.get('total_bytes') is None:
+            return None
+
         if event['status'] == 'error':
             log.error(f'[youtube-dl] error occured downloading: {filename}')
         elif event['status'] == 'downloading':
