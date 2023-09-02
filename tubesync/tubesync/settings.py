@@ -160,9 +160,6 @@ YOUTUBE_DEFAULTS = {
     'ignoreerrors': True,   # Skip on errors (such as unavailable videos in playlists)
     'cachedir': False,      # Disable on-disk caching
     'addmetadata': True,    # Embed metadata during postprocessing where available
-    'writesubtitles': True,
-    'writeautomaticsub': True,
-    'subtitleslangs': ['fr', 'en'],
 }
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 

@@ -350,6 +350,24 @@ class Source(models.Model):
         help_text=_('Source has failed to index media')
     )
 
+    write_subtitles = models.BooleanField(
+        _('write subtitles'),
+        default=False,
+        help_text=_('Download video subtitles')
+    )
+
+    auto_subtitles = models.BooleanField(
+        _('accept auto-generated subs'),
+        default=False,
+        help_text=_('Accept auto-generated subtitles')
+    )
+    sub_langs = models.CharField(
+        _('subs langs'),
+        max_length=30,
+        default='en',
+        help_text=_('List of subtitles langs to download, comma-separated. Example: en,fr')
+    )
+
     def __str__(self):
         return self.name
 
@@ -1334,7 +1352,8 @@ class Media(models.Model):
         download_youtube_media(self.url, format_str, self.source.extension,
                                str(self.filepath), self.source.write_json, 
                                self.source.sponsorblock_categories, self.source.embed_thumbnail,
-                               self.source.embed_metadata, self.source.enable_sponsorblock)
+                               self.source.embed_metadata, self.source.enable_sponsorblock,
+                              self.source.write_subtitles, self.source.auto_subtitles,self.source.sub_langs )
         # Return the download paramaters
         return format_str, self.source.extension
 
