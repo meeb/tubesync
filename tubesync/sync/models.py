@@ -8,6 +8,7 @@ from pathlib import Path
 from django.conf import settings
 from django.db import models
 from django.core.files.storage import FileSystemStorage
+from django.core.validators import RegexValidator
 from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -347,6 +348,30 @@ class Source(models.Model):
         _('has failed'),
         default=False,
         help_text=_('Source has failed to index media')
+    )
+
+    write_subtitles = models.BooleanField(
+        _('write subtitles'),
+        default=False,
+        help_text=_('Download video subtitles')
+    )
+
+    auto_subtitles = models.BooleanField(
+        _('accept auto-generated subs'),
+        default=False,
+        help_text=_('Accept auto-generated subtitles')
+    )
+    sub_langs = models.CharField(
+        _('subs langs'),
+        max_length=30,
+        default='en',
+        help_text=_('List of subtitles langs to download, comma-separated. Example: en,fr or all,-fr,-live_chat'),
+        validators=[
+            RegexValidator(
+                regex=r"^(\-?[\_\.a-zA-Z]+,)*(\-?[\_\.a-zA-Z]+){1}$",
+                message=_('Subtitle langs must be a comma-separated list of langs. example: en,fr or all,-fr,-live_chat')
+            )
+        ]
     )
 
     def __str__(self):
@@ -1333,7 +1358,8 @@ class Media(models.Model):
         download_youtube_media(self.url, format_str, self.source.extension,
                                str(self.filepath), self.source.write_json, 
                                self.source.sponsorblock_categories, self.source.embed_thumbnail,
-                               self.source.embed_metadata, self.source.enable_sponsorblock)
+                               self.source.embed_metadata, self.source.enable_sponsorblock,
+                              self.source.write_subtitles, self.source.auto_subtitles,self.source.sub_langs )
         # Return the download paramaters
         return format_str, self.source.extension
 

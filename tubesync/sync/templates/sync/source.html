@@ -162,6 +162,22 @@
         </strong></td>
       </tr>
       {% endif %}
+
+      <tr title="{{ _('Are Subtitles downloaded?') }}">
+        <td class="hide-on-small-only">{{ _("Download subtitles?") }}:</td>
+        <td><span class="hide-on-med-and-up">{{ _("Download subtitles?") }}:</span><strong><i class="fas {% if source.write_subtitles %}fa-check{% else %}fa-times{% endif %}"></i></strong></td>
+      </tr>
+
+      {% if source.write_subtitles %}
+      <tr title="{{ _('Are auto subs accepted?') }}">
+        <td class="hide-on-small-only">{{ _("Auto-generated subtitles?") }}:</td>
+        <td><span class="hide-on-med-and-up">{{ _("Auto-generated subtitles?") }}:</span><strong><i class="fas {% if source.auto_subtitles %}fa-check{% else %}fa-times{% endif %}"></i></strong></td>
+      </tr>
+      <tr title="{{ _('Subs langs?') }}">
+        <td class="hide-on-small-only">{{ _("Subs langs?") }}:</td>
+        <td><span class="hide-on-med-and-up">{{ _("Subs langs?") }}:</span><strong>{{source.sub_langs}}</strong></td>
+      </tr>
+      {% endif %}
       
     </table>
   </div>

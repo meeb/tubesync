@@ -66,13 +66,18 @@ def get_media_info(url):
 
 def download_media(url, media_format, extension, output_file, info_json, 
                    sponsor_categories="all", 
-                   embed_thumbnail=False, embed_metadata=False, skip_sponsors=True):
+                   embed_thumbnail=False, embed_metadata=False, skip_sponsors=True, 
+                   write_subtitles=False, auto_subtitles=False, sub_langs='en'):
     '''
         Downloads a YouTube URL to a file on disk.
     '''
 
     def hook(event):
         filename = os.path.basename(event['filename'])
+    
+        if event.get('downloaded_bytes') is None or event.get('total_bytes') is None:
+            return None
+
         if event['status'] == 'error':
             log.error(f'[youtube-dl] error occured downloading: {filename}')
         elif event['status'] == 'downloading':
@@ -110,8 +115,12 @@ def download_media(url, media_format, extension, output_file, info_json,
         'quiet': True,
         'progress_hooks': [hook],
         'writeinfojson': info_json,
-        'postprocessors': []
+        'postprocessors': [],
+        'writesubtitles': write_subtitles,
+        'writeautomaticsub': auto_subtitles,
+        'subtitleslangs': sub_langs.split(','),
     }
+    
     sbopt = {
         'key': 'SponsorBlock',
         'categories': [sponsor_categories]
