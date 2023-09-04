@@ -8,6 +8,7 @@ from pathlib import Path
 from django.conf import settings
 from django.db import models
 from django.core.files.storage import FileSystemStorage
+from django.core.validators import RegexValidator
 from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -364,7 +365,13 @@ class Source(models.Model):
         _('subs langs'),
         max_length=30,
         default='en',
-        help_text=_('List of subtitles langs to download, comma-separated. Example: en,fr')
+        help_text=_('List of subtitles langs to download, comma-separated. Example: en,fr or all,-fr,-live_chat'),
+        validators=[
+            RegexValidator(
+                regex=r"^(\-?[\_\.a-zA-Z]+,)*(\-?[\_\.a-zA-Z]+){1}$",
+                message=_('Subtitle langs must be a comma-separated list of langs. example: en,fr or all,-fr,-live_chat')
+            )
+        ]
     )
 
     def __str__(self):
