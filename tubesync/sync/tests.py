@@ -183,7 +183,8 @@ class FrontEndTestCase(TestCase):
             'source_acodec': 'OPUS',
             'prefer_60fps': False,
             'prefer_hdr': False,
-            'fallback': 'f'
+            'fallback': 'f',
+            'sub_langs': 'en',
         }
         response = c.post('/source-add', data)
         self.assertEqual(response.status_code, 302)
@@ -224,7 +225,8 @@ class FrontEndTestCase(TestCase):
             'source_acodec': Source.SOURCE_ACODEC_OPUS,
             'prefer_60fps': False,
             'prefer_hdr': False,
-            'fallback': Source.FALLBACK_FAIL
+            'fallback': Source.FALLBACK_FAIL,
+            'sub_langs': 'en',
         }
         response = c.post(f'/source-update/{source_uuid}', data)
         self.assertEqual(response.status_code, 302)
@@ -253,7 +255,8 @@ class FrontEndTestCase(TestCase):
             'source_acodec': Source.SOURCE_ACODEC_OPUS,
             'prefer_60fps': False,
             'prefer_hdr': False,
-            'fallback': Source.FALLBACK_FAIL
+            'fallback': Source.FALLBACK_FAIL,
+            'sub_langs': 'en',
         }
         response = c.post(f'/source-update/{source_uuid}', data)
         self.assertEqual(response.status_code, 302)
