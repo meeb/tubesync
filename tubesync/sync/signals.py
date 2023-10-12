@@ -156,7 +156,7 @@ def media_post_save(sender, instance, created, **kwargs):
         verbose_name = _('Downloading metadata for "{}"')
         download_media_metadata(
             str(instance.pk),
-            priority=10,
+            priority=5,
             verbose_name=verbose_name.format(instance.pk),
             remove_existing_tasks=True
         )
