@@ -510,7 +510,7 @@ class Source(models.Model):
             'mm': now.strftime('%m'),
             'dd': now.strftime('%d'),
             'source': self.slugname,
-            'source_full': self.name,
+            'source_full': self.source.name,
             'title': 'some-media-title-name',
             'title_full': 'Some Media Title Name',
             'key': 'SoMeUnIqUiD',
@@ -1020,6 +1020,7 @@ class Media(models.Model):
             'acodec': display_format['acodec'],
             'fps': display_format['fps'],
             'hdr': display_format['hdr'],
+            'uploader': self.uploader,
         }
 
     @property
