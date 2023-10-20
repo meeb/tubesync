@@ -115,6 +115,10 @@
         <td class="hide-on-small-only">Write JSON?</td>
         <td><span class="hide-on-med-and-up">Write JSON?<br></span><strong>{% if source.write_json %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
       </tr>
+      <tr title="Delete media that is no longer on this playlist?">
+        <td class="hide-on-small-only">Delete removed media</td>
+        <td><span class="hide-on-med-and-up">Delete removed media<br></span><strong>{% if source.delete_removed_media %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
       {% if source.delete_old_media and source.days_to_keep > 0 %}
       <tr title="Days after which your media from this source will be locally deleted">
         <td class="hide-on-small-only">Delete old media</td>

@@ -287,6 +287,11 @@ class Source(models.Model):
         help_text=_('If "delete old media" is ticked, the number of days after which '
                     'to automatically delete media')
     )
+    delete_removed_media = models.BooleanField(
+        _('delete removed media'),
+        default=False,
+        help_text=_('Delete media that is no longer on this playlist')
+    )
     source_resolution = models.CharField(
         _('source resolution'),
         max_length=8,
