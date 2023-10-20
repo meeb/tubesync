@@ -287,6 +287,11 @@ class Source(models.Model):
         help_text=_('If "delete old media" is ticked, the number of days after which '
                     'to automatically delete media')
     )
+    filterText = models.CharField(
+        _('filter string'),
+        default='',
+        help_text=_('Regex compatible filter string for video titles')
+    )
     source_resolution = models.CharField(
         _('source resolution'),
         max_length=8,

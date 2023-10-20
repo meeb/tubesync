@@ -8,6 +8,7 @@ import os
 import json
 import math
 import uuid
+import re
 from io import BytesIO
 from hashlib import sha1
 from datetime import timedelta, datetime
@@ -255,6 +256,10 @@ def download_media_metadata(media_id):
                 log.warn(f'Media: {source} / {media} is older than '
                          f'{source.days_to_keep} days, skipping')
                 media.skip = True
+
+    if not re.search(filterText,media.title):
+        #filter text not found in the media title. Accepts regex string
+        media.skip = True
     # Check we can download the media item
     if not media.skip:
         if media.get_format_str():
