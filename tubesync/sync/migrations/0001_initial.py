@@ -24,6 +24,7 @@ class Migration(migrations.Migration):
                 ('source_type', models.CharField(choices=[('c', 'YouTube channel'), ('p', 'YouTube playlist')], db_index=True, default='c', help_text='Source type', max_length=1, verbose_name='source type')),
                 ('key', models.CharField(db_index=True, help_text='Source key, such as exact YouTube channel name or playlist ID', max_length=100, unique=True, verbose_name='key')),
                 ('name', models.CharField(db_index=True, help_text='Friendly name for the source, used locally in TubeSync only', max_length=100, unique=True, verbose_name='name')),
+                ('filter_text', models.CharField(db_index=True, help_text='Regex compatible filter string for video titles', max_length=100, verbose_name='filter text')),
                 ('directory', models.CharField(db_index=True, help_text='Directory name to save the media into', max_length=100, unique=True, verbose_name='directory')),
                 ('index_schedule', models.IntegerField(choices=[(3600, 'Every hour'), (7200, 'Every 2 hours'), (10800, 'Every 3 hours'), (14400, 'Every 4 hours'), (18000, 'Every 5 hours'), (21600, 'Every 6 hours'), (43200, 'Every 12 hours'), (86400, 'Every 24 hours')], db_index=True, default=21600, help_text='Schedule of how often to index the source for new media', verbose_name='index schedule')),
                 ('delete_old_media', models.BooleanField(default=False, help_text='Delete old media after "days to keep" days?', verbose_name='delete old media')),
