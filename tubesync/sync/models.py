@@ -291,7 +291,7 @@ class Source(models.Model):
         _('filter string'),
         max_length=100,
         default='.*',
-        blank=True
+        blank=True,
         help_text=_('Regex compatible filter string for video titles')
     )
     delete_removed_media = models.BooleanField(
