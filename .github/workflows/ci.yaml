@@ -4,6 +4,7 @@ env:
   IMAGE_NAME: tubesync
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
