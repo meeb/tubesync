@@ -8,7 +8,6 @@ import os
 import json
 import math
 import uuid
-import re
 from io import BytesIO
 from hashlib import sha1
 from datetime import timedelta, datetime
@@ -256,9 +255,9 @@ def download_media_metadata(media_id):
                      f'{max_cap_age}, skipping')
             media.skip = True
     # If the source has a search filter, check the video title matches the filter
-    if not re.search(source.filter_text,media.title):
+    if source.filter_text and not source.is_regex_match(media.title):
         # Filter text not found in the media title. Accepts regex string, blank search filter results in this returning false
-        log.warn(f'Media: {source} / {media} does not contain {source.filter_text}, skipping')
+        log.warn(f'Media: {source} / {media} does not match {source.filter_text}, skipping')
         media.skip = True
     # If the source has a cut-off check the upload date is within the allowed delta
     if source.delete_old_media and source.days_to_keep > 0:

@@ -1,5 +1,4 @@
 import os
-import re
 from django.conf import settings
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
 from django.dispatch import receiver
@@ -109,34 +108,34 @@ def media_post_save(sender, instance, created, **kwargs):
         published = instance.published 
 
         if instance.skip:
-                #currently marked to be skipped, check if skip conditions still apply
-                if not published:
-                    log.debug(f'Media: {instance.source} / {instance} has no published date '
-                                  f'set but is already marked to be skipped')
-                else:            
-                    if max_cap_age and filter_text:
-                        if (published > max_cap_age) and (re.search(filter_text,instance.title)):
-                            # Media was published after the cap date but is set to be skipped
-                            print('Has a valid publishing date and matches filter, marking unskipped')
-                            instance.skip = False
-                            cap_changed = True
-                        else:
-                            print('does not have a valid publishing date or filter string, already marked skipped')
-                            log.info(f'Media: {instance.source} / {instance} has no published date '
-                                  f'set but is already marked to be skipped')
-                    elif max_cap_age:
-                        if published > max_cap_age:
-                            # Media was published after the cap date but is set to be skipped
-                            log.info(f'Media: {instance.source} / {instance} has a valid '
-                                    f'publishing date, marking to be unskipped')
-                            instance.skip = False
-                            cap_changed = True
-                    elif filter_text:
-                        if re.search(filter_text,instance.title):
-                            # Media was published after the cap date but is set to be skipped
-                            log.info(f'Media: {instance.source} / {instance} matches the filter text, marking to be unskipped')
-                            instance.skip = False
-                            cap_changed = True
+            #currently marked to be skipped, check if skip conditions still apply
+            if not published:
+                log.debug(f'Media: {instance.source} / {instance} has no published date '
+                        f'set but is already marked to be skipped')
+            else:            
+                if max_cap_age and filter_text:
+                    if (published > max_cap_age) and (source.is_regex_match(instance.title)):
+                        # Media was published after the cap date and matches the filter text, but is set to be skipped
+                        print('Has a valid publishing date and matches filter, marking unskipped')
+                        instance.skip = False
+                        cap_changed = True
+                    else:
+                        print('does not have a valid publishing date or filter string, already marked skipped')
+                        log.info(f'Media: {instance.source} / {instance} has no published date '
+                                f'set but is already marked to be skipped')
+                elif max_cap_age:
+                    if published > max_cap_age:
+                        # Media was published after the cap date but is set to be skipped
+                        log.info(f'Media: {instance.source} / {instance} has a valid '
+                                f'publishing date, marking to be unskipped')
+                        instance.skip = False
+                        cap_changed = True
+                elif filter_text:
+                    if source.is_regex_match(instance.title):
+                        # Media matches the filter text but is set to be skipped
+                        log.info(f'Media: {instance.source} / {instance} matches the filter text, marking to be unskipped')
+                        instance.skip = False
+                        cap_changed = True
         else:
             if not published:
                 log.info(f'Media: {instance.source} / {instance} has no published date, marking to be skipped')
