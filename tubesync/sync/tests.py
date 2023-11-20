@@ -175,6 +175,7 @@ class FrontEndTestCase(TestCase):
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
+            'filter_text':'.*',
             'index_schedule': 3600,
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -217,6 +218,7 @@ class FrontEndTestCase(TestCase):
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
+            'filter_text':'.*',
             'index_schedule': Source.IndexSchedule.EVERY_HOUR,
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -247,6 +249,7 @@ class FrontEndTestCase(TestCase):
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
+            'filter_text':'.*',
             'index_schedule': Source.IndexSchedule.EVERY_2_HOURS,  # changed
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -1468,6 +1471,29 @@ class FormatMatchingTestCase(TestCase):
             self.media.get_best_video_format()
             self.media.get_best_audio_format()
 
+    def test_is_regex_match(self):
+        
+        self.media.metadata = all_test_metadata['boring']
+        expected_matches = {
+            ('.*'): (True),
+            ('no fancy stuff'): (True),
+            ('No fancy stuff'): (False),
+            ('(?i)No fancy stuff'): (True), #set case insensitive flag
+            ('no'): (True),
+            ('Foo'): (False),
+            ('^(?!.*fancy).*$'): (False),
+            ('^(?!.*funny).*$'): (True),
+            ('(?=.*f.*)(?=.{0,2}|.{4,})'): (True),
+            ('f{4,}'): (False),
+            ('^[^A-Z]*$'): (True),
+            ('^[^a-z]*$'): (False),
+            ('^[^\\s]*$'): (False)
+        }
+
+        for params, expected in expected_matches.items():
+            self.source.filter_text = params
+            expected_match_result = expected
+            self.assertEqual(self.source.is_regex_match(self.media.title), expected_match_result)
 
 class TasksTestCase(TestCase):
     def setUp(self):

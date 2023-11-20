@@ -64,5 +64,5 @@
   </div>
   {% endfor %}
 </div>
-{% include 'pagination.html' with pagination=sources.paginator filter=source.pk show_skipped=show_skipped %}
+{% include 'pagination.html' with pagination=sources.paginator filter=source.pk show_skipped=show_skipped only_skipped=only_skipped%}
 {% endblock %}

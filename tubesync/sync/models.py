@@ -1,6 +1,7 @@
 import os
 import uuid
 import json
+import re
 from xml.etree import ElementTree
 from collections import OrderedDict
 from datetime import datetime, timedelta
@@ -287,6 +288,13 @@ class Source(models.Model):
         help_text=_('If "delete old media" is ticked, the number of days after which '
                     'to automatically delete media')
     )
+    filter_text = models.CharField(
+        _('filter string'),
+        max_length=100,
+        default='',
+        blank=True,
+        help_text=_('Regex compatible filter string for video titles')
+    )
     delete_removed_media = models.BooleanField(
         _('delete removed media'),
         default=False,
@@ -538,6 +546,9 @@ class Source(models.Model):
         except Exception as e:
             return ''
 
+    def is_regex_match(self, media_item_title):
+        return bool(re.search(self.filter_text,media_item_title))       
+    
     def index_media(self):
         '''
             Index the media source returning a list of media metadata as dicts.
