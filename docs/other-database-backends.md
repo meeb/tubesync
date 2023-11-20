@@ -78,3 +78,46 @@ entry in the container or stdout logs:
 
 If you see a line similar to the above and the web interface loads, congratulations,
 you are now using an external database server for your TubeSync data!
+
+## Docker Compose
+
+If you're using Docker Compose and simply want to connect to another container with
+the DB for the performance benefits, a configuration like this would be enough:
+
+```
+ tubesync-db:
+  image: postgres:15.2
+  container_name: tubesync-db
+  restart: unless-stopped
+  volumes:
+   - /<path/to>/init.sql:/docker-entrypoint-initdb.d/init.sql
+   - /<path/to>/tubesync-db:/var/lib/postgresql/data
+  environment:
+   - POSTGRES_USER=postgres
+   - POSTGRES_PASSWORD=testpassword
+
+ tubesync:
+  image: ghcr.io/meeb/tubesync:latest
+  container_name: tubesync
+  restart: unless-stopped
+  ports:
+   - 4848:4848
+  volumes:
+   - /<path/to>/tubesync/config:/config
+   - /<path/to>/YouTube:/downloads
+  environment:
+   - DATABASE_CONNECTION=postgresql://postgres:testpassword@tubesync-db:5432/tubesync
+  depends_on:
+   - tubesync-db
+```
+
+Note that an `init.sql` file is needed to initialize the `tubesync`
+database before it can be written to. This file should contain:
+
+```
+CREATE DATABASE tubesync;
+```
+
+Then it must be mapped to `/docker-entrypoint-initdb.d/init.sql` for it
+to be executed on first startup of the container. See the `tubesync-db`
+volume mapping above for how to do this.
