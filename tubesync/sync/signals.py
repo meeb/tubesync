@@ -114,7 +114,7 @@ def media_post_save(sender, instance, created, **kwargs):
                         f'set but is already marked to be skipped')
             else:            
                 if max_cap_age and filter_text:
-                    if (published > max_cap_age) and (source.is_regex_match(instance.title)):
+                    if (published > max_cap_age) and (instance.source.is_regex_match(instance.title)):
                         # Media was published after the cap date and matches the filter text, but is set to be skipped
                         print('Has a valid publishing date and matches filter, marking unskipped')
                         instance.skip = False
@@ -131,7 +131,7 @@ def media_post_save(sender, instance, created, **kwargs):
                         instance.skip = False
                         cap_changed = True
                 elif filter_text:
-                    if source.is_regex_match(instance.title):
+                    if instance.source.is_regex_match(instance.title):
                         # Media matches the filter text but is set to be skipped
                         log.info(f'Media: {instance.source} / {instance} matches the filter text, marking to be unskipped')
                         instance.skip = False
@@ -149,7 +149,7 @@ def media_post_save(sender, instance, created, **kwargs):
                         instance.skip = True
                         cap_changed = True
                 if filter_text:
-                    if not re.search(filter_text,instance.title):
+                    if not instance.source.is_regex_match(instance.title):
                         #media doesn't match the filter text but is not marked to be skipped
                         log.info(f'Media: {instance.source} / {instance} does not match the filter text')
                         instance.skip = True
