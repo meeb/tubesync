@@ -29,6 +29,10 @@ runcontainer:
 	$(docker) run --rm --name $(name) --env-file dev.env --log-opt max-size=50m -ti -p 4848:4848 $(image)
 
 
+stopcontainer:
+	$(docker) stop $(name)
+
+
 test: build
 	cd tubesync && $(python) manage.py test --verbosity=2 && cd ..
 
