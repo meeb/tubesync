@@ -231,11 +231,9 @@ def download_media_metadata(media_id):
         log.error(f'Task download_media_metadata(pk={media_id}) called but no '
                   f'media exists with ID: {media_id}')
         return
-    
     if media.manual_skip:
         log.info(f'Task for ID: {media_id} skipped, due to task being manually skipped.')
         return
-
     source = media.source
     metadata = media.index_metadata()
     media.metadata = json.dumps(metadata, default=json_serial)

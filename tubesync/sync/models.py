@@ -547,7 +547,9 @@ class Source(models.Model):
             return ''
 
     def is_regex_match(self, media_item_title):
-        return bool(re.search(self.filter_text,media_item_title))       
+        if not self.filter_text:
+            return True
+        return bool(re.search(self.filter_text, media_item_title))
     
     def index_media(self):
         '''
