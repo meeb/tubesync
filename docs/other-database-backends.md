@@ -79,6 +79,14 @@ entry in the container or stdout logs:
 If you see a line similar to the above and the web interface loads, congratulations,
 you are now using an external database server for your TubeSync data!
 
+## Database Compression (For MariaDB)
+With a lot of media files the `sync_media` table grows in size quickly.
+You can save space using column compression using the following steps while using MariaDB:
+
+ 1. Stop tubesync 
+ 2. Execute `ALTER TABLE sync_source MODIFY metadata LONGTEXT COMPRESSED;` on database tubesync
+ 3. Start tunesync and confirm the connection still works.
+
 ## Docker Compose
 
 If you're using Docker Compose and simply want to connect to another container with
@@ -117,6 +125,7 @@ database before it can be written to. This file should contain:
 ```
 CREATE DATABASE tubesync;
 ```
+
 
 Then it must be mapped to `/docker-entrypoint-initdb.d/init.sql` for it
 to be executed on first startup of the container. See the `tubesync-db`
