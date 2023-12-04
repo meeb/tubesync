@@ -81,7 +81,8 @@ you are now using an external database server for your TubeSync data!
 
 ## Database Compression (For MariaDB)
 With a lot of media files the `sync_media` table grows in size quickly.
-You can save space using column compression while using MariaDB
+You can save space using column compression using the following steps while using MariaDB:
+
  1. Stop tubesync 
  2. Execute `ALTER TABLE sync_source MODIFY metadata LONGTEXT COMPRESSED;` on database tubesync
  3. Start tunesync and confirm the connection still works.
