@@ -1410,35 +1410,25 @@ class Media(models.Model):
 
     def calculate_episode_number(self):
         filtered_media = Media.objects.filter(source=self.source)
+        position_counter = 1
         if self.source.source_type == Source.SOURCE_TYPE_YOUTUBE_PLAYLIST:
             # Calculate the episode number based on the position in the playlist
-            position_counter = 1
-
             for media in filtered_media:
                 if media == self:
                     return position_counter
                 position_counter += 1
         else:
             # Sort the filtered media by upload_date in ascending order and video ID
-            sorted_media = sorted(filtered_media, key=lambda x: (x.upload_date, x.id))
-
-            # Initialize an episode counter by year
-            episode_counter = {}
-
+            sorted_media = sorted(filtered_media, key=lambda x: (x.upload_date, x.key))
             self_year = self.upload_date.year if self.upload_date else self.created.year
-
             for media in sorted_media:
-                year = media.upload_date.year
-                if year not in episode_counter:
-                    # If it's the first video of the year, initialize the counter to 1
-                    episode_counter[year] = 1
-                else:
-                    # If it's not the first video of the year, use the current counter
-                    episode_counter[year] += 1
-
                 # Assign the calculated episode number to the media
                 if media == self:
-                    return episode_counter[self_year]
+                    return position_counter
+                year = media.upload_date.year if media.upload_date else media.created.year
+                if year == self_year:
+                    position_counter += 1
+
 
 
 class MediaServer(models.Model):
