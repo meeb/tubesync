@@ -1409,26 +1409,18 @@ class Media(models.Model):
         return indexer(self.url)
 
     def calculate_episode_number(self):
-        filtered_media = Media.objects.filter(source=self.source)
-        position_counter = 1
         if self.source.source_type == Source.SOURCE_TYPE_YOUTUBE_PLAYLIST:
-            # Calculate the episode number based on the position in the playlist
-            for media in filtered_media:
-                if media == self:
-                    return position_counter
-                position_counter += 1
+            sorted_media = Media.objects.filter(source=self.source)
         else:
-            # Sort the filtered media by upload_date in ascending order and video ID
-            sorted_media = sorted(filtered_media, key=lambda x: (x.upload_date, x.key))
             self_year = self.upload_date.year if self.upload_date else self.created.year
-            for media in sorted_media:
-                # Assign the calculated episode number to the media
-                if media == self:
-                    return position_counter
-                year = media.upload_date.year if media.upload_date else media.created.year
-                if year == self_year:
-                    position_counter += 1
-
+            filtered_media = Media.objects.filter(source=self.source, published__year=self_year)
+            sorted_media = sorted(filtered_media, key=lambda x: (x.upload_date, x.key))
+        
+        position_counter = 1
+        for media in sorted_media:
+            if media == self:
+                return position_counter
+            position_counter += 1
 
 
 class MediaServer(models.Model):
