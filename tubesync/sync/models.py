@@ -1269,6 +1269,21 @@ class Media(models.Model):
         showtitle.text = str(self.source.name).strip()
         showtitle.tail = '\n  '
         nfo.append(showtitle)
+        # season = upload date year
+        season = nfo.makeelement('season', {})
+        if self.source.source_type == Source.SOURCE_TYPE_YOUTUBE_PLAYLIST:
+            # If it's a playlist, set season to 1
+            season.text = '1'
+        else:
+            # If it's not a playlist, set season to upload date year
+            season.text = str(self.upload_date.year) if self.upload_date else ''
+        season.tail = '\n  '
+        nfo.append(season)
+        # episode = number of video in the year
+        episode = nfo.makeelement('episode', {})
+        episode.text = str(self.calculate_episode_number())  # Remplacez par la logique de calcul
+        episode.tail = '\n  '
+        nfo.append(episode)
         # ratings = media metadata youtube rating
         value = nfo.makeelement('value', {})
         value.text = str(self.rating)
@@ -1392,6 +1407,20 @@ class Media(models.Model):
             raise Exception(f'Media with source type f"{self.source.source_type}" '
                             f'has no indexer')
         return indexer(self.url)
+
+    def calculate_episode_number(self):
+        if self.source.source_type == Source.SOURCE_TYPE_YOUTUBE_PLAYLIST:
+            sorted_media = Media.objects.filter(source=self.source)
+        else:
+            self_year = self.upload_date.year if self.upload_date else self.created.year
+            filtered_media = Media.objects.filter(source=self.source, published__year=self_year)
+            sorted_media = sorted(filtered_media, key=lambda x: (x.upload_date, x.key))
+        
+        position_counter = 1
+        for media in sorted_media:
+            if media == self:
+                return position_counter
+            position_counter += 1
 
 
 class MediaServer(models.Model):
