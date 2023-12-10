@@ -14,6 +14,7 @@ from datetime import timedelta, datetime
 from shutil import copyfile
 from PIL import Image
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from django.db.utils import IntegrityError
@@ -217,6 +218,42 @@ def check_source_directory_exists(source_id):
         # Try and create it
         log.info(f'Creating directory: {source.directory_path}')
         source.make_directory()
+
+
+@background(schedule=0)
+def download_source_thumbnail(source_id):
+    '''
+        Downloads an image and save it as a local thumbnail attached to a
+        Source instance.
+    '''
+    try:
+        source = Source.objects.get(pk=source_id)
+    except Source.DoesNotExist:
+        # Task triggered but the source no longer exists, do nothing
+        log.error(f'Task download_source_thumbnail(pk={source_id}) called but no '
+                  f'source exists with ID: {source_id}')
+        return
+
+    url = source.get_thumbnail_url
+    width = 400
+    height = 400
+    i = get_remote_image(url)
+    log.info(f'Resizing {i.width}x{i.height} thumbnail to '
+             f'{width}x{height}: {url}')
+    i = resize_image_to_height(i, width, height)
+    image_file = BytesIO()
+    i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
+
+    for file_name in ["poster.jpg", "season-poster.jpg"]:
+        # Reset file pointer to the beginning for the next save
+        image_file.seek(0)
+        # Create a Django ContentFile from BytesIO stream
+        django_file = ContentFile(image_file.read())
+        file_path = source.directory_path / file_name
+        with open(file_path, 'wb') as f:
+            f.write(django_file.read())
+
+    log.info(f'Thumbnail downloaded from {url} for source with ID: {source_id}')
 
 
 @background(schedule=0)

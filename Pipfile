@@ -23,3 +23,4 @@ yt-dlp = "*"
 redis = "*"
 hiredis = "*"
 requests = {extras = ["socks"], version = "*"}
+bs4 = "*"

@@ -2,6 +2,8 @@ import os
 import uuid
 import json
 import re
+import requests
+from bs4 import BeautifulSoup
 from xml.etree import ElementTree
 from collections import OrderedDict
 from datetime import datetime, timedelta
@@ -342,6 +344,11 @@ class Source(models.Model):
         default=FALLBACK_NEXT_BEST_HD,
         help_text=_('What do do when media in your source resolution and codecs is not available')
     )
+    copy_channel_thumbnails = models.BooleanField(
+        _('copy channel thumbnails'),
+        default=False,
+        help_text=_('Copy channel thumbnails in poster.jpg and season-poster.jpg, these may be detected and used by some media servers')
+    )
     copy_thumbnails = models.BooleanField(
         _('copy thumbnails'),
         default=False,
@@ -481,6 +488,15 @@ class Source(models.Model):
 
     def make_directory(self):
         return os.makedirs(self.directory_path, exist_ok=True)
+
+    @property
+    def get_thumbnail_url(self):
+        if self.source_type==Source.SOURCE_TYPE_YOUTUBE_PLAYLIST:
+            raise Exception('This source is a playlist so it doesn\'t have thumbnail.')
+        soup = BeautifulSoup(requests.get(self.url, cookies={'CONSENT': 'YES+1'}).text, "html.parser")
+        data = re.search(r"var ytInitialData = ({.*});", str(soup.prettify())).group(1)
+        json_data = json.loads(data)
+        return json_data["header"]["c4TabbedHeaderRenderer"]["avatar"]["thumbnails"][2]["url"]
 
     def directory_exists(self):
         return (os.path.isdir(self.directory_path) and
