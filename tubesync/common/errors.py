@@ -27,3 +27,10 @@ class DatabaseConnectionError(Exception):
         Raised when parsing or initially connecting to a database.
     '''
     pass
+
+
+class NoImageSourceException(Exception):
+    '''
+        Raised when images are requested from a source of a type that does not have any.
+    '''
+    pass

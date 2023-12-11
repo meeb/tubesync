@@ -491,7 +491,7 @@ class Source(models.Model):
     @property
     def get_image_url(self):
         if self.source_type == self.SOURCE_TYPE_YOUTUBE_PLAYLIST:
-            raise Exception('This source is a playlist so it doesn\'t have thumbnail.')
+            raise NoImageSourceException('This source is a playlist so it doesn\'t have thumbnail.')
         
         return get_youtube_channel_image_info(self.url)
 
