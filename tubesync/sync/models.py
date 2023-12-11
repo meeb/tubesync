@@ -3,7 +3,6 @@ import uuid
 import json
 import re
 import requests
-from bs4 import BeautifulSoup
 from xml.etree import ElementTree
 from collections import OrderedDict
 from datetime import datetime, timedelta
@@ -18,7 +17,8 @@ from django.utils.translation import gettext_lazy as _
 from common.errors import NoFormatException
 from common.utils import clean_filename
 from .youtube import (get_media_info as get_youtube_media_info,
-                      download_media as download_youtube_media)
+                      download_media as download_youtube_media,
+                      get_channel_image_info as get_youtube_channel_image_info)
 from .utils import seconds_to_timestr, parse_media_format
 from .matching import (get_best_combined_format, get_best_audio_format, 
                        get_best_video_format)
@@ -490,26 +490,12 @@ class Source(models.Model):
         return os.makedirs(self.directory_path, exist_ok=True)
 
     @property
-    def get_thumbnail_url(self):
+    def get_image_url(self):
         if self.source_type == self.SOURCE_TYPE_YOUTUBE_PLAYLIST:
             raise Exception('This source is a playlist so it doesn\'t have thumbnail.')
         
-        try:
-            response = requests.get(self.url, cookies={'CONSENT': 'YES+1'})
-            response.raise_for_status()
-        except RequestException as e:
-            print(f"Error occurred while making a request to YouTube: {e}")
-            return None
+        return get_youtube_channel_image_info(self.url)
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        
-        try:
-            data = re.search(r"var ytInitialData = ({.*});", str(soup.prettify())).group(1)
-            json_data = json.loads(data)
-            return json_data["header"]["c4TabbedHeaderRenderer"]["avatar"]["thumbnails"][2]["url"]
-        except (KeyError, ValueError, TypeError) as e:
-            print(f"Error occurred while parsing YouTube JSON: {e}")
-            return None
 
     def directory_exists(self):
         return (os.path.isdir(self.directory_path) and

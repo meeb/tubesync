@@ -233,18 +233,16 @@ def download_source_thumbnail(source_id):
         log.error(f'Task download_source_thumbnail(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         return
-
-    url = source.get_thumbnail_url
-    width = 400
-    height = 400
-    i = get_remote_image(url)
-    log.info(f'Resizing {i.width}x{i.height} thumbnail to '
-             f'{width}x{height}: {url}')
-    i = resize_image_to_height(i, width, height)
-    image_file = BytesIO()
-    i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
-
-    for file_name in ["poster.jpg", "season-poster.jpg"]:
+    avatar, banner = source.get_image_url
+    log.info(f'Thumbnail URL for source with ID: {source_id} '
+        f'Avatar: {avatar} '
+        f'Banner: {banner}')
+    if banner != None:
+        url = banner
+        i = get_remote_image(url)
+        image_file = BytesIO()
+        i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
+        file_name = "banner.jpg"
         # Reset file pointer to the beginning for the next save
         image_file.seek(0)
         # Create a Django ContentFile from BytesIO stream
@@ -253,7 +251,22 @@ def download_source_thumbnail(source_id):
         with open(file_path, 'wb') as f:
             f.write(django_file.read())
 
-    log.info(f'Thumbnail downloaded from {url} for source with ID: {source_id}')
+    if avatar != None:
+        url = avatar
+        i = get_remote_image(url)
+        image_file = BytesIO()
+        i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
+
+        for file_name in ["poster.jpg", "season-poster.jpg"]:
+            # Reset file pointer to the beginning for the next save
+            image_file.seek(0)
+            # Create a Django ContentFile from BytesIO stream
+            django_file = ContentFile(image_file.read())
+            file_path = source.directory_path / file_name
+            with open(file_path, 'wb') as f:
+                f.write(django_file.read())
+
+    log.info(f'Thumbnail downloaded for source with ID: {source_id}')
 
 
 @background(schedule=0)
