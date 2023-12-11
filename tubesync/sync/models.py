@@ -13,7 +13,7 @@ from django.core.validators import RegexValidator
 from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from common.errors import NoFormatException
+from common.errors import NoFormatException, NoImageSourceException
 from common.utils import clean_filename
 from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media,
