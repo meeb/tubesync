@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='source',
-            name='copy_channel_thumbnails',
-            field=models.BooleanField(default=False, help_text='Copy channel thumbnails in poster.jpg and season-poster.jpg, these may be detected and used by some media servers', verbose_name='copy channel thumbnails'),
+            name='copy_channel_images',
+            field=models.BooleanField(default=False, help_text='Copy channel images : banner as banner.jpg and avatar as poster.jpg and season-poster.jpg. These may be detected and used by some media servers', verbose_name='copy channel images'),
         ),
     ]

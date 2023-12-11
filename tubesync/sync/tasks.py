@@ -221,7 +221,7 @@ def check_source_directory_exists(source_id):
 
 
 @background(schedule=0)
-def download_source_thumbnail(source_id):
+def download_source_images(source_id):
     '''
         Downloads an image and save it as a local thumbnail attached to a
         Source instance.
@@ -230,7 +230,7 @@ def download_source_thumbnail(source_id):
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist:
         # Task triggered but the source no longer exists, do nothing
-        log.error(f'Task download_source_thumbnail(pk={source_id}) called but no '
+        log.error(f'Task download_source_images(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         return
     avatar, banner = source.get_image_url

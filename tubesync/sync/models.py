@@ -343,10 +343,10 @@ class Source(models.Model):
         default=FALLBACK_NEXT_BEST_HD,
         help_text=_('What do do when media in your source resolution and codecs is not available')
     )
-    copy_channel_thumbnails = models.BooleanField(
-        _('copy channel thumbnails'),
+    copy_channel_images = models.BooleanField(
+        _('copy channel images'),
         default=False,
-        help_text=_('Copy channel thumbnails in poster.jpg and season-poster.jpg, these may be detected and used by some media servers')
+        help_text=_('Copy channel images : banner as banner.jpg and avatar as poster.jpg and season-poster.jpg. These may be detected and used by some media servers')
     )
     copy_thumbnails = models.BooleanField(
         _('copy thumbnails'),
