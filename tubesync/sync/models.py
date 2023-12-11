@@ -300,6 +300,11 @@ class Source(models.Model):
         default=False,
         help_text=_('Delete media that is no longer on this playlist')
     )
+    delete_files_on_disk = models.BooleanField(
+        _('delete files on disk'),
+        default=False,
+        help_text=_('Delete files on disk when they are removed from TubeSync')
+    )
     source_resolution = models.CharField(
         _('source resolution'),
         max_length=8,
