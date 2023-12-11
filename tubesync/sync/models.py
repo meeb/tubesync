@@ -491,12 +491,25 @@ class Source(models.Model):
 
     @property
     def get_thumbnail_url(self):
-        if self.source_type==Source.SOURCE_TYPE_YOUTUBE_PLAYLIST:
+        if self.source_type == self.SOURCE_TYPE_YOUTUBE_PLAYLIST:
             raise Exception('This source is a playlist so it doesn\'t have thumbnail.')
-        soup = BeautifulSoup(requests.get(self.url, cookies={'CONSENT': 'YES+1'}).text, "html.parser")
-        data = re.search(r"var ytInitialData = ({.*});", str(soup.prettify())).group(1)
-        json_data = json.loads(data)
-        return json_data["header"]["c4TabbedHeaderRenderer"]["avatar"]["thumbnails"][2]["url"]
+        
+        try:
+            response = requests.get(self.url, cookies={'CONSENT': 'YES+1'})
+            response.raise_for_status()
+        except RequestException as e:
+            print(f"Error occurred while making a request to YouTube: {e}")
+            return None
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        
+        try:
+            data = re.search(r"var ytInitialData = ({.*});", str(soup.prettify())).group(1)
+            json_data = json.loads(data)
+            return json_data["header"]["c4TabbedHeaderRenderer"]["avatar"]["thumbnails"][2]["url"]
+        except (KeyError, ValueError, TypeError) as e:
+            print(f"Error occurred while parsing YouTube JSON: {e}")
+            return None
 
     def directory_exists(self):
         return (os.path.isdir(self.directory_path) and
