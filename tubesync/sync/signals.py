@@ -224,7 +224,7 @@ def media_pre_delete(sender, instance, **kwargs):
     if thumbnail_url:
         delete_task_by_media('sync.tasks.download_media_thumbnail',
                              (str(instance.pk), thumbnail_url))
-    if instance.source.delete_files_on_disk and (instance.media_file or instance.thumb):
+    if instance.media_file or instance.thumb:
         # Delete all media files if it contains filename
         filepath = instance.media_file.path if instance.media_file else instance.thumb.path
         barefilepath, fileext = os.path.splitext(filepath)

@@ -298,7 +298,7 @@ class EditSourceMixin:
     model = Source
     fields = ('source_type', 'key', 'name', 'directory', 'filter_text', 'media_format',
               'index_schedule', 'download_media', 'download_cap', 'delete_old_media',
-              'delete_removed_media', 'delete_files_on_disk', 'days_to_keep', 'source_resolution',
+              'delete_removed_media', 'days_to_keep', 'source_resolution',
               'source_vcodec', 'source_acodec', 'prefer_60fps', 'prefer_hdr', 'fallback',
               'copy_thumbnails', 'write_nfo', 'write_json', 'embed_metadata', 'embed_thumbnail',
               'enable_sponsorblock', 'sponsorblock_categories', 'write_subtitles',
