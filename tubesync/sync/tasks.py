@@ -242,14 +242,15 @@ def download_source_images(source_id):
         i = get_remote_image(url)
         image_file = BytesIO()
         i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
-        file_name = "banner.jpg"
-        # Reset file pointer to the beginning for the next save
-        image_file.seek(0)
-        # Create a Django ContentFile from BytesIO stream
-        django_file = ContentFile(image_file.read())
-        file_path = source.directory_path / file_name
-        with open(file_path, 'wb') as f:
-            f.write(django_file.read())
+
+        for file_name in ["banner.jpg", "background.jpg"]:
+            # Reset file pointer to the beginning for the next save
+            image_file.seek(0)
+            # Create a Django ContentFile from BytesIO stream
+            django_file = ContentFile(image_file.read())
+            file_path = source.directory_path / file_name
+            with open(file_path, 'wb') as f:
+                f.write(django_file.read())
 
     if avatar != None:
         url = avatar

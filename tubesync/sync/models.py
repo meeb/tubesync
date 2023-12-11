@@ -346,7 +346,7 @@ class Source(models.Model):
     copy_channel_images = models.BooleanField(
         _('copy channel images'),
         default=False,
-        help_text=_('Copy channel images : banner as banner.jpg and avatar as poster.jpg and season-poster.jpg. These may be detected and used by some media servers')
+        help_text=_('Copy channel banner and avatar. These may be detected and used by some media servers')
     )
     copy_thumbnails = models.BooleanField(
         _('copy thumbnails'),
