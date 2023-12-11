@@ -1,4 +1,5 @@
 import os
+import glob
 from django.conf import settings
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
 from django.dispatch import receiver
@@ -72,6 +73,7 @@ def source_pre_delete(sender, instance, **kwargs):
     for media in Media.objects.filter(source=instance):
         log.info(f'Deleting media for source: {instance.name} item: {media.name}')
         media.delete()
+
 
 
 @receiver(post_delete, sender=Source)
@@ -222,20 +224,16 @@ def media_pre_delete(sender, instance, **kwargs):
     if thumbnail_url:
         delete_task_by_media('sync.tasks.download_media_thumbnail',
                              (str(instance.pk), thumbnail_url))
-    if instance.source.delete_files_on_disk:
-        if instance.thumb:
-            log.info(f'Deleting thumbnail for: {instance} path: {instance.thumb.path}')
-            delete_file(instance.thumb.path)
-        # Delete the media file if it exists
-        if instance.media_file:
-            filepath = instance.media_file.path
-            log.info(f'Deleting media for: {instance} path: {filepath}')
-            delete_file(filepath)
-            # Delete thumbnail copy if it exists
-            barefilepath, fileext = os.path.splitext(filepath)
-            thumbpath = f'{barefilepath}.jpg'
-            log.info(f'Deleting thumbnail for: {instance} path: {thumbpath}')
-            delete_file(thumbpath)
+    if instance.source.delete_files_on_disk and (instance.media_file or instance.thumb):
+        # Delete all media files if it contains filename
+        filepath = instance.media_file.path if instance.media_file else instance.thumb.path
+        barefilepath, fileext = os.path.splitext(filepath)
+        # Get all files that start with the bare file path
+        all_related_files = glob.glob(f'{barefilepath}.*')
+        for file in all_related_files:
+            log.info(f'Deleting file for: {instance} path: {file}')
+            delete_file(file)
+
 
 
 @receiver(post_delete, sender=Media)
