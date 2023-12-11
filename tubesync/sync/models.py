@@ -2,7 +2,6 @@ import os
 import uuid
 import json
 import re
-import requests
 from xml.etree import ElementTree
 from collections import OrderedDict
 from datetime import datetime, timedelta
