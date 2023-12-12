@@ -8,12 +8,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from django.conf import settings
 from django.db import models
+from django.core.exceptions import SuspiciousOperation
 from django.core.files.storage import FileSystemStorage
 from django.core.validators import RegexValidator
 from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from common.errors import NoFormatException, NoImageSourceException
+from common.errors import NoFormatException
 from common.utils import clean_filename
 from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media,
@@ -491,7 +492,7 @@ class Source(models.Model):
     @property
     def get_image_url(self):
         if self.source_type == self.SOURCE_TYPE_YOUTUBE_PLAYLIST:
-            raise NoImageSourceException('This source is a playlist so it doesn\'t have thumbnail.')
+            raise SuspiciousOperation('This source is a playlist so it doesn\'t have thumbnail.')
         
         return get_youtube_channel_image_info(self.url)
 
