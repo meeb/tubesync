@@ -124,18 +124,16 @@ def download_media(url, media_format, extension, output_file, info_json,
         sponsor_categories = []
     sbopt = {
         'key': 'SponsorBlock',
-        'categories': [sponsor_categories]
+        'categories': sponsor_categories
     }
     ffmdopt = {
         'key': 'FFmpegMetadata',
-        'add_chapters': True,
-        'add_metadata': True
+        'add_chapters': embed_metadata,
+        'add_metadata': embed_metadata
     }
     opts = get_yt_opts()
     if embed_thumbnail:
         ytopts['postprocessors'].append({'key': 'EmbedThumbnail'})
-    if embed_metadata:
-        ffmdopt["add_metadata"] = True
     if skip_sponsors:
         ytopts['postprocessors'].append(sbopt)
     ytopts['postprocessors'].append(ffmdopt)
