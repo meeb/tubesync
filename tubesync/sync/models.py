@@ -158,8 +158,8 @@ class Source(models.Model):
     }
     # Format used to create indexable URLs
     INDEX_URLS = {
-        SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/c/{key}/videos',
-        SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/channel/{key}/videos',
+        SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/c/{key}/{type}',
+        SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/channel/{key}/{type}',
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/playlist?list={key}',
     }
     # Callback functions to get a list of media from the source
@@ -266,6 +266,16 @@ class Source(models.Model):
         _('download media'),
         default=True,
         help_text=_('Download media from this source, if not selected the source will only be indexed')
+    )
+    index_streams = models.BooleanField(
+        _('index streams'),
+        default=False,
+        help_text=_('Index live stream media from this source')
+    )
+    download_streams = models.BooleanField(
+        _('download streams'),
+        default=False,
+        help_text=_('Download live stream media from this source')
     )
     download_cap = models.IntegerField(
         _('download cap'),
@@ -440,17 +450,16 @@ class Source(models.Model):
         return url.format(key=key)
 
     @classmethod
-    def create_index_url(obj, source_type, key):
+    def create_index_url(obj, source_type, key, type):
         url = obj.INDEX_URLS.get(source_type)
-        return url.format(key=key)
+        return url.format(key=key, type=type)
 
     @property
     def url(self):
         return Source.create_url(self.source_type, self.key)
 
-    @property
-    def index_url(self):
-        return Source.create_index_url(self.source_type, self.key)
+    def get_index_url(self, type='videos'):
+        return Source.create_index_url(self.source_type, self.key, type)
 
     @property
     def format_summary(self):
@@ -547,18 +556,35 @@ class Source(models.Model):
             return True
         return bool(re.search(self.filter_text, media_item_title))
     
+    def index_media_videos(self):
+        indexer = self.INDEXERS.get(self.source_type, None)
+        if not callable(indexer):
+            raise Exception(f'Source type f"{self.source_type}" has no indexer')
+        response = indexer(self.get_index_url(type='videos'))
+        if not isinstance(response, dict):
+            return []
+        entries = response.get('entries', [])
+        return entries
+
+    def index_media_streams(self):
+        indexer = self.INDEXERS.get(self.source_type, None)
+        if not callable(indexer):
+            raise Exception(f'Source type f"{self.source_type}" has no indexer')
+        response = indexer(self.get_index_url(type='streams'))
+        if not isinstance(response, dict):
+            return []
+        entries = response.get('entries', [])
+        return entries
+
     def index_media(self):
         '''
             Index the media source returning a list of media metadata as dicts.
         '''
-        indexer = self.INDEXERS.get(self.source_type, None)
-        if not callable(indexer):
-            raise Exception(f'Source type f"{self.source_type}" has no indexer')
-        response = indexer(self.index_url)
-        if not isinstance(response, dict):
-            return []
-        entries = response.get('entries', [])
-
+        entries = self.index_media_videos()
+        # Playlists do something different that I have yet to figure out
+        if self.source_type != Source.SOURCE_TYPE_YOUTUBE_PLAYLIST:
+            if self.index_streams:
+                entries += self.index_media_streams()
         if settings.MAX_ENTRIES_PROCESSING:
             entries = entries[:settings.MAX_ENTRIES_PROCESSING]
         return entries

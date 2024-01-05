@@ -69,6 +69,14 @@
         <td class="hide-on-small-only">Download media?</td>
         <td><span class="hide-on-med-and-up">Download media?<br></span><strong>{% if source.download_media %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
       </tr>
+      <tr title="Index streams from this source">
+        <td class="hide-on-small-only">Index streams?</td>
+        <td><span class="hide-on-med-and-up">Index streams?<br></span><strong>{% if source.index_streams %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
+      <tr title="Download streams from this source">
+        <td class="hide-on-small-only">Download streams?</td>
+        <td><span class="hide-on-med-and-up">Download streams?<br></span><strong>{% if source.download_streams %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
       <tr title="When then source was created locally in TubeSync">
         <td class="hide-on-small-only">Created</td>
         <td><span class="hide-on-med-and-up">Created<br></span><strong>{{ source.created|date:'Y-m-d H:i:s' }}</strong></td>
