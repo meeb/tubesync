@@ -59,7 +59,7 @@ class DashboardView(TemplateView):
         # Disk usage
         disk_usage = Media.objects.filter(
             downloaded=True, downloaded_filesize__isnull=False
-        ).aggregate(Sum('downloaded_filesize'))
+        ).defer('metadata').aggregate(Sum('downloaded_filesize'))
         data['disk_usage_bytes'] = disk_usage['downloaded_filesize__sum']
         if not data['disk_usage_bytes']:
             data['disk_usage_bytes'] = 0
@@ -71,11 +71,11 @@ class DashboardView(TemplateView):
         # Latest downloads
         data['latest_downloads'] = Media.objects.filter(
             downloaded=True, downloaded_filesize__isnull=False
-        ).order_by('-download_date')[:10]
+        ).defer('metadata').order_by('-download_date')[:10]
         # Largest downloads
         data['largest_downloads'] = Media.objects.filter(
             downloaded=True, downloaded_filesize__isnull=False
-        ).order_by('-downloaded_filesize')[:10]
+        ).defer('metadata').order_by('-downloaded_filesize')[:10]
         # UID and GID
         data['uid'] = os.getuid()
         data['gid'] = os.getgid()
@@ -404,7 +404,7 @@ class SourceView(DetailView):
             error_message = get_error_message(error)
             setattr(error, 'error_message', error_message)
             data['errors'].append(error)
-        data['media'] = Media.objects.filter(source=self.object).order_by('-published')
+        data['media'] = Media.objects.filter(source=self.object).order_by('-published').defer('metadata')
         return data
 
 
