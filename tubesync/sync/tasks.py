@@ -235,7 +235,14 @@ def download_media_metadata(media_id):
         log.info(f'Task for ID: {media_id} skipped, due to task being manually skipped.')
         return
     source = media.source
-    metadata = media.index_metadata()
+
+    try:
+        metadata = media.index_metadata()
+    except Exception as e:
+        media.can_download = False
+        media.skip = True
+        media.save()
+        return
     media.metadata = json.dumps(metadata, default=json_serial)
     upload_date = media.upload_date
     # Media must have a valid upload date

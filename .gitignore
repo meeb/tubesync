@@ -134,3 +134,6 @@ dmypy.json
 
 Pipfile.lock
 .vscode/launch.json
+
+# Jetbrains
+.idea
