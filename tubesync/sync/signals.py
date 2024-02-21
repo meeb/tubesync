@@ -172,7 +172,7 @@ def media_post_save(sender, instance, created, **kwargs):
         instance.save()
         post_save.connect(media_post_save, sender=Media)
     # If the media is missing metadata schedule it to be downloaded
-    if not instance.metadata:
+    if not instance.metadata and (instance.can_download and not instance.skip):
         log.info(f'Scheduling task to download metadata for: {instance.url}')
         verbose_name = _('Downloading metadata for "{}"')
         download_media_metadata(
