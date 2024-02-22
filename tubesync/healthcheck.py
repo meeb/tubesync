@@ -1,3 +1,14 @@
+#!/usr/bin/env python3
+'''
+
+    Perform an HTTP request to a URL and exit with an exit code of 1 if the
+    request did not return an HTTP/200 status code.
+
+    Usage:
+    $ ./healthcheck.py http://some.url.here/healthcheck/resource
+
+'''
+
 import os
 import sys
 import requests
@@ -25,7 +36,7 @@ def health_check(url):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python healthcheck.py <URL>")
+        print("Usage: python3 healthcheck.py <URL>")
         sys.exit(1)
     
     url = sys.argv[1]
