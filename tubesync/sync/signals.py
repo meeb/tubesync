@@ -11,7 +11,7 @@ from .models import Source, Media, MediaServer
 from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
                     download_media_thumbnail, download_media_metadata,
                     map_task_to_instance, check_source_directory_exists,
-                    download_media, rescan_media_server)
+                    download_media, rescan_media_server, download_source_images)
 from .utils import delete_file
 
 
@@ -48,6 +48,12 @@ def source_post_save(sender, instance, created, **kwargs):
             priority=0,
             verbose_name=verbose_name.format(instance.name)
         )
+        if instance.source_type != Source.SOURCE_TYPE_YOUTUBE_PLAYLIST and instance.copy_channel_images:
+            download_source_images(
+                str(instance.pk),
+                priority=0,
+                verbose_name=verbose_name.format(instance.name)
+            )
         if instance.index_schedule > 0:
             delete_task_by_source('sync.tasks.index_source_task', instance.pk)
             log.info(f'Scheduling media indexing for source: {instance.name}')

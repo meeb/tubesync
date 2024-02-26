@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from django.conf import settings
 from django.db import models
+from django.core.exceptions import SuspiciousOperation
 from django.core.files.storage import FileSystemStorage
 from django.core.validators import RegexValidator
 from django.utils.text import slugify
@@ -16,7 +17,8 @@ from django.utils.translation import gettext_lazy as _
 from common.errors import NoFormatException
 from common.utils import clean_filename
 from .youtube import (get_media_info as get_youtube_media_info,
-                      download_media as download_youtube_media)
+                      download_media as download_youtube_media,
+                      get_channel_image_info as get_youtube_channel_image_info)
 from .utils import seconds_to_timestr, parse_media_format
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
@@ -343,6 +345,11 @@ class Source(models.Model):
         default=FALLBACK_NEXT_BEST_HD,
         help_text=_('What do do when media in your source resolution and codecs is not available')
     )
+    copy_channel_images = models.BooleanField(
+        _('copy channel images'),
+        default=False,
+        help_text=_('Copy channel banner and avatar. These may be detected and used by some media servers')
+    )
     copy_thumbnails = models.BooleanField(
         _('copy thumbnails'),
         default=False,
@@ -482,6 +489,14 @@ class Source(models.Model):
 
     def make_directory(self):
         return os.makedirs(self.directory_path, exist_ok=True)
+
+    @property
+    def get_image_url(self):
+        if self.source_type == self.SOURCE_TYPE_YOUTUBE_PLAYLIST:
+            raise SuspiciousOperation('This source is a playlist so it doesn\'t have thumbnail.')
+        
+        return get_youtube_channel_image_info(self.url)
+
 
     def directory_exists(self):
         return (os.path.isdir(self.directory_path) and

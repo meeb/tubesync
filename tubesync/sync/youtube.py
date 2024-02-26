@@ -35,6 +35,35 @@ def get_yt_opts():
         opts.update({'cookiefile': cookie_file_path})
     return opts
 
+def get_channel_image_info(url):
+    opts = get_yt_opts()
+    opts.update({
+        'skip_download': True,
+        'forcejson': True,
+        'simulate': True,
+        'logger': log,
+        'extract_flat': True,  # Change to False to get detailed info
+    })
+
+    with yt_dlp.YoutubeDL(opts) as y:
+        try:
+            response = y.extract_info(url, download=False)
+            
+            avatar_url = None
+            banner_url = None
+            for thumbnail in response['thumbnails']:
+                if thumbnail['id'] == 'avatar_uncropped':
+                    avatar_url = thumbnail['url']
+                if thumbnail['id'] == 'banner_uncropped':
+                    banner_url = thumbnail['url']
+                if banner_url != None and avatar_url != None:
+                    break
+                    
+            return avatar_url, banner_url
+        except yt_dlp.utils.DownloadError as e:
+            raise YouTubeError(f'Failed to extract channel info for "{url}": {e}') from e
+
+
 
 def get_media_info(url):
     '''
