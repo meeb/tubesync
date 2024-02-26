@@ -5,7 +5,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0020_auto_20231024_1825'),
+        ('sync', '0021_source_copy_channel_images'),
     ]
 
     operations = [
