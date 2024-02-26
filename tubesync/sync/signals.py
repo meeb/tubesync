@@ -172,7 +172,7 @@ def media_post_save(sender, instance, created, **kwargs):
         instance.save()
         post_save.connect(media_post_save, sender=Media)
     # If the media is missing metadata schedule it to be downloaded
-    if not instance.metadata and not instance.skip:
+    if not instance.metadata:
         log.info(f'Scheduling task to download metadata for: {instance.url}')
         verbose_name = _('Downloading metadata for "{}"')
         download_media_metadata(
@@ -184,7 +184,7 @@ def media_post_save(sender, instance, created, **kwargs):
     # If the media is missing a thumbnail schedule it to be downloaded
     if not instance.thumb_file_exists:
         instance.thumb = None
-    if not instance.thumb and not instance.skip:
+    if not instance.thumb:
         thumbnail_url = instance.thumbnail
         if thumbnail_url:
             log.info(f'Scheduling task to download thumbnail for: {instance.name} '
