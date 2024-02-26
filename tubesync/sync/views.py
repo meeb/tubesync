@@ -1,7 +1,9 @@
+import glob
 import os
 import json
 from base64 import b64decode
 import pathlib
+import shutil
 import sys
 from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponseNotFound, HttpResponseRedirect
@@ -59,7 +61,7 @@ class DashboardView(TemplateView):
         # Disk usage
         disk_usage = Media.objects.filter(
             downloaded=True, downloaded_filesize__isnull=False
-        ).aggregate(Sum('downloaded_filesize'))
+        ).defer('metadata').aggregate(Sum('downloaded_filesize'))
         data['disk_usage_bytes'] = disk_usage['downloaded_filesize__sum']
         if not data['disk_usage_bytes']:
             data['disk_usage_bytes'] = 0
@@ -71,11 +73,11 @@ class DashboardView(TemplateView):
         # Latest downloads
         data['latest_downloads'] = Media.objects.filter(
             downloaded=True, downloaded_filesize__isnull=False
-        ).order_by('-download_date')[:10]
+        ).defer('metadata').order_by('-download_date')[:10]
         # Largest downloads
         data['largest_downloads'] = Media.objects.filter(
             downloaded=True, downloaded_filesize__isnull=False
-        ).order_by('-downloaded_filesize')[:10]
+        ).defer('metadata').order_by('-downloaded_filesize')[:10]
         # UID and GID
         data['uid'] = os.getuid()
         data['gid'] = os.getgid()
@@ -298,6 +300,8 @@ class EditSourceMixin:
               'index_schedule', 'download_media', 'download_cap', 'delete_old_media',
               'delete_removed_media', 'days_to_keep', 'source_resolution', 'source_vcodec',
               'source_acodec', 'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_channel_images',
+              'delete_removed_media', 'delete_files_on_disk', 'days_to_keep', 'source_resolution',
+              'source_vcodec', 'source_acodec', 'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_channel_images',
               'copy_thumbnails', 'write_nfo', 'write_json', 'embed_metadata', 'embed_thumbnail',
               'enable_sponsorblock', 'sponsorblock_categories', 'write_subtitles',
               'auto_subtitles', 'sub_langs')
@@ -404,7 +408,7 @@ class SourceView(DetailView):
             error_message = get_error_message(error)
             setattr(error, 'error_message', error_message)
             data['errors'].append(error)
-        data['media'] = Media.objects.filter(source=self.object).order_by('-published')
+        data['media'] = Media.objects.filter(source=self.object).order_by('-published').defer('metadata')
         return data
 
 
@@ -435,14 +439,13 @@ class DeleteSourceView(DeleteView, FormMixin):
             source = self.get_object()
             for media in Media.objects.filter(source=source):
                 if media.media_file:
-                    # Delete the media file
-                    delete_file(media.media_file.path)
-                    # Delete thumbnail copy if it exists
-                    delete_file(media.thumbpath)
-                    # Delete NFO file if it exists
-                    delete_file(media.nfopath)
-                    # Delete JSON file if it exists
-                    delete_file(media.jsonpath)
+                    file_path = media.media_file.path
+                    matching_files = glob.glob(os.path.splitext(file_path)[0] + '.*')
+                    for file in matching_files:
+                        delete_file(file)
+            directory_path = source.directory_path
+            if os.path.exists(directory_path):
+                shutil.rmtree(directory_path, True)
         return super().post(request, *args, **kwargs)
 
     def get_success_url(self):
@@ -653,12 +656,13 @@ class MediaSkipView(FormView, SingleObjectMixin):
         delete_task_by_media('sync.tasks.download_media', (str(self.object.pk),))
         # If the media file exists on disk, delete it
         if self.object.media_file_exists:
-            delete_file(self.object.media_file.path)
-            self.object.media_file = None
-            # If the media has an associated thumbnail copied, also delete it
-            delete_file(self.object.thumbpath)
-            # If the media has an associated NFO file with it, also delete it
-            delete_file(self.object.nfopath)
+            # Delete all files which contains filename
+            filepath = self.object.media_file.path
+            barefilepath, fileext = os.path.splitext(filepath)
+            # Get all files that start with the bare file path
+            all_related_files = glob.glob(f'{barefilepath}.*')
+            for file in all_related_files:
+                delete_file(file)
         # Reset all download data
         self.object.metadata = None
         self.object.downloaded = False

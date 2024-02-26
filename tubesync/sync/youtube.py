@@ -1,5 +1,5 @@
 '''
-    Wrapper for the youtube-dl library. Used so if there are any library interface
+    Wrapper for the yt-dlp library. Used so if there are any library interface
     updates we only need to udpate them in one place.
 '''
 
@@ -93,9 +93,9 @@ def get_media_info(url):
     return response
 
 
-def download_media(url, media_format, extension, output_file, info_json, 
-                   sponsor_categories="all", 
-                   embed_thumbnail=False, embed_metadata=False, skip_sponsors=True, 
+def download_media(url, media_format, extension, output_file, info_json,
+                   sponsor_categories=None,
+                   embed_thumbnail=False, embed_metadata=False, skip_sponsors=True,
                    write_subtitles=False, auto_subtitles=False, sub_langs='en'):
     '''
         Downloads a YouTube URL to a file on disk.
@@ -103,7 +103,7 @@ def download_media(url, media_format, extension, output_file, info_json,
 
     def hook(event):
         filename = os.path.basename(event['filename'])
-    
+
         if event.get('downloaded_bytes') is None or event.get('total_bytes') is None:
             return None
 
@@ -135,8 +135,8 @@ def download_media(url, media_format, extension, output_file, info_json,
                      f'{total_size_str} in {elapsed_str}')
         else:
             log.warn(f'[youtube-dl] unknown event: {str(event)}')
-    hook.download_progress = 0
 
+    hook.download_progress = 0
     ytopts = {
         'format': media_format,
         'merge_output_format': extension,
@@ -149,29 +149,25 @@ def download_media(url, media_format, extension, output_file, info_json,
         'writeautomaticsub': auto_subtitles,
         'subtitleslangs': sub_langs.split(','),
     }
-    
+    if not sponsor_categories:
+        sponsor_categories = []
     sbopt = {
         'key': 'SponsorBlock',
-        'categories': [sponsor_categories]
+        'categories': sponsor_categories
     }
     ffmdopt = {
         'key': 'FFmpegMetadata',
-        'add_chapters': True,
-        'add_metadata': True
+        'add_chapters': embed_metadata,
+        'add_metadata': embed_metadata
     }
-
     opts = get_yt_opts()
     if embed_thumbnail:
         ytopts['postprocessors'].append({'key': 'EmbedThumbnail'})
-    if embed_metadata:
-        ffmdopt["add_metadata"] = True
     if skip_sponsors:
         ytopts['postprocessors'].append(sbopt)
-    
     ytopts['postprocessors'].append(ffmdopt)
-        
     opts.update(ytopts)
-        
+
     with yt_dlp.YoutubeDL(opts) as y:
         try:
             return y.download([url])

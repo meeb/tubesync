@@ -25,9 +25,6 @@ DEBUG = True if os.getenv('TUBESYNC_DEBUG', False) else False
 FORCE_SCRIPT_NAME = os.getenv('DJANGO_FORCE_SCRIPT_NAME', DJANGO_URL_PREFIX)
 
 
-TIME_ZONE = os.getenv('TZ', 'UTC')
-
-
 database_dict = {}
 database_connection_env = os.getenv('DATABASE_CONNECTION', '')
 if database_connection_env:
