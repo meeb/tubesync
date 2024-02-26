@@ -10,16 +10,22 @@
 '''
 
 
+import os
 import sys
 import requests
 
 
 TIMEOUT = 5  # Seconds
+HTTP_USER = os.getenv('HTTP_USER')
+HTTP_PASS = os.getenv('HTTP_PASS')
 
 
 def do_heatlhcheck(url):
     headers = {'User-Agent': 'healthcheck'}
-    response = requests.get(url, headers=headers, timeout=TIMEOUT)
+    auth = None
+    if HTTP_USER and HTTP_PASS:
+        auth = (HTTP_USER, HTTP_PASS)
+    response = requests.get(url, headers=headers, auth=auth, timeout=TIMEOUT)
     return response.status_code == 200
 
 
