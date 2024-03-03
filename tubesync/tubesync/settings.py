@@ -164,8 +164,8 @@ YOUTUBE_DEFAULTS = {
 }
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 
-
-MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'
+# default for new sources from env vars
+MEDIA_FORMATSTR_DEFAULT = os.environ.get('MEDIA_FORMATSTR_DEFAULT', '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}')
 
 
 try:

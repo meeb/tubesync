@@ -121,6 +121,30 @@ class Source(models.Model):
         ('music_offtopic', 'Non-Music Section'),
     )
 
+    EMBED_METADATA_DEFAULT = bool(os.environ.get('EMBED_METADATA_DEFAULT', False))
+    EMBED_THUMBNAIL_DEFAULT = bool(os.environ.get('EMBED_THUMBNAIL_DEFAULT', False))
+    ENABLE_SPONSORBLOCK_DEFAULT = bool(os.environ.get('ENABLE_SPONSORBLOCK_DEFAULT', True))
+
+    DOWNLOAD_MEDIA_DEFAULT = bool(os.environ.get('DOWNLOAD_MEDIA_DEFAULT', True))
+    DELETE_OLD_MEDIA_DEFAULT = bool(os.environ.get('DELETE_OLD_MEDIA_DEFAULT', False))
+    DAYS_TO_KEEP_DEFAULT = int(os.environ.get('DAYS_TO_KEEP_DEFAULT', 14))
+    FILTER_TEXT_DEFAULT = str(os.environ.get('FILTER_TEXT_DEFAULT', ''))
+    DELETE_REMOVED_MEDIA_DEFAULT = bool(os.environ.get('DELETE_REMOVED_MEDIA_DEFAULT', False))
+    DELETE_FILES_ON_DISK_DEFAULT = bool(os.environ.get('DELETE_FILES_ON_DISK_DEFAULT', False))
+    SOURCE_RESOLUTION_DEFAULT = str(os.environ.get('SOURCE_RESOLUTION_DEFAULT', SOURCE_RESOLUTION_1080P))
+    SOURCE_VCODEC_DEFAULT = str(os.environ.get('SOURCE_VCODEC_DEFAULT', SOURCE_VCODEC_VP9))
+    SOURCE_ACODEC_DEFAULT = str(os.environ.get('SOURCE_ACODEC_DEFAULT', SOURCE_ACODEC_OPUS))
+    PREFER_60FPS_DEFAULT = bool(os.environ.get('PREFER_60FPS_DEFAULT', True))
+    PREFER_HDR_DEFAULT = bool(os.environ.get('PREFER_HDR_DEFAULT', False))
+    FALLBACK_DEFAULT = str(os.environ.get('FALLBACK_DEFAULT', FALLBACK_NEXT_BEST_HD))
+    COPY_CHANNEL_IMAGES_DEFAULT = bool(os.environ.get('COPY_CHANNEL_IMAGES_DEFAULT', False))
+    COPY_THUMBNAILS_DEFAULT = bool(os.environ.get('COPY_THUMBNAILS_DEFAULT', False))
+    WRITE_NFO_DEFAULT = bool(os.environ.get('WRITE_NFO_DEFAULT', False))
+    WRITE_JSON_DEFAULT = bool(os.environ.get('WRITE_JSON_DEFAULT', False))
+    WRITE_SUBTITLES_DEFAULT = bool(os.environ.get('WRITE_SUBTITLES_DEFAULT', False))
+    AUTO_SUBTITLES_DEFAULT = bool(os.environ.get('AUTO_SUBTITLES_DEFAULT', False))
+    SUB_LANGS_DEFAULT = str(os.environ.get('SUB_LANGS_DEFAULT', 'en'))
+
     sponsorblock_categories = CommaSepChoiceField(
         _(''),
         possible_choices=SPONSORBLOCK_CATEGORIES_CHOICES,
@@ -132,17 +156,17 @@ class Source(models.Model):
     )
     embed_metadata = models.BooleanField(
         _('embed metadata'),
-        default=False,
+        default=EMBED_METADATA_DEFAULT,
         help_text=_('Embed metadata from source into file')
     )
     embed_thumbnail = models.BooleanField(
         _('embed thumbnail'),
-        default=False,
+        default=EMBED_THUMBNAIL_DEFAULT,
         help_text=_('Embed thumbnail into the file')
     )
     enable_sponsorblock = models.BooleanField(
         _('enable sponsorblock'),
-        default=True,
+        default=ENABLE_SPONSORBLOCK_DEFAULT,
         help_text=_('Use SponsorBlock?')
     )
 
@@ -266,7 +290,7 @@ class Source(models.Model):
     )
     download_media = models.BooleanField(
         _('download media'),
-        default=True,
+        default=DOWNLOAD_MEDIA_DEFAULT,
         help_text=_('Download media from this source, if not selected the source will only be indexed')
     )
     download_cap = models.IntegerField(
@@ -277,30 +301,30 @@ class Source(models.Model):
     )
     delete_old_media = models.BooleanField(
         _('delete old media'),
-        default=False,
+        default=DELETE_OLD_MEDIA_DEFAULT,
         help_text=_('Delete old media after "days to keep" days?')
     )
     days_to_keep = models.PositiveSmallIntegerField(
         _('days to keep'),
-        default=14,
+        default=DAYS_TO_KEEP_DEFAULT,
         help_text=_('If "delete old media" is ticked, the number of days after which '
                     'to automatically delete media')
     )
     filter_text = models.CharField(
         _('filter string'),
         max_length=100,
-        default='',
+        default=FILTER_TEXT_DEFAULT,
         blank=True,
         help_text=_('Regex compatible filter string for video titles')
     )
     delete_removed_media = models.BooleanField(
         _('delete removed media'),
-        default=False,
+        default=DELETE_REMOVED_MEDIA_DEFAULT,
         help_text=_('Delete media that is no longer on this playlist')
     )
     delete_files_on_disk = models.BooleanField(
         _('delete files on disk'),
-        default=False,
+        default=DELETE_FILES_ON_DISK_DEFAULT,
         help_text=_('Delete files on disk when they are removed from TubeSync')
     )
     source_resolution = models.CharField(
@@ -308,7 +332,7 @@ class Source(models.Model):
         max_length=8,
         db_index=True,
         choices=SOURCE_RESOLUTION_CHOICES,
-        default=SOURCE_RESOLUTION_1080P,
+        default=SOURCE_RESOLUTION_DEFAULT,
         help_text=_('Source resolution, desired video resolution to download')
     )
     source_vcodec = models.CharField(
@@ -316,7 +340,7 @@ class Source(models.Model):
         max_length=8,
         db_index=True,
         choices=SOURCE_VCODEC_CHOICES,
-        default=SOURCE_VCODEC_VP9,
+        default=SOURCE_VCODEC_DEFAULT,
         help_text=_('Source video codec, desired video encoding format to download (ignored if "resolution" is audio only)')
     )
     source_acodec = models.CharField(
@@ -324,17 +348,17 @@ class Source(models.Model):
         max_length=8,
         db_index=True,
         choices=SOURCE_ACODEC_CHOICES,
-        default=SOURCE_ACODEC_OPUS,
+        default=SOURCE_ACODEC_DEFAULT,
         help_text=_('Source audio codec, desired audio encoding format to download')
     )
     prefer_60fps = models.BooleanField(
         _('prefer 60fps'),
-        default=True,
+        default=PREFER_60FPS_DEFAULT,
         help_text=_('Where possible, prefer 60fps media for this source')
     )
     prefer_hdr = models.BooleanField(
         _('prefer hdr'),
-        default=False,
+        default=PREFER_HDR_DEFAULT,
         help_text=_('Where possible, prefer HDR media for this source')
     )
     fallback = models.CharField(
@@ -342,27 +366,27 @@ class Source(models.Model):
         max_length=1,
         db_index=True,
         choices=FALLBACK_CHOICES,
-        default=FALLBACK_NEXT_BEST_HD,
+        default=FALLBACK_DEFAULT,
         help_text=_('What do do when media in your source resolution and codecs is not available')
     )
     copy_channel_images = models.BooleanField(
         _('copy channel images'),
-        default=False,
+        default=COPY_CHANNEL_IMAGES_DEFAULT,
         help_text=_('Copy channel banner and avatar. These may be detected and used by some media servers')
     )
     copy_thumbnails = models.BooleanField(
         _('copy thumbnails'),
-        default=False,
+        default=COPY_THUMBNAILS_DEFAULT,
         help_text=_('Copy thumbnails with the media, these may be detected and used by some media servers')
     )
     write_nfo = models.BooleanField(
         _('write nfo'),
-        default=False,
+        default=WRITE_NFO_DEFAULT,
         help_text=_('Write an NFO file in XML with the media info, these may be detected and used by some media servers')
     )
     write_json = models.BooleanField(
         _('write json'),
-        default=False,
+        default=WRITE_JSON_DEFAULT,
         help_text=_('Write a JSON file with the media info, these may be detected and used by some media servers')
     )
     has_failed = models.BooleanField(
@@ -373,19 +397,19 @@ class Source(models.Model):
 
     write_subtitles = models.BooleanField(
         _('write subtitles'),
-        default=False,
+        default=WRITE_SUBTITLES_DEFAULT,
         help_text=_('Download video subtitles')
     )
 
     auto_subtitles = models.BooleanField(
         _('accept auto-generated subs'),
-        default=False,
+        default=AUTO_SUBTITLES_DEFAULT,
         help_text=_('Accept auto-generated subtitles')
     )
     sub_langs = models.CharField(
         _('subs langs'),
         max_length=30,
-        default='en',
+        default=SUB_LANGS_DEFAULT,
         help_text=_('List of subtitles langs to download, comma-separated. Example: en,fr or all,-fr,-live_chat'),
         validators=[
             RegexValidator(
