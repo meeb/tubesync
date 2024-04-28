@@ -1041,7 +1041,7 @@ class Media(models.Model):
             'mm': dateobj.strftime('%m'),
             'dd': dateobj.strftime('%d'),
             'source': self.source.slugname,
-            'source_full': self.source.name,
+            'source_full': clean_filename(self.source.name),
             'title': self.slugtitle,
             'title_full': clean_filename(self.title),
             'key': self.key,
