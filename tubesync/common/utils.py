@@ -1,6 +1,7 @@
 import string
 from datetime import datetime
 from urllib.parse import urlunsplit, urlencode, urlparse
+import emoji
 from yt_dlp.utils import LazyList
 from .errors import DatabaseConnectionError
 
@@ -121,6 +122,12 @@ def clean_filename(filename):
         if ord(c) > 30:
             clean_filename += c
     return clean_filename.strip()
+
+
+def clean_emoji(s):
+    if not isinstance(s, str):
+        raise ValueError(f'parameter must be a str, got {type(s)}')
+    return emoji.replace_emoji(s)
 
 
 def json_serial(obj):

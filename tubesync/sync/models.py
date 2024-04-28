@@ -15,7 +15,7 @@ from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.errors import NoFormatException
-from common.utils import clean_filename
+from common.utils import clean_filename, clean_emoji
 from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media,
                       get_channel_image_info as get_youtube_channel_image_info)
@@ -1275,12 +1275,12 @@ class Media(models.Model):
         nfo.text = '\n  '
         # title = media metadata title
         title = nfo.makeelement('title', {})
-        title.text = str(self.name).strip()
+        title.text = clean_emoji(str(self.name).strip())
         title.tail = '\n  '
         nfo.append(title)
         # showtitle = source name
         showtitle = nfo.makeelement('showtitle', {})
-        showtitle.text = str(self.source.name).strip()
+        showtitle.text = clean_emoji(str(self.source.name).strip())
         showtitle.tail = '\n  '
         nfo.append(showtitle)
         # season = upload date year
@@ -1322,7 +1322,7 @@ class Media(models.Model):
         nfo.append(ratings)
         # plot = media metadata description
         plot = nfo.makeelement('plot', {})
-        plot.text = str(self.description).strip()
+        plot.text = clean_emoji(str(self.description).strip())
         plot.tail = '\n  '
         nfo.append(plot)
         # thumb = local path to media thumbnail
@@ -1355,7 +1355,7 @@ class Media(models.Model):
         nfo.append(uniqueid)
         # studio = media metadata uploader
         studio = nfo.makeelement('studio', {})
-        studio.text = str(self.uploader).strip()
+        studio.text = clean_emoji(str(self.uploader).strip())
         studio.tail = '\n  '
         nfo.append(studio)
         # aired = media metadata uploaded date
