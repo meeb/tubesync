@@ -56,14 +56,17 @@ def validate_url(url, validator):
     return extract_value
 
 
-def get_remote_image(url):
+def get_remote_image(url, force_rgb=True):
     headers = {
         'user-agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
                        '(KHTML, like Gecko) Chrome/69.0.3497.64 Safari/537.36')
     }
     r = requests.get(url, headers=headers, stream=True, timeout=60)
     r.raw.decode_content = True
-    return Image.open(r.raw)
+    i = Image.open(r.raw)
+    if force_rgb:
+        i = i.convert('RGB')
+    return i
 
 
 def resize_image_to_height(image, width, height):
