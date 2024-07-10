@@ -1516,11 +1516,11 @@ class TasksTestCase(TestCase):
         m22 = Media.objects.create(source=src2, downloaded=True, key='a22', download_date=now - timedelta(days=25))
         m23 = Media.objects.create(source=src2, downloaded=False, key='a23')
 
-        self.assertEquals(src1.media_source.all().count(), 3)
-        self.assertEquals(src2.media_source.all().count(), 3)
+        self.assertEqual(src1.media_source.all().count(), 3)
+        self.assertEqual(src2.media_source.all().count(), 3)
 
         cleanup_old_media()
 
-        self.assertEquals(src1.media_source.all().count(), 3)
-        self.assertEquals(src2.media_source.all().count(), 2)
-        self.assertEquals(Media.objects.filter(pk=m22.pk).exists(), False)
+        self.assertEqual(src1.media_source.all().count(), 3)
+        self.assertEqual(src2.media_source.all().count(), 2)
+        self.assertEqual(Media.objects.filter(pk=m22.pk).exists(), False)
