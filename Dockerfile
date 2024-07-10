@@ -2,8 +2,8 @@ FROM debian:bookworm-slim
 
 ARG TARGETPLATFORM
 ARG S6_VERSION="3.1.5.0"
-ARG FFMPEG_DATE="autobuild-2024-04-28-14-08"
-ARG FFMPEG_VERSION="115020-ga9a69a5a31"
+ARG FFMPEG_DATE="autobuild-2024-07-09-14-13"
+ARG FFMPEG_VERSION="116212-g85706f5136"
 
 ENV DEBIAN_FRONTEND="noninteractive" \
   HOME="/root" \
@@ -27,8 +27,8 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/arm64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.xz" ;; \
   *)               echo ""        ;; esac) && \
   export FFMPEG_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "f8e7518c28328d3e27d7b6f49ef6bad0d0438edef268fc4f0777f574ad4013ef" ;; \
-  "linux/arm64")   echo "b30bf7db2d5170dee78c4b514b9c085a64266c448204653da57bdb9e5ab23e75" ;; \
+  "linux/amd64")   echo "1323f9849b8b115672e7b360071c460c76c183d270d3ded218467b0217a1f079" ;; \
+  "linux/arm64")   echo "ba915ab53b7846f6965da67a875812dd4b5193788a63f475da27480bba9f55b9" ;; \
   *)               echo ""        ;; esac) && \
   export FFMPEG_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linux64-gpl.tar.xz"   ;; \
@@ -155,7 +155,7 @@ COPY config/root /
 HEALTHCHECK --interval=1m --timeout=10s CMD /app/healthcheck.py http://127.0.0.1:8080/healthcheck
 
 # ENVS and ports
-ENV PYTHONPATH "/app:${PYTHONPATH}"
+ENV PYTHONPATH="/app"
 EXPOSE 4848
 
 # Volumes
