@@ -935,7 +935,7 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, acodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.source_acodec = acodec
@@ -943,7 +943,7 @@ class FormatMatchingTestCase(TestCase):
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_combined_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
 
     def test_audio_exact_format_matching(self):
         self.source.fallback = Source.FALLBACK_FAIL
