@@ -39,7 +39,7 @@ def filter_media(instance: Media):
 
 def filter_published(instance: Media):
     # Check if the instance is not published, we have to skip then
-    if not instance.published:
+    if not isinstance(instance.published, datetime):
         log.warn(f'Media: {instance.source} / {instance} has no published date '
                  f'set, marking to be skipped')
         return True
