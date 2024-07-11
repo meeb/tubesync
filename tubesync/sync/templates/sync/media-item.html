@@ -25,7 +25,7 @@
 {% if media.manual_skip %}{% include 'errorbox.html' with message='Media is marked to be skipped and will not be downloaded.' %}
 {% else %}
   {% if not media.can_download %}{% include 'errorbox.html' with message='Media cannot be downloaded because it has no formats which match the source requirements.' %}{% endif %}
-  {% if media.skip %}{% include 'errorbox.html' with message='This media may be skipped due to error(s).' %}{% endif %}
+  {% if media.skip %}{% include 'errorbox.html' with message='This media may be skipped due to error(s) or not matching a filter condition.' %}{% endif %}
 {% endif %}
 {% include 'infobox.html' with message=message %}
 <div class="row">

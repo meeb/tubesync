@@ -31,7 +31,7 @@ def filter_media(instance: Media):
     # Check if skipping
     if instance.skip != skip:
         instance.skip = skip
-        log.warn(f'Media: {instance.source} / {instance} has changed skip setting to {skip}')
+        log.info(f'Media: {instance.source} / {instance} has changed skip setting to {skip}')
         return True
 
     return False
@@ -40,7 +40,7 @@ def filter_media(instance: Media):
 def filter_published(instance: Media):
     # Check if the instance is not published, we have to skip then
     if not isinstance(instance.published, datetime):
-        log.warn(f'Media: {instance.source} / {instance} has no published date '
+        log.info(f'Media: {instance.source} / {instance} has no published date '
                  f'set, marking to be skipped')
         return True
     return False
@@ -85,13 +85,13 @@ def filter_source_cutoff(instance: Media):
     if instance.source.delete_old_media and instance.source.days_to_keep > 0:
         if not isinstance(instance.published, datetime):
             # Media has no known published date or incomplete metadata
-            log.warn(f'Media: {instance.source} / {instance} has no published date, skipping')
+            log.info(f'Media: {instance.source} / {instance} has no published date, skipping')
             return True
 
         delta = timezone.now() - timedelta(days=instance.source.days_to_keep)
         if instance.published < delta:
             # Media was published after the cutoff date, skip it
-            log.warn(f'Media: {instance.source} / {instance} is older than '
+            log.info(f'Media: {instance.source} / {instance} is older than '
                      f'{instance.source.days_to_keep} days, skipping')
             return True
 
