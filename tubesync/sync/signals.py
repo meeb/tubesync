@@ -13,6 +13,7 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     map_task_to_instance, check_source_directory_exists,
                     download_media, rescan_media_server, download_source_images)
 from .utils import delete_file
+from .filtering import filter_media
 
 
 @receiver(pre_save, sender=Source)
@@ -110,7 +111,7 @@ def media_post_save(sender, instance, created, **kwargs):
     # Reset the skip flag if the download cap has changed if the media has not
     # already been downloaded
     if not instance.downloaded and instance.metadata:
-        skip_changed = filter_instance(instance)
+        skip_changed = filter_media(instance)
 
     # Recalculate the "can_download" flag, this may
     # need to change if the source specifications have been changed
@@ -172,73 +173,7 @@ def media_post_save(sender, instance, created, **kwargs):
         )
 
 
-# Check the filter conditions for instance, return is if the Skip property has changed so we can do other things
-def filter_instance(instance):
-    # Assume we aren't skipping it, if any of these conditions are true, we skip it
-    skip = False
 
-    # Check if it's published
-    if filter_instance_published(instance):
-        skip = True
-
-    # Check if older than max_cap_age, skip
-    if filter_instance_max_cap(instance):
-        skip = True
-
-    # Check if we have filter_text and filter text matches, set unskip
-    if filter_instance_filter_text(instance):
-        skip = True
-
-    # Check if skipping
-    if instance.skip != skip:
-        instance.skip = skip
-        log.warn(f'Media: {instance.source} / {instance} has changed skip setting to {skip}')
-        return True
-
-    return False
-
-
-def filter_instance_published(instance):
-    # Check if the instance is not published, we have to skip then
-    if not instance.published:
-        log.warn(f'Media: {instance.source} / {instance} has no published date '
-                 f'set, marking to be skipped')
-        return True
-    return False
-
-
-# Return True if we are to skip downloading it based on filter text not matching
-def filter_instance_filter_text(instance):
-    filter_text = instance.source.filter_text.strip()
-
-    if not filter_text:
-        return False
-
-    # We match the filter text, so don't skip downloading this
-    if instance.source.is_regex_match(instance.title):
-        log.info(f'Media: {instance.source} / {instance} has a valid '
-                 f'title filter, marking to be unskipped')
-        return False
-
-    log.info(f'Media: {instance.source} / {instance} doesn\'t match '
-             f'title filter, marking to be skipped')
-
-    return True
-
-
-def filter_instance_max_cap(instance):
-    max_cap_age = instance.source.download_cap_date
-    if not max_cap_age:
-        log.debug(f'Media: {instance.source} / {instance} has not max_cap_age '
-                  f'so not skipping based on max_cap_age')
-        return False
-
-    if instance.published <= max_cap_age:
-        log.info(f'Media: {instance.source} / {instance} is too old for '
-                 f'the download cap date, marking to be skipped')
-        return True
-
-    return False
 
 @receiver(pre_delete, sender=Media)
 def media_pre_delete(sender, instance, **kwargs):

@@ -15,7 +15,7 @@ from django.utils import timezone
 from background_task.models import Task
 from .models import Source, Media
 from .tasks import cleanup_old_media
-from .signals import filter_instance
+from .filtering import filter_media
 
 
 class FrontEndTestCase(TestCase):
@@ -735,7 +735,7 @@ class MediaFilterTestCase(TestCase):
         # Check if unpublished that we skip download it
         self.media.skip = False
         self.media.published = False
-        changed = filter_instance(self.media)
+        changed = filter_media(self.media)
         self.assertTrue(changed)
         self.assertTrue(self.media.skip)
 
@@ -744,7 +744,7 @@ class MediaFilterTestCase(TestCase):
         self.media.skip = True
         self.media.published = timezone.make_aware(datetime(year=2020, month=1, day=1, hour=1,
                                         minute=1, second=1))
-        changed = filter_instance(self.media)
+        changed = filter_media(self.media)
         self.assertTrue(changed)
         self.assertFalse(self.media.skip)
 
@@ -754,7 +754,7 @@ class MediaFilterTestCase(TestCase):
         self.media.skip = False
         self.media.published = timezone.make_aware(datetime(year=2020, month=1, day=1, hour=1,
                                         minute=1, second=1))
-        changed = filter_instance(self.media)
+        changed = filter_media(self.media)
         self.assertTrue(changed)
         self.assertTrue(self.media.skip)
 
@@ -764,7 +764,7 @@ class MediaFilterTestCase(TestCase):
         self.media.skip = True
         self.media.published = timezone.make_aware(datetime(year=2020, month=1, day=1, hour=1,
                                         minute=1, second=1))
-        changed = filter_instance(self.media)
+        changed = filter_media(self.media)
         self.assertTrue(changed)
         self.assertFalse(self.media.skip)
 
@@ -774,7 +774,7 @@ class MediaFilterTestCase(TestCase):
         self.media.skip = False
         self.media.published = timezone.make_aware(datetime(year=2020, month=1, day=1, hour=1,
                                         minute=1, second=1))
-        changed = filter_instance(self.media)
+        changed = filter_media(self.media)
         self.assertTrue(changed)
         self.assertTrue(self.media.skip)
 
@@ -783,7 +783,7 @@ class MediaFilterTestCase(TestCase):
         self.media.source.download_cap = 3600
         self.media.skip = True
         self.media.published = timezone.now()
-        changed = filter_instance(self.media)
+        changed = filter_media(self.media)
         self.assertTrue(changed)
         self.assertFalse(self.media.skip)
 
