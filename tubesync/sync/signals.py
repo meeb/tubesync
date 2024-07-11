@@ -139,10 +139,10 @@ def media_post_save(sender, instance, created, **kwargs):
             verbose_name=verbose_name.format(instance.pk),
             remove_existing_tasks=True
         )
-    # If the media is missing a thumbnail schedule it to be downloaded
+    # If the media is missing a thumbnail schedule it to be downloaded (unless we are skipping this media)
     if not instance.thumb_file_exists:
         instance.thumb = None
-    if not instance.thumb:
+    if not instance.thumb and not instance.skip:
         thumbnail_url = instance.thumbnail
         if thumbnail_url:
             log.info(f'Scheduling task to download thumbnail for: {instance.name} '
