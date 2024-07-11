@@ -105,62 +105,13 @@ def media_post_save(sender, instance, created, **kwargs):
     if instance.manual_skip:
         return
     # Triggered after media is saved
-    cap_changed = False
+    skip_changed = False
     can_download_changed = False
     # Reset the skip flag if the download cap has changed if the media has not
     # already been downloaded
     if not instance.downloaded and instance.metadata:
-        max_cap_age = instance.source.download_cap_date
-        filter_text = instance.source.filter_text.strip()
-        published = instance.published
-        if not published:
-            if not instance.skip:
-                log.warn(f'Media: {instance.source} / {instance} has no published date '
-                         f'set, marking to be skipped')
-                instance.skip = True
-                cap_changed = True
-            else:
-                log.debug(f'Media: {instance.source} / {instance} has no published date '
-                          f'set but is already marked to be skipped')
-        else:
-            if max_cap_age:
-                if published > max_cap_age and instance.skip:
-                    if filter_text:
-                        if instance.source.is_regex_match(instance.title):
-                            log.info(f'Media: {instance.source} / {instance} has a valid '
-                                    f'publishing date and title filter, marking to be unskipped')
-                            instance.skip = False
-                            cap_changed = True
-                        else:
-                            log.debug(f'Media: {instance.source} / {instance} has a valid publishing date '
-                                      f'but failed the title filter match, already marked skipped')
-                    else:
-                        log.info(f'Media: {instance.source} / {instance} has a valid '
-                                 f'publishing date, marking to be unskipped')
-                        instance.skip = False
-                        cap_changed = True
-                elif published <= max_cap_age and not instance.skip:
-                    log.info(f'Media: {instance.source} / {instance} is too old for '
-                            f'the download cap date, marking to be skipped')
-                    instance.skip = True
-                    cap_changed = True
-            else:
-                if instance.skip:
-                    # Media marked to be skipped but source download cap removed
-                    if filter_text:
-                        if instance.source.is_regex_match(instance.title):
-                            log.info(f'Media: {instance.source} / {instance} has a valid '
-                                     f'publishing date and title filter, marking to be unskipped')
-                            instance.skip = False
-                            cap_changed = True
-                        else:
-                            log.info(f'Media: {instance.source} / {instance} has a valid publishing date '
-                                     f'but failed the title filter match, already marked skipped')
-                else:
-                    log.debug(f'Media: {instance.source} / {instance} has a valid publishing date and '
-                              f'is already marked as not to be skipped')
+        skip_changed = filter_instance(instance)
 
-                    cap_changed = False
     # Recalculate the "can_download" flag, this may
     # need to change if the source specifications have been changed
     if instance.metadata:
@@ -173,7 +124,7 @@ def media_post_save(sender, instance, created, **kwargs):
                 instance.can_download = False
                 can_download_changed = True
     # Save the instance if any changes were required
-    if cap_changed or can_download_changed:
+    if skip_changed or can_download_changed:
         post_save.disconnect(media_post_save, sender=Media)
         instance.save()
         post_save.connect(media_post_save, sender=Media)
@@ -220,6 +171,74 @@ def media_post_save(sender, instance, created, **kwargs):
             remove_existing_tasks=True
         )
 
+
+# Check the filter conditions for instance, return is if the Skip property has changed so we can do other things
+def filter_instance(instance):
+    # Assume we aren't skipping it, if any of these conditions are true, we skip it
+    skip = False
+
+    # Check if it's published
+    if filter_instance_published(instance):
+        skip = True
+
+    # Check if older than max_cap_age, skip
+    if filter_instance_max_cap(instance):
+        skip = True
+
+    # Check if we have filter_text and filter text matches, set unskip
+    if filter_instance_filter_text(instance):
+        skip = True
+
+    # Check if skipping
+    if instance.skip != skip:
+        instance.skip = skip
+        log.warn(f'Media: {instance.source} / {instance} has changed skip setting to {skip}')
+        return True
+
+    return False
+
+
+def filter_instance_published(instance):
+    # Check if the instance is not published, we have to skip then
+    if not instance.published:
+        log.warn(f'Media: {instance.source} / {instance} has no published date '
+                 f'set, marking to be skipped')
+        return True
+    return False
+
+
+# Return True if we are to skip downloading it based on filter text not matching
+def filter_instance_filter_text(instance):
+    filter_text = instance.source.filter_text.strip()
+
+    if not filter_text:
+        return False
+
+    # We match the filter text, so don't skip downloading this
+    if instance.source.is_regex_match(instance.title):
+        log.info(f'Media: {instance.source} / {instance} has a valid '
+                 f'title filter, marking to be unskipped')
+        return False
+
+    log.info(f'Media: {instance.source} / {instance} doesn\'t match '
+             f'title filter, marking to be skipped')
+
+    return True
+
+
+def filter_instance_max_cap(instance):
+    max_cap_age = instance.source.download_cap_date
+    if not max_cap_age:
+        log.debug(f'Media: {instance.source} / {instance} has not max_cap_age '
+                  f'so not skipping based on max_cap_age')
+        return False
+
+    if instance.published <= max_cap_age:
+        log.info(f'Media: {instance.source} / {instance} is too old for '
+                 f'the download cap date, marking to be skipped')
+        return True
+
+    return False
 
 @receiver(pre_delete, sender=Media)
 def media_pre_delete(sender, instance, **kwargs):
