@@ -61,11 +61,30 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   # Clean up
   rm -rf /tmp/s6-overlay-${ARCH}.tar.gz && \
   rm -rf /tmp/ffmpeg-${ARCH}.tar.xz && \
-  apt-get -y autoremove --purge curl binutils xz-utils
+  apt-get -y autoremove --purge curl binutils xz-utils && \
+  rm -rf /var/lib/apt/lists/* && \
+  rm -rf /var/cache/apt/* && \
+  rm -rf /tmp/*
 
-# Copy app
-COPY tubesync /app
-COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
+# Install dependencies we keep
+RUN set -x && \
+  apt-get update && \
+  # Install required distro packages
+  apt-get -y --no-install-recommends install \
+  libjpeg62-turbo \
+  libmariadb3 \
+  libpq5 \
+  libwebp7 \
+  nginx-light \
+  pipenv \
+  pkgconf \
+  python3 \
+  python3-wheel \
+  redis-server \
+  && apt-get -y autoclean && \
+  rm -rf /var/lib/apt/lists/* && \
+  rm -rf /var/cache/apt/* && \
+  rm -rf /tmp/*
 
 # Copy over pip.conf to use piwheels
 COPY pip.conf /etc/pip.conf
@@ -79,44 +98,27 @@ WORKDIR /app
 # Set up the app
 RUN set -x && \
   apt-get update && \
-  # Install required distro packages
-  apt-get -y install nginx-light && \
+  # Install required build packages
   apt-get -y --no-install-recommends install \
-  python3 \
-  python3-dev \
   python3-pip \
-  python3-wheel \
-  pipenv \
+  python3-dev \
   gcc \
   g++ \
   make \
   pkgconf \
   default-libmysqlclient-dev \
-  libmariadb3 \
   postgresql-common \
   libpq-dev \
-  libpq5 \
   libjpeg62-turbo \
-  libwebp7 \
   libjpeg-dev \
   zlib1g-dev \
   libwebp-dev \
-  redis-server && \
+  && \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
   PIPENV_VERBOSITY=64 pipenv install --system --skip-lock && \
-  # Make absolutely sure we didn't accidentally bundle a SQLite dev database
-  rm -rf /app/db.sqlite3 && \
-  # Run any required app commands
-  /usr/bin/python3 /app/manage.py compilescss && \
-  /usr/bin/python3 /app/manage.py collectstatic --no-input --link && \
-  # Create config, downloads and run dirs
-  mkdir -p /run/app && \
-  mkdir -p /config/media && \
-  mkdir -p /downloads/audio && \
-  mkdir -p /downloads/video && \
   # Clean up
   rm /app/Pipfile && \
   pipenv --clear && \
@@ -142,6 +144,25 @@ RUN set -x && \
   mkdir -p /root && \
   chown root:root /root && \
   chmod 0755 /root
+
+
+# Copy app
+COPY tubesync /app
+COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
+
+# Build app
+RUN set -x && \
+  # Make absolutely sure we didn't accidentally bundle a SQLite dev database
+  rm -rf /app/db.sqlite3 && \
+  # Run any required app commands
+  /usr/bin/python3 /app/manage.py compilescss && \
+  /usr/bin/python3 /app/manage.py collectstatic --no-input --link && \
+  # Create config, downloads and run dirs
+  mkdir -p /run/app && \
+  mkdir -p /config/media && \
+  mkdir -p /downloads/audio && \
+  mkdir -p /downloads/video
+
 
 # Append software versions
 RUN set -x && \
