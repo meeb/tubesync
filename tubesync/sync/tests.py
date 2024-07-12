@@ -176,7 +176,8 @@ class FrontEndTestCase(TestCase):
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
-            'filter_text':'.*',
+            'filter_text': '.*',
+            'filter_seconds_min': True,
             'index_schedule': 3600,
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -219,7 +220,8 @@ class FrontEndTestCase(TestCase):
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
-            'filter_text':'.*',
+            'filter_text': '.*',
+            'filter_seconds_min': True,
             'index_schedule': Source.IndexSchedule.EVERY_HOUR,
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -250,7 +252,8 @@ class FrontEndTestCase(TestCase):
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
-            'filter_text':'.*',
+            'filter_text': '.*',
+            'filter_seconds_min': True,
             'index_schedule': Source.IndexSchedule.EVERY_2_HOURS,  # changed
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -819,6 +822,7 @@ class FormatMatchingTestCase(TestCase):
     def test_combined_exact_format_matching(self):
         self.source.fallback = Source.FALLBACK_FAIL
         self.media.metadata = all_test_metadata['boring']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, acodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', 'MP4A', True, False): (False, False),
@@ -948,6 +952,7 @@ class FormatMatchingTestCase(TestCase):
     def test_audio_exact_format_matching(self):
         self.source.fallback = Source.FALLBACK_FAIL
         self.media.metadata = all_test_metadata['boring']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, acodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', 'MP4A', True, False): (True, '140'),
@@ -1094,6 +1099,7 @@ class FormatMatchingTestCase(TestCase):
         self.source.fallback = Source.FALLBACK_FAIL
         # Test no 60fps, no HDR metadata
         self.media.metadata = all_test_metadata['boring']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, False),
@@ -1141,6 +1147,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
         # Test 60fps metadata
         self.media.metadata = all_test_metadata['60fps']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, False),
@@ -1180,6 +1187,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
         # Test hdr metadata
         self.media.metadata = all_test_metadata['hdr']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, False),
@@ -1235,6 +1243,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
         # Test 60fps+hdr metadata
         self.media.metadata = all_test_metadata['60fps+hdr']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, False),
@@ -1300,6 +1309,7 @@ class FormatMatchingTestCase(TestCase):
         self.source.fallback = Source.FALLBACK_NEXT_BEST
         # Test no 60fps, no HDR metadata
         self.media.metadata = all_test_metadata['boring']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, '134'),             # Fallback match, no hdr
@@ -1347,6 +1357,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
         # Test 60fps metadata
         self.media.metadata = all_test_metadata['60fps']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, '134'),             # Fallback match, no hdr
@@ -1386,6 +1397,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
         # Test hdr metadata
         self.media.metadata = all_test_metadata['hdr']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, '332'),             # Fallback match, hdr, switched to VP9
@@ -1441,6 +1453,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
         # Test 60fps+hdr metadata
         self.media.metadata = all_test_metadata['60fps+hdr']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, '134'),             # Fallback match, no hdr
@@ -1504,6 +1517,7 @@ class FormatMatchingTestCase(TestCase):
 
     def test_metadata_20230629(self):
         self.media.metadata = all_test_metadata['20230629']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, '134'),             # Fallback match, no hdr
@@ -1568,6 +1582,7 @@ class FormatMatchingTestCase(TestCase):
     def test_is_regex_match(self):
         
         self.media.metadata = all_test_metadata['boring']
+        self.media.save()
         expected_matches = {
             ('.*'): (True),
             ('no fancy stuff'): (True),
@@ -1587,7 +1602,11 @@ class FormatMatchingTestCase(TestCase):
         for params, expected in expected_matches.items():
             self.source.filter_text = params
             expected_match_result = expected
-            self.assertEqual(self.source.is_regex_match(self.media.title), expected_match_result)
+            self.assertEqual(
+                self.source.is_regex_match(self.media.title),
+                expected_match_result,
+                msg=f'Media title "{self.media.title}" checked against regex "{self.source.filter_text}" failed '
+                    f'expected {expected_match_result}')
 
 class TasksTestCase(TestCase):
     def setUp(self):

@@ -876,12 +876,19 @@ class Media(models.Model):
         null=True,
         help_text=_('Size of the downloaded media in bytes')
     )
-
     duration = models.PositiveIntegerField(
         _('duration'),
         blank=True,
         null=True,
         help_text=_('Duration of media in seconds')
+    )
+    title = models.CharField(
+        _('title'),
+        max_length=100,
+        blank=True,
+        null=False,
+        default='',
+        help_text=_('Video title')
     )
 
     def __str__(self):
@@ -893,6 +900,21 @@ class Media(models.Model):
         unique_together = (
             ('source', 'key'),
         )
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        # Trigger an update of derived fields from metadata
+        if self.metadata:
+            self.title = self.metadata_title
+            self.duration = self.metadata_duration
+        if update_fields is not None and "metadata" in update_fields:
+            # If only some fields are being updated, make sure we update title and duration if metadata changes
+            update_fields = {"title", "duration"}.union(update_fields)
+
+        super().save(
+            force_insert=force_insert,
+            force_update=force_update,
+            using=using,
+            update_fields=update_fields,)
 
     def get_metadata_field(self, field):
         fields = self.METADATA_FIELDS.get(field, {})
@@ -1108,7 +1130,7 @@ class Media(models.Model):
         return self.loaded_metadata.get(field, '').strip()
 
     @property
-    def title(self):
+    def metadata_title(self):
         field = self.get_metadata_field('title')
         return self.loaded_metadata.get(field, '').strip()
 
@@ -1152,7 +1174,7 @@ class Media(models.Model):
     @property
     def duration_formatted(self):
         duration = self.duration
-        if duration > 0:
+        if duration and duration > 0:
             return seconds_to_timestr(duration)
         return '??:??:??'
 
