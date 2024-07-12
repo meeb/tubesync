@@ -104,6 +104,11 @@ class Source(models.Model):
         (FALLBACK_NEXT_BEST_HD, _('Get next best resolution but at least HD'))
     )
 
+    FILTER_SECONDS_CHOICES = (
+        (True, _('Minimum Length')),
+        (False, _('Maximum Length')),
+    )
+
     EXTENSION_M4A = 'm4a'
     EXTENSION_OGG = 'ogg'
     EXTENSION_MKV = 'mkv'
@@ -292,6 +297,19 @@ class Source(models.Model):
         default='',
         blank=True,
         help_text=_('Regex compatible filter string for video titles')
+    )
+    filter_seconds = models.PositiveIntegerField(
+                _('filter seconds'),
+                blank=True,
+                null=True,
+                help_text=_('Filter Media based on Min/Max duration. Leave blank or 0 to disable filtering')
+    )
+    filter_seconds_min = models.BooleanField(
+        _('filter seconds min/max'),
+        choices=FILTER_SECONDS_CHOICES,
+        default=True,
+        help_text=_('When Filter Seconds is > 0, do we skip on minimum (video shorter than limit) or maximum (video '
+                    'greater than maximum) video duration')
     )
     delete_removed_media = models.BooleanField(
         _('delete removed media'),
@@ -785,7 +803,7 @@ class Media(models.Model):
         _('manual_skip'),
         db_index=True,
         default=False,
-        help_text=_('Media marked as "skipped", won\' be downloaded')
+        help_text=_('Media marked as "skipped", won\'t be downloaded')
     )
     downloaded = models.BooleanField(
         _('downloaded'),
@@ -857,6 +875,13 @@ class Media(models.Model):
         blank=True,
         null=True,
         help_text=_('Size of the downloaded media in bytes')
+    )
+
+    duration = models.PositiveIntegerField(
+        _('duration'),
+        blank=True,
+        null=True,
+        help_text=_('Duration of media in seconds')
     )
 
     def __str__(self):
@@ -1115,7 +1140,7 @@ class Media(models.Model):
             return None
 
     @property
-    def duration(self):
+    def metadata_duration(self):
         field = self.get_metadata_field('duration')
         duration = self.loaded_metadata.get(field, 0)
         try:

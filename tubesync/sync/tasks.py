@@ -294,6 +294,10 @@ def download_media_metadata(media_id):
     if upload_date:
         media.published = timezone.make_aware(upload_date)
 
+    # Store duration in DB so it's fast to access
+    if media.metadata_duration:
+        media.duration = media.metadata_duration
+
     filter_media(media)
     # Check we can download the media item
     if not media.skip:

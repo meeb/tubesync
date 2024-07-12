@@ -296,8 +296,8 @@ class ValidateSourceView(FormView):
 
 class EditSourceMixin:
     model = Source
-    fields = ('source_type', 'key', 'name', 'directory', 'filter_text', 'media_format',
-              'index_schedule', 'download_media', 'download_cap', 'delete_old_media',
+    fields = ('source_type', 'key', 'name', 'directory', 'filter_text', 'filter_seconds', 'filter_seconds_min',
+              'media_format', 'index_schedule', 'download_media', 'download_cap', 'delete_old_media',
               'delete_removed_media', 'days_to_keep', 'source_resolution', 'source_vcodec',
               'source_acodec', 'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_channel_images',
               'delete_removed_media', 'delete_files_on_disk', 'days_to_keep', 'source_resolution',

@@ -28,6 +28,10 @@ def filter_media(instance: Media):
     if filter_filter_text(instance):
         skip = True
 
+    # Check if the video is longer than the max, or shorter than the min
+    if filter_duration(instance):
+        skip = True
+
     # Check if skipping
     if instance.skip != skip:
         instance.skip = skip
@@ -94,5 +98,38 @@ def filter_source_cutoff(instance: Media):
             log.info(f'Media: {instance.source} / {instance} is older than '
                      f'{instance.source.days_to_keep} days, skipping')
             return True
+
+    return False
+
+
+# Check if we skip based on duration (min/max)
+def filter_duration(instance: Media):
+    if not instance.source.filter_seconds:
+        return False
+
+    duration = instance.duration
+    if not duration:
+        # Attempt fallback to slower metadata field, this adds significant time, new media won't need this
+        # Tests show fetching instance.duration can take as long as the rest of the filtering
+        if instance.metadata_duration:
+            duration = instance.metadata_duration
+            instance.duration = duration
+            instance.save()
+        else:
+            log.info(f'Media: {instance.source} / {instance} has no duration stored, not skipping')
+            return False
+
+    duration_limit = instance.source.filter_seconds
+    if instance.source.filter_seconds_min and duration < duration_limit:
+        # Filter out videos that are shorter than the minimum
+        log.info(f'Media: {instance.source} / {instance} is shorter ({duration}) than '
+                 f'the minimum duration ({duration_limit}), skipping')
+        return True
+
+    if not instance.source.filter_seconds_min and duration > duration_limit:
+        # Filter out videos that are greater than the maximum
+        log.info(f'Media: {instance.source} / {instance} is longer ({duration}) than '
+                 f'the maximum duration ({duration_limit}), skipping')
+        return True
 
     return False
