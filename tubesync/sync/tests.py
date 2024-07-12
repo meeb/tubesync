@@ -708,9 +708,9 @@ class MediaFilterTestCase(TestCase):
         # Add a test source
         self.source = Source.objects.create(
             source_type=Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
-            key='testkey',
-            name='testname',
-            directory='testdirectory',
+            key="testkey",
+            name="testname",
+            directory="testdirectory",
             media_format=settings.MEDIA_FORMATSTR_DEFAULT,
             index_schedule=3600,
             delete_old_media=False,
@@ -724,15 +724,18 @@ class MediaFilterTestCase(TestCase):
         )
         # Add some test media
         self.media = Media.objects.create(
-            key='mediakey',
+            key="mediakey",
             source=self.source,
             metadata=metadata,
             skip=False,
-            published=timezone.make_aware(datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1))
+            published=timezone.make_aware(
+                datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+            ),
         )
         # Fix a created datetime for predictable testing
-        self.media.created = datetime(year=2020, month=1, day=1, hour=1,
-                                      minute=1, second=1)
+        self.media.created = datetime(
+            year=2020, month=1, day=1, hour=1, minute=1, second=1
+        )
 
     def test_filter_unpublished_skip(self):
         # Check if unpublished that we skip download it
@@ -745,28 +748,31 @@ class MediaFilterTestCase(TestCase):
     def test_filter_published_unskip(self):
         # Check if we had previously skipped it, but now it's published, we won't skip it
         self.media.skip = True
-        self.media.published = timezone.make_aware(datetime(year=2020, month=1, day=1, hour=1,
-                                        minute=1, second=1))
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
         changed = filter_media(self.media)
         self.assertTrue(changed)
         self.assertFalse(self.media.skip)
 
     def test_filter_filter_text_nomatch(self):
         # Check that if we don't match the filter text, we skip
-        self.media.source.filter_text = 'No fancy stuff'
+        self.media.source.filter_text = "No fancy stuff"
         self.media.skip = False
-        self.media.published = timezone.make_aware(datetime(year=2020, month=1, day=1, hour=1,
-                                        minute=1, second=1))
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
         changed = filter_media(self.media)
         self.assertTrue(changed)
         self.assertTrue(self.media.skip)
 
     def test_filter_filter_text_match(self):
         # Check that if we match the filter text, we don't skip
-        self.media.source.filter_text = '(?i)No fancy stuff'
+        self.media.source.filter_text = "(?i)No fancy stuff"
         self.media.skip = True
-        self.media.published = timezone.make_aware(datetime(year=2020, month=1, day=1, hour=1,
-                                        minute=1, second=1))
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
         changed = filter_media(self.media)
         self.assertTrue(changed)
         self.assertFalse(self.media.skip)
@@ -775,8 +781,9 @@ class MediaFilterTestCase(TestCase):
         # Check if it's older than the max_cap, we don't download it (1 second so it will always fail)
         self.media.source.download_cap = 1
         self.media.skip = False
-        self.media.published = timezone.make_aware(datetime(year=2020, month=1, day=1, hour=1,
-                                        minute=1, second=1))
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
         changed = filter_media(self.media)
         self.assertTrue(changed)
         self.assertTrue(self.media.skip)
@@ -786,6 +793,54 @@ class MediaFilterTestCase(TestCase):
         self.media.source.download_cap = 3600
         self.media.skip = True
         self.media.published = timezone.now()
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertFalse(self.media.skip)
+
+    def test_filter_below_min(self):
+        # Filter videos shorter than the minimum limit
+        self.media.skip = False
+        self.media.source.filter_seconds_min = True
+        self.media.source.filter_seconds = 500
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertTrue(self.media.skip)
+
+    def test_filter_above_min(self):
+        # Video is longer than the minimum, allow it
+        self.media.skip = True
+        self.media.source.filter_seconds_min = True
+        self.media.source.filter_seconds = 300
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertFalse(self.media.skip)
+
+    def test_filter_above_max(self):
+        # Filter videos longer than the maximum limit
+        self.media.skip = False
+        self.media.source.filter_seconds_min = False
+        self.media.source.filter_seconds = 300
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertTrue(self.media.skip)
+
+    def test_filter_below_max(self):
+        # Video is below the maximum, allow it
+        self.media.skip = True
+        self.media.source.filter_seconds_min = False
+        self.media.source.filter_seconds = 500
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
         changed = filter_media(self.media)
         self.assertTrue(changed)
         self.assertFalse(self.media.skip)
