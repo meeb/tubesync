@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
             model_name='source',
             name='filter_seconds_min',
             field=models.BooleanField(
-                verbose_name='filter seconds min',
+                verbose_name='filter seconds min/max',
                 choices=[(True, 'Minimum Length'),(False, 'Maximum Length')],
                 default=True,
                 help_text='When Filter Seconds is > 0, do we skip on minimum (video shorter than limit) or maximum ('
@@ -39,3 +39,4 @@ class Migration(migrations.Migration):
             ),
         ),
     ]
+

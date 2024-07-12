@@ -47,6 +47,13 @@
         <td class="hide-on-small-only">Filter text</td>
         <td><span class="hide-on-med-and-up">Filter text<br></span><strong>{{ source.filter_text }}</strong></td>
       </tr>
+      {% if source.filter_seconds %}
+      <tr title="Do not download videos shorter/longer than this limit seconds">
+        <td class="hide-on-small-only">Filter Seconds</td>
+        <td><span class="hide-on-med-and-up">Filter seconds<br>
+        </span><strong>{{ source.filter_seconds }}s {% if source.filter_seconds_min %}(Minimum length){% else %}(Maximum Length){% endif %}</strong></td>
+      </tr>
+      {% endif %}
       <tr title="Media file name format to use for saving files">
         <td class="hide-on-small-only">Media format</td>
         <td><span class="hide-on-med-and-up">Media format<br></span><strong>{{ source.media_format }}</strong></td>
