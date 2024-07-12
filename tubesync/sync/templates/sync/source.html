@@ -44,8 +44,9 @@
         <td><span class="hide-on-med-and-up">Directory<br></span><strong>{{ source.directory }}</strong></td>
       </tr>
       <tr title="Filter text">
-        <td class="hide-on-small-only">Filter text</td>
-        <td><span class="hide-on-med-and-up">Filter text<br></span><strong>{{ source.filter_text }}</strong></td>
+        <td class="hide-on-small-only">Filter text{% if source.filter_text_invert %} <em>Inverted</em>{% endif %}</td>
+        <td><span class="hide-on-med-and-up">Filter text{% if source.filter_text_invert %} <em>Inverted</em>{% endif %}<br></span>
+          <strong>{{ source.filter_text }}</strong></td>
       </tr>
       {% if source.filter_seconds %}
       <tr title="Do not download videos shorter/longer than this limit seconds">

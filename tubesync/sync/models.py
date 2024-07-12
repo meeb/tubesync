@@ -298,6 +298,11 @@ class Source(models.Model):
         blank=True,
         help_text=_('Regex compatible filter string for video titles')
     )
+    filter_text_invert = models.BooleanField(
+        _("invert filter text matching"),
+        default=False,
+        help_text="Invert filter string regex match, skip any matching titles when selected",
+    )
     filter_seconds = models.PositiveIntegerField(
                 _('filter seconds'),
                 blank=True,

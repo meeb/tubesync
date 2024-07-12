@@ -777,6 +777,30 @@ class MediaFilterTestCase(TestCase):
         self.assertTrue(changed)
         self.assertFalse(self.media.skip)
 
+    def test_filter_filter_text_invert_nomatch(self):
+        # Check that if we don't match the filter text, we don't skip
+        self.media.source.filter_text = "No fancy stuff"
+        self.media.source.filter_text_invert = True
+        self.media.skip = True
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertFalse(self.media.skip)
+
+    def test_filter_filter_text_invert_match(self):
+        # Check that if we match the filter text and do skip
+        self.media.source.filter_text = "(?i)No fancy stuff"
+        self.media.source.filter_text_invert = True
+        self.media.skip = False
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertTrue(self.media.skip)
+
     def test_filter_max_cap_skip(self):
         # Check if it's older than the max_cap, we don't download it (1 second so it will always fail)
         self.media.source.download_cap = 1

@@ -62,20 +62,35 @@ def filter_filter_text(instance: Media):
     if not filter_text:
         return False
 
-    # We match the filter text, so don't skip downloading this
+    if not instance.source.filter_text_invert:
+        # We match the filter text, so don't skip downloading this
+        if instance.source.is_regex_match(instance.title):
+            log.info(
+                f"Media: {instance.source} / {instance} has a valid "
+                f"title filter, not marking to be skipped"
+            )
+            return False
+
+        log.info(
+            f"Media: {instance.source} / {instance} doesn't match "
+            f"title filter, marking to be skipped"
+        )
+
+        return True
+
     if instance.source.is_regex_match(instance.title):
         log.info(
-            f"Media: {instance.source} / {instance} has a valid "
-            f"title filter, not marking to be skipped"
+            f"Media: {instance.source} / {instance} matches inverted "
+            f"title filter, marking to be skipped"
         )
-        return False
+
+        return True
 
     log.info(
-        f"Media: {instance.source} / {instance} doesn't match "
-        f"title filter, marking to be skipped"
+        f"Media: {instance.source} / {instance} does not match the inverted "
+        f"title filter, not marking to be skipped"
     )
-
-    return True
+    return False
 
 
 def filter_max_cap(instance: Media):

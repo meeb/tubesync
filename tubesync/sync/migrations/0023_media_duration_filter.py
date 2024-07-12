@@ -50,4 +50,13 @@ class Migration(migrations.Migration):
                 "video greater than maximum) video duration",
             ),
         ),
+        migrations.AddField(
+            model_name="source",
+            name="filter_text_invert",
+            field=models.BooleanField(
+                verbose_name="invert filter text matching",
+                default=False,
+                help_text="Invert filter string regex match, skip any matching titles when selected",
+            ),
+        ),
     ]
