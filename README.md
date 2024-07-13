@@ -122,7 +122,6 @@ occurring, typical ones are file permission issues.
 Alternatively, for Docker Compose, you can use something like:
 
 ```yml
-version: '3.7'
 services:
   tubesync:
     image: ghcr.io/meeb/tubesync:latest
