@@ -36,6 +36,7 @@ def filter_media(instance: Media):
 
     # If we aren't already skipping the file, call our custom function that can be overridden
     if not skip and filter_custom(instance):
+        log.info(f"Media: {instance.source} / {instance} has been skipped by Custom Filter")
         skip = True
 
     # Check if skipping
