@@ -6,6 +6,7 @@ from common.logger import log
 from .models import Media
 from datetime import datetime, timedelta
 from django.utils import timezone
+from .overrides.custom_filter import filter_custom
 
 
 # Check the filter conditions for instance, return is if the Skip property has changed so we can do other things
@@ -31,6 +32,10 @@ def filter_media(instance: Media):
 
     # Check if the video is longer than the max, or shorter than the min
     if filter_duration(instance):
+        skip = True
+
+    # If we aren't already skipping the file, call our custom function that can be overridden
+    if not skip and filter_custom(instance):
         skip = True
 
     # Check if skipping
