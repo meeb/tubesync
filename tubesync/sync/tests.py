@@ -15,6 +15,7 @@ from django.utils import timezone
 from background_task.models import Task
 from .models import Source, Media
 from .tasks import cleanup_old_media
+from .filtering import filter_media
 
 
 class FrontEndTestCase(TestCase):
@@ -175,7 +176,8 @@ class FrontEndTestCase(TestCase):
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
-            'filter_text':'.*',
+            'filter_text': '.*',
+            'filter_seconds_min': True,
             'index_schedule': 3600,
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -218,7 +220,8 @@ class FrontEndTestCase(TestCase):
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
-            'filter_text':'.*',
+            'filter_text': '.*',
+            'filter_seconds_min': True,
             'index_schedule': Source.IndexSchedule.EVERY_HOUR,
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -249,7 +252,8 @@ class FrontEndTestCase(TestCase):
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
-            'filter_text':'.*',
+            'filter_text': '.*',
+            'filter_seconds_min': True,
             'index_schedule': Source.IndexSchedule.EVERY_2_HOURS,  # changed
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -696,6 +700,176 @@ class MediaTestCase(TestCase):
             self.assertEqual(expected_node.text, nfo_node.text)
 
 
+class MediaFilterTestCase(TestCase):
+
+    def setUp(self):
+        # Disable general logging for test case
+        # logging.disable(logging.CRITICAL)
+        # Add a test source
+        self.source = Source.objects.create(
+            source_type=Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            key="testkey",
+            name="testname",
+            directory="testdirectory",
+            media_format=settings.MEDIA_FORMATSTR_DEFAULT,
+            index_schedule=3600,
+            delete_old_media=False,
+            days_to_keep=14,
+            source_resolution=Source.SOURCE_RESOLUTION_1080P,
+            source_vcodec=Source.SOURCE_VCODEC_VP9,
+            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            prefer_60fps=False,
+            prefer_hdr=False,
+            fallback=Source.FALLBACK_FAIL,
+        )
+        # Add some test media
+        self.media = Media.objects.create(
+            key="mediakey",
+            source=self.source,
+            metadata=metadata,
+            skip=False,
+            published=timezone.make_aware(
+                datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+            ),
+        )
+        # Fix a created datetime for predictable testing
+        self.media.created = datetime(
+            year=2020, month=1, day=1, hour=1, minute=1, second=1
+        )
+
+    def test_filter_unpublished_skip(self):
+        # Check if unpublished that we skip download it
+        self.media.skip = False
+        self.media.published = False
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertTrue(self.media.skip)
+
+    def test_filter_published_unskip(self):
+        # Check if we had previously skipped it, but now it's published, we won't skip it
+        self.media.skip = True
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertFalse(self.media.skip)
+
+    def test_filter_filter_text_nomatch(self):
+        # Check that if we don't match the filter text, we skip
+        self.media.source.filter_text = "No fancy stuff"
+        self.media.skip = False
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertTrue(self.media.skip)
+
+    def test_filter_filter_text_match(self):
+        # Check that if we match the filter text, we don't skip
+        self.media.source.filter_text = "(?i)No fancy stuff"
+        self.media.skip = True
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertFalse(self.media.skip)
+
+    def test_filter_filter_text_invert_nomatch(self):
+        # Check that if we don't match the filter text, we don't skip
+        self.media.source.filter_text = "No fancy stuff"
+        self.media.source.filter_text_invert = True
+        self.media.skip = True
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertFalse(self.media.skip)
+
+    def test_filter_filter_text_invert_match(self):
+        # Check that if we match the filter text and do skip
+        self.media.source.filter_text = "(?i)No fancy stuff"
+        self.media.source.filter_text_invert = True
+        self.media.skip = False
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertTrue(self.media.skip)
+
+    def test_filter_max_cap_skip(self):
+        # Check if it's older than the max_cap, we don't download it (1 second so it will always fail)
+        self.media.source.download_cap = 1
+        self.media.skip = False
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertTrue(self.media.skip)
+
+    def test_filter_max_cap_unskip(self):
+        # Make sure it's newer than the cap so we download it, ensure that we are published in the last seconds
+        self.media.source.download_cap = 3600
+        self.media.skip = True
+        self.media.published = timezone.now()
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertFalse(self.media.skip)
+
+    def test_filter_below_min(self):
+        # Filter videos shorter than the minimum limit
+        self.media.skip = False
+        self.media.source.filter_seconds_min = True
+        self.media.source.filter_seconds = 500
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertTrue(self.media.skip)
+
+    def test_filter_above_min(self):
+        # Video is longer than the minimum, allow it
+        self.media.skip = True
+        self.media.source.filter_seconds_min = True
+        self.media.source.filter_seconds = 300
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertFalse(self.media.skip)
+
+    def test_filter_above_max(self):
+        # Filter videos longer than the maximum limit
+        self.media.skip = False
+        self.media.source.filter_seconds_min = False
+        self.media.source.filter_seconds = 300
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertTrue(self.media.skip)
+
+    def test_filter_below_max(self):
+        # Video is below the maximum, allow it
+        self.media.skip = True
+        self.media.source.filter_seconds_min = False
+        self.media.source.filter_seconds = 500
+        self.media.published = timezone.make_aware(
+            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
+        )
+        changed = filter_media(self.media)
+        self.assertTrue(changed)
+        self.assertFalse(self.media.skip)
+
+
 class FormatMatchingTestCase(TestCase):
 
     def setUp(self):
@@ -727,6 +901,7 @@ class FormatMatchingTestCase(TestCase):
     def test_combined_exact_format_matching(self):
         self.source.fallback = Source.FALLBACK_FAIL
         self.media.metadata = all_test_metadata['boring']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, acodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', 'MP4A', True, False): (False, False),
@@ -843,7 +1018,7 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, acodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.source_acodec = acodec
@@ -851,11 +1026,12 @@ class FormatMatchingTestCase(TestCase):
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_combined_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
 
     def test_audio_exact_format_matching(self):
         self.source.fallback = Source.FALLBACK_FAIL
         self.media.metadata = all_test_metadata['boring']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, acodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', 'MP4A', True, False): (True, '140'),
@@ -1002,6 +1178,7 @@ class FormatMatchingTestCase(TestCase):
         self.source.fallback = Source.FALLBACK_FAIL
         # Test no 60fps, no HDR metadata
         self.media.metadata = all_test_metadata['boring']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, False),
@@ -1049,6 +1226,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
         # Test 60fps metadata
         self.media.metadata = all_test_metadata['60fps']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, False),
@@ -1088,6 +1266,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
         # Test hdr metadata
         self.media.metadata = all_test_metadata['hdr']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, False),
@@ -1143,6 +1322,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
         # Test 60fps+hdr metadata
         self.media.metadata = all_test_metadata['60fps+hdr']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, False),
@@ -1208,6 +1388,7 @@ class FormatMatchingTestCase(TestCase):
         self.source.fallback = Source.FALLBACK_NEXT_BEST
         # Test no 60fps, no HDR metadata
         self.media.metadata = all_test_metadata['boring']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, '134'),             # Fallback match, no hdr
@@ -1255,6 +1436,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
         # Test 60fps metadata
         self.media.metadata = all_test_metadata['60fps']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, '134'),             # Fallback match, no hdr
@@ -1294,6 +1476,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
         # Test hdr metadata
         self.media.metadata = all_test_metadata['hdr']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, '332'),             # Fallback match, hdr, switched to VP9
@@ -1349,6 +1532,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
         # Test 60fps+hdr metadata
         self.media.metadata = all_test_metadata['60fps+hdr']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, '134'),             # Fallback match, no hdr
@@ -1412,6 +1596,7 @@ class FormatMatchingTestCase(TestCase):
 
     def test_metadata_20230629(self):
         self.media.metadata = all_test_metadata['20230629']
+        self.media.save()
         expected_matches = {
             # (format, vcodec, prefer_60fps, prefer_hdr): (match_type, code),
             ('360p', 'AVC1', False, True): (False, '134'),             # Fallback match, no hdr
@@ -1476,6 +1661,7 @@ class FormatMatchingTestCase(TestCase):
     def test_is_regex_match(self):
         
         self.media.metadata = all_test_metadata['boring']
+        self.media.save()
         expected_matches = {
             ('.*'): (True),
             ('no fancy stuff'): (True),
@@ -1495,7 +1681,11 @@ class FormatMatchingTestCase(TestCase):
         for params, expected in expected_matches.items():
             self.source.filter_text = params
             expected_match_result = expected
-            self.assertEqual(self.source.is_regex_match(self.media.title), expected_match_result)
+            self.assertEqual(
+                self.source.is_regex_match(self.media.title),
+                expected_match_result,
+                msg=f'Media title "{self.media.title}" checked against regex "{self.source.filter_text}" failed '
+                    f'expected {expected_match_result}')
 
 class TasksTestCase(TestCase):
     def setUp(self):

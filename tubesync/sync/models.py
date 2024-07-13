@@ -104,6 +104,11 @@ class Source(models.Model):
         (FALLBACK_NEXT_BEST_HD, _('Get next best resolution but at least HD'))
     )
 
+    FILTER_SECONDS_CHOICES = (
+        (True, _('Minimum Length')),
+        (False, _('Maximum Length')),
+    )
+
     EXTENSION_M4A = 'm4a'
     EXTENSION_OGG = 'ogg'
     EXTENSION_MKV = 'mkv'
@@ -292,6 +297,24 @@ class Source(models.Model):
         default='',
         blank=True,
         help_text=_('Regex compatible filter string for video titles')
+    )
+    filter_text_invert = models.BooleanField(
+        _("invert filter text matching"),
+        default=False,
+        help_text="Invert filter string regex match, skip any matching titles when selected",
+    )
+    filter_seconds = models.PositiveIntegerField(
+                _('filter seconds'),
+                blank=True,
+                null=True,
+                help_text=_('Filter Media based on Min/Max duration. Leave blank or 0 to disable filtering')
+    )
+    filter_seconds_min = models.BooleanField(
+        _('filter seconds min/max'),
+        choices=FILTER_SECONDS_CHOICES,
+        default=True,
+        help_text=_('When Filter Seconds is > 0, do we skip on minimum (video shorter than limit) or maximum (video '
+                    'greater than maximum) video duration')
     )
     delete_removed_media = models.BooleanField(
         _('delete removed media'),
@@ -785,7 +808,7 @@ class Media(models.Model):
         _('manual_skip'),
         db_index=True,
         default=False,
-        help_text=_('Media marked as "skipped", won\' be downloaded')
+        help_text=_('Media marked as "skipped", won\'t be downloaded')
     )
     downloaded = models.BooleanField(
         _('downloaded'),
@@ -858,6 +881,20 @@ class Media(models.Model):
         null=True,
         help_text=_('Size of the downloaded media in bytes')
     )
+    duration = models.PositiveIntegerField(
+        _('duration'),
+        blank=True,
+        null=True,
+        help_text=_('Duration of media in seconds')
+    )
+    title = models.CharField(
+        _('title'),
+        max_length=100,
+        blank=True,
+        null=False,
+        default='',
+        help_text=_('Video title')
+    )
 
     def __str__(self):
         return self.key
@@ -868,6 +905,21 @@ class Media(models.Model):
         unique_together = (
             ('source', 'key'),
         )
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        # Trigger an update of derived fields from metadata
+        if self.metadata:
+            self.title = self.metadata_title
+            self.duration = self.metadata_duration
+        if update_fields is not None and "metadata" in update_fields:
+            # If only some fields are being updated, make sure we update title and duration if metadata changes
+            update_fields = {"title", "duration"}.union(update_fields)
+
+        super().save(
+            force_insert=force_insert,
+            force_update=force_update,
+            using=using,
+            update_fields=update_fields,)
 
     def get_metadata_field(self, field):
         fields = self.METADATA_FIELDS.get(field, {})
@@ -1083,7 +1135,7 @@ class Media(models.Model):
         return self.loaded_metadata.get(field, '').strip()
 
     @property
-    def title(self):
+    def metadata_title(self):
         field = self.get_metadata_field('title')
         return self.loaded_metadata.get(field, '').strip()
 
@@ -1115,7 +1167,7 @@ class Media(models.Model):
             return None
 
     @property
-    def duration(self):
+    def metadata_duration(self):
         field = self.get_metadata_field('duration')
         duration = self.loaded_metadata.get(field, 0)
         try:
@@ -1127,7 +1179,7 @@ class Media(models.Model):
     @property
     def duration_formatted(self):
         duration = self.duration
-        if duration > 0:
+        if duration and duration > 0:
             return seconds_to_timestr(duration)
         return '??:??:??'
 

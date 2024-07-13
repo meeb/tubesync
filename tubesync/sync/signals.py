@@ -13,6 +13,7 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     map_task_to_instance, check_source_directory_exists,
                     download_media, rescan_media_server, download_source_images)
 from .utils import delete_file
+from .filtering import filter_media
 
 
 @receiver(pre_save, sender=Source)
@@ -105,62 +106,13 @@ def media_post_save(sender, instance, created, **kwargs):
     if instance.manual_skip:
         return
     # Triggered after media is saved
-    cap_changed = False
+    skip_changed = False
     can_download_changed = False
     # Reset the skip flag if the download cap has changed if the media has not
     # already been downloaded
     if not instance.downloaded and instance.metadata:
-        max_cap_age = instance.source.download_cap_date
-        filter_text = instance.source.filter_text.strip()
-        published = instance.published
-        if not published:
-            if not instance.skip:
-                log.warn(f'Media: {instance.source} / {instance} has no published date '
-                         f'set, marking to be skipped')
-                instance.skip = True
-                cap_changed = True
-            else:
-                log.debug(f'Media: {instance.source} / {instance} has no published date '
-                          f'set but is already marked to be skipped')
-        else:
-            if max_cap_age:
-                if published > max_cap_age and instance.skip:
-                    if filter_text:
-                        if instance.source.is_regex_match(instance.title):
-                            log.info(f'Media: {instance.source} / {instance} has a valid '
-                                    f'publishing date and title filter, marking to be unskipped')
-                            instance.skip = False
-                            cap_changed = True
-                        else:
-                            log.debug(f'Media: {instance.source} / {instance} has a valid publishing date '
-                                      f'but failed the title filter match, already marked skipped')
-                    else:
-                        log.info(f'Media: {instance.source} / {instance} has a valid '
-                                 f'publishing date, marking to be unskipped')
-                        instance.skip = False
-                        cap_changed = True
-                elif published <= max_cap_age and not instance.skip:
-                    log.info(f'Media: {instance.source} / {instance} is too old for '
-                            f'the download cap date, marking to be skipped')
-                    instance.skip = True
-                    cap_changed = True
-            else:
-                if instance.skip:
-                    # Media marked to be skipped but source download cap removed
-                    if filter_text:
-                        if instance.source.is_regex_match(instance.title):
-                            log.info(f'Media: {instance.source} / {instance} has a valid '
-                                     f'publishing date and title filter, marking to be unskipped')
-                            instance.skip = False
-                            cap_changed = True
-                        else:
-                            log.info(f'Media: {instance.source} / {instance} has a valid publishing date '
-                                     f'but failed the title filter match, already marked skipped')
-                else:
-                    log.debug(f'Media: {instance.source} / {instance} has a valid publishing date and '
-                              f'is already marked as not to be skipped')
+        skip_changed = filter_media(instance)
 
-                    cap_changed = False
     # Recalculate the "can_download" flag, this may
     # need to change if the source specifications have been changed
     if instance.metadata:
@@ -173,7 +125,7 @@ def media_post_save(sender, instance, created, **kwargs):
                 instance.can_download = False
                 can_download_changed = True
     # Save the instance if any changes were required
-    if cap_changed or can_download_changed:
+    if skip_changed or can_download_changed:
         post_save.disconnect(media_post_save, sender=Media)
         instance.save()
         post_save.connect(media_post_save, sender=Media)
@@ -187,10 +139,10 @@ def media_post_save(sender, instance, created, **kwargs):
             verbose_name=verbose_name.format(instance.pk),
             remove_existing_tasks=True
         )
-    # If the media is missing a thumbnail schedule it to be downloaded
+    # If the media is missing a thumbnail schedule it to be downloaded (unless we are skipping this media)
     if not instance.thumb_file_exists:
         instance.thumb = None
-    if not instance.thumb:
+    if not instance.thumb and not instance.skip:
         thumbnail_url = instance.thumbnail
         if thumbnail_url:
             log.info(f'Scheduling task to download thumbnail for: {instance.name} '
@@ -219,6 +171,8 @@ def media_post_save(sender, instance, created, **kwargs):
             verbose_name=verbose_name.format(instance.name),
             remove_existing_tasks=True
         )
+
+
 
 
 @receiver(pre_delete, sender=Media)
