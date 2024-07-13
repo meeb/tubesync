@@ -302,14 +302,7 @@ def download_media_metadata(media_id):
     if media.metadata_duration:
         media.duration = media.metadata_duration
 
-    filter_media(media)
-    # Check we can download the media item
-    if not media.skip:
-        if media.get_format_str():
-            media.can_download = True
-        else:
-            media.can_download = False
-    # Save the media
+    # Don't filter media here, the post_save signal will handle that
     media.save()
     log.info(f'Saved {len(media.metadata)} bytes of metadata for: '
              f'{source} / {media_id}')
