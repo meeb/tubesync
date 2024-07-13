@@ -100,19 +100,17 @@ RUN set -x && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
-  python3-pip \
-  python3-dev \
-  gcc \
-  g++ \
-  make \
-  pkgconf \
   default-libmysqlclient-dev \
-  postgresql-common \
-  libpq-dev \
-  libjpeg62-turbo \
+  g++ \
+  gcc \
   libjpeg-dev \
-  zlib1g-dev \
+  libpq-dev \
   libwebp-dev \
+  make \
+  postgresql-common \
+  python3-dev \
+  python3-pip \
+  zlib1g-dev \
   && \
   # Create a 'app' user which the application will run as
   groupadd app && \
@@ -123,17 +121,18 @@ RUN set -x && \
   rm /app/Pipfile && \
   pipenv --clear && \
   apt-get -y autoremove --purge \
-  python3-pip \
-  python3-dev \
-  gcc \
-  g++ \
-  make \
   default-libmysqlclient-dev \
-  postgresql-common \
-  libpq-dev \
+  g++ \
+  gcc \
   libjpeg-dev \
+  libpq-dev \
+  libwebp-dev \
+  make \
+  postgresql-common \
+  python3-dev \
+  python3-pip \
   zlib1g-dev \
-  libwebp-dev && \
+  && \
   apt-get -y autoremove && \
   apt-get -y autoclean && \
   rm -rf /var/lib/apt/lists/* && \
