@@ -11,7 +11,8 @@ from .models import Source, Media, MediaServer
 from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
                     download_media_thumbnail, download_media_metadata,
                     map_task_to_instance, check_source_directory_exists,
-                    download_media, rescan_media_server, download_source_images)
+                    download_media, rescan_media_server, download_source_images,
+                    save_all_media_for_source)
 from .utils import delete_file
 from .filtering import filter_media
 
