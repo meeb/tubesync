@@ -67,10 +67,13 @@ def source_post_save(sender, instance, created, **kwargs):
                 verbose_name=verbose_name.format(instance.name),
                 remove_existing_tasks=True
             )
-    # Trigger the post_save signal for each media item linked to this source as various
-    # flags may need to be recalculated
-    for media in Media.objects.filter(source=instance):
-        media.save()
+    verbose_name = _('Checking all media for source "{}"')
+    save_all_media_for_source(
+        str(instance.pk),
+        priority=0,
+        verbose_name=verbose_name.format(instance.name),
+        remove_existing_tasks=True
+    )
 
 
 @receiver(pre_delete, sender=Source)
@@ -80,7 +83,6 @@ def source_pre_delete(sender, instance, **kwargs):
     for media in Media.objects.filter(source=instance):
         log.info(f'Deleting media for source: {instance.name} item: {media.name}')
         media.delete()
-
 
 
 @receiver(post_delete, sender=Source)
@@ -173,8 +175,6 @@ def media_post_save(sender, instance, created, **kwargs):
         )
 
 
-
-
 @receiver(pre_delete, sender=Media)
 def media_pre_delete(sender, instance, **kwargs):
     # Triggered before media is deleted, delete any scheduled tasks
@@ -193,7 +193,6 @@ def media_pre_delete(sender, instance, **kwargs):
         for file in all_related_files:
             log.info(f'Deleting file for: {instance} path: {file}')
             delete_file(file)
-
 
 
 @receiver(post_delete, sender=Media)

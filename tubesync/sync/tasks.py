@@ -49,6 +49,7 @@ def map_task_to_instance(task):
         'sync.tasks.check_source_directory_exists': Source,
         'sync.tasks.download_media_thumbnail': Media,
         'sync.tasks.download_media': Media,
+        'sync.tasks.save_all_media_for_source': Source,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
@@ -464,3 +465,24 @@ def rescan_media_server(mediaserver_id):
     # Request an rescan / update
     log.info(f'Updating media server: {mediaserver}')
     mediaserver.update()
+
+
+@background(schedule=0)
+def save_all_media_for_source(source_id):
+    '''
+        Iterates all media items linked to a source and saves them to
+        trigger the post_save signal for every media item. Used when a
+        source has its parameters changed and all media needs to be
+        checked to see if its download status has changed.
+    '''
+    try:
+        source = Source.objects.get(pk=source_id)
+    except Source.DoesNotExist:
+        # Task triggered but the source no longer exists, do nothing
+        log.error(f'Task save_all_media_for_source(pk={source_id}) called but no '
+                  f'source exists with ID: {source_id}')
+        return
+    # Trigger the post_save signal for each media item linked to this source as various
+    # flags may need to be recalculated
+    for media in Media.objects.filter(source=source):
+        media.save()
