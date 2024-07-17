@@ -889,7 +889,7 @@ class Media(models.Model):
     )
     title = models.CharField(
         _('title'),
-        max_length=100,
+        max_length=200,
         blank=True,
         null=False,
         default='',

@@ -297,7 +297,7 @@ def download_media_metadata(media_id):
 
     # Store title in DB so it's fast to access
     if media.metadata_title:
-        media.title = media.metadata_title
+        media.title = media.metadata_title[:200]
 
     # Store duration in DB so it's fast to access
     if media.metadata_duration:
