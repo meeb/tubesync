@@ -100,6 +100,15 @@ def filter_filter_text(instance: Media):
 
 
 def filter_max_cap(instance: Media):
+
+    if instance.published is None:
+        log.debug(
+            f"Media: {instance.source} / {instance} has no published date "
+            f"set (likely not downloaded metadata) so not filtering based on "
+            f"publish date"
+        )
+        return False
+
     max_cap_age = instance.source.download_cap_date
     if not max_cap_age:
         log.debug(
