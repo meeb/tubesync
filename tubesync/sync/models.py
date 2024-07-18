@@ -1480,7 +1480,8 @@ class Media(models.Model):
             sorted_media = Media.objects.filter(source=self.source)
         else:
             self_year = self.upload_date.year if self.upload_date else self.created.year
-            filtered_media = Media.objects.filter(source=self.source, published__year=self_year, upload_date__isnull=False)
+            filtered_media = Media.objects.filter(source=self.source, published__year=self_year)
+            filtered_media = [m for m in filtered_media where m.upload_date is not None]
             sorted_media = sorted(filtered_media, key=lambda x: (x.upload_date, x.key))
         position_counter = 1
         for media in sorted_media:
