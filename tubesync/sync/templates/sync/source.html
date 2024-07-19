@@ -73,6 +73,14 @@
         <td class="hide-on-small-only">Index schedule</td>
         <td><span class="hide-on-med-and-up">Index schedule<br></span><strong>{{ source.get_index_schedule_display }}</strong></td>
       </tr>
+      <tr title="Index videos from this source">
+        <td class="hide-on-small-only">Index videos?</td>
+        <td><span class="hide-on-med-and-up">Index videos?<br></span><strong>{% if source.index_videos %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
+      <tr title="Index streams from this source">
+        <td class="hide-on-small-only">Index streams?</td>
+        <td><span class="hide-on-med-and-up">Index streams?<br></span><strong>{% if source.index_streams %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
       <tr title="Download media from this source">
         <td class="hide-on-small-only">Download media?</td>
         <td><span class="hide-on-med-and-up">Download media?<br></span><strong>{% if source.download_media %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
