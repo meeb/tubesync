@@ -276,7 +276,7 @@ class Source(models.Model):
     )
     index_videos = models.BooleanField(
         _('index videos'),
-        default=False,
+        default=True,
         help_text=_('Index video media from this source')
     )
     index_streams = models.BooleanField(
