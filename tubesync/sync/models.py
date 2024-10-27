@@ -1155,7 +1155,7 @@ class Media(models.Model):
             old_mdl = len(self.metadata or "")
             data = json.loads(self.metadata or "")
             compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
-            
+
             filtered_data = filter_response(data, True)
             filtered_json = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
         except Exception as e:
@@ -1288,6 +1288,19 @@ class Media(models.Model):
         return self.loaded_metadata.get(field, '')
 
     @property
+    def selected_path(self):
+        if self.downloaded and self.media_file:
+            filename = self.media_file.path
+            for prefix in self.source.directory_path.as_posix().split('/'):
+                if prefix == '':
+                    continue
+                filename = filename.removeprefix(f'/{prefix}')
+            filename = filename.removeprefix('/')
+        else:
+            filename = self.filename
+        return os.path.splitext(filename)[0]
+
+    @property
     def filename(self):
         # Create a suitable filename from the source media_format
         media_format = str(self.source.media_format)
@@ -1304,12 +1317,7 @@ class Media(models.Model):
 
     @property
     def thumbname(self):
-        if self.downloaded and self.media_file:
-            filename = self.media_file.path
-        else:
-            filename = self.filename
-        prefix, ext = os.path.splitext(os.path.basename(filename))
-        return f'{prefix}.jpg'
+        return f'{self.selected_path}.jpg'
 
     @property
     def thumbpath(self):
@@ -1317,12 +1325,7 @@ class Media(models.Model):
 
     @property
     def nfoname(self):
-        if self.downloaded and self.media_file:
-            filename = self.media_file.path
-        else:
-            filename = self.filename
-        prefix, ext = os.path.splitext(os.path.basename(filename))
-        return f'{prefix}.nfo'
+        return f'{self.selected_path}.nfo'
     
     @property
     def nfopath(self):
@@ -1330,12 +1333,7 @@ class Media(models.Model):
 
     @property
     def jsonname(self):
-        if self.downloaded and self.media_file:
-            filename = self.media_file.path
-        else:
-            filename = self.filename
-        prefix, ext = os.path.splitext(os.path.basename(filename))
-        return f'{prefix}.info.json'
+        return f'{self.selected_path}.info.json'
     
     @property
     def jsonpath(self):
@@ -1515,9 +1513,15 @@ class Media(models.Model):
         if not format_str:
             raise NoFormatException(f'Cannot download, media "{self.pk}" ({self}) has '
                                     f'no valid format available')
+        # Ensure if media is re-downloaded it's saved to the same location that the database says it is
+        if self.media_file:
+            filepath = self.media_file.path
+        else:
+            filepath = self.filepath
+
         # Download the media with youtube-dl
         download_youtube_media(self.url, format_str, self.source.extension,
-                               str(self.filepath), self.source.write_json,
+                               str(filepath), self.source.write_json,
                                self.source.sponsorblock_categories.selected_choices, self.source.embed_thumbnail,
                                self.source.embed_metadata, self.source.enable_sponsorblock,
                               self.source.write_subtitles, self.source.auto_subtitles,self.source.sub_langs )
@@ -1564,7 +1568,7 @@ class Media(models.Model):
 
         if use_padding:
             return f'{episode_number:02}'
-        
+
         return str(episode_number)
 
 

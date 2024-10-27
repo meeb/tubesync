@@ -134,6 +134,8 @@ dmypy.json
 
 Pipfile.lock
 .vscode/launch.json
+container_config
+container_downloads
 
 # Ignore Jetbrains IDE files
 .idea/
