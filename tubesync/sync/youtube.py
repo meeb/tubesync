@@ -5,17 +5,27 @@
 
 
 import os
+from pathlib import Path
 from django.conf import settings
 from copy import copy
 from common.logger import log
 import yt_dlp
 
 
-_youtubedl_cachedir = getattr(settings, 'YOUTUBE_DL_CACHEDIR', None)
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
+_youtubedl_cachedir = getattr(settings, 'YOUTUBE_DL_CACHEDIR', None)
 if _youtubedl_cachedir:
     _youtubedl_cachedir = str(_youtubedl_cachedir)
     _defaults['cachedir'] = _youtubedl_cachedir
+_youtubedl_tempdir = getattr(settings, 'YOUTUBE_DL_TEMPDIR', None)
+if _youtubedl_tempdir:
+    _youtubedl_tempdir = str(_youtubedl_tempdir)
+    _youtubedl_tempdir_path = Path(_youtubedl_tempdir)
+    _youtubedl_tempdir_path.mkdir(parents=True, exist_ok=True)
+    (_youtubedl_tempdir_path / '.ignore').touch(exist_ok=True)
+    _paths = _defaults.get('paths', {})
+    _paths.update({ 'temp': _youtubedl_tempdir, })
+    _defaults['paths'] = _paths
 
 
 
@@ -140,7 +150,7 @@ def download_media(url, media_format, extension, output_file, info_json,
     ytopts = {
         'format': media_format,
         'merge_output_format': extension,
-        'outtmpl': output_file,
+        'outtmpl': os.path.basename(output_file),
         'quiet': True,
         'progress_hooks': [hook],
         'writeinfojson': info_json,
@@ -161,6 +171,10 @@ def download_media(url, media_format, extension, output_file, info_json,
         'add_metadata': embed_metadata
     }
     opts = get_yt_opts()
+    ytopts['paths'] = opts.get('paths', {})
+    ytopts['paths'].update({
+        'home': os.path.dirname(output_file),
+    })
     if embed_thumbnail:
         ytopts['postprocessors'].append({'key': 'EmbedThumbnail'})
     if skip_sponsors:
