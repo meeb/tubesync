@@ -24,27 +24,46 @@ ENV DEBIAN_FRONTEND="noninteractive" \
   S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
 
 # Install third party software
-RUN decide_arch() { \
-      case "${TARGETARCH:-amd64}" in \
+# Reminder: the SHELL handles all variables
+RUN set -ux && decide_arch() { \
+      case "${TARGETARCH:=amd64}" in \
         (arm64) printf 'aarch64' ;; \
-        (*) printf '%s' "${TARGETARCH:-amd64}" ;; \
+        (*) printf '%s' "${TARGETARCH}" ;; \
       esac ; \
     } && \
     decide_expected() { \
-      case "\${1}" in \
-        (s6) case "\${2}" in \
+      case "${1}" in \
+        (s6) case "${2}" in \
             (amd64) printf -- '%s' "${SHA256_S6_AMD64}" ;; \
             (arm64) printf -- '%s' "${SHA256_S6_ARM64}" ;; \
             (noarch) printf -- '%s' "${SHA256_S6_NOARCH}" ;; \
           esac ;; \
       esac ; \
-    } && set -x && \
+    } && \
+    decide_url() { \
+      case "${1}" in \
+        (s6) printf -- \
+          'https://github.com/just-containers/s6-overlay/releases/download/v%s/s6-overlay-%s.tar.xz' \
+          "${S6_VERSION}" \
+          "$(case "${2}" in \
+            (amd64) printf -- 'x86_64' ;; \
+            (arm64) printf -- 'aarch64' ;; \
+            (*) printf -- '%s' "${2}" ;; \
+          esac)" ;; \
+      esac ; \
+    } && \
+    verify_download() { \
+      while [ $# -ge 2 ] ; do \
+        sha256sum "${2}" ; \
+        printf -- '%s  %s\n' "${1}" "${2}" | sha256sum -c || return ; \
+        shift ; shift ; \
+      done ; \
+    } && \
+    download_expected_file() { \
+      curl -sSL --output "${3}" "$(decide_url "${1}" "${2}")" && \
+      verify_download "$(decide_expected "${1}" "${2}")" \
+    } && \
   export ARCH="$(decide_arch)" && \
-  export S6_ARCH_EXPECTED_SHA256="$(decide_expected s6 "${TARGETARCH:-amd64}")" && \
-  export S6_DOWNLOAD_ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-x86_64.tar.xz"   ;; \
-  "linux/arm64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.xz" ;; \
-  *)               echo ""        ;; esac) && \
   export FFMPEG_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "08f889687ca9706171c2b534ff241e0e1fda082f27f2ddd9fedf14a8e7b5f1aa" ;; \
   "linux/arm64")   echo "a2ea26c54b1c79b63a6b51b5c228b6a350fe790c4c75e5d0889636b37e2e694b" ;; \
@@ -53,8 +72,6 @@ RUN decide_arch() { \
   "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linux64-gpl.tar.xz"   ;; \
   "linux/arm64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linuxarm64-gpl.tar.xz" ;; \
   *)               echo ""        ;; esac) && \
-  export S6_NOARCH_EXPECTED_SHA256="$(decide_expected s6 noarch)" && \
-  export S6_DOWNLOAD_NOARCH="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-noarch.tar.xz" && \
   echo "Building for arch: ${ARCH}|${ARCH44}, downloading S6 from: ${S6_DOWNLOAD}}, expecting S6 SHA256: ${S6_EXPECTED_SHA256}" && \
   set -x && \
   apt-get update && \
@@ -64,11 +81,9 @@ RUN decide_arch() { \
   # Install required distro packages
   apt-get -y --no-install-recommends install curl ca-certificates binutils xz-utils && \
   # Install s6
-  curl -L ${S6_DOWNLOAD_NOARCH} --output /tmp/s6-overlay-noarch.tar.xz && \
-  echo "${S6_NOARCH_EXPECTED_SHA256}  /tmp/s6-overlay-noarch.tar.xz" | sha256sum -c - && \
+  download_expected_file s6 noarch "/tmp/s6-overlay-noarch.tar.xz" && \
   tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
-  curl -L ${S6_DOWNLOAD_ARCH} --output /tmp/s6-overlay-${ARCH}.tar.xz && \
-  echo "${S6_ARCH_EXPECTED_SHA256}  /tmp/s6-overlay-${ARCH}.tar.xz" | sha256sum -c - && \
+  download_expected_file s6 "${TARGETARCH}" "/tmp/s6-overlay-${ARCH}.tar.xz" \
   tar -C / -Jxpf /tmp/s6-overlay-${ARCH}.tar.xz && \
   # Install ffmpeg
   echo "Building for arch: ${ARCH}|${ARCH44}, downloading FFMPEG from: ${FFMPEG_DOWNLOAD}, expecting FFMPEG SHA256: ${FFMPEG_EXPECTED_SHA256}" && \
