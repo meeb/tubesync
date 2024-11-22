@@ -1,9 +1,15 @@
 FROM debian:bookworm-slim
 
+ARG TARGETARCH
 ARG TARGETPLATFORM
+
 ARG S6_VERSION="3.2.0.0"
 ARG FFMPEG_DATE="autobuild-2024-10-30-14-17"
 ARG FFMPEG_VERSION="117674-g44a0a0c050"
+
+ENV S6_VERSION="${S6_VERSION}" \
+  FFMPEG_DATE="${FFMPEG_DATE}" \
+  FFMPEG_VERSION="${FFMPEG_VERSION}"
 
 ENV DEBIAN_FRONTEND="noninteractive" \
   HOME="/root" \
@@ -14,10 +20,9 @@ ENV DEBIAN_FRONTEND="noninteractive" \
   S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
 
 # Install third party software
-RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "amd64"  ;; \
-  "linux/arm64")   echo "aarch64" ;; \
-  *)               echo ""        ;; esac) && \
+RUN export ARCH="$(case "${TARGETARCH:-amd64}" in \
+  arm64) echo 'aarch64' ;; \
+  *)     echo "${TARGETARCH:-amd64}" ;; esac)" && \
   export S6_ARCH_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "ad982a801bd72757c7b1b53539a146cf715e640b4d8f0a6a671a3d1b560fe1e2" ;; \
   "linux/arm64")   echo "868973e98210257bba725ff5b17aa092008c9a8e5174499e38ba611a8fc7e473" ;; \
