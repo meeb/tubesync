@@ -25,7 +25,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 
 # Install third party software
 # Reminder: the SHELL handles all variables
-RUN set -ux && decide_arch() { \
+RUN decide_arch() { \
       case "${TARGETARCH:=amd64}" in \
         (arm64) printf 'aarch64' ;; \
         (*) printf '%s' "${TARGETARCH}" ;; \
@@ -60,8 +60,10 @@ RUN set -ux && decide_arch() { \
       done ; \
     } && \
     download_expected_file() { \
+      printf -- '%s\n' \
+        "Building for arch: ${2}|${ARCH}, downloading ${1} from: $(decide_url "${1}" "${2}"), expecting ${1} SHA256: $(decide_expected "${1}" "${2}")" && \
       curl -sSL --output "${3}" "$(decide_url "${1}" "${2}")" && \
-      verify_download "$(decide_expected "${1}" "${2}")" \
+      verify_download "$(decide_expected "${1}" "${2}")" "${3}" ; \
     } && \
   export ARCH="$(decide_arch)" && \
   export FFMPEG_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
@@ -72,7 +74,6 @@ RUN set -ux && decide_arch() { \
   "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linux64-gpl.tar.xz"   ;; \
   "linux/arm64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linuxarm64-gpl.tar.xz" ;; \
   *)               echo ""        ;; esac) && \
-  echo "Building for arch: ${ARCH}|${ARCH44}, downloading S6 from: ${S6_DOWNLOAD}}, expecting S6 SHA256: ${S6_EXPECTED_SHA256}" && \
   set -x && \
   apt-get update && \
   apt-get -y --no-install-recommends install locales && \
