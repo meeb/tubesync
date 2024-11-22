@@ -1,9 +1,21 @@
 FROM debian:bookworm-slim
 
+ARG TARGETARCH=amd64
 ARG TARGETPLATFORM
+
 ARG S6_VERSION="3.2.0.0"
-ARG FFMPEG_DATE="autobuild-2024-10-30-14-17"
-ARG FFMPEG_VERSION="117674-g44a0a0c050"
+ARG SHA256_S6_AMD64="ad982a801bd72757c7b1b53539a146cf715e640b4d8f0a6a671a3d1b560fe1e2"
+ARG SHA256_S6_ARM64="868973e98210257bba725ff5b17aa092008c9a8e5174499e38ba611a8fc7e473"
+ARG SHA256_S6_NOARCH="4b0c0907e6762814c31850e0e6c6762c385571d4656eb8725852b0b1586713b6"
+
+ARG FFMPEG_DATE="autobuild-2024-10-31-14-17"
+ARG FFMPEG_VERSION="117676-g87068b9600"
+ARG SHA256_FFMPEG_AMD64="841c5d93d96d376be12f74db8f091b1f29fd73d59da44ff09c2eb44dbdabe273"
+ARG SHA256_FFMPEG_ARM64="8546beda0132483b3ed6be24abbd92b20a1af51ba28daf34860adeb27b60140e"
+
+ENV S6_VERSION="${S6_VERSION}" \
+  FFMPEG_DATE="${FFMPEG_DATE}" \
+  FFMPEG_VERSION="${FFMPEG_VERSION}"
 
 ENV DEBIAN_FRONTEND="noninteractive" \
   HOME="/root" \
@@ -14,29 +26,65 @@ ENV DEBIAN_FRONTEND="noninteractive" \
   S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
 
 # Install third party software
-RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "amd64"  ;; \
-  "linux/arm64")   echo "aarch64" ;; \
-  *)               echo ""        ;; esac) && \
-  export S6_ARCH_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "ad982a801bd72757c7b1b53539a146cf715e640b4d8f0a6a671a3d1b560fe1e2" ;; \
-  "linux/arm64")   echo "868973e98210257bba725ff5b17aa092008c9a8e5174499e38ba611a8fc7e473" ;; \
-  *)               echo ""        ;; esac) && \
-  export S6_DOWNLOAD_ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-x86_64.tar.xz"   ;; \
-  "linux/arm64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.xz" ;; \
-  *)               echo ""        ;; esac) && \
-  export FFMPEG_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "08f889687ca9706171c2b534ff241e0e1fda082f27f2ddd9fedf14a8e7b5f1aa" ;; \
-  "linux/arm64")   echo "a2ea26c54b1c79b63a6b51b5c228b6a350fe790c4c75e5d0889636b37e2e694b" ;; \
-  *)               echo ""        ;; esac) && \
-  export FFMPEG_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linux64-gpl.tar.xz"   ;; \
-  "linux/arm64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linuxarm64-gpl.tar.xz" ;; \
-  *)               echo ""        ;; esac) && \
-  export S6_NOARCH_EXPECTED_SHA256="4b0c0907e6762814c31850e0e6c6762c385571d4656eb8725852b0b1586713b6" && \
-  export S6_DOWNLOAD_NOARCH="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-noarch.tar.xz" && \
-  echo "Building for arch: ${ARCH}|${ARCH44}, downloading S6 from: ${S6_DOWNLOAD}}, expecting S6 SHA256: ${S6_EXPECTED_SHA256}" && \
+# Reminder: the SHELL handles all variables
+RUN decide_arch() { \
+      case "${TARGETARCH:=amd64}" in \
+        (arm64) printf 'aarch64' ;; \
+        (*) printf '%s' "${TARGETARCH}" ;; \
+      esac ; \
+    } && \
+    decide_expected() { \
+      case "${1}" in \
+        (ffmpeg) case "${2}" in \
+            (amd64) printf -- '%s' "${SHA256_FFMPEG_AMD64}" ;; \
+            (arm64) printf -- '%s' "${SHA256_FFMPEG_ARM64}" ;; \
+          esac ;; \
+        (s6) case "${2}" in \
+            (amd64) printf -- '%s' "${SHA256_S6_AMD64}" ;; \
+            (arm64) printf -- '%s' "${SHA256_S6_ARM64}" ;; \
+            (noarch) printf -- '%s' "${SHA256_S6_NOARCH}" ;; \
+          esac ;; \
+      esac ; \
+    } && \
+    decide_url() { \
+      case "${1}" in \
+        (ffmpeg) printf -- \
+          'https://github.com/yt-dlp/FFmpeg-Builds/releases/download/%s/ffmpeg-N-%s-linux%s-gpl.tar.xz' \
+          "${FFMPEG_DATE}" \
+          "${FFMPEG_VERSION}" \
+          "$(case "${2}" in \
+            (amd64) printf -- '64' ;; \
+            (*) printf -- '%s' "${2}" ;; \
+          esac)" ;; \
+        (s6) printf -- \
+          'https://github.com/just-containers/s6-overlay/releases/download/v%s/s6-overlay-%s.tar.xz' \
+          "${S6_VERSION}" \
+          "$(case "${2}" in \
+            (amd64) printf -- 'x86_64' ;; \
+            (arm64) printf -- 'aarch64' ;; \
+            (*) printf -- '%s' "${2}" ;; \
+          esac)" ;; \
+      esac ; \
+    } && \
+    verify_download() { \
+      while [ $# -ge 2 ] ; do \
+        sha256sum "${2}" ; \
+        printf -- '%s  %s\n' "${1}" "${2}" | sha256sum -c || return ; \
+        shift ; shift ; \
+      done ; \
+    } && \
+    download_expected_file() { \
+      local arg1 expected file url ; \
+      arg1="$(printf -- '%s\n' "${1}" | awk '{print toupper($0);}')" ; \
+      expected="$(decide_expected "${1}" "${2}")" ; \
+      file="${3}" ; \
+      url="$(decide_url "${1}" "${2}")" ; \
+      printf -- '%s\n' \
+        "Building for arch: ${2}|${ARCH}, downloading ${arg1} from: ${url}, expecting ${arg1} SHA256: ${expected}" && \
+      curl -sSL --output "${file}" "${url}" && \
+      verify_download "${expected}" "${file}" ; \
+    } && \
+  export ARCH="$(decide_arch)" && \
   set -x && \
   apt-get update && \
   apt-get -y --no-install-recommends install locales && \
@@ -45,22 +93,17 @@ RUN export ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   # Install required distro packages
   apt-get -y --no-install-recommends install curl ca-certificates binutils xz-utils && \
   # Install s6
-  curl -L ${S6_DOWNLOAD_NOARCH} --output /tmp/s6-overlay-noarch.tar.xz && \
-  echo "${S6_NOARCH_EXPECTED_SHA256}  /tmp/s6-overlay-noarch.tar.xz" | sha256sum -c - && \
-  tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
-  curl -L ${S6_DOWNLOAD_ARCH} --output /tmp/s6-overlay-${ARCH}.tar.xz && \
-  echo "${S6_ARCH_EXPECTED_SHA256}  /tmp/s6-overlay-${ARCH}.tar.xz" | sha256sum -c - && \
-  tar -C / -Jxpf /tmp/s6-overlay-${ARCH}.tar.xz && \
+  _file="/tmp/s6-overlay-noarch.tar.xz" && \
+  download_expected_file s6 noarch "${_file}" && \
+  tar -C / -xpf "${_file}" && rm -f "${_file}" && \
+  _file="/tmp/s6-overlay-${ARCH}.tar.xz" && \
+  download_expected_file s6 "${TARGETARCH}" "${_file}" && \
+  tar -C / -xpf "${_file}" && rm -f "${_file}" && \
   # Install ffmpeg
-  echo "Building for arch: ${ARCH}|${ARCH44}, downloading FFMPEG from: ${FFMPEG_DOWNLOAD}, expecting FFMPEG SHA256: ${FFMPEG_EXPECTED_SHA256}" && \
-  curl -L ${FFMPEG_DOWNLOAD} --output /tmp/ffmpeg-${ARCH}.tar.xz && \
-  sha256sum /tmp/ffmpeg-${ARCH}.tar.xz && \
-  echo "${FFMPEG_EXPECTED_SHA256}  /tmp/ffmpeg-${ARCH}.tar.xz" | sha256sum -c - && \
-  tar -xf /tmp/ffmpeg-${ARCH}.tar.xz --strip-components=2 --no-anchored -C /usr/local/bin/ "ffmpeg" && \
-  tar -xf /tmp/ffmpeg-${ARCH}.tar.xz --strip-components=2 --no-anchored -C /usr/local/bin/ "ffprobe" && \
+  _file="/tmp/ffmpeg-${ARCH}.tar.xz" && \
+  download_expected_file ffmpeg "${TARGETARCH}" "${_file}" && \
+  tar -xvvpf "${_file}" --strip-components=2 --no-anchored -C /usr/local/bin/ "ffmpeg" "ffprobe" && rm -f "${_file}" && \
   # Clean up
-  rm -rf /tmp/s6-overlay-${ARCH}.tar.gz && \
-  rm -rf /tmp/ffmpeg-${ARCH}.tar.xz && \
   apt-get -y autoremove --purge curl binutils xz-utils && \
   rm -rf /var/lib/apt/lists/* && \
   rm -rf /var/cache/apt/* && \
@@ -116,6 +159,7 @@ RUN set -x && \
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
+  cp -at /tmp/ "${HOME}"  && HOME="/tmp/${HOME#/}" && \
   PIPENV_VERBOSITY=64 pipenv install --system --skip-lock && \
   # Clean up
   rm /app/Pipfile && \
@@ -137,12 +181,7 @@ RUN set -x && \
   apt-get -y autoclean && \
   rm -rf /var/lib/apt/lists/* && \
   rm -rf /var/cache/apt/* && \
-  rm -rf /tmp/* && \
-  # Pipenv leaves a bunch of stuff in /root, as we're not using it recreate it
-  rm -rf /root && \
-  mkdir -p /root && \
-  chown root:root /root && \
-  chmod 0755 /root
+  rm -rf /tmp/*
 
 
 # Copy app
