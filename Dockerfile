@@ -4,6 +4,10 @@ ARG TARGETARCH
 ARG TARGETPLATFORM
 
 ARG S6_VERSION="3.2.0.0"
+ARG SHA256_S6_AMD64="ad982a801bd72757c7b1b53539a146cf715e640b4d8f0a6a671a3d1b560fe1e2"
+ARG SHA256_S6_ARM64="868973e98210257bba725ff5b17aa092008c9a8e5174499e38ba611a8fc7e473"
+ARG SHA256_S6_NOARCH="4b0c0907e6762814c31850e0e6c6762c385571d4656eb8725852b0b1586713b6"
+
 ARG FFMPEG_DATE="autobuild-2024-10-30-14-17"
 ARG FFMPEG_VERSION="117674-g44a0a0c050"
 
@@ -20,13 +24,23 @@ ENV DEBIAN_FRONTEND="noninteractive" \
   S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
 
 # Install third party software
-RUN export ARCH="$(case "${TARGETARCH:-amd64}" in \
-  arm64) echo 'aarch64' ;; \
-  *)     echo "${TARGETARCH:-amd64}" ;; esac)" && \
-  export S6_ARCH_EXPECTED_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "ad982a801bd72757c7b1b53539a146cf715e640b4d8f0a6a671a3d1b560fe1e2" ;; \
-  "linux/arm64")   echo "868973e98210257bba725ff5b17aa092008c9a8e5174499e38ba611a8fc7e473" ;; \
-  *)               echo ""        ;; esac) && \
+RUN decide_arch() { \
+      case "${TARGETARCH:-amd64}" in \
+        (arm64) printf 'aarch64' ;; \
+        (*) printf '%s' "${TARGETARCH:-amd64}" ;; \
+      esac ; \
+    } && \
+    decide_expected() { \
+      case "\${1}" in \
+        (s6) case "\${2}" in \
+            (amd64) printf -- '%s' "${SHA256_S6_AMD64}" ;; \
+            (arm64) printf -- '%s' "${SHA256_S6_ARM64}" ;; \
+            (noarch) printf -- '%s' "${SHA256_S6_NOARCH}" ;; \
+          esac ;; \
+      esac ; \
+    } && set -x && \
+  export ARCH="$(decide_arch)" && \
+  export S6_ARCH_EXPECTED_SHA256="$(decide_expected s6 "${TARGETARCH:-amd64}")" && \
   export S6_DOWNLOAD_ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
   "linux/amd64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-x86_64.tar.xz"   ;; \
   "linux/arm64")   echo "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.xz" ;; \
@@ -39,7 +53,7 @@ RUN export ARCH="$(case "${TARGETARCH:-amd64}" in \
   "linux/amd64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linux64-gpl.tar.xz"   ;; \
   "linux/arm64")   echo "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/${FFMPEG_DATE}/ffmpeg-N-${FFMPEG_VERSION}-linuxarm64-gpl.tar.xz" ;; \
   *)               echo ""        ;; esac) && \
-  export S6_NOARCH_EXPECTED_SHA256="4b0c0907e6762814c31850e0e6c6762c385571d4656eb8725852b0b1586713b6" && \
+  export S6_NOARCH_EXPECTED_SHA256="$(decide_expected s6 noarch)" && \
   export S6_DOWNLOAD_NOARCH="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-noarch.tar.xz" && \
   echo "Building for arch: ${ARCH}|${ARCH44}, downloading S6 from: ${S6_DOWNLOAD}}, expecting S6 SHA256: ${S6_EXPECTED_SHA256}" && \
   set -x && \
