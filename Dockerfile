@@ -196,10 +196,10 @@ RUN set -x && \
   /usr/bin/python3 /app/manage.py compilescss && \
   /usr/bin/python3 /app/manage.py collectstatic --no-input --link && \
   # Create config, downloads and run dirs
-  mkdir -p /run/app && \
-  mkdir -p /config/media && \
-  mkdir -p /downloads/audio && \
-  mkdir -p /downloads/video
+  mkdir -v -p /run/app && \
+  mkdir -v -p /config/media && \
+  mkdir -v -p /downloads/audio && \
+  mkdir -v -p /downloads/video
 
 
 # Append software versions
