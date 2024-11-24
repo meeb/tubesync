@@ -82,7 +82,7 @@ RUN decide_arch() { \
       printf -- '%s\n' \
         "Building for arch: ${2}|${ARCH}, downloading ${arg1} from: ${url}, expecting ${arg1} SHA256: ${expected}" && \
       rm -rf "${file}" && \
-      curl --disable -SL --output "${file}" --clobber --dump-header - --no-progress-meter "${url}" && \
+      curl --disable --output "${file}" --clobber --location --dump-header - --no-progress-meter --url "${url}" && \
       verify_download "${expected}" "${file}" ; \
     } && \
   export ARCH="$(decide_arch)" && \
