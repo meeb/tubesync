@@ -368,13 +368,14 @@ useful if you are manually installing TubeSync in some other environment. These 
 | TUBESYNC_DEBUG              | Enable debugging                                             | True                                 |
 | TUBESYNC_WORKERS            | Number of background workers, default is 2, max allowed is 8 | 2                                    |
 | TUBESYNC_HOSTS              | Django's ALLOWED_HOSTS, defaults to `*`                      | tubesync.example.com,otherhost.com   |
-| TUBESYNC_RESET_DOWNLOAD_DIR | Toggle resetting `/downloads` permissions, defaults to True  | True
+| TUBESYNC_RESET_DOWNLOAD_DIR | Toggle resetting `/downloads` permissions, defaults to True  | True                                 |
 | GUNICORN_WORKERS            | Number of gunicorn workers to spawn                          | 3                                    |
 | LISTEN_HOST                 | IP address for gunicorn to listen on                         | 127.0.0.1                            |
 | LISTEN_PORT                 | Port number for gunicorn to listen on                        | 8080                                 |
 | HTTP_USER                   | Sets the username for HTTP basic authentication              | some-username                        |
 | HTTP_PASS                   | Sets the password for HTTP basic authentication              | some-secure-password                 |
 | DATABASE_CONNECTION         | Optional external database connection details                | mysql://user:pass@host:port/database |
+| VIDEO_HEIGHT_CUTOFF         | Smallest video height in pixels permitted to download        | 240                                  |
 
 
 # Manual, non-containerised, installation
