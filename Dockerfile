@@ -29,8 +29,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Reminder: the SHELL handles all variables
 RUN decide_arch() { \
       case "${TARGETARCH:=amd64}" in \
-        (arm64) printf 'aarch64' ;; \
-        (*) printf '%s' "${TARGETARCH}" ;; \
+        (arm64) printf -- 'aarch64' ;; \
+        (*) printf -- '%s' "${TARGETARCH}" ;; \
       esac ; \
     } && \
     decide_expected() { \
@@ -88,7 +88,7 @@ RUN decide_arch() { \
   set -x && \
   apt-get update && \
   apt-get -y --no-install-recommends install locales && \
-  echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
+  printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
   locale-gen en_US.UTF-8 && \
   # Install required distro packages
   apt-get -y --no-install-recommends install curl ca-certificates binutils xz-utils && \
@@ -205,7 +205,7 @@ RUN set -x && \
 # Append software versions
 RUN set -x && \
   FFMPEG_VERSION=$(/usr/local/bin/ffmpeg -version | head -n 1 | awk '{ print $3 }') && \
-  echo "ffmpeg_version = '${FFMPEG_VERSION}'" >> /app/common/third_party_versions.py
+  printf -- "ffmpeg_version = '%s'\n" "${FFMPEG_VERSION}" >> /app/common/third_party_versions.py
 
 # Copy root
 COPY config/root /
