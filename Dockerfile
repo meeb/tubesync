@@ -91,7 +91,7 @@ RUN decide_arch() { \
   printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
   locale-gen en_US.UTF-8 && \
   # Install required distro packages
-  apt-get -y --no-install-recommends install curl ca-certificates binutils xz-utils && \
+  apt-get -y --no-install-recommends install curl ca-certificates file binutils xz-utils && \
   # Install s6
   _file="/tmp/s6-overlay-noarch.tar.xz" && \
   download_expected_file s6 noarch "${_file}" && \
@@ -99,12 +99,14 @@ RUN decide_arch() { \
   _file="/tmp/s6-overlay-${ARCH}.tar.xz" && \
   download_expected_file s6 "${TARGETARCH}" "${_file}" && \
   tar -C / -xpf "${_file}" && rm -f "${_file}" && \
+  file /init && \
   # Install ffmpeg
   _file="/tmp/ffmpeg-${ARCH}.tar.xz" && \
   download_expected_file ffmpeg "${TARGETARCH}" "${_file}" && \
   tar -xvvpf "${_file}" --strip-components=2 --no-anchored -C /usr/local/bin/ "ffmpeg" "ffprobe" && rm -f "${_file}" && \
+  file /usr/local/bin/ff* && \
   # Clean up
-  apt-get -y autoremove --purge curl binutils xz-utils && \
+  apt-get -y autoremove --purge curl file binutils xz-utils && \
   rm -rf /var/lib/apt/lists/* && \
   rm -rf /var/cache/apt/* && \
   rm -rf /tmp/*
