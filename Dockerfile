@@ -208,7 +208,7 @@ RUN set -x && \
 # Append software versions
 RUN set -x && \
   /usr/local/bin/ffmpeg -version && \
-  FFMPEG_VERSION=$(/usr/local/bin/ffmpeg -version | head -n 1 | awk '{ print $3 }') && \
+  FFMPEG_VERSION=$(/usr/local/bin/ffmpeg -version | awk '1 == NR && "ffmpeg" == $1 { print $3; exit 0; } END { exit 1; }') && \
   test -n "${FFMPEG_VERSION}" && \
   printf -- "ffmpeg_version = '%s'\n" "${FFMPEG_VERSION}" >> /app/common/third_party_versions.py
 
