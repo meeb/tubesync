@@ -150,8 +150,8 @@ MEDIA_THUMBNAIL_WIDTH = 430                 # Width in pixels to resize thumbnai
 MEDIA_THUMBNAIL_HEIGHT = 240                # Height in pixels to resize thumbnails to
 
 
-VIDEO_HEIGHT_CUTOFF = 240       # Smallest resolution in pixels permitted to download
-VIDEO_HEIGHT_IS_HD = 500        # Height in pixels to count as 'HD'
+VIDEO_HEIGHT_CUTOFF = int(os.getenv("VIDEO_HEIGHT_CUTOFF", "240"))  # Smallest resolution in pixels permitted to download
+VIDEO_HEIGHT_IS_HD = 500                                            # Height in pixels to count as 'HD'
 
 
 YOUTUBE_DL_CACHEDIR = None
