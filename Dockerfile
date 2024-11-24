@@ -99,7 +99,7 @@ RUN decide_arch() { \
   _file="/tmp/s6-overlay-${ARCH}.tar.xz" && \
   download_expected_file s6 "${TARGETARCH}" "${_file}" && \
   tar -C / -xpf "${_file}" && rm -f "${_file}" && \
-  file /init && \
+  file -L /command/s6-overlay-suexec && \
   # Install ffmpeg
   _file="/tmp/ffmpeg-${ARCH}.tar.xz" && \
   download_expected_file ffmpeg "${TARGETARCH}" "${_file}" && \
