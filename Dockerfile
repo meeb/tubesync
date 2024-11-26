@@ -29,8 +29,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Reminder: the SHELL handles all variables
 RUN decide_arch() { \
       case "${TARGETARCH:=amd64}" in \
-        (arm64) printf 'aarch64' ;; \
-        (*) printf '%s' "${TARGETARCH}" ;; \
+        (arm64) printf -- 'aarch64' ;; \
+        (*) printf -- '%s' "${TARGETARCH}" ;; \
       esac ; \
     } && \
     decide_expected() { \
@@ -81,17 +81,18 @@ RUN decide_arch() { \
       url="$(decide_url "${1}" "${2}")" ; \
       printf -- '%s\n' \
         "Building for arch: ${2}|${ARCH}, downloading ${arg1} from: ${url}, expecting ${arg1} SHA256: ${expected}" && \
-      curl -sSL --output "${file}" "${url}" && \
+      rm -rf "${file}" && \
+      curl --disable --output "${file}" --clobber --location --no-progress-meter --url "${url}" && \
       verify_download "${expected}" "${file}" ; \
     } && \
   export ARCH="$(decide_arch)" && \
   set -x && \
   apt-get update && \
   apt-get -y --no-install-recommends install locales && \
-  echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
+  printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
   locale-gen en_US.UTF-8 && \
   # Install required distro packages
-  apt-get -y --no-install-recommends install curl ca-certificates binutils xz-utils && \
+  apt-get -y --no-install-recommends install curl ca-certificates file binutils xz-utils && \
   # Install s6
   _file="/tmp/s6-overlay-noarch.tar.xz" && \
   download_expected_file s6 noarch "${_file}" && \
@@ -99,12 +100,14 @@ RUN decide_arch() { \
   _file="/tmp/s6-overlay-${ARCH}.tar.xz" && \
   download_expected_file s6 "${TARGETARCH}" "${_file}" && \
   tar -C / -xpf "${_file}" && rm -f "${_file}" && \
+  file -L /command/s6-overlay-suexec && \
   # Install ffmpeg
   _file="/tmp/ffmpeg-${ARCH}.tar.xz" && \
   download_expected_file ffmpeg "${TARGETARCH}" "${_file}" && \
   tar -xvvpf "${_file}" --strip-components=2 --no-anchored -C /usr/local/bin/ "ffmpeg" "ffprobe" && rm -f "${_file}" && \
+  file /usr/local/bin/ff* && \
   # Clean up
-  apt-get -y autoremove --purge curl binutils xz-utils && \
+  apt-get -y autoremove --purge curl file binutils xz-utils && \
   rm -rf /var/lib/apt/lists/* && \
   rm -rf /var/cache/apt/* && \
   rm -rf /tmp/*
@@ -159,8 +162,8 @@ RUN set -x && \
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
-  cp -at /tmp/ "${HOME}"  && HOME="/tmp/${HOME#/}" && \
-  PIPENV_VERBOSITY=64 pipenv install --system --skip-lock && \
+  cp -at /tmp/ "${HOME}" && \
+  PIPENV_VERBOSITY=64 HOME="/tmp/${HOME#/}" pipenv install --system --skip-lock && \
   # Clean up
   rm /app/Pipfile && \
   pipenv --clear && \
@@ -196,16 +199,18 @@ RUN set -x && \
   /usr/bin/python3 /app/manage.py compilescss && \
   /usr/bin/python3 /app/manage.py collectstatic --no-input --link && \
   # Create config, downloads and run dirs
-  mkdir -p /run/app && \
-  mkdir -p /config/media && \
-  mkdir -p /downloads/audio && \
-  mkdir -p /downloads/video
+  mkdir -v -p /run/app && \
+  mkdir -v -p /config/media && \
+  mkdir -v -p /downloads/audio && \
+  mkdir -v -p /downloads/video
 
 
 # Append software versions
 RUN set -x && \
-  FFMPEG_VERSION=$(/usr/local/bin/ffmpeg -version | head -n 1 | awk '{ print $3 }') && \
-  echo "ffmpeg_version = '${FFMPEG_VERSION}'" >> /app/common/third_party_versions.py
+  /usr/local/bin/ffmpeg -version && \
+  FFMPEG_VERSION=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
+  test -n "${FFMPEG_VERSION}" && \
+  printf -- "ffmpeg_version = '%s'\n" "${FFMPEG_VERSION}" >> /app/common/third_party_versions.py
 
 # Copy root
 COPY config/root /
