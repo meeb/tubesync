@@ -1,7 +1,7 @@
 import os
 import re
 import math
-from operator import attrgetter
+from operator import itemgetter
 from pathlib import Path
 import requests
 from PIL import Image
@@ -135,10 +135,10 @@ def seconds_to_timestr(seconds):
    return '{:02d}:{:02d}:{:02d}'.format(hour, minutes, seconds)
 
 
-def multi_key_sort(objs, specs):
+def multi_key_sort(sort_dict, specs):
     for key, reverse in specs:
-        sorted(objs, key=attrgetter(key), reverse=reverse)
-    return objs
+        sorted(sort_dict, key=itemgetter(key), reverse=reverse)
+    return sort_dict
 
 
 def parse_media_format(format_dict):
