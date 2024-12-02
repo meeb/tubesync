@@ -135,10 +135,12 @@ def seconds_to_timestr(seconds):
    return '{:02d}:{:02d}:{:02d}'.format(hour, minutes, seconds)
 
 
-def multi_key_sort(sort_dict, specs):
-    for key, reverse in specs:
+def multi_key_sort(sort_dict, specs, reversed=False):
+    for key, reverse in reversed(specs):
         sorted(sort_dict, key=itemgetter(key), reverse=reverse)
-    return sort_dict
+    if reversed:
+        return list(reversed(sort_dict))
+    return list(sort_dict)
 
 
 def parse_media_format(format_dict):
