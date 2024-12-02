@@ -50,7 +50,7 @@ def get_best_audio_format(media):
     '''
     # Order all audio-only formats by bitrate
     audio_formats = []
-    sort_keys = [('abr', True)] # key, reverse
+    sort_keys = [('abr', False)] # key, reverse
     for fmt in media.iter_formats():
         # If the format has a video stream, skip it
         if fmt['vcodec'] is not None:
@@ -58,7 +58,7 @@ def get_best_audio_format(media):
         if not fmt['acodec']:
             continue
         audio_formats.append(fmt)
-    audio_formats = list(multi_key_sort(audio_formats, sort_keys))
+    audio_formats = multi_key_sort(audio_formats, sort_keys, True)
     if not audio_formats:
         # Media has no audio formats at all
         return False, False
@@ -88,7 +88,7 @@ def get_best_video_format(media):
         return False, False
     # Filter video-only formats by resolution that matches the source
     video_formats = []
-    sort_keys = [('height', True), ('id', True)] # key, reverse
+    sort_keys = [('height', False), ('id', False)] # key, reverse
     for fmt in media.iter_formats():
         # If the format has an audio stream, skip it
         if fmt['acodec'] is not None:
@@ -112,7 +112,7 @@ def get_best_video_format(media):
         else:
             # Can't fallback
             return False, False
-    video_formats = list(multi_key_sort(video_formats, sort_keys))
+    video_formats = multi_key_sort(video_formats, sort_keys, True)
     source_resolution = media.source.source_resolution.strip().upper()
     source_vcodec = media.source.source_vcodec
     if not video_formats:
