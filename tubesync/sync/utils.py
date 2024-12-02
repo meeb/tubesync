@@ -135,10 +135,10 @@ def seconds_to_timestr(seconds):
    return '{:02d}:{:02d}:{:02d}'.format(hour, minutes, seconds)
 
 
-def multi_key_sort(sort_dict, specs, reversed=False):
+def multi_key_sort(sort_dict, specs, use_reversed=False):
     for key, reverse in reversed(specs):
         sorted(sort_dict, key=itemgetter(key), reverse=reverse)
-    if reversed:
+    if use_reversed:
         return list(reversed(sort_dict))
     return list(sort_dict)
 
