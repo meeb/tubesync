@@ -141,7 +141,7 @@ def multi_key_sort(sort_dict, specs, use_reversed=False):
         result = sorted(result, key=itemgetter(key), reverse=reverse)
     if use_reversed:
         return list(reversed(result))
-    return list(result)
+    return result
 
 
 def parse_media_format(format_dict):
