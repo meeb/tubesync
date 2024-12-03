@@ -5,6 +5,7 @@
 '''
 
 
+from .utils import multi_key_sort
 from django.conf import settings
 
 
@@ -21,7 +22,7 @@ def get_best_combined_format(media):
     '''
     for fmt in media.iter_formats():
         # Check height matches
-        if media.source.source_resolution.strip().upper() != fmt['format']:
+        if media.source.source_resolution_height != fmt['height']:
             continue
         # Check the video codec matches
         if media.source.source_vcodec != fmt['vcodec']:
@@ -49,6 +50,7 @@ def get_best_audio_format(media):
     '''
     # Order all audio-only formats by bitrate
     audio_formats = []
+    sort_keys = [('abr', False)] # key, reverse
     for fmt in media.iter_formats():
         # If the format has a video stream, skip it
         if fmt['vcodec'] is not None:
@@ -56,7 +58,7 @@ def get_best_audio_format(media):
         if not fmt['acodec']:
             continue
         audio_formats.append(fmt)
-    audio_formats = list(reversed(sorted(audio_formats, key=lambda k: k['abr'])))
+    audio_formats = multi_key_sort(audio_formats, sort_keys, True)
     if not audio_formats:
         # Media has no audio formats at all
         return False, False
@@ -86,6 +88,7 @@ def get_best_video_format(media):
         return False, False
     # Filter video-only formats by resolution that matches the source
     video_formats = []
+    sort_keys = [('height', False), ('id', False)] # key, reverse
     for fmt in media.iter_formats():
         # If the format has an audio stream, skip it
         if fmt['acodec'] is not None:
@@ -93,6 +96,8 @@ def get_best_video_format(media):
         if not fmt['vcodec']:
             continue
         if media.source.source_resolution.strip().upper() == fmt['format']:
+            video_formats.append(fmt)
+        elif media.source.source_resolution_height == fmt['height']:
             video_formats.append(fmt)
     # Check we matched some streams
     if not video_formats:
@@ -109,7 +114,7 @@ def get_best_video_format(media):
         else:
             # Can't fallback
             return False, False
-    video_formats = list(reversed(sorted(video_formats, key=lambda k: k['height'])))
+    video_formats = multi_key_sort(video_formats, sort_keys, True)
     source_resolution = media.source.source_resolution.strip().upper()
     source_vcodec = media.source.source_vcodec
     if not video_formats:
