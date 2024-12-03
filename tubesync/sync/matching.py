@@ -22,7 +22,7 @@ def get_best_combined_format(media):
     '''
     for fmt in media.iter_formats():
         # Check height matches
-        if media.source.source_resolution.strip().upper() != fmt['format']:
+        if media.source.source_resolution_height != fmt['height']:
             continue
         # Check the video codec matches
         if media.source.source_vcodec != fmt['vcodec']:
@@ -96,6 +96,8 @@ def get_best_video_format(media):
         if not fmt['vcodec']:
             continue
         if media.source.source_resolution.strip().upper() == fmt['format']:
+            video_formats.append(fmt)
+        elif media.source.source_resolution_height == fmt['height']:
             video_formats.append(fmt)
     # Check we matched some streams
     if not video_formats:
