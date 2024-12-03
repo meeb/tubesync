@@ -136,11 +136,12 @@ def seconds_to_timestr(seconds):
 
 
 def multi_key_sort(sort_dict, specs, use_reversed=False):
+    result = list(sort_dict)
     for key, reverse in reversed(specs):
-        sorted(sort_dict, key=itemgetter(key), reverse=reverse)
+        result = sorted(result, key=itemgetter(key), reverse=reverse)
     if use_reversed:
-        return list(reversed(sort_dict))
-    return list(sort_dict)
+        return list(reversed(result))
+    return list(result)
 
 
 def parse_media_format(format_dict):
