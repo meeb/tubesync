@@ -87,7 +87,7 @@ def get_best_video_format(media):
         return False, False
     # Filter video-only formats by resolution that matches the source
     video_formats = []
-    sort_keys = [('height', False), ('id', False)] # key, reverse
+    sort_keys = [('height', False), ('vcodec', True), ('vbr', False)] # key, reverse
     for fmt in media.iter_formats():
         # If the format has an audio stream, skip it
         if fmt['acodec'] is not None:
@@ -120,6 +120,10 @@ def get_best_video_format(media):
     source_resolution = media.source.source_resolution.strip().upper()
     source_vcodec = media.source.source_vcodec
     exact_match, best_match = None, None
+    for fmt in video_formats:
+        # format_note was blank, match height instead
+        if '' == fmt['format'] and fmt['height'] == media.source.source_resolution_height:
+            fmt['format'] = source_resolution
     # Of our filtered video formats, check for resolution + codec + hdr + fps match
     if media.source.prefer_60fps and media.source.prefer_hdr:
         for fmt in video_formats:
