@@ -48,9 +48,8 @@ def get_best_audio_format(media):
         Finds the best match for the source required audio format. If the source
         has a 'fallback' of fail this can return no match.
     '''
-    # Order all audio-only formats by bitrate
+    # Reverse order all audio-only formats
     audio_formats = []
-    sort_keys = [('abr', False)] # key, reverse
     for fmt in media.iter_formats():
         # If the format has a video stream, skip it
         if fmt['vcodec'] is not None:
@@ -58,18 +57,18 @@ def get_best_audio_format(media):
         if not fmt['acodec']:
             continue
         audio_formats.append(fmt)
-    audio_formats = multi_key_sort(audio_formats, sort_keys, True)
+    audio_formats = list(reversed(audio_formats))
     if not audio_formats:
         # Media has no audio formats at all
         return False, False
-    # Find the highest bitrate audio format with a matching codec
+    # Find the first audio format with a matching codec
     for fmt in audio_formats:
         if media.source.source_acodec == fmt['acodec']:
             # Matched!
             return True, fmt['id']
     # No codecs matched
     if media.source.can_fallback:
-        # Can fallback, find the next highest bitrate non-matching codec
+        # Can fallback, find the next non-matching codec
         return False, audio_formats[0]['id']
     else:
         # Can't fallback
