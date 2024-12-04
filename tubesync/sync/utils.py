@@ -8,7 +8,6 @@ from PIL import Image
 from django.conf import settings
 from urllib.parse import urlsplit, parse_qs
 from django.forms import ValidationError
-from .models import Source
 
 
 def validate_url(url, validator):
@@ -160,7 +159,7 @@ def parse_media_format(format_dict):
     if vcodec == 'NONE':
         vcodec = None
     if vcodec == 'VP09':
-        vcodec = Source.SOURCE_VCODEC_VP9
+        vcodec = 'VP9'
     acodec_full = format_dict.get('acodec', '')
     acodec_parts = acodec_full.split('.')
     if len(acodec_parts) > 0:
