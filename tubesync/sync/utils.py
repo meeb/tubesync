@@ -8,6 +8,7 @@ from PIL import Image
 from django.conf import settings
 from urllib.parse import urlsplit, parse_qs
 from django.forms import ValidationError
+from .models import Source
 
 
 def validate_url(url, validator):
@@ -136,11 +137,12 @@ def seconds_to_timestr(seconds):
 
 
 def multi_key_sort(sort_dict, specs, use_reversed=False):
+    result = list(sort_dict)
     for key, reverse in reversed(specs):
-        sorted(sort_dict, key=itemgetter(key), reverse=reverse)
+        result = sorted(result, key=itemgetter(key), reverse=reverse)
     if use_reversed:
-        return list(reversed(sort_dict))
-    return list(sort_dict)
+        return list(reversed(result))
+    return result
 
 
 def parse_media_format(format_dict):
@@ -157,6 +159,8 @@ def parse_media_format(format_dict):
         vcodec = None
     if vcodec == 'NONE':
         vcodec = None
+    if vcodec == 'VP09':
+        vcodec = Source.SOURCE_VCODEC_VP9
     acodec_full = format_dict.get('acodec', '')
     acodec_parts = acodec_full.split('.')
     if len(acodec_parts) > 0:
