@@ -57,10 +57,10 @@ def get_best_audio_format(media):
         if not fmt['acodec']:
             continue
         audio_formats.append(fmt)
-    audio_formats = list(reversed(audio_formats))
     if not audio_formats:
         # Media has no audio formats at all
         return False, False
+    audio_formats = list(reversed(audio_formats))
     # Find the first audio format with a matching codec
     for fmt in audio_formats:
         if media.source.source_acodec == fmt['acodec']:
@@ -113,12 +113,12 @@ def get_best_video_format(media):
         else:
             # Can't fallback
             return False, False
-    video_formats = multi_key_sort(video_formats, sort_keys, True)
-    source_resolution = media.source.source_resolution.strip().upper()
-    source_vcodec = media.source.source_vcodec
     if not video_formats:
         # Still no matches
         return False, False
+    video_formats = multi_key_sort(video_formats, sort_keys, True)
+    source_resolution = media.source.source_resolution.strip().upper()
+    source_vcodec = media.source.source_vcodec
     exact_match, best_match = None, None
     # Of our filtered video formats, check for resolution + codec + hdr + fps match
     if media.source.prefer_60fps and media.source.prefer_hdr:
