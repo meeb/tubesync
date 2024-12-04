@@ -158,6 +158,8 @@ def parse_media_format(format_dict):
         vcodec = None
     if vcodec == 'NONE':
         vcodec = None
+    if vcodec == 'VP09':
+        vcodec = 'VP9'
     acodec_full = format_dict.get('acodec', '')
     acodec_parts = acodec_full.split('.')
     if len(acodec_parts) > 0:
