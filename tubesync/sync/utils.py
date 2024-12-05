@@ -1,6 +1,7 @@
 import os
 import re
 import math
+from operator import itemgetter
 from pathlib import Path
 import requests
 from PIL import Image
@@ -134,6 +135,15 @@ def seconds_to_timestr(seconds):
    return '{:02d}:{:02d}:{:02d}'.format(hour, minutes, seconds)
 
 
+def multi_key_sort(sort_dict, specs, use_reversed=False):
+    result = list(sort_dict)
+    for key, reverse in reversed(specs):
+        result = sorted(result, key=itemgetter(key), reverse=reverse)
+    if use_reversed:
+        return list(reversed(result))
+    return result
+
+
 def parse_media_format(format_dict):
     '''
         This parser primarily adapts the format dict returned by youtube-dl into a
@@ -148,6 +158,8 @@ def parse_media_format(format_dict):
         vcodec = None
     if vcodec == 'NONE':
         vcodec = None
+    if vcodec == 'VP09':
+        vcodec = 'VP9'
     acodec_full = format_dict.get('acodec', '')
     acodec_parts = acodec_full.split('.')
     if len(acodec_parts) > 0:
