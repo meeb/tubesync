@@ -145,7 +145,7 @@ def multi_key_sort(sort_dict, specs, use_reversed=False):
 
 
 def normalize_codec(codec_str):
-    result = str(codec_str)
+    result = str(codec_str).upper()
     parts = result.split('.')
     if len(parts) > 0:
         result = parts[0].strip()
@@ -156,7 +156,7 @@ def normalize_codec(codec_str):
     if str(0) in result:
         prefix = result.rstrip('0123456789')
         result = prefix + str(int(result[len(prefix):]))
-    return result.upper()
+    return result
 
 
 def parse_media_format(format_dict):
