@@ -514,35 +514,10 @@ class Source(models.Model):
 
     @property
     def type_directory_path(self):
-        # Get the directory mode from the environment
-        directory_mode = os.getenv("TUBESYNC_DIRECTORY_MODE", "default")
-
-        # Default behavior
-        if directory_mode == "default":
-            if self.source_resolution == self.SOURCE_RESOLUTION_AUDIO:
-                return Path(settings.DOWNLOAD_AUDIO_DIR) / self.directory
-            else:
-                return Path(settings.DOWNLOAD_VIDEO_DIR) / self.directory
-
-        # Flat mode - Place all files in the root
-        elif directory_mode == "flat":
-            return Path(settings.DOWNLOAD_DIR) / self.directory
-
-        # Custom mode - Parse prefixes for audio and video
-        elif directory_mode.startswith("custom:"):
-            try:
-                audio_prefix, video_prefix = directory_mode.split(":")[1].split(",")
-            except ValueError:
-                raise ValueError("Invalid format for TUBESYNC_DIRECTORY_MODE=custom. Expected 'custom:audio_prefix,video_prefix'.")
-
-            if self.source_resolution == self.SOURCE_RESOLUTION_AUDIO:
-                return Path(settings.DOWNLOAD_DIR) / audio_prefix / self.directory
-            else:
-                return Path(settings.DOWNLOAD_DIR) / video_prefix / self.directory
-
-        # Fallback for invalid modes
+        if self.source_resolution == self.SOURCE_RESOLUTION_AUDIO:
+            return Path(settings.DOWNLOAD_AUDIO_DIR) / self.directory
         else:
-            raise ValueError(f"Unsupported TUBESYNC_DIRECTORY_MODE: {directory_mode}")
+            return Path(settings.DOWNLOAD_VIDEO_DIR) / self.directory
 
     def make_directory(self):
         return os.makedirs(self.directory_path, exist_ok=True)
