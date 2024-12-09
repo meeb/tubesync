@@ -120,6 +120,8 @@ elif directory_mode.startswith('custom:'):
     custom_value = directory_mode.split(':', maxsplit=1)[1]
     if ',' in custom_value:
         DOWNLOAD_AUDIO_DIR, DOWNLOAD_VIDEO_DIR = custom_value.split(',', maxsplit=1)
+elif directory_mode not in ('', 'default'):
+    raise ValueError(f"Unsupported TUBESYNC_DIRECTORY_MODE: {directory_mode}")
 
 
 ROBOTS = '''
