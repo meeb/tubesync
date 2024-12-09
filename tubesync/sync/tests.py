@@ -6,7 +6,9 @@
 
 
 import logging
+import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from urllib.parse import urlsplit
 from xml.etree import ElementTree
 from django.conf import settings
@@ -1714,3 +1716,77 @@ class TasksTestCase(TestCase):
         self.assertEqual(src1.media_source.all().count(), 3)
         self.assertEqual(src2.media_source.all().count(), 2)
         self.assertEqual(Media.objects.filter(pk=m22.pk).exists(), False)
+
+class TypeDirectoryPathTestCase(TestCase):
+    def setUp(self):
+        # Mock settings for testing
+        self.audio_dir = Path("/mock/audio/dir")
+        self.video_dir = Path("/mock/video/dir")
+        self.download_dir = Path("/mock/download/dir")
+        settings.DOWNLOAD_AUDIO_DIR = self.audio_dir
+        settings.DOWNLOAD_VIDEO_DIR = self.video_dir
+        settings.DOWNLOAD_DIR = self.download_dir
+
+        # Create a source object for testing
+        self.source = Source(
+            directory="test_directory",
+            source_resolution=Source.SOURCE_RESOLUTION_AUDIO,
+        )
+
+    def test_default_mode_audio(self):
+        """
+        Test default mode for audio resolution.
+        """
+        os.environ["TUBESYNC_DIRECTORY_MODE"] = "default"
+        expected_path = self.audio_dir / self.source.directory
+        self.assertEqual(self.source.type_directory_path, expected_path)
+
+    def test_default_mode_video(self):
+        """
+        Test default mode for video resolution.
+        """
+        os.environ["TUBESYNC_DIRECTORY_MODE"] = "default"
+        self.source.source_resolution = Source.SOURCE_RESOLUTION_1080P
+        expected_path = self.video_dir / self.source.directory
+        self.assertEqual(self.source.type_directory_path, expected_path)
+
+    def test_flat_mode(self):
+        """
+        Test flat mode places files in the root download directory.
+        """
+        os.environ["TUBESYNC_DIRECTORY_MODE"] = "flat"
+        expected_path = self.download_dir / self.source.directory
+        self.assertEqual(self.source.type_directory_path, expected_path)
+
+    def test_custom_mode_audio(self):
+        """
+        Test custom mode with prefixes for audio.
+        """
+        os.environ["TUBESYNC_DIRECTORY_MODE"] = "custom:audio_prefix,video_prefix"
+        expected_path = self.download_dir / "audio_prefix" / self.source.directory
+        self.assertEqual(self.source.type_directory_path, expected_path)
+
+    def test_custom_mode_video(self):
+        """
+        Test custom mode with prefixes for video.
+        """
+        os.environ["TUBESYNC_DIRECTORY_MODE"] = "custom:audio_prefix,video_prefix"
+        self.source.source_resolution = Source.SOURCE_RESOLUTION_1080P
+        expected_path = self.download_dir / "video_prefix" / self.source.directory
+        self.assertEqual(self.source.type_directory_path, expected_path)
+
+    def test_custom_mode_invalid_format(self):
+        """
+        Test custom mode with an invalid format.
+        """
+        os.environ["TUBESYNC_DIRECTORY_MODE"] = "custom:only_audio_prefix"
+        with self.assertRaises(ValueError):
+            _ = self.source.type_directory_path
+
+    def test_invalid_mode(self):
+        """
+        Test unsupported directory mode raises an error.
+        """
+        os.environ["TUBESYNC_DIRECTORY_MODE"] = "unsupported_mode"
+        with self.assertRaises(ValueError):
+            _ = self.source.type_directory_path
