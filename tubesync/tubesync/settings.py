@@ -118,7 +118,7 @@ if directory_mode == 'flat':
     DOWNLOAD_AUDIO_DIR = '.'
 elif directory_mode.startswith('custom:'):
     custom_value = directory_mode.split(':', maxsplit=1)[1]
-    if str(',') in custom_value:
+    if ',' in custom_value:
         DOWNLOAD_AUDIO_DIR, DOWNLOAD_VIDEO_DIR = custom_value.split(',', maxsplit=1)
 
 
