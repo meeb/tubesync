@@ -1719,15 +1719,9 @@ class TasksTestCase(TestCase):
 
 class TypeDirectoryPathTestCase(TestCase):
     def setUp(self):
-        # Mock settings for testing
-        self.audio_dir = Path("/mock/audio/dir")
-        self.video_dir = Path("/mock/video/dir")
-        self.download_dir = Path("/mock/download/dir")
-        settings.DOWNLOAD_AUDIO_DIR = self.audio_dir
-        settings.DOWNLOAD_VIDEO_DIR = self.video_dir
-        settings.DOWNLOAD_DIR = self.download_dir
-
-        # Create a source object for testing
+        self.audio_dir = Path(settings.DOWNLOAD_AUDIO_DIR)
+        self.video_dir = Path(settings.DOWNLOAD_VIDEO_DIR)
+        self.download_dir = Path(settings.DOWNLOAD_ROOT)
         self.source = Source(
             directory="test_directory",
             source_resolution=Source.SOURCE_RESOLUTION_AUDIO,
