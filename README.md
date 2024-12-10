@@ -376,7 +376,21 @@ useful if you are manually installing TubeSync in some other environment. These 
 | HTTP_PASS                   | Sets the password for HTTP basic authentication              | some-secure-password                 |
 | DATABASE_CONNECTION         | Optional external database connection details                | mysql://user:pass@host:port/database |
 | VIDEO_HEIGHT_CUTOFF         | Smallest video height in pixels permitted to download        | 240                                  |
+| TUBESYNC_DIRECTORY_MODE     | Controls how downloaded files are organized.                 | default                              |
 
+# TubeSync Directory Mode
+
+Controls how downloaded files are organized.
+
+Values:
+- default: Audio files go to `audio`, video files to `video`.
+- flat: All files are placed in the root of DOWNLOAD_DIR.
+- custom:<audio_prefix>,<video_prefix>: Allows custom prefixes for audio and video directories under DOWNLOAD_DIR.
+
+Example:
+```
+TUBESYNC_DIRECTORY_MODE=custom:music,shows
+```
 
 # Manual, non-containerised, installation
 

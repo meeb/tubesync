@@ -112,6 +112,19 @@ DOWNLOAD_VIDEO_DIR = 'video'
 DOWNLOAD_AUDIO_DIR = 'audio'
 SASS_PROCESSOR_ROOT = STATIC_ROOT
 
+directory_mode = os.getenv('TUBESYNC_DIRECTORY_MODE', 'default')
+if directory_mode == 'flat':
+    DOWNLOAD_VIDEO_DIR = '.'
+    DOWNLOAD_AUDIO_DIR = '.'
+elif directory_mode.startswith('custom:'):
+    custom_value = directory_mode.split(':', maxsplit=1)[1]
+    if ',' in custom_value:
+        DOWNLOAD_AUDIO_DIR, DOWNLOAD_VIDEO_DIR = custom_value.split(',', maxsplit=1)
+    else:
+        raise ValueError("Invalid format for TUBESYNC_DIRECTORY_MODE=custom. Expected 'custom:audio_prefix,video_prefix'.")
+elif directory_mode not in ('', 'default'):
+    raise ValueError(f"Unsupported TUBESYNC_DIRECTORY_MODE: {directory_mode}")
+
 
 ROBOTS = '''
 User-agent: *
