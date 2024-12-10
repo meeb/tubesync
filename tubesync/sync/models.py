@@ -1291,10 +1291,7 @@ class Media(models.Model):
 
     @property
     def directory_path(self):
-        # Otherwise, create a suitable filename from the source media_format
-        media_format = str(self.source.media_format)
-        media_details = self.format_dict
-        dirname = self.source.directory_path / media_format.format(**media_details)
+        dirname = self.source.directory_path / self.filename
         return os.path.dirname(str(dirname))
 
     @property
