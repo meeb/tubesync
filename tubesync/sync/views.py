@@ -86,7 +86,7 @@ class DashboardView(TemplateView):
         data['downloads_dir'] = str(settings.DOWNLOAD_ROOT)
         data['database_connection'] = settings.DATABASE_CONNECTION_STR
         if settings.DATABASE_CONNECTION_STR.startswith('sqlite at '):
-            db_size = Path(settings.DATABASES["default"]["NAME"]).stat().st_size
+            db_size = pathlib.Path(settings.DATABASES["default"]["NAME"]).stat().st_size
             data['database_connection'] += f' ({db_size} bytes)'
         return data
 
