@@ -144,6 +144,21 @@ def multi_key_sort(sort_dict, specs, use_reversed=False):
     return result
 
 
+def normalize_codec(codec_str):
+    result = str(codec_str).upper()
+    parts = result.split('.')
+    if len(parts) > 0:
+        result = parts[0].strip()
+    else:
+        return None
+    if 'NONE' == result:
+        return None
+    if str(0) in result:
+        prefix = result.rstrip('0123456789')
+        result = prefix + str(int(result[len(prefix):]))
+    return result
+
+
 def parse_media_format(format_dict):
     '''
         This parser primarily adapts the format dict returned by youtube-dl into a
@@ -151,23 +166,9 @@ def parse_media_format(format_dict):
         any internals, update it here.
     '''
     vcodec_full = format_dict.get('vcodec', '')
-    vcodec_parts = vcodec_full.split('.')
-    if len(vcodec_parts) > 0:
-        vcodec = vcodec_parts[0].strip().upper()
-    else:
-        vcodec = None
-    if vcodec == 'NONE':
-        vcodec = None
-    if vcodec == 'VP09':
-        vcodec = 'VP9'
+    vcodec = normalize_codec(vcodec_full)
     acodec_full = format_dict.get('acodec', '')
-    acodec_parts = acodec_full.split('.')
-    if len(acodec_parts) > 0:
-        acodec = acodec_parts[0].strip().upper()
-    else:
-        acodec = None
-    if acodec == 'NONE':
-        acodec = None
+    acodec = normalize_codec(acodec_full) 
     try:
         fps = int(format_dict.get('fps', 0))
     except (ValueError, TypeError):

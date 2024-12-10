@@ -339,7 +339,7 @@ def get_best_video_format(media):
                 for fmt in video_formats:
                     # Check for a codec, hdr and fps match but drop the resolution
                     if (source_vcodec == fmt['vcodec'] and 
-                        not fmt['is_hdr'] and fmt['is_60fps']):
+                        not fmt['is_hdr'] and not fmt['is_60fps']):
                         # Close match
                         exact_match, best_match = False, fmt
                         break
