@@ -90,7 +90,7 @@ class DashboardView(TemplateView):
         db_path = pathlib.Path(db_name) if '/' == db_name[0] else None
         if db_path and settings.DATABASE_CONNECTION_STR.startswith('sqlite at '):
             db_size = db_path.stat().st_size
-            data['database_connection'] += f' ({db_size} bytes)'
+            data['database_connection'] += f' ({db_size:,} bytes)'
         return data
 
 
