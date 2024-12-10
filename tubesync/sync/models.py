@@ -422,7 +422,7 @@ class Source(models.Model):
         help_text=_('List of subtitles langs to download, comma-separated. Example: en,fr or all,-fr,-live_chat'),
         validators=[
             RegexValidator(
-                regex=r"^(\-?[\_\.a-zA-Z-]+,)*(\-?[\_\.a-zA-Z-]+){1}$",
+                regex=r"^(\-?[\_\.a-zA-Z-]+(,|$))+",
                 message=_('Subtitle langs must be a comma-separated list of langs. example: en,fr or all,-fr,-live_chat')
             )
         ]
