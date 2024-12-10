@@ -5,6 +5,7 @@
 '''
 
 
+from .utils import multi_key_sort
 from django.conf import settings
 
 
@@ -21,7 +22,7 @@ def get_best_combined_format(media):
     '''
     for fmt in media.iter_formats():
         # Check height matches
-        if media.source.source_resolution.strip().upper() != fmt['format']:
+        if media.source.source_resolution_height != fmt['height']:
             continue
         # Check the video codec matches
         if media.source.source_vcodec != fmt['vcodec']:
@@ -47,7 +48,7 @@ def get_best_audio_format(media):
         Finds the best match for the source required audio format. If the source
         has a 'fallback' of fail this can return no match.
     '''
-    # Order all audio-only formats by bitrate
+    # Reverse order all audio-only formats
     audio_formats = []
     for fmt in media.iter_formats():
         # If the format has a video stream, skip it
@@ -56,18 +57,18 @@ def get_best_audio_format(media):
         if not fmt['acodec']:
             continue
         audio_formats.append(fmt)
-    audio_formats = list(reversed(sorted(audio_formats, key=lambda k: k['abr'])))
     if not audio_formats:
         # Media has no audio formats at all
         return False, False
-    # Find the highest bitrate audio format with a matching codec
+    audio_formats = list(reversed(audio_formats))
+    # Find the first audio format with a matching codec
     for fmt in audio_formats:
         if media.source.source_acodec == fmt['acodec']:
             # Matched!
             return True, fmt['id']
     # No codecs matched
     if media.source.can_fallback:
-        # Can fallback, find the next highest bitrate non-matching codec
+        # Can fallback, find the next non-matching codec
         return False, audio_formats[0]['id']
     else:
         # Can't fallback
@@ -86,6 +87,7 @@ def get_best_video_format(media):
         return False, False
     # Filter video-only formats by resolution that matches the source
     video_formats = []
+    sort_keys = [('height', False), ('vcodec', True), ('vbr', False)] # key, reverse
     for fmt in media.iter_formats():
         # If the format has an audio stream, skip it
         if fmt['acodec'] is not None:
@@ -93,6 +95,8 @@ def get_best_video_format(media):
         if not fmt['vcodec']:
             continue
         if media.source.source_resolution.strip().upper() == fmt['format']:
+            video_formats.append(fmt)
+        elif media.source.source_resolution_height == fmt['height']:
             video_formats.append(fmt)
     # Check we matched some streams
     if not video_formats:
@@ -109,13 +113,17 @@ def get_best_video_format(media):
         else:
             # Can't fallback
             return False, False
-    video_formats = list(reversed(sorted(video_formats, key=lambda k: k['height'])))
-    source_resolution = media.source.source_resolution.strip().upper()
-    source_vcodec = media.source.source_vcodec
     if not video_formats:
         # Still no matches
         return False, False
+    video_formats = multi_key_sort(video_formats, sort_keys, True)
+    source_resolution = media.source.source_resolution.strip().upper()
+    source_vcodec = media.source.source_vcodec
     exact_match, best_match = None, None
+    for fmt in video_formats:
+        # format_note was blank, match height instead
+        if '' == fmt['format'] and fmt['height'] == media.source.source_resolution_height:
+            fmt['format'] = source_resolution
     # Of our filtered video formats, check for resolution + codec + hdr + fps match
     if media.source.prefer_60fps and media.source.prefer_hdr:
         for fmt in video_formats:
