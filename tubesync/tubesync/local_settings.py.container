@@ -46,6 +46,13 @@ else:
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': CONFIG_BASE_DIR / 'db.sqlite3',
+            "OPTIONS": {
+                "transaction_mode": "IMMEDIATE",
+                "init_command": """
+                    PRAGMA auto_vacuum = INCREMENTAL;
+                    PRAGMA incremental_vacuum(100);
+                """,
+            },
         }
     }
     DATABASE_CONNECTION_STR = f'sqlite at "{DATABASES["default"]["NAME"]}"'
