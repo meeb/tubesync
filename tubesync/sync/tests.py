@@ -1719,68 +1719,28 @@ class TasksTestCase(TestCase):
 
 class TypeDirectoryPathTestCase(TestCase):
     def setUp(self):
-        self.audio_dir = Path(settings.DOWNLOAD_AUDIO_DIR)
-        self.video_dir = Path(settings.DOWNLOAD_VIDEO_DIR)
-        self.download_dir = Path(settings.DOWNLOAD_ROOT)
         self.source = Source(
             directory="test_directory",
             source_resolution=Source.SOURCE_RESOLUTION_AUDIO,
         )
 
-    def test_default_mode_audio(self):
+    def test_directory_prefix_default(self):
         """
-        Test default mode for audio resolution.
+        Test that default directory prefix exist.
         """
-        os.environ["TUBESYNC_DIRECTORY_MODE"] = "default"
-        expected_path = self.audio_dir / self.source.directory
-        self.assertEqual(self.source.type_directory_path, expected_path)
+        os.environ['TUBESYNC_DIRECTORY_PREFIX'] = ''
+        self.assertEqual(self.source.type_directory_path, Path(settings.DOWNLOAD_AUDIO_DIR) / 'test_directory')
 
-    def test_default_mode_video(self):
+    def test_directory_prefix_true(self):
         """
-        Test default mode for video resolution.
+        Test that when TUBESYNC_DIRECTORY_PREFIX is set to true the directory prefix exist.
         """
-        os.environ["TUBESYNC_DIRECTORY_MODE"] = "default"
-        self.source.source_resolution = Source.SOURCE_RESOLUTION_1080P
-        expected_path = self.video_dir / self.source.directory
-        self.assertEqual(self.source.type_directory_path, expected_path)
+        os.environ['TUBESYNC_DIRECTORY_PREFIX'] = 'true'
+        self.assertEqual(self.source.type_directory_path, Path(settings.DOWNLOAD_AUDIO_DIR) / 'test_directory')
 
-    def test_flat_mode(self):
+    def test_directory_prefix_false(self):
         """
-        Test flat mode places files in the root download directory.
+        Test that when TUBESYNC_DIRECTORY_PREFIX is set to false the directory prefix does not exist.
         """
-        os.environ["TUBESYNC_DIRECTORY_MODE"] = "flat"
-        expected_path = self.download_dir / self.source.directory
-        self.assertEqual(self.source.type_directory_path, expected_path)
-
-    def test_custom_mode_audio(self):
-        """
-        Test custom mode with prefixes for audio.
-        """
-        os.environ["TUBESYNC_DIRECTORY_MODE"] = "custom:audio_prefix,video_prefix"
-        expected_path = self.download_dir / "audio_prefix" / self.source.directory
-        self.assertEqual(self.source.type_directory_path, expected_path)
-
-    def test_custom_mode_video(self):
-        """
-        Test custom mode with prefixes for video.
-        """
-        os.environ["TUBESYNC_DIRECTORY_MODE"] = "custom:audio_prefix,video_prefix"
-        self.source.source_resolution = Source.SOURCE_RESOLUTION_1080P
-        expected_path = self.download_dir / "video_prefix" / self.source.directory
-        self.assertEqual(self.source.type_directory_path, expected_path)
-
-    def test_custom_mode_invalid_format(self):
-        """
-        Test custom mode with an invalid format.
-        """
-        os.environ["TUBESYNC_DIRECTORY_MODE"] = "custom:only_audio_prefix"
-        with self.assertRaises(ValueError):
-            _ = self.source.type_directory_path
-
-    def test_invalid_mode(self):
-        """
-        Test unsupported directory mode raises an error.
-        """
-        os.environ["TUBESYNC_DIRECTORY_MODE"] = "unsupported_mode"
-        with self.assertRaises(ValueError):
-            _ = self.source.type_directory_path
+        os.environ['TUBESYNC_DIRECTORY_PREFIX'] = 'false'
+        self.assertEqual(self.source.type_directory_path, Path('.') / 'test_directory')
