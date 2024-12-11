@@ -158,6 +158,14 @@ VIDEO_HEIGHT_CUTOFF = int(os.getenv("VIDEO_HEIGHT_CUTOFF", "240"))  # Smallest r
 VIDEO_HEIGHT_IS_HD = 500                                            # Height in pixels to count as 'HD'
 
 
+
+# If True source directories are prefixed with their type (either 'video' or 'audio')
+# e.g. /downloads/video/SomeSourceName
+# If False, sources are placed directly in /downloads
+# e.g. /downloads/SomeSourceName
+SOURCE_DOWNLOAD_DIRECTORY_PREFIX = True
+
+
 YOUTUBE_DL_CACHEDIR = None
 YOUTUBE_DL_TEMPDIR = None
 YOUTUBE_DEFAULTS = {

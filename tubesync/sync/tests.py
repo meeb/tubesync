@@ -628,6 +628,25 @@ class FilepathTestCase(TestCase):
                          ('no-fancy-stuff-title_test_720p-720x1280-opus'
                           '-vp9-30fps-hdr.mkv'))
 
+    def test_directory_prefix(self):
+        # Confirm the setting exists and is valid
+        self.assertTrue(hasattr(settings, 'SOURCE_DOWNLOAD_DIRECTORY_PREFIX'))
+        self.assertTrue(isinstance(settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX, bool))
+        # Test the default behavior for "True", forced "audio" or "video" parent directories for sources
+        settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX = True
+        self.source.source_resolution = Source.SOURCE_RESOLUTION_AUDIO
+        test_audio_prefix_path = Path(self.source.directory_path)
+        self.assertEqual(test_audio_prefix_path.parts[-2], 'audio')
+        self.assertEqual(test_audio_prefix_path.parts[-1], 'testdirectory')
+        self.source.source_resolution = Source.SOURCE_RESOLUTION_1080P
+        test_video_prefix_path = Path(self.source.directory_path)
+        self.assertEqual(test_video_prefix_path.parts[-2], 'video')
+        self.assertEqual(test_video_prefix_path.parts[-1], 'testdirectory')
+        # Test the default behavior for "False", no parent directories for sources
+        settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX = False
+        test_no_prefix_path = Path(self.source.directory_path)
+        self.assertEqual(test_no_prefix_path.parts[-1], 'testdirectory')
+
 
 class MediaTestCase(TestCase):
 
@@ -1661,7 +1680,7 @@ class FormatMatchingTestCase(TestCase):
             self.media.get_best_audio_format()
 
     def test_is_regex_match(self):
-        
+
         self.media.metadata = all_test_metadata['boring']
         self.media.save()
         expected_matches = {
@@ -1689,7 +1708,9 @@ class FormatMatchingTestCase(TestCase):
                 msg=f'Media title "{self.media.title}" checked against regex "{self.source.filter_text}" failed '
                     f'expected {expected_match_result}')
 
+
 class TasksTestCase(TestCase):
+
     def setUp(self):
         # Disable general logging for test case
         logging.disable(logging.CRITICAL)
@@ -1716,31 +1737,3 @@ class TasksTestCase(TestCase):
         self.assertEqual(src1.media_source.all().count(), 3)
         self.assertEqual(src2.media_source.all().count(), 2)
         self.assertEqual(Media.objects.filter(pk=m22.pk).exists(), False)
-
-class TypeDirectoryPathTestCase(TestCase):
-    def setUp(self):
-        self.source = Source(
-            directory="test_directory",
-            source_resolution=Source.SOURCE_RESOLUTION_AUDIO,
-        )
-
-    def test_directory_prefix_default(self):
-        """
-        Test that default directory prefix exist.
-        """
-        os.environ['TUBESYNC_DIRECTORY_PREFIX'] = ''
-        self.assertEqual(self.source.type_directory_path, Path(settings.DOWNLOAD_AUDIO_DIR) / 'test_directory')
-
-    def test_directory_prefix_true(self):
-        """
-        Test that when TUBESYNC_DIRECTORY_PREFIX is set to true the directory prefix exist.
-        """
-        os.environ['TUBESYNC_DIRECTORY_PREFIX'] = 'true'
-        self.assertEqual(self.source.type_directory_path, Path(settings.DOWNLOAD_AUDIO_DIR) / 'test_directory')
-
-    def test_directory_prefix_false(self):
-        """
-        Test that when TUBESYNC_DIRECTORY_PREFIX is set to false the directory prefix does not exist.
-        """
-        os.environ['TUBESYNC_DIRECTORY_PREFIX'] = 'false'
-        self.assertEqual(self.source.type_directory_path, Path('.') / 'test_directory')

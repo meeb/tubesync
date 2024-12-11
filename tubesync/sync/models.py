@@ -514,10 +514,13 @@ class Source(models.Model):
 
     @property
     def type_directory_path(self):
-        if self.source_resolution == self.SOURCE_RESOLUTION_AUDIO:
-            return Path(settings.DOWNLOAD_AUDIO_DIR) / self.directory
+        if settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX:
+            if self.source_resolution == self.SOURCE_RESOLUTION_AUDIO:
+                return Path(settings.DOWNLOAD_AUDIO_DIR) / self.directory
+            else:
+                return Path(settings.DOWNLOAD_VIDEO_DIR) / self.directory
         else:
-            return Path(settings.DOWNLOAD_VIDEO_DIR) / self.directory
+            return Path(self.directory)
 
     def make_directory(self):
         return os.makedirs(self.directory_path, exist_ok=True)
