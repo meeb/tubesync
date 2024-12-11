@@ -6,7 +6,9 @@
 
 
 import logging
+import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from urllib.parse import urlsplit
 from xml.etree import ElementTree
 from django.conf import settings
@@ -1714,3 +1716,31 @@ class TasksTestCase(TestCase):
         self.assertEqual(src1.media_source.all().count(), 3)
         self.assertEqual(src2.media_source.all().count(), 2)
         self.assertEqual(Media.objects.filter(pk=m22.pk).exists(), False)
+
+class TypeDirectoryPathTestCase(TestCase):
+    def setUp(self):
+        self.source = Source(
+            directory="test_directory",
+            source_resolution=Source.SOURCE_RESOLUTION_AUDIO,
+        )
+
+    def test_directory_prefix_default(self):
+        """
+        Test that default directory prefix exist.
+        """
+        os.environ['TUBESYNC_DIRECTORY_PREFIX'] = ''
+        self.assertEqual(self.source.type_directory_path, Path(settings.DOWNLOAD_AUDIO_DIR) / 'test_directory')
+
+    def test_directory_prefix_true(self):
+        """
+        Test that when TUBESYNC_DIRECTORY_PREFIX is set to true the directory prefix exist.
+        """
+        os.environ['TUBESYNC_DIRECTORY_PREFIX'] = 'true'
+        self.assertEqual(self.source.type_directory_path, Path(settings.DOWNLOAD_AUDIO_DIR) / 'test_directory')
+
+    def test_directory_prefix_false(self):
+        """
+        Test that when TUBESYNC_DIRECTORY_PREFIX is set to false the directory prefix does not exist.
+        """
+        os.environ['TUBESYNC_DIRECTORY_PREFIX'] = 'false'
+        self.assertEqual(self.source.type_directory_path, Path('.') / 'test_directory')

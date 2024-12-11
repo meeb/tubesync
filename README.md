@@ -362,7 +362,7 @@ There are a number of other environment variables you can set. These are, mostly
 useful if you are manually installing TubeSync in some other environment. These are:
 
 | Name                        | What                                                         | Example                              |
-| --------------------------- | ------------------------------------------------------------ | ------------------------------------ |
+| --------------------------- | ------------------------------------------------------------ |--------------------------------------|
 | DJANGO_SECRET_KEY           | Django's SECRET_KEY                                          | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l     |
 | DJANGO_URL_PREFIX           | Run TubeSync in a sub-URL on the web server                  | /somepath/                           |
 | TUBESYNC_DEBUG              | Enable debugging                                             | True                                 |
@@ -376,7 +376,15 @@ useful if you are manually installing TubeSync in some other environment. These 
 | HTTP_PASS                   | Sets the password for HTTP basic authentication              | some-secure-password                 |
 | DATABASE_CONNECTION         | Optional external database connection details                | mysql://user:pass@host:port/database |
 | VIDEO_HEIGHT_CUTOFF         | Smallest video height in pixels permitted to download        | 240                                  |
+| TUBESYNC_DIRECTORY_PREFIX   | Controls how downloaded files are organized.                 | true                                 |
 
+# TubeSync Directory Mode
+
+Controls how downloaded files are organized.
+
+Values:
+- true: Audio files go to `audio`, video files to `video`.
+- false: All files are placed in the root of DOWNLOAD_DIR.
 
 # Manual, non-containerised, installation
 
