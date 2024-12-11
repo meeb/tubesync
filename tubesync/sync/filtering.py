@@ -23,8 +23,8 @@ def filter_media(instance: Media):
         skip = True
 
     # Check if older than source_cutoff
-    if filter_source_cutoff(instance):
-        skip = True
+    #if filter_source_cutoff(instance):
+    #    skip = True
 
     # Check if we have filter_text and filter text matches
     if filter_filter_text(instance):
@@ -128,6 +128,7 @@ def filter_max_cap(instance: Media):
 
 
 # If the source has a cut-off, check the upload date is within the allowed delta
+# TODO: days to keep should be compared to downloaded date, not published
 def filter_source_cutoff(instance: Media):
     if instance.source.delete_old_media and instance.source.days_to_keep > 0:
         if not isinstance(instance.published, datetime):
