@@ -112,10 +112,6 @@ DOWNLOAD_VIDEO_DIR = 'video'
 DOWNLOAD_AUDIO_DIR = 'audio'
 SASS_PROCESSOR_ROOT = STATIC_ROOT
 
-directory_prefix = os.getenv('TUBESYNC_DIRECTORY_PREFIX', 'true')
-if directory_prefix == 'false':
-    DOWNLOAD_VIDEO_DIR = '.'
-    DOWNLOAD_AUDIO_DIR = '.'
 
 ROBOTS = '''
 User-agent: *
