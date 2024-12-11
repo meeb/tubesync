@@ -461,6 +461,14 @@ class Source(models.Model):
             return False
 
     @property
+    def days_to_keep_date(self):
+        delta = self.days_to_keep
+        if delta > 0:
+            return timezone.now() - timedelta(days=delta)
+        else:
+            return False
+
+    @property
     def extension(self):
         '''
             The extension is also used by youtube-dl to set the output container. As
