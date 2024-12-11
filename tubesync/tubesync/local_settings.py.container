@@ -44,7 +44,7 @@ if database_dict:
 else:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
+            'ENGINE': 'tubesync.sqlite3',
             'NAME': CONFIG_BASE_DIR / 'db.sqlite3',
             "OPTIONS": {
                 "transaction_mode": "IMMEDIATE",
