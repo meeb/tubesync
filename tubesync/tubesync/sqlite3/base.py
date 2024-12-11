@@ -30,6 +30,6 @@ class DatabaseWrapper(base.DatabaseWrapper):
         filtered_params = conn_params.copy()
         filtered_params["isolation_level"] = filtered_params.pop("transaction_mode", "DEFERRED")
         _ = filtered_params.pop("init_command", None)
-        super().get_new_connection(filtered_params)
+        return super().get_new_connection(filtered_params)
 
 
