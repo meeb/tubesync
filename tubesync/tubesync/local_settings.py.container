@@ -49,6 +49,7 @@ else:
             "OPTIONS": {
                 "transaction_mode": "IMMEDIATE",
                 "init_command": """
+                    PRAGMA legacy_alter_table = OFF;
                     PRAGMA auto_vacuum = INCREMENTAL;
                     PRAGMA incremental_vacuum(100);
                 """,
