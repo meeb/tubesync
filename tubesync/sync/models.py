@@ -461,6 +461,14 @@ class Source(models.Model):
             return False
 
     @property
+    def days_to_keep_date(self):
+        delta = self.days_to_keep
+        if delta > 0:
+            return timezone.now() - timedelta(days=delta)
+        else:
+            return False
+
+    @property
     def extension(self):
         '''
             The extension is also used by youtube-dl to set the output container. As
@@ -514,10 +522,13 @@ class Source(models.Model):
 
     @property
     def type_directory_path(self):
-        if self.source_resolution == self.SOURCE_RESOLUTION_AUDIO:
-            return Path(settings.DOWNLOAD_AUDIO_DIR) / self.directory
+        if settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX:
+            if self.source_resolution == self.SOURCE_RESOLUTION_AUDIO:
+                return Path(settings.DOWNLOAD_AUDIO_DIR) / self.directory
+            else:
+                return Path(settings.DOWNLOAD_VIDEO_DIR) / self.directory
         else:
-            return Path(settings.DOWNLOAD_VIDEO_DIR) / self.directory
+            return Path(self.directory)
 
     def make_directory(self):
         return os.makedirs(self.directory_path, exist_ok=True)
