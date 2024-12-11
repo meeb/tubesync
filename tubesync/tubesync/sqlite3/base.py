@@ -25,4 +25,9 @@ class DatabaseWrapper(base.DatabaseWrapper):
                 for init_cmd in cmds:
                     cursor.execute(init_cmd.strip())
 
+    
+    def get_new_connection(self, conn_params):
+        conn_params["isolation_level"] = conn_params.pop("transaction_mode", "DEFERRED")
+        super().get_new_connection(conn_params)
+
 
