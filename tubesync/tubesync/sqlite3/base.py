@@ -26,9 +26,12 @@ class DatabaseWrapper(base.DatabaseWrapper):
 
     
     def get_new_connection(self, conn_params):
-        filtered_params = conn_params.copy()
-        filtered_params["isolation_level"] = filtered_params.pop("transaction_mode", "DEFERRED")
-        _ = filtered_params.pop("init_command", None)
+        filter_map = {
+            "init_command": None,
+            "transaction_mode": ("isolation_level", "DEFERRED"),
+        }
+        filtered_params = {k: v for (k,v) in conn_params.items() if k not in filter_map}
+        filtered_params.update({v[0]: conn_params.get(k, v[1]) for (k,v) in filter_map.items() if v is not None})
         return super().get_new_connection(filtered_params)
 
 
