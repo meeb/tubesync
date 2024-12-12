@@ -5,15 +5,14 @@ class DatabaseWrapper(base.DatabaseWrapper):
 
     def _start_transaction_under_autocommit(self):
         conn_params = self.get_connection_params()
-        if "transaction_mode" not in conn_params:
-            self.cursor().execute("BEGIN TRANSACTION")
-        else:
+        transaction_modes = frozenset(["DEFERRED", "EXCLUSIVE", "IMMEDIATE"])
+
+        sql_statement = "BEGIN TRANSACTION"
+        if "transaction_mode" in conn_params:
             tm = str(conn_params["transaction_mode"]).upper().strip()
-            transaction_modes = frozenset(["DEFERRED", "EXCLUSIVE", "IMMEDIATE"])
             if tm in transaction_modes:
-                self.cursor().execute(f"BEGIN {tm} TRANSACTION")
-            else:
-                self.cursor().execute("BEGIN TRANSACTION")
+                sql_statement = f"BEGIN {tm} TRANSACTION"
+        self.cursor().execute(sql_statement)
 
 
     def init_connection_state(self):
