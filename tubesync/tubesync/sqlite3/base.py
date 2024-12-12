@@ -25,7 +25,25 @@ class DatabaseWrapper(base.DatabaseWrapper):
                 for init_cmd in cmds:
                     cursor.execute(init_cmd.strip())
 
-    
+
+    def _remove_invalid_keyword_argument(self, e, filtered_params):
+        key = None
+        try:
+            prog = re.compile(r"^'(?P<key>[^']+)' is an invalid keyword argument for Connection[()]{2}$")
+            match = prog.match(e.args[0])
+        except:
+            raise
+        else:
+            if match:
+                key = match.group('key')
+        finally:
+            # This isn't a TypeError we can handle
+            if key is None:
+                raise e
+        # remove the invalid keyword argument
+        del filtered_params[key]
+
+
     def get_new_connection(self, conn_params):
         filter_map = {
             "transaction_mode": ("isolation_level", "DEFERRED"),
@@ -37,16 +55,10 @@ class DatabaseWrapper(base.DatabaseWrapper):
         connection = None
         tries = len(filtered_params)
         while connection is None and attempt < tries:
+            attempt += 1
             try:
-                attempt += 1
                 connection = super().get_new_connection(filtered_params)
             except TypeError as e:
-                prog = re.compile("^'(?P<key>[^']+)' is an invalid keyword argument for Connection[()]{2}$")
-                match = prog.match(e.args[0])
-                key = match.group('key') if match else None
-                if key is None:
-                    raise e
-                del filtered_params[key]
+                self._remove_invalid_keyword_argument(e, filtered_params)
         return connection
-
 
