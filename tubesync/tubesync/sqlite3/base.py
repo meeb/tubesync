@@ -1,3 +1,4 @@
+import re
 from django.db.backends.sqlite3 import base
 
 
@@ -24,27 +25,39 @@ class DatabaseWrapper(base.DatabaseWrapper):
                 for init_cmd in cmds:
                     cursor.execute(init_cmd.strip())
 
-    
+
+    def _remove_invalid_keyword_argument(self, params):
+        try:
+            prog = re.compile(r"^(?P<quote>['])(?P<key>[^']+)(?P=quote) is an invalid keyword argument for Connection\(\)$")
+            match = prog.match(e.args[0])
+
+        if match:
+            key = match.group('key')
+            try:
+                # remove the invalid keyword argument
+                del params[key]
+            return True
+
+        return False
+
+
     def get_new_connection(self, conn_params):
         filter_map = {
             "transaction_mode": ("isolation_level", "DEFERRED"),
         }
         filtered_params = {k: v for (k,v) in conn_params.items() if k not in filter_map}
-        filtered_params.update({v[0]: conn_params.get(k, v[1]) for (k,v) in filter_map.items() if v is not None})
+        filtered_params.update({v[0]: conn_params.get(k, v[1]) for (k,v) in filter_map.items()})
 
         attempt = 0
         connection = None
         tries = len(filtered_params)
         while connection is None and attempt < tries:
+            attempt += 1
             try:
-                attempt += 1
                 connection = super().get_new_connection(filtered_params)
             except TypeError as e:
-                # remove unaccepted param
-                print(e, flush=True)
-                print('Exception args:', flush=True)
-                print(e.args, flush=True)
-                del filtered_params["init_command"]
+                if not self._remove_invalid_keyword_argument(filtered_params):
+                    # This isn't a TypeError we can handle
+                    raise e
         return connection
-
 
