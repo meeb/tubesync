@@ -26,10 +26,10 @@ class DatabaseWrapper(base.DatabaseWrapper):
                     cursor.execute(init_cmd.strip())
 
 
-    def _remove_invalid_keyword_argument(self, arg_str, params):
+    def _remove_invalid_keyword_argument(self, e_args, params):
         try:
             prog = re.compile(r"^(?P<quote>['])(?P<key>[^']+)(?P=quote) is an invalid keyword argument for Connection\(\)$")
-            match = prog.match(arg_str)
+            match = prog.match(str(e_args[0]))
             if match is None:
                 return False
             key = match.group('key')
@@ -61,8 +61,7 @@ class DatabaseWrapper(base.DatabaseWrapper):
             try:
                 connection = super().get_new_connection(filtered_params)
             except TypeError as e:
-                e_arg = str(e.args[0])
-                if not self._remove_invalid_keyword_argument(e_arg, filtered_params):
+                if not self._remove_invalid_keyword_argument(e.args, filtered_params):
                     # This isn't a TypeError we can handle
                     raise e
         return connection
