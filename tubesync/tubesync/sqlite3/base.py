@@ -28,16 +28,15 @@ class DatabaseWrapper(base.DatabaseWrapper):
 
     def _remove_invalid_keyword_argument(self, params):
         try:
-            prog = re.compile(r"^'(?P<key>[^']+)' is an invalid keyword argument for Connection[()]{2}$")
+            prog = re.compile(r"^(?P<quote>['])(?P<key>[^']+)(?P=quote) is an invalid keyword argument for Connection\(\)$")
             match = prog.match(e.args[0])
-        else:
-            if match:
-                key = match.group('key')
-                try:
-                    # remove the invalid keyword argument
-                    del params[key]
-                else:
-                    return True
+
+        if match:
+            key = match.group('key')
+            try:
+                # remove the invalid keyword argument
+                del params[key]
+            return True
 
         return False
 
