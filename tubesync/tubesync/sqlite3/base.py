@@ -26,22 +26,20 @@ class DatabaseWrapper(base.DatabaseWrapper):
                     cursor.execute(init_cmd.strip())
 
 
-    def _remove_invalid_keyword_argument(self, e, filtered_params):
-        key = None
+    def _remove_invalid_keyword_argument(self, params):
         try:
             prog = re.compile(r"^'(?P<key>[^']+)' is an invalid keyword argument for Connection[()]{2}$")
             match = prog.match(e.args[0])
-        except:
-            raise
         else:
             if match:
                 key = match.group('key')
-        finally:
-            # This isn't a TypeError we can handle
-            if key is None:
-                raise e
-        # remove the invalid keyword argument
-        del filtered_params[key]
+                try:
+                    # remove the invalid keyword argument
+                    del params[key]
+                else:
+                    return True
+
+        return False
 
 
     def get_new_connection(self, conn_params):
@@ -59,6 +57,8 @@ class DatabaseWrapper(base.DatabaseWrapper):
             try:
                 connection = super().get_new_connection(filtered_params)
             except TypeError as e:
-                self._remove_invalid_keyword_argument(e, filtered_params)
+                if not self._remove_invalid_keyword_argument(filtered_params):
+                    # This isn't a TypeError we can handle
+                    raise e
         return connection
 
