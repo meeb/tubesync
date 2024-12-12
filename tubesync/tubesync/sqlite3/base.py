@@ -1,3 +1,4 @@
+import re
 from django.db.backends.sqlite3 import base
 
 
@@ -30,7 +31,7 @@ class DatabaseWrapper(base.DatabaseWrapper):
             "transaction_mode": ("isolation_level", "DEFERRED"),
         }
         filtered_params = {k: v for (k,v) in conn_params.items() if k not in filter_map}
-        filtered_params.update({v[0]: conn_params.get(k, v[1]) for (k,v) in filter_map.items() if v is not None})
+        filtered_params.update({v[0]: conn_params.get(k, v[1]) for (k,v) in filter_map.items()})
 
         attempt = 0
         connection = None
@@ -40,11 +41,12 @@ class DatabaseWrapper(base.DatabaseWrapper):
                 attempt += 1
                 connection = super().get_new_connection(filtered_params)
             except TypeError as e:
-                # remove unaccepted param
-                print(e, flush=True)
-                print('Exception args:', flush=True)
-                print(e.args, flush=True)
-                del filtered_params["init_command"]
+                prog = re.compile("^'(?P<key>[^']+)' is an invalid keyword argument for Connection[()]{2}$")
+                match = prog.match(e.args[0])
+                key = match.group('key') if match else None
+                if key is None:
+                    raise e
+                del filtered_params[key]
         return connection
 
 
