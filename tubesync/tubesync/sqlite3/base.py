@@ -5,15 +5,14 @@ class DatabaseWrapper(base.DatabaseWrapper):
 
     def _start_transaction_under_autocommit(self):
         conn_params = self.get_connection_params()
-        if "transaction_mode" not in conn_params:
-            self.cursor().execute("BEGIN TRANSACTION")
-        else:
+        transaction_modes = frozenset(["DEFERRED", "EXCLUSIVE", "IMMEDIATE"])
+
+        sql_statement = "BEGIN TRANSACTION"
+        if "transaction_mode" in conn_params:
             tm = str(conn_params["transaction_mode"]).upper().strip()
-            transaction_modes = frozenset(["DEFERRED", "EXCLUSIVE", "IMMEDIATE"])
             if tm in transaction_modes:
-                self.cursor().execute(f"BEGIN {tm} TRANSACTION")
-            else:
-                self.cursor().execute("BEGIN TRANSACTION")
+                sql_statement = f"BEGIN {tm} TRANSACTION"
+        self.cursor().execute(sql_statement)
 
 
     def init_connection_state(self):
@@ -27,9 +26,25 @@ class DatabaseWrapper(base.DatabaseWrapper):
 
     
     def get_new_connection(self, conn_params):
-        filtered_params = conn_params.copy()
-        filtered_params["isolation_level"] = filtered_params.pop("transaction_mode", "DEFERRED")
-        _ = filtered_params.pop("init_command", None)
-        return super().get_new_connection(filtered_params)
+        filter_map = {
+            "transaction_mode": ("isolation_level", "DEFERRED"),
+        }
+        filtered_params = {k: v for (k,v) in conn_params.items() if k not in filter_map}
+        filtered_params.update({v[0]: conn_params.get(k, v[1]) for (k,v) in filter_map.items() if v is not None})
+
+        attempt = 0
+        connection = None
+        tries = len(filtered_params)
+        while connection is None and attempt < tries:
+            try:
+                attempt += 1
+                connection = super().get_new_connection(filtered_params)
+            except TypeError as e:
+                # remove unaccepted param
+                print(e, flush=True)
+                print('Exception args:', flush=True)
+                print(e.args, flush=True)
+                del filtered_params["init_command"]
+        return connection
 
 
