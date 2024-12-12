@@ -27,11 +27,24 @@ class DatabaseWrapper(base.DatabaseWrapper):
     
     def get_new_connection(self, conn_params):
         filter_map = {
-            "init_command": None,
             "transaction_mode": ("isolation_level", "DEFERRED"),
         }
         filtered_params = {k: v for (k,v) in conn_params.items() if k not in filter_map}
         filtered_params.update({v[0]: conn_params.get(k, v[1]) for (k,v) in filter_map.items() if v is not None})
-        return super().get_new_connection(filtered_params)
+
+        attempt = 0
+        connection = None
+        tries = len(filtered_params)
+        while connection is None and attempt < tries:
+            try:
+                attempt += 1
+                connection = super().get_new_connection(filtered_params)
+            except TypeError as e:
+                # remove unaccepted param
+                print(e, flush=True)
+                print('Exception args:', flush=True)
+                print(e.args, flush=True)
+                del filtered_params["init_command"]
+        return connection
 
 
