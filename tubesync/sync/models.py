@@ -1515,6 +1515,38 @@ class Media(models.Model):
                 return position_counter
             position_counter += 1
 
+    def rename_files(self):
+        if self.downloaded and self.media_file:
+            old_video_path = Path(self.media_file.path)
+            new_video_path = Path(get_media_file_path(self, None))
+            if old_video_path.exists() and not new_video_path.exists():
+                old_video_path = old_video_path.resolve(strict=True)
+                # build the glob to match other files
+                stem = old_video_path
+                while '' != stem.suffix:
+                    stem = Path(stem.stem)
+                old_stem = stem
+                old_prefix_path = old_video_path.parent
+                other_paths = list(old_prefix_path.glob(str(old_stem) + '*'))
+
+                old_video_path.rename(new_video_path)
+                if new_video_path.exists():
+                    new_video_path = new_video_path.resolve(strict=True)
+                    stem = new_video_path
+                    while '' != stem:
+                        stem = Path(stem.stem)
+                    new_stem = stem
+                    new_prefix_path = new_video_path.parent
+                    for other_path in other_paths:
+                        old_file_str = other_path.name
+                        new_file_str = str(new_stem) + old_file_str[len(old_stem):]
+                        new_file_path = Path(new_prefix_path / new_file_str)
+                        other_path.replace(new_file_path)
+
+                    # update the media_file in the db
+                    self.media_file.name = new_video_path.relative_to(media_file_storage.location)
+                    self.save(update_fields={'media_file'})
+
 
 class MediaServer(models.Model):
     '''
