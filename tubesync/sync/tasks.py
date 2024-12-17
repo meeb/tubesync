@@ -494,7 +494,7 @@ def rename_all_media_for_source(source_id):
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist:
         # Task triggered but the source no longer exists, do nothing
-        log.error(f'Task save_all_media_for_source(pk={source_id}) called but no '
+        log.error(f'Task rename_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         return
     for media in Media.objects.filter(source=source):
