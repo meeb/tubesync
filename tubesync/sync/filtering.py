@@ -4,7 +4,7 @@
 
 from common.logger import log
 from .models import Media
-from datetime import datetime, timedelta
+from datetime import datetime
 from django.utils import timezone
 from .overrides.custom_filter import filter_custom
 
