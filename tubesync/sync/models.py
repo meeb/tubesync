@@ -1529,6 +1529,10 @@ class Media(models.Model):
             new_video_path = Path(get_media_file_path(self, None))
             if old_video_path.exists() and not new_video_path.exists():
                 old_video_path = old_video_path.resolve(strict=True)
+
+                # mkdir -p destination_dir
+                new_video_path.parent.mkdir(parents=True, exist_ok=True)
+
                 # build the glob to match other files
                 stem = Path(old_video_path.stem)
                 while stem.suffixes and '' != stem.suffix:
@@ -1536,26 +1540,36 @@ class Media(models.Model):
                 old_stem = str(stem)
                 old_prefix_path = old_video_path.parent
                 glob_prefix = old_stem.translate(self._glob_translation)
+
+                # move video to destination
+                old_video_path.rename(new_video_path)
+
+                # collect the list of files to move
+                # this should not include the video we just moved
                 other_paths = list(old_prefix_path.glob(glob_prefix + '*'))
 
-                new_video_path.parent.mkdir(parents=True, exist_ok=True)
-                old_video_path.rename(new_video_path)
                 if new_video_path.exists():
                     new_video_path = new_video_path.resolve(strict=True)
+
+                    # update the media_file in the db
+                    self.media_file.name = str(new_video_path.relative_to(media_file_storage.location))
+                    self.save(update_fields={'media_file'})
+
+                    # set up new stem and destination directory
                     stem = Path(new_video_path.stem)
                     while stem.suffixes and '' != stem.suffix:
                         stem = Path(stem.stem)
                     new_stem = str(stem)
                     new_prefix_path = new_video_path.parent
+
+                    # move and change names to match stem
                     for other_path in other_paths:
                         old_file_str = other_path.name
                         new_file_str = new_stem + old_file_str[len(old_stem):]
                         new_file_path = Path(new_prefix_path / new_file_str)
-                        other_path.replace(new_file_path)
-
-                    # update the media_file in the db
-                    self.media_file.name = str(new_video_path.relative_to(media_file_storage.location))
-                    self.save(update_fields={'media_file'})
+                        # it should exist, but check anyway 
+                        if other_path.exists():
+                            other_path.replace(new_file_path)
 
                     # The thumbpath inside the .nfo file may have changed
                     if self.source.write_nfo and self.source.copy_thumbnails:
