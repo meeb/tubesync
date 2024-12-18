@@ -50,6 +50,7 @@ def map_task_to_instance(task):
         'sync.tasks.download_media_thumbnail': Media,
         'sync.tasks.download_media': Media,
         'sync.tasks.save_all_media_for_source': Source,
+        'sync.tasks.rename_all_media_for_source': Source,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
@@ -486,3 +487,18 @@ def save_all_media_for_source(source_id):
     # flags may need to be recalculated
     for media in Media.objects.filter(source=source):
         media.save()
+
+
+@background(schedule=0)
+def rename_all_media_for_source(source_id):
+    try:
+        source = Source.objects.get(pk=source_id)
+    except Source.DoesNotExist:
+        # Task triggered but the source no longer exists, do nothing
+        log.error(f'Task rename_all_media_for_source(pk={source_id}) called but no '
+                  f'source exists with ID: {source_id}')
+        return
+    for media in Media.objects.filter(source=source):
+        media.rename_files()
+
+
