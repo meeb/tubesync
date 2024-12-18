@@ -751,6 +751,14 @@ class Media(models.Model):
         STATE_DISABLED_AT_SOURCE: '<i class="fas fa-stop-circle" title="Media downloading disabled at source"></i>',
         STATE_ERROR: '<i class="fas fa-exclamation-triangle" title="Error downloading"></i>',
     }
+    # Path.glob uses fnmatch, so we must escape certain characters
+    _glob_specials = {
+        '?': '[?]',
+        '*': '[*]',
+        '[': '[[]',
+        ']': '[]]', # probably not needed, but it won't hurt
+    }
+    _glob_translation = str.maketrans(_glob_specials)
 
     uuid = models.UUIDField(
         _('uuid'),
@@ -1527,7 +1535,8 @@ class Media(models.Model):
                     stem = Path(stem.stem)
                 old_stem = stem
                 old_prefix_path = old_video_path.parent
-                other_paths = list(old_prefix_path.glob(str(old_stem) + '*'))
+                glob_prefix = str(old_stem).translate(_glob_translation)
+                other_paths = list(old_prefix_path.glob(glob_prefix + '*'))
 
                 new_video_path.parent.mkdir(parents=True, exist_ok=True)
                 old_video_path.rename(new_video_path)
