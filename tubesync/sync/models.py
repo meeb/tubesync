@@ -1535,7 +1535,7 @@ class Media(models.Model):
                     stem = Path(stem.stem)
                 old_stem = stem
                 old_prefix_path = old_video_path.parent
-                glob_prefix = str(old_stem).translate(_glob_translation)
+                glob_prefix = str(old_stem).translate(self._glob_translation)
                 other_paths = list(old_prefix_path.glob(glob_prefix + '*'))
 
                 new_video_path.parent.mkdir(parents=True, exist_ok=True)
