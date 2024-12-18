@@ -1554,6 +1554,7 @@ class Media(models.Model):
                     # update the media_file in the db
                     self.media_file.name = str(new_video_path.relative_to(media_file_storage.location))
                     self.save(update_fields={'media_file'})
+                    self.refresh_from_db(fields={'media_file'})
 
                     # set up new stem and destination directory
                     stem = Path(new_video_path.stem)
