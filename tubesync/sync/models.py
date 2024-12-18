@@ -1529,6 +1529,7 @@ class Media(models.Model):
                 old_prefix_path = old_video_path.parent
                 other_paths = list(old_prefix_path.glob(str(old_stem) + '*'))
 
+                new_video_path.parent.mkdir(parents=True, exist_ok=True)
                 old_video_path.rename(new_video_path)
                 if new_video_path.exists():
                     new_video_path = new_video_path.resolve(strict=True)
