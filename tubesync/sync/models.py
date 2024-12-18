@@ -1530,26 +1530,26 @@ class Media(models.Model):
             if old_video_path.exists() and not new_video_path.exists():
                 old_video_path = old_video_path.resolve(strict=True)
                 # build the glob to match other files
-                stem = old_video_path
+                stem = Path(old_video_path.stem)
                 while stem.suffixes and '' != stem.suffix:
                     stem = Path(stem.stem)
-                old_stem = stem
+                old_stem = str(stem)
                 old_prefix_path = old_video_path.parent
-                glob_prefix = str(old_stem).translate(self._glob_translation)
+                glob_prefix = old_stem.translate(self._glob_translation)
                 other_paths = list(old_prefix_path.glob(glob_prefix + '*'))
 
                 new_video_path.parent.mkdir(parents=True, exist_ok=True)
                 old_video_path.rename(new_video_path)
                 if new_video_path.exists():
                     new_video_path = new_video_path.resolve(strict=True)
-                    stem = new_video_path
+                    stem = Path(new_video_path.stem)
                     while stem.suffixes and '' != stem.suffix:
                         stem = Path(stem.stem)
-                    new_stem = stem
+                    new_stem = str(stem)
                     new_prefix_path = new_video_path.parent
                     for other_path in other_paths:
                         old_file_str = other_path.name
-                        new_file_str = str(new_stem) + old_file_str[len(old_stem):]
+                        new_file_str = new_stem + old_file_str[len(old_stem):]
                         new_file_path = Path(new_prefix_path / new_file_str)
                         other_path.replace(new_file_path)
 
@@ -1561,7 +1561,7 @@ class Media(models.Model):
                     if self.source.write_nfo and self.source.copy_thumbnails:
                         nfo_path_tmp = Path(str(self.nfopath) + '.tmp')
                         write_text_file(nfo_path_tmp, self.nfoxml)
-                        nfo_path_tmp.replace(self.nfopath)
+                        nfo_path_tmp.replace(new_prefix_path / self.nfopath.name)
 
 
 class MediaServer(models.Model):
