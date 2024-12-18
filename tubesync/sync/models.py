@@ -1523,7 +1523,7 @@ class Media(models.Model):
                 old_video_path = old_video_path.resolve(strict=True)
                 # build the glob to match other files
                 stem = old_video_path
-                while '' != stem.suffix:
+                while stem.suffixes and '' != stem.suffix:
                     stem = Path(stem.stem)
                 old_stem = stem
                 old_prefix_path = old_video_path.parent
@@ -1534,7 +1534,7 @@ class Media(models.Model):
                 if new_video_path.exists():
                     new_video_path = new_video_path.resolve(strict=True)
                     stem = new_video_path
-                    while '' != stem:
+                    while stem.suffixes and '' != stem.suffix:
                         stem = Path(stem.stem)
                     new_stem = stem
                     new_prefix_path = new_video_path.parent
@@ -1545,7 +1545,7 @@ class Media(models.Model):
                         other_path.replace(new_file_path)
 
                     # update the media_file in the db
-                    self.media_file.name = new_video_path.relative_to(media_file_storage.location)
+                    self.media_file.name = str(new_video_path.relative_to(media_file_storage.location))
                     self.save(update_fields={'media_file'})
 
 
