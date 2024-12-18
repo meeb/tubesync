@@ -19,7 +19,7 @@ from common.utils import clean_filename, clean_emoji
 from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media,
                       get_channel_image_info as get_youtube_channel_image_info)
-from .utils import seconds_to_timestr, parse_media_format
+from .utils import seconds_to_timestr, parse_media_format, write_text_file
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
@@ -1547,6 +1547,12 @@ class Media(models.Model):
                     # update the media_file in the db
                     self.media_file.name = str(new_video_path.relative_to(media_file_storage.location))
                     self.save(update_fields={'media_file'})
+
+                    # The thumbpath inside the .nfo file may have changed
+                    if self.source.write_nfo and self.source.copy_thumbnails:
+                        nfo_path_tmp = Path(str(self.nfopath) + '.tmp')
+                        write_text_file(nfo_path_tmp, self.nfoxml)
+                        nfo_path_tmp.replace(self.nfopath)
 
 
 class MediaServer(models.Model):
