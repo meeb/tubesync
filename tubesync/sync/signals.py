@@ -71,14 +71,14 @@ def source_post_save(sender, instance, created, **kwargs):
     verbose_name = _('Renaming all media for source "{}"')
     rename_all_media_for_source(
         str(instance.pk),
-        priority=10,
+        priority=0,
         verbose_name=verbose_name.format(instance.name),
         remove_existing_tasks=True
     )
     verbose_name = _('Checking all media for source "{}"')
     save_all_media_for_source(
         str(instance.pk),
-        priority=0,
+        priority=1,
         verbose_name=verbose_name.format(instance.name),
         remove_existing_tasks=True
     )
