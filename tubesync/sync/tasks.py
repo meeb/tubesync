@@ -49,6 +49,7 @@ def map_task_to_instance(task):
         'sync.tasks.check_source_directory_exists': Source,
         'sync.tasks.download_media_thumbnail': Media,
         'sync.tasks.download_media': Media,
+        'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
     }
     MODEL_URL_MAP = {
