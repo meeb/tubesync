@@ -118,7 +118,7 @@ def directory_and_stem(arg_path):
     while stem.suffixes and '' != stem.suffix:
         stem = Path(stem.stem)
     stem = str(stem)
-    return (filepath.parent, stem, filepath.suffixes,)
+    return (filepath.parent, stem,)
 
 
 def mkdir_p(arg_path, mode=0o777):
