@@ -19,7 +19,8 @@ from common.utils import clean_filename, clean_emoji
 from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media,
                       get_channel_image_info as get_youtube_channel_image_info)
-from .utils import seconds_to_timestr, parse_media_format, write_text_file
+from .utils import (seconds_to_timestr, parse_media_format, write_text_file,
+                    mkdir_p)
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
@@ -1530,8 +1531,7 @@ class Media(models.Model):
             if old_video_path.exists() and not new_video_path.exists():
                 old_video_path = old_video_path.resolve(strict=True)
 
-                # mkdir -p destination_dir
-                new_video_path.parent.mkdir(parents=True, exist_ok=True)
+                mkdir_p(new_video_path.parent)
 
                 # build the glob to match other files
                 stem = Path(old_video_path.stem)
