@@ -118,6 +118,12 @@ def get_media_download_task(media_id):
     except IndexError:
         return False
 
+def get_media_metadata_task(media_id):
+    try:
+        return Task.objects.get_task('sync.tasks.download_media_metadata',
+                                     args=(str(media_id),))[0]
+    except IndexError:
+        return False
 
 def delete_task_by_source(task_name, source_id):
     return Task.objects.filter(task_name=task_name, queue=str(source_id)).delete()
