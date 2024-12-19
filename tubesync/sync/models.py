@@ -20,7 +20,7 @@ from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media,
                       get_channel_image_info as get_youtube_channel_image_info)
 from .utils import (seconds_to_timestr, parse_media_format, write_text_file,
-                    mkdir_p)
+                    mkdir_p, directory_and_stem)
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
@@ -1534,11 +1534,7 @@ class Media(models.Model):
                 mkdir_p(new_video_path.parent)
 
                 # build the glob to match other files
-                stem = Path(old_video_path.stem)
-                while stem.suffixes and '' != stem.suffix:
-                    stem = Path(stem.stem)
-                old_stem = str(stem)
-                old_prefix_path = old_video_path.parent
+                (old_prefix_path, old_stem) = directory_and_stem(old_video_path)
                 glob_prefix = old_stem.translate(self._glob_translation)
 
                 # move video to destination
@@ -1556,12 +1552,7 @@ class Media(models.Model):
                     self.save(update_fields={'media_file'})
                     self.refresh_from_db(fields={'media_file'})
 
-                    # set up new stem and destination directory
-                    stem = Path(new_video_path.stem)
-                    while stem.suffixes and '' != stem.suffix:
-                        stem = Path(stem.stem)
-                    new_stem = str(stem)
-                    new_prefix_path = new_video_path.parent
+                    (new_prefix_path, new_stem) = directory_and_stem(new_video_path)
 
                     # move and change names to match stem
                     for other_path in other_paths:
