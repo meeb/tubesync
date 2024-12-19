@@ -92,6 +92,20 @@ def resize_image_to_height(image, width, height):
     return image
 
 
+def glob_quote(filestr):
+    _glob_specials = {
+        '?': '[?]',
+        '*': '[*]',
+        '[': '[[]',
+        ']': '[]]', # probably not needed, but it won't hurt
+    }
+
+    if not isinstance(filestr, str):
+        raise ValueError(f'filestr must be a str, got "{type(filestr)}"')
+
+    return filestr.translate(str.maketrans(_glob_specials))
+
+
 def file_is_editable(filepath):
     '''
         Checks that a file exists and the file is in an allowed predefined tuple of
