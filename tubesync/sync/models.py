@@ -20,7 +20,7 @@ from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media,
                       get_channel_image_info as get_youtube_channel_image_info)
 from .utils import (seconds_to_timestr, parse_media_format, write_text_file,
-                    mkdir_p, directory_and_stem)
+                    mkdir_p, directory_and_stem, glob_quote)
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
@@ -752,14 +752,6 @@ class Media(models.Model):
         STATE_DISABLED_AT_SOURCE: '<i class="fas fa-stop-circle" title="Media downloading disabled at source"></i>',
         STATE_ERROR: '<i class="fas fa-exclamation-triangle" title="Error downloading"></i>',
     }
-    # Path.glob uses fnmatch, so we must escape certain characters
-    _glob_specials = {
-        '?': '[?]',
-        '*': '[*]',
-        '[': '[[]',
-        ']': '[]]', # probably not needed, but it won't hurt
-    }
-    _glob_translation = str.maketrans(_glob_specials)
 
     uuid = models.UUIDField(
         _('uuid'),
@@ -1531,18 +1523,14 @@ class Media(models.Model):
             if old_video_path.exists() and not new_video_path.exists():
                 old_video_path = old_video_path.resolve(strict=True)
 
-                mkdir_p(new_video_path.parent)
-
-                # build the glob to match other files
-                (old_prefix_path, old_stem) = directory_and_stem(old_video_path)
-                glob_prefix = old_stem.translate(self._glob_translation)
-
                 # move video to destination
+                mkdir_p(new_video_path.parent)
                 old_video_path.rename(new_video_path)
 
                 # collect the list of files to move
                 # this should not include the video we just moved
-                other_paths = list(old_prefix_path.glob(glob_prefix + '*'))
+                (old_prefix_path, old_stem) = directory_and_stem(old_video_path)
+                other_paths = list(old_prefix_path.glob(glob_quote(old_stem) + '*'))
 
                 if new_video_path.exists():
                     new_video_path = new_video_path.resolve(strict=True)
