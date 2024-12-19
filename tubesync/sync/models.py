@@ -1572,9 +1572,12 @@ class Media(models.Model):
                         nfo_path_tmp.replace(new_prefix_path / self.nfopath.name)
 
                     # try to remove empty dirs
+                    parent_dir = old_video_path.parent
                     try:
-                        old_video_path.parent.rmdir()
-                    except:
+                        while parent_dir.is_dir():
+                            parent_dir.rmdir()
+                            parent_dir = parent_dir.parent
+                    except OSError as e:
                         pass
 
 
