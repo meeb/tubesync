@@ -102,6 +102,10 @@ def task_task_failed(sender, task_id, completed_task, **kwargs):
         obj.has_failed = True
         obj.save()
 
+    if isinstance(obj, Media) and completed_task.task_name == "sync.tasks.download_media_metadata":
+        log.error(f'Permanent failure for media: {obj} task: {completed_task}')
+        obj.skip = True
+        obj.save()
 
 @receiver(post_save, sender=Media)
 def media_post_save(sender, instance, created, **kwargs):
