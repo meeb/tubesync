@@ -112,6 +112,23 @@ def file_is_editable(filepath):
     return False
 
 
+def directory_and_stem(arg_path):
+    filepath = Path(arg_path)
+    stem = Path(filepath.stem)
+    while stem.suffixes and '' != stem.suffix:
+        stem = Path(stem.stem)
+    stem = str(stem)
+    return (filepath.parent, stem, filepath.suffixes,)
+
+
+def mkdir_p(arg_path, mode=0o777):
+    '''
+        Reminder: mode only affects the last directory
+    '''
+    dirpath = Path(arg_path)
+    return dirpath.mkdir(mode=mode, parents=True, exist_ok=True)
+
+
 def write_text_file(filepath, filedata):
     if not isinstance(filedata, str):
         raise ValueError(f'filedata must be a str, got "{type(filedata)}"')
