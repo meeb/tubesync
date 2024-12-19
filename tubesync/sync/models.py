@@ -1532,6 +1532,11 @@ class Media(models.Model):
                 (old_prefix_path, old_stem) = directory_and_stem(old_video_path)
                 other_paths = list(old_prefix_path.glob(glob_quote(old_stem) + '*'))
 
+                # adopt orphaned files, if possible
+                media_format = str(self.source.media_format)
+                if '{key}' in media_format:
+                    fuzzy_paths = list(old_prefix_path.glob('*' + glob_quote(str(self.key)) + '*'))
+
                 if new_video_path.exists():
                     new_video_path = new_video_path.resolve(strict=True)
 
@@ -1551,11 +1556,26 @@ class Media(models.Model):
                         if other_path.exists():
                             other_path.replace(new_file_path)
 
+                    for fuzzy_path in fuzzy_paths:
+                        (fuzzy_prefix_path, fuzzy_stem) = directory_and_stem(fuzzy_path)
+                        old_file_str = fuzzy_path.name
+                        new_file_str = new_stem + old_file_str[len(fuzzy_stem):]
+                        new_file_path = Path(new_prefix_path / new_file_str) 
+                        # it quite possibly was renamed already
+                        if fuzzy_path.exists() and not new_file_path.exists():
+                            fuzzy_path.rename(new_file_path)
+
                     # The thumbpath inside the .nfo file may have changed
                     if self.source.write_nfo and self.source.copy_thumbnails:
                         nfo_path_tmp = Path(str(self.nfopath) + '.tmp')
                         write_text_file(nfo_path_tmp, self.nfoxml)
                         nfo_path_tmp.replace(new_prefix_path / self.nfopath.name)
+
+                    # try to remove empty dirs
+                    try:
+                        old_video_path.parent.rmdir()
+                    except:
+                        pass
 
 
 class MediaServer(models.Model):
