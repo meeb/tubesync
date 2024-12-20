@@ -49,7 +49,6 @@ def get_channel_image_info(url):
     opts = get_yt_opts()
     opts.update({
         'skip_download': True,
-        'forcejson': True,
         'simulate': True,
         'logger': log,
         'extract_flat': True,  # Change to False to get detailed info
@@ -84,7 +83,6 @@ def get_media_info(url):
     opts = get_yt_opts()
     opts.update({
         'skip_download': True,
-        'forcejson': True,
         'simulate': True,
         'logger': log,
         'extract_flat': True,
