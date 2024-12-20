@@ -19,7 +19,8 @@ from common.utils import clean_filename, clean_emoji
 from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media,
                       get_channel_image_info as get_youtube_channel_image_info)
-from .utils import seconds_to_timestr, parse_media_format, write_text_file
+from .utils import (seconds_to_timestr, parse_media_format, write_text_file,
+                    mkdir_p, directory_and_stem, glob_quote)
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
@@ -751,14 +752,6 @@ class Media(models.Model):
         STATE_DISABLED_AT_SOURCE: '<i class="fas fa-stop-circle" title="Media downloading disabled at source"></i>',
         STATE_ERROR: '<i class="fas fa-exclamation-triangle" title="Error downloading"></i>',
     }
-    # Path.glob uses fnmatch, so we must escape certain characters
-    _glob_specials = {
-        '?': '[?]',
-        '*': '[*]',
-        '[': '[[]',
-        ']': '[]]', # probably not needed, but it won't hurt
-    }
-    _glob_translation = str.maketrans(_glob_specials)
 
     uuid = models.UUIDField(
         _('uuid'),
@@ -1530,23 +1523,19 @@ class Media(models.Model):
             if old_video_path.exists() and not new_video_path.exists():
                 old_video_path = old_video_path.resolve(strict=True)
 
-                # mkdir -p destination_dir
-                new_video_path.parent.mkdir(parents=True, exist_ok=True)
-
-                # build the glob to match other files
-                stem = Path(old_video_path.stem)
-                while stem.suffixes and '' != stem.suffix:
-                    stem = Path(stem.stem)
-                old_stem = str(stem)
-                old_prefix_path = old_video_path.parent
-                glob_prefix = old_stem.translate(self._glob_translation)
-
                 # move video to destination
+                mkdir_p(new_video_path.parent)
                 old_video_path.rename(new_video_path)
 
                 # collect the list of files to move
                 # this should not include the video we just moved
-                other_paths = list(old_prefix_path.glob(glob_prefix + '*'))
+                (old_prefix_path, old_stem) = directory_and_stem(old_video_path)
+                other_paths = list(old_prefix_path.glob(glob_quote(old_stem) + '*'))
+
+                # adopt orphaned files, if possible
+                media_format = str(self.source.media_format)
+                if '{key}' in media_format:
+                    fuzzy_paths = list(old_prefix_path.glob('*' + glob_quote(str(self.key)) + '*'))
 
                 if new_video_path.exists():
                     new_video_path = new_video_path.resolve(strict=True)
@@ -1556,12 +1545,7 @@ class Media(models.Model):
                     self.save(update_fields={'media_file'})
                     self.refresh_from_db(fields={'media_file'})
 
-                    # set up new stem and destination directory
-                    stem = Path(new_video_path.stem)
-                    while stem.suffixes and '' != stem.suffix:
-                        stem = Path(stem.stem)
-                    new_stem = str(stem)
-                    new_prefix_path = new_video_path.parent
+                    (new_prefix_path, new_stem) = directory_and_stem(new_video_path)
 
                     # move and change names to match stem
                     for other_path in other_paths:
@@ -1572,11 +1556,27 @@ class Media(models.Model):
                         if other_path.exists():
                             other_path.replace(new_file_path)
 
+                    for fuzzy_path in fuzzy_paths:
+                        (fuzzy_prefix_path, fuzzy_stem) = directory_and_stem(fuzzy_path)
+                        old_file_str = fuzzy_path.name
+                        new_file_str = new_stem + old_file_str[len(fuzzy_stem):]
+                        new_file_path = Path(new_prefix_path / new_file_str) 
+                        # it quite possibly was renamed already
+                        if fuzzy_path.exists() and not new_file_path.exists():
+                            fuzzy_path.rename(new_file_path)
+
                     # The thumbpath inside the .nfo file may have changed
                     if self.source.write_nfo and self.source.copy_thumbnails:
-                        nfo_path_tmp = Path(str(self.nfopath) + '.tmp')
-                        write_text_file(nfo_path_tmp, self.nfoxml)
-                        nfo_path_tmp.replace(new_prefix_path / self.nfopath.name)
+                        write_text_file(new_prefix_path / self.nfopath.name, self.nfoxml)
+
+                    # try to remove empty dirs
+                    parent_dir = old_video_path.parent
+                    try:
+                        while parent_dir.is_dir():
+                            parent_dir.rmdir()
+                            parent_dir = parent_dir.parent
+                    except OSError as e:
+                        pass
 
 
 class MediaServer(models.Model):
