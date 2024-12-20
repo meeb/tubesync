@@ -83,6 +83,7 @@ def get_media_info(url):
     '''
     opts = get_yt_opts()
     opts.update({
+        'ignore_no_formats_error': False,
         'skip_download': True,
         'simulate': True,
         'logger': log,
@@ -92,6 +93,11 @@ def get_media_info(url):
     with yt_dlp.YoutubeDL(opts) as y:
         try:
             response = y.extract_info(url, download=False)
+        except yt_dlp.utils.ExtractorError as e:
+            if not e.expected:
+                raise e
+            log.warn(e.msg)
+            pass
         except yt_dlp.utils.DownloadError as e:
             raise YouTubeError(f'Failed to extract_info for "{url}": {e}') from e
     if not response:
