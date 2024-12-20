@@ -3,6 +3,7 @@ import re
 import math
 from operator import itemgetter
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 import requests
 from PIL import Image
 from django.conf import settings
@@ -114,9 +115,18 @@ def file_is_editable(filepath):
 
 def write_text_file(filepath, filedata):
     if not isinstance(filedata, str):
-        raise ValueError(f'filedata must be a str, got "{type(filedata)}"')
-    with open(filepath, 'wt') as f:
+        raise TypeError(f'filedata must be a str, got "{type(filedata)}"')
+    filepath_dir = str(Path(filepath).parent)
+    with NamedTemporaryFile(mode='wt', suffix='.tmp', prefix='', dir=filepath_dir, delete=False) as f:
+        new_filepath = Path(f.name)
         bytes_written = f.write(filedata)
+    # chmod a+r temp_file
+    old_mode = new_filepath.stat().st_mode
+    new_filepath.chmod(0o444 | old_mode)
+    if not file_is_editable(new_filepath):
+        new_filepath.unlink()
+        raise ValueError(f'File cannot be edited or removed: {filepath}')
+    new_filepath.replace(filepath)
     return bytes_written
 
 
