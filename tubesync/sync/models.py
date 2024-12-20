@@ -1567,9 +1567,7 @@ class Media(models.Model):
 
                     # The thumbpath inside the .nfo file may have changed
                     if self.source.write_nfo and self.source.copy_thumbnails:
-                        nfo_path_tmp = Path(str(self.nfopath) + '.tmp')
-                        write_text_file(nfo_path_tmp, self.nfoxml)
-                        nfo_path_tmp.replace(new_prefix_path / self.nfopath.name)
+                        write_text_file(new_prefix_path / self.nfopath.name, self.nfoxml)
 
                     # try to remove empty dirs
                     parent_dir = old_video_path.parent
