@@ -101,7 +101,7 @@ def glob_quote(filestr):
     }
 
     if not isinstance(filestr, str):
-        raise ValueError(f'filestr must be a str, got "{type(filestr)}"')
+        raise TypeError(f'filestr must be a str, got "{type(filestr)}"')
 
     return filestr.translate(str.maketrans(_glob_specials))
 
