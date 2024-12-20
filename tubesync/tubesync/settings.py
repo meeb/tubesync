@@ -165,7 +165,7 @@ SOURCE_DOWNLOAD_DIRECTORY_PREFIX = True
 YOUTUBE_DL_CACHEDIR = None
 YOUTUBE_DL_TEMPDIR = None
 YOUTUBE_DEFAULTS = {
-    'no_color': True,       # Do not use colours in output
+    'color': 'never',       # Do not use colours in output
     'age_limit': 99,        # 'Age in years' to spoof
     'ignoreerrors': True,   # Skip on errors (such as unavailable videos in playlists)
     'cachedir': False,      # Disable on-disk caching
