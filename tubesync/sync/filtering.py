@@ -14,28 +14,32 @@ def filter_media(instance: Media):
     # Assume we aren't skipping it, if any of these conditions are true, we skip it
     skip = False
 
+    # Check if it has already been marked as skipped
+    if instance.manual_skip:
+        skip = True
+
     # Check if it's published
-    if not instance.skip and filter_published(instance):
+    if not skip and filter_published(instance):
         skip = True
 
     # Check if older than max_cap_age, skip
-    if not instance.skip and filter_max_cap(instance):
+    if not skip and filter_max_cap(instance):
         skip = True
 
     # Check if older than source_cutoff
-    if not instance.skip and filter_source_cutoff(instance):
+    if not skip and filter_source_cutoff(instance):
         skip = True
 
     # Check if we have filter_text and filter text matches
-    if not instance.skip and filter_filter_text(instance):
+    if not skip and filter_filter_text(instance):
         skip = True
 
     # Check if the video is longer than the max, or shorter than the min
-    if not instance.skip and filter_duration(instance):
+    if not skip and filter_duration(instance):
         skip = True
 
     # If we aren't already skipping the file, call our custom function that can be overridden
-    if not skip and not instance.skip and filter_custom(instance):
+    if not skip and filter_custom(instance):
         log.info(f"Media: {instance.source} / {instance} has been skipped by Custom Filter")
         skip = True
 
