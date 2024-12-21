@@ -422,7 +422,7 @@ class Source(models.Model):
         help_text=_('List of subtitles langs to download, comma-separated. Example: en,fr or all,-fr,-live_chat'),
         validators=[
             RegexValidator(
-                regex=r"^(\-?[\_\.a-zA-Z]+,)*(\-?[\_\.a-zA-Z]+){1}$",
+                regex=r"^(\-?[\_\.a-zA-Z-]+(,|$))+",
                 message=_('Subtitle langs must be a comma-separated list of langs. example: en,fr or all,-fr,-live_chat')
             )
         ]
@@ -457,6 +457,14 @@ class Source(models.Model):
         delta = self.download_cap
         if delta > 0:
             return timezone.now() - timedelta(seconds=delta)
+        else:
+            return False
+
+    @property
+    def days_to_keep_date(self):
+        delta = self.days_to_keep
+        if delta > 0:
+            return timezone.now() - timedelta(days=delta)
         else:
             return False
 
@@ -514,10 +522,13 @@ class Source(models.Model):
 
     @property
     def type_directory_path(self):
-        if self.source_resolution == self.SOURCE_RESOLUTION_AUDIO:
-            return Path(settings.DOWNLOAD_AUDIO_DIR) / self.directory
+        if settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX:
+            if self.source_resolution == self.SOURCE_RESOLUTION_AUDIO:
+                return Path(settings.DOWNLOAD_AUDIO_DIR) / self.directory
+            else:
+                return Path(settings.DOWNLOAD_VIDEO_DIR) / self.directory
         else:
-            return Path(settings.DOWNLOAD_VIDEO_DIR) / self.directory
+            return Path(self.directory)
 
     def make_directory(self):
         return os.makedirs(self.directory_path, exist_ok=True)
@@ -1291,10 +1302,7 @@ class Media(models.Model):
 
     @property
     def directory_path(self):
-        # Otherwise, create a suitable filename from the source media_format
-        media_format = str(self.source.media_format)
-        media_details = self.format_dict
-        dirname = self.source.directory_path / media_format.format(**media_details)
+        dirname = self.source.directory_path / self.filename
         return os.path.dirname(str(dirname))
 
     @property

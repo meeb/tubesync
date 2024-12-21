@@ -4,7 +4,7 @@
 
 from common.logger import log
 from .models import Media
-from datetime import datetime, timedelta
+from datetime import datetime
 from django.utils import timezone
 from .overrides.custom_filter import filter_custom
 
@@ -127,19 +127,15 @@ def filter_max_cap(instance: Media):
     return False
 
 
-# If the source has a cut-off, check the upload date is within the allowed delta
+# If the source has a cut-off, check the download date is within the allowed delta
 def filter_source_cutoff(instance: Media):
-    if instance.source.delete_old_media and instance.source.days_to_keep > 0:
-        if not isinstance(instance.published, datetime):
-            # Media has no known published date or incomplete metadata
-            log.info(
-                f"Media: {instance.source} / {instance} has no published date, skipping"
-            )
-            return True
+    if instance.source.delete_old_media and instance.source.days_to_keep_date:
+        if not instance.downloaded or not isinstance(instance.download_date, datetime):
+            return False
 
-        delta = timezone.now() - timedelta(days=instance.source.days_to_keep)
-        if instance.published < delta:
-            # Media was published after the cutoff date, skip it
+        days_to_keep_age = instance.source.days_to_keep_date
+        if instance.download_date < days_to_keep_age:
+            # Media has expired, skip it
             log.info(
                 f"Media: {instance.source} / {instance} is older than "
                 f"{instance.source.days_to_keep} days, skipping"
