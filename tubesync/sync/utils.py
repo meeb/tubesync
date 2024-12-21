@@ -114,15 +114,16 @@ def file_is_editable(filepath):
     '''
     allowed_paths = (
         # Media item thumbnails
-        os.path.commonpath([os.path.abspath(str(settings.MEDIA_ROOT))]),
+        Path(str(settings.MEDIA_ROOT)).resolve(),
+
         # Downloaded media files
-        os.path.commonpath([os.path.abspath(str(settings.DOWNLOAD_ROOT))]),
+        Path(str(settings.DOWNLOAD_ROOT)).resolve(),
     )
-    filepath = os.path.abspath(str(filepath))
-    if not os.path.isfile(filepath):
+    filepath = Path(str(filepath)).resolve()
+    if not filepath.is_file():
         return False
     for allowed_path in allowed_paths:
-        if allowed_path == os.path.commonpath([allowed_path, filepath]):
+        if str(allowed_path) == os.path.commonpath([allowed_path, filepath]):
             return True
     return False
 
