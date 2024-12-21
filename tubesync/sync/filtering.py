@@ -122,10 +122,12 @@ def filter_max_cap(instance: Media):
         return False
 
     if instance.published <= max_cap_age:
-        log.info(
-            f"Media: {instance.source} / {instance} is too old for "
-            f"the download cap date, marking to be skipped"
-        )
+        # log new media instances, not every media instance every time
+        if not instance.skip:
+            log.info(
+                f"Media: {instance.source} / {instance} is too old for "
+                f"the download cap date, marking to be skipped"
+            )
         return True
 
     return False
