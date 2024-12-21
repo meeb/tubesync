@@ -5,7 +5,6 @@
 
 
 import os
-import json
 from pathlib import Path
 from django.conf import settings
 from copy import copy
@@ -85,16 +84,14 @@ def _subscriber_only(msg='', response=None):
             return True
     else:
         # ignore msg entirely
-        try:
-            data = json.loads(str(response))
-        except (TypeError, ValueError, AttributeError):
-            return False
+        if not isinstance(response, dict):
+            raise TypeError(f'response must be a dict, got "{type(response)}" instead')
 
-        if 'availability' not in data.keys():
+        if 'availability' not in response.keys():
             return False
 
         # check for the specific expected value
-        return 'subscriber_only' == data.get('availability')
+        return 'subscriber_only' == response.get('availability')
     return False
 
 
