@@ -86,7 +86,7 @@ def _subscriber_only(msg='', response=None):
     else:
         # ignore msg entirely
         try:
-            data = json.loads(response)
+            data = json.loads(str(response))
         except (TypeError, ValueError, AttributeError):
             return False
 
