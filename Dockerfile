@@ -206,7 +206,7 @@ RUN set -x && \
   # Create config, downloads and run dirs
   mkdir -v -p /run/app && \
   mkdir -v -p /config/media && \
-  mkdir -v -p /config/pycache && \
+  mkdir -v -p /config/cache/pycache && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video
 
@@ -225,7 +225,7 @@ COPY config/root /
 HEALTHCHECK --interval=1m --timeout=10s CMD /app/healthcheck.py http://127.0.0.1:8080/healthcheck
 
 # ENVS and ports
-ENV PYTHONPATH="/app" PYTHONPYCACHEPREFIX="/config/pycache"
+ENV PYTHONPATH="/app" PYTHONPYCACHEPREFIX="/config/cache/pycache"
 EXPOSE 4848
 
 # Volumes
