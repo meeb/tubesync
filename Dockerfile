@@ -168,7 +168,7 @@ RUN set -x && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
   cp -at /tmp/ "${HOME}" && \
-  PIPENV_VERBOSITY=64 HOME="/tmp/${HOME#/}" pipenv install --system --skip-lock --no-cache-dir && \
+  PIPENV_VERBOSITY=64 HOME="/tmp/${HOME#/}" pipenv install --system --skip-lock && \
   # Clean up
   rm /app/Pipfile && \
   pipenv --clear && \
