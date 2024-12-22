@@ -1264,7 +1264,7 @@ class Media(models.Model):
     @property
     def directory_path(self):
         dirname = self.source.directory_path / self.filename
-        return os.path.dirname(str(dirname))
+        return dirname.parent
 
     @property
     def filepath(self):
