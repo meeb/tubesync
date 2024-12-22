@@ -35,8 +35,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Find upstream ghcr slug
-        id: ghcrslug
+      - name: Find upstream GitHub slug
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
