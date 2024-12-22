@@ -138,6 +138,9 @@ COPY pip.conf /etc/pip.conf
 # Add Pipfile
 COPY Pipfile /app/Pipfile
 
+# Do not include compiled byte-code
+ENV PIP_ROOT_USER_ACTION='ignore' PIP_NO_COMPILE=1
+
 # Switch workdir to the the app
 WORKDIR /app
 
@@ -163,7 +166,7 @@ RUN set -x && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
   cp -at /tmp/ "${HOME}" && \
-  PIPENV_VERBOSITY=64 HOME="/tmp/${HOME#/}" pipenv install --system --skip-lock && \
+  PIPENV_VERBOSITY=64 HOME="/tmp/${HOME#/}" pipenv install --system --skip-lock --no-cache-dir && \
   # Clean up
   rm /app/Pipfile && \
   pipenv --clear && \
@@ -184,7 +187,7 @@ RUN set -x && \
   apt-get -y autoclean && \
   rm -rf /var/lib/apt/lists/* && \
   rm -rf /var/cache/apt/* && \
-  rm -rf /tmp/*
+  rm -rfv /tmp/*
 
 
 # Copy app
@@ -196,11 +199,12 @@ RUN set -x && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   rm -rf /app/db.sqlite3 && \
   # Run any required app commands
-  /usr/bin/python3 /app/manage.py compilescss && \
-  /usr/bin/python3 /app/manage.py collectstatic --no-input --link && \
+  /usr/bin/python3 -B /app/manage.py compilescss && \
+  /usr/bin/python3 -B /app/manage.py collectstatic --no-input --link && \
   # Create config, downloads and run dirs
   mkdir -v -p /run/app && \
   mkdir -v -p /config/media && \
+  mkdir -v -p /config/pycache && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video
 
@@ -219,7 +223,7 @@ COPY config/root /
 HEALTHCHECK --interval=1m --timeout=10s CMD /app/healthcheck.py http://127.0.0.1:8080/healthcheck
 
 # ENVS and ports
-ENV PYTHONPATH="/app"
+ENV PYTHONPATH="/app" PYTHONPYCACHEPREFIX="/config/pycache"
 EXPOSE 4848
 
 # Volumes
