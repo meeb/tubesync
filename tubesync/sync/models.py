@@ -1264,45 +1264,6 @@ class Media(models.Model):
         return media_format.format(**media_details)
 
     @property
-    def thumbname(self):
-        if self.downloaded and self.media_file:
-            filename = os.path.basename(self.media_file.path)
-        else:
-            filename = self.filename
-        prefix, ext = os.path.splitext(filename)
-        return f'{prefix}.jpg'
-
-    @property
-    def thumbpath(self):
-        return self.source.directory_path / self.thumbname
-
-    @property
-    def nfoname(self):
-        if self.downloaded and self.media_file:
-            filename = os.path.basename(self.media_file.path)
-        else:
-            filename = self.filename
-        prefix, ext = os.path.splitext(filename)
-        return f'{prefix}.nfo'
-    
-    @property
-    def nfopath(self):
-        return self.source.directory_path / self.nfoname
-
-    @property
-    def jsonname(self):
-        if self.downloaded and self.media_file:
-            filename = os.path.basename(self.media_file.path)
-        else:
-            filename = self.filename
-        prefix, ext = os.path.splitext(filename)
-        return f'{prefix}.info.json'
-    
-    @property
-    def jsonpath(self):
-        return self.source.directory_path / self.jsonname
-
-    @property
     def directory_path(self):
         dirname = self.source.directory_path / self.filename
         return os.path.dirname(str(dirname))
@@ -1310,6 +1271,45 @@ class Media(models.Model):
     @property
     def filepath(self):
         return self.source.directory_path / self.filename
+
+    @property
+    def thumbname(self):
+        if self.downloaded and self.media_file:
+            filename = self.media_file.path
+        else:
+            filename = self.filename
+        prefix, ext = os.path.splitext(os.path.basename(filename))
+        return f'{prefix}.jpg'
+
+    @property
+    def thumbpath(self):
+        return self.directory_path / self.thumbname
+
+    @property
+    def nfoname(self):
+        if self.downloaded and self.media_file:
+            filename = self.media_file.path
+        else:
+            filename = self.filename
+        prefix, ext = os.path.splitext(os.path.basename(filename))
+        return f'{prefix}.nfo'
+    
+    @property
+    def nfopath(self):
+        return self.directory_path / self.nfoname
+
+    @property
+    def jsonname(self):
+        if self.downloaded and self.media_file:
+            filename = self.media_file.path
+        else:
+            filename = self.filename
+        prefix, ext = os.path.splitext(os.path.basename(filename))
+        return f'{prefix}.info.json'
+    
+    @property
+    def jsonpath(self):
+        return self.directory_path / self.jsonname
 
     @property
     def thumb_file_exists(self):
