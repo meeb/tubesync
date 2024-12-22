@@ -41,13 +41,19 @@ jobs:
         env:
           DOCKER_REGISTRY: https://ghcr.io
           DOCKER_REGISTRY_USERNAME: ${{ github.actor }}
-          DOCKER_REGISTRY_PASSWORD: {{ secrets.GITHUB_TOKEN }}
+          DOCKER_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: docker login
       - name: Find upstream ghcr slug
         id: ghcrslug
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh api repos/:owner/:repo --jq .parent.full_name
+        run: |
+          {
+            delim='EOF' ;
+            printf -- 'GHCR_UPSTREAM_SLUG<<"%s"\n' "${delim}" ;
+            gh api repos/:owner/:repo --jq .parent.full_name ;
+            printf -- '%s\n' "${delim}" ;
+          } >> "$GITHUB_ENV"
       - name: Lowercase github username for ghcr
         id: string
         uses: ASzc/change-string-case-action@v1
