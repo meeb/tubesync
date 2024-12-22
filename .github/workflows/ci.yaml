@@ -51,8 +51,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
-            delim='EOF' ;
-            printf -- 'GHCR_UPSTREAM_SLUG<<"%s"\n' "${delim}" ;
+            delim='"GHCR_UPSTREAM_SLUG_EOF"' ;
+            printf -- 'GHCR_UPSTREAM_SLUG<<%s\n' "${delim}" ;
             gh api repos/:owner/:repo --jq .parent.full_name ;
             printf -- '%s\n' "${delim}" ;
           } >> "$GITHUB_ENV"
