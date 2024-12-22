@@ -14,10 +14,6 @@ def filter_media(instance: Media):
     # Assume we aren't skipping it, if any of these conditions are true, we skip it
     skip = False
 
-    # Check if it has already been marked as skipped
-    if instance.manual_skip:
-        skip = True
-
     # Check if it's published
     if not skip and filter_published(instance):
         skip = True
