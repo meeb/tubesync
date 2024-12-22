@@ -582,6 +582,8 @@ class MediaItemView(DetailView):
         data['video_exact'] = video_exact
         data['video_format'] = video_format
         data['youtube_dl_format'] = self.object.get_format_str()
+        data['filename_path'] = pathlib.Path(self.object.filename)
+        data['media_file_path'] = pathlib.Path(self.object.media_file.path) if self.object.media_file else None
         return data
 
 
