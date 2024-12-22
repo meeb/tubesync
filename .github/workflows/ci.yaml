@@ -43,6 +43,8 @@ jobs:
           DOCKER_REGISTRY_USERNAME: ${{ github.actor }}
           DOCKER_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: docker login
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Find upstream ghcr slug
         id: ghcrslug
         env:
