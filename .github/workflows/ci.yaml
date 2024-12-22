@@ -41,8 +41,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
-            var='GHCR_UPSTREAM_SLUG' ;
-            delim='"GHCR_UPSTREAM_SLUG_EOF"' ;
+            var='GH_UPSTREAM_SLUG' ;
+            delim='"'"${var}"'_EOF"' ;
             printf -- '%s<<%s\n' "${var}" "${delim}" ;
             gh api repos/:owner/:repo --jq .parent.full_name ;
             printf -- '%s\n' "${delim}" ;
@@ -50,7 +50,7 @@ jobs:
       - name: Upstream registry ref
         id: upstream
         run: |
-          user="$(printf -- '%s\n' "${GHCR_UPSTREAM_SLUG}" | cut -d '/' -f 1)"
+          user="$(printf -- '%s\n' "${GH_UPSTREAM_SLUG}" | cut -d '/' -f 1)"
           user_lowercase="$(printf -- '%s\n' "${user}" | awk '{print tolower($0);}')" ;
           printf -- 'ref=ghcr.io/%s/%s:latest\n' \
             "${user_lowercase}" "${IMAGE_NAME}" >> "$GITHUB_OUTPUT" ;
@@ -69,7 +69,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
       - name: Log into GitHub Container Registry
-        # run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
         run: echo '${{ secrets.GITHUB_TOKEN }}' | docker login --password-stdin --username '${{ github.actor }}' 'https://ghcr.io'
       - name: Build and push
         uses: docker/build-push-action@v2
@@ -77,7 +76,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.origin.outputs.tag }}
-          cache-from: type=registry,ref=${{ steps.origin.outputs.ref }}
+          cache-from: |
+            type=registry,ref=${{ steps.upstream.outputs.ref }}
+            type=registry,ref=${{ steps.origin.outputs.ref }}
           cache-to: type=inline
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
