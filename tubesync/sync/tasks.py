@@ -191,7 +191,10 @@ def index_source_task(source_id):
         media.source = source
         try:
             media.save()
-            log.info(f'Indexed media: {source} / {media}')
+            log.debug(f'Indexed media: {source} / {media}')
+            # log the new media instances
+            if media.created >= source.last_crawl:
+                log.info(f'Indexed new media: {source} / {media}')
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
     # Tack on a cleanup of old completed tasks
