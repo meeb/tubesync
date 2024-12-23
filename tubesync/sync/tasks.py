@@ -430,7 +430,7 @@ def download_media(media_id):
             copyfile(media.thumb.path, media.thumbpath)
         # If selected, write an NFO file
         if media.source.write_nfo:
-            log.info(f'Writing media NFO file to: to: {media.nfopath}')
+            log.info(f'Writing media NFO file to: {media.nfopath}')
             write_text_file(media.nfopath, media.nfoxml)
         # Schedule a task to update media servers
         for mediaserver in MediaServer.objects.all():
