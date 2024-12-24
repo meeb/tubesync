@@ -49,7 +49,7 @@ class Command(BaseCommand):
             for filepath, item in filemap.items():
                 log.info(f'Matched on-disk file: {filepath} '
                          f'to media item: {item.source} / {item}')
-                item.media_file.name = filepath
+                item.media_file.name = str(Path(filepath).relative_to(item.media_file.storage.location))
                 item.downloaded = True
                 item.save()
         log.info('Done')
