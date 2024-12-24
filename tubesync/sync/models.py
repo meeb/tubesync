@@ -1353,7 +1353,7 @@ class Media(models.Model):
         nfo.text = '\n  '
         # title = media metadata title
         title = nfo.makeelement('title', {})
-        title.text = clean_emoji(str(self.name).strip())
+        title.text = clean_emoji(self.title)
         title.tail = '\n  '
         nfo.append(title)
         # showtitle = source name
