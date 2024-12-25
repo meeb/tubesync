@@ -1501,7 +1501,16 @@ class Media(models.Model):
         if not callable(indexer):
             raise Exception(f'Media with source type f"{self.source.source_type}" '
                             f'has no indexer')
-        return indexer(self.url)
+        response = indexer(self.url)
+        no_formats_available = (
+            not response or
+            "formats" not in response.keys() or
+            0 == len(response["formats"])
+        )
+        if no_formats_available:
+            self.can_download = False
+            self.skip = True
+        return response
 
     def calculate_episode_number(self):
         if self.source.source_type == Source.SOURCE_TYPE_YOUTUBE_PLAYLIST:
