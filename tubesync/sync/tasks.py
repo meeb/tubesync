@@ -199,7 +199,7 @@ def index_source_task(source_id):
     # Tack on a cleanup of old media
     cleanup_old_media()
     if source.delete_removed_media:
-        log.info(f'Cleaning up media no longer in source {source}')
+        log.info(f'Cleaning up media no longer in source: {source}')
         cleanup_removed_media(source, videos)
 
 
@@ -236,7 +236,7 @@ def download_source_images(source_id):
                   f'source exists with ID: {source_id}')
         return
     avatar, banner = source.get_image_url
-    log.info(f'Thumbnail URL for source with ID: {source_id} '
+    log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
         f'Banner: {banner}')
     if banner != None:
@@ -269,7 +269,7 @@ def download_source_images(source_id):
             with open(file_path, 'wb') as f:
                 f.write(django_file.read())
 
-    log.info(f'Thumbnail downloaded for source with ID: {source_id}')
+    log.info(f'Thumbnail downloaded for source with ID: {source_id} / {source}')
 
 
 @background(schedule=0)
@@ -285,7 +285,7 @@ def download_media_metadata(media_id):
                   f'media exists with ID: {media_id}')
         return
     if media.manual_skip:
-        log.info(f'Task for ID: {media_id} skipped, due to task being manually skipped.')
+        log.info(f'Task for ID: {media_id} / {media} skipped, due to task being manually skipped.')
         return
     source = media.source
     metadata = media.index_metadata()
@@ -306,7 +306,7 @@ def download_media_metadata(media_id):
     # Don't filter media here, the post_save signal will handle that
     media.save()
     log.info(f'Saved {len(media.metadata)} bytes of metadata for: '
-             f'{source} / {media_id}')
+             f'{source} / {media}: {media_id}')
 
 
 @background(schedule=0)
