@@ -644,7 +644,7 @@ def get_media_thumb_path(instance, filename):
 
 
 def get_media_file_path(instance, filename):
-    return instance.filepath
+    return instance.filepath.relative_to(instance.media_file.storage.location)
 
 
 class Media(models.Model):
