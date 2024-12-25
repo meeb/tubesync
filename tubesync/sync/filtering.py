@@ -14,24 +14,28 @@ def filter_media(instance: Media):
     # Assume we aren't skipping it, if any of these conditions are true, we skip it
     skip = False
 
+    # Check if it has already been marked as skipped
+    if instance.manual_skip:
+        skip = True
+
     # Check if it's published
-    if filter_published(instance):
+    if not skip and filter_published(instance):
         skip = True
 
     # Check if older than max_cap_age, skip
-    if filter_max_cap(instance):
+    if not skip and filter_max_cap(instance):
         skip = True
 
     # Check if older than source_cutoff
-    if filter_source_cutoff(instance):
+    if not skip and filter_source_cutoff(instance):
         skip = True
 
     # Check if we have filter_text and filter text matches
-    if filter_filter_text(instance):
+    if not skip and filter_filter_text(instance):
         skip = True
 
     # Check if the video is longer than the max, or shorter than the min
-    if filter_duration(instance):
+    if not skip and filter_duration(instance):
         skip = True
 
     # If we aren't already skipping the file, call our custom function that can be overridden
@@ -118,10 +122,12 @@ def filter_max_cap(instance: Media):
         return False
 
     if instance.published <= max_cap_age:
-        log.info(
-            f"Media: {instance.source} / {instance} is too old for "
-            f"the download cap date, marking to be skipped"
-        )
+        # log new media instances, not every media instance every time
+        if not instance.skip:
+            log.info(
+                f"Media: {instance.source} / {instance} is too old for "
+                f"the download cap date, marking to be skipped"
+            )
         return True
 
     return False

@@ -44,8 +44,16 @@ if database_dict:
 else:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
+            'ENGINE': 'tubesync.sqlite3',
             'NAME': CONFIG_BASE_DIR / 'db.sqlite3',
+            "OPTIONS": {
+                "transaction_mode": "IMMEDIATE",
+                "init_command": """
+                    PRAGMA legacy_alter_table = OFF;
+                    PRAGMA auto_vacuum = INCREMENTAL;
+                    PRAGMA incremental_vacuum(100);
+                """,
+            },
         }
     }
     DATABASE_CONNECTION_STR = f'sqlite at "{DATABASES["default"]["NAME"]}"'
@@ -60,7 +68,7 @@ if BACKGROUND_TASK_ASYNC_THREADS > MAX_BACKGROUND_TASK_ASYNC_THREADS:
 
 MEDIA_ROOT = CONFIG_BASE_DIR / 'media'
 DOWNLOAD_ROOT = DOWNLOADS_BASE_DIR
-YOUTUBE_DL_CACHEDIR = CONFIG_BASE_DIR / 'cache'
+YOUTUBE_DL_CACHEDIR = CONFIG_BASE_DIR / 'cache/youtube'
 YOUTUBE_DL_TEMPDIR = DOWNLOAD_ROOT / 'cache'
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 
@@ -88,3 +96,13 @@ SOURCE_DOWNLOAD_DIRECTORY_PREFIX = True if SOURCE_DOWNLOAD_DIRECTORY_PREFIX_STR 
 
 
 VIDEO_HEIGHT_CUTOFF = int(os.getenv("TUBESYNC_VIDEO_HEIGHT_CUTOFF", "240"))
+
+
+# ensure that the current directory exists
+if not YOUTUBE_DL_CACHEDIR.is_dir():
+    YOUTUBE_DL_CACHEDIR.mkdir(parents=True)
+# rename any old yt_dlp cache directories to the current directory
+old_youtube_cache_dirs = list(YOUTUBE_DL_CACHEDIR.parent.glob('youtube-*'))
+for cache_dir in old_youtube_cache_dirs:
+    cache_dir.rename(YOUTUBE_DL_CACHEDIR / cache_dir.name)
+

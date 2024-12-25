@@ -50,6 +50,7 @@ def map_task_to_instance(task):
         'sync.tasks.download_media_thumbnail': Media,
         'sync.tasks.download_media': Media,
         'sync.tasks.save_all_media_for_source': Source,
+        'sync.tasks.rename_all_media_for_source': Source,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
@@ -146,12 +147,12 @@ def cleanup_old_media():
 
 
 def cleanup_removed_media(source, videos):
-    media_objects = Media.objects.filter(source=source, downloaded=True)
-    for item in media_objects:
-        matching_source_item = [video['id'] for video in videos if video['id'] == item.key]
+    media_objects = Media.objects.filter(source=source)
+    for media in media_objects:
+        matching_source_item = [video['id'] for video in videos if video['id'] == media.key]
         if not matching_source_item:
-            log.info(f'{item.title} is no longer in source, removing')
-            item.delete()
+            log.info(f'{media.name} is no longer in source, removing')
+            media.delete()
 
 
 @background(schedule=0)
@@ -191,7 +192,10 @@ def index_source_task(source_id):
         media.source = source
         try:
             media.save()
-            log.info(f'Indexed media: {source} / {media}')
+            log.debug(f'Indexed media: {source} / {media}')
+            # log the new media instances
+            if media.created >= source.last_crawl:
+                log.info(f'Indexed new media: {source} / {media}')
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
     # Tack on a cleanup of old completed tasks
@@ -199,7 +203,7 @@ def index_source_task(source_id):
     # Tack on a cleanup of old media
     cleanup_old_media()
     if source.delete_removed_media:
-        log.info(f'Cleaning up media no longer in source {source}')
+        log.info(f'Cleaning up media no longer in source: {source}')
         cleanup_removed_media(source, videos)
 
 
@@ -236,7 +240,7 @@ def download_source_images(source_id):
                   f'source exists with ID: {source_id}')
         return
     avatar, banner = source.get_image_url
-    log.info(f'Thumbnail URL for source with ID: {source_id} '
+    log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
         f'Banner: {banner}')
     if banner != None:
@@ -269,7 +273,7 @@ def download_source_images(source_id):
             with open(file_path, 'wb') as f:
                 f.write(django_file.read())
 
-    log.info(f'Thumbnail downloaded for source with ID: {source_id}')
+    log.info(f'Thumbnail downloaded for source with ID: {source_id} / {source}')
 
 
 @background(schedule=0)
@@ -285,7 +289,7 @@ def download_media_metadata(media_id):
                   f'media exists with ID: {media_id}')
         return
     if media.manual_skip:
-        log.info(f'Task for ID: {media_id} skipped, due to task being manually skipped.')
+        log.info(f'Task for ID: {media_id} / {media} skipped, due to task being manually skipped.')
         return
     source = media.source
     metadata = media.index_metadata()
@@ -306,7 +310,7 @@ def download_media_metadata(media_id):
     # Don't filter media here, the post_save signal will handle that
     media.save()
     log.info(f'Saved {len(media.metadata)} bytes of metadata for: '
-             f'{source} / {media_id}')
+             f'{source} / {media}: {media_id}')
 
 
 @background(schedule=0)
@@ -359,10 +363,10 @@ def download_media(media_id):
         return
     if media.skip:
         # Media was toggled to be skipped after the task was scheduled
-        log.warn(f'Download task triggered for  media: {media} (UUID: {media.pk}) but '
+        log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
                  f'it is now marked to be skipped, not downloading')
         return
-    if media.downloaded and media.media_file:
+    if media.downloaded and media.media_file and media.media_file.name:
         # Media has been marked as downloaded before the download_media task was fired,
         # skip it
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
@@ -430,7 +434,7 @@ def download_media(media_id):
             copyfile(media.thumb.path, media.thumbpath)
         # If selected, write an NFO file
         if media.source.write_nfo:
-            log.info(f'Writing media NFO file to: to: {media.nfopath}')
+            log.info(f'Writing media NFO file to: {media.nfopath}')
             write_text_file(media.nfopath, media.nfoxml)
         # Schedule a task to update media servers
         for mediaserver in MediaServer.objects.all():
@@ -446,7 +450,7 @@ def download_media(media_id):
     else:
         # Expected file doesn't exist on disk
         err = (f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
-               f'expected outfile does not exist: {media.filepath}')
+               f'expected outfile does not exist: {filepath}')
         log.error(err)
         # Raising an error here triggers the task to be re-attempted (or fail)
         raise DownloadFailedException(err)
@@ -486,3 +490,18 @@ def save_all_media_for_source(source_id):
     # flags may need to be recalculated
     for media in Media.objects.filter(source=source):
         media.save()
+
+
+@background(schedule=0)
+def rename_all_media_for_source(source_id):
+    try:
+        source = Source.objects.get(pk=source_id)
+    except Source.DoesNotExist:
+        # Task triggered but the source no longer exists, do nothing
+        log.error(f'Task rename_all_media_for_source(pk={source_id}) called but no '
+                  f'source exists with ID: {source_id}')
+        return
+    for media in Media.objects.filter(source=source):
+        media.rename_files()
+
+
