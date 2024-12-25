@@ -189,7 +189,7 @@ RUN set -x && \
   apt-get -y autoclean && \
   rm -rf /var/lib/apt/lists/* && \
   rm -rf /var/cache/apt/* && \
-  rm -rfv /tmp/*
+  rm -rf /tmp/*
 
 
 # Copy app
