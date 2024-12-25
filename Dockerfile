@@ -8,10 +8,10 @@ ARG SHA256_S6_AMD64="59289456ab1761e277bd456a95e737c06b03ede99158beb24f12b165a90
 ARG SHA256_S6_ARM64="8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f66f785"
 ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae"
 
-ARG FFMPEG_DATE="autobuild-2024-12-09-14-16"
-ARG FFMPEG_VERSION="118034-gd21134313f"
-ARG SHA256_FFMPEG_AMD64="cd50122fb0939e913585282347a8f95074c2d5477ceb059cd90aca551f14e9ea"
-ARG SHA256_FFMPEG_ARM64="33b4edebf9c23701473ba8db696b26072bb9b9c05fc4a156e115f94e44d361e0"
+ARG FFMPEG_DATE="autobuild-2024-12-24-14-15"
+ARG FFMPEG_VERSION="n7.1-62-gb168ed9b14"
+ARG SHA256_FFMPEG_AMD64="56f7ae56ee3cf5906006fb5845d963cae3580513a22d84236e82bc307c3d6fd5"
+ARG SHA256_FFMPEG_ARM64="2872f0ecfe791c9d9837b2563af4e77dc862c766abef5108c84e082cab5fad1f"
 
 ENV S6_VERSION="${S6_VERSION}" \
   FFMPEG_DATE="${FFMPEG_DATE}" \
@@ -49,12 +49,16 @@ RUN decide_arch() { \
     decide_url() { \
       case "${1}" in \
         (ffmpeg) printf -- \
-          'https://github.com/yt-dlp/FFmpeg-Builds/releases/download/%s/ffmpeg-N-%s-linux%s-gpl.tar.xz' \
+          'https://github.com/yt-dlp/FFmpeg-Builds/releases/download/%s/ffmpeg-%s-linux%s-gpl%s.tar.xz' \
           "${FFMPEG_DATE}" \
           "${FFMPEG_VERSION}" \
           "$(case "${2}" in \
             (amd64) printf -- '64' ;; \
             (*) printf -- '%s' "${2}" ;; \
+          esac)" \
+          "$(case "${FFMPEG_VERSION%%-*}" in \
+            (n*) printf -- '-%s\n' "${FFMPEG_VERSION#n}" | cut -d '-' -f 1,2 ;; \
+            (*) printf -- '' ;; \
           esac)" ;; \
         (s6) printf -- \
           'https://github.com/just-containers/s6-overlay/releases/download/v%s/s6-overlay-%s.tar.xz' \
