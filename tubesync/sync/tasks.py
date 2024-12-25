@@ -152,7 +152,7 @@ def cleanup_removed_media(source, videos):
         matching_source_item = [video['id'] for video in videos if video['id'] == media.key]
         if not matching_source_item:
             log.info(f'{media.name} is no longer in source, removing')
-            item.delete()
+            media.delete()
 
 
 @background(schedule=0)
