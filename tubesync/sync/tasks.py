@@ -146,12 +146,12 @@ def cleanup_old_media():
 
 
 def cleanup_removed_media(source, videos):
-    media_objects = Media.objects.filter(source=source, downloaded=True)
-    for item in media_objects:
-        matching_source_item = [video['id'] for video in videos if video['id'] == item.key]
+    media_objects = Media.objects.filter(source=source)
+    for media in media_objects:
+        matching_source_item = [video['id'] for video in videos if video['id'] == media.key]
         if not matching_source_item:
-            log.info(f'{item.title} is no longer in source, removing')
-            item.delete()
+            log.info(f'{media.name} is no longer in source, removing')
+            media.delete()
 
 
 @background(schedule=0)
