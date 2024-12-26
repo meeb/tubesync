@@ -597,11 +597,11 @@ class FilepathTestCase(TestCase):
         # Check child directories work
         self.source.media_format = '{yyyy}/{key}.{ext}'
         self.assertEqual(self.media.directory_path,
-                         str(self.source.directory_path / '2017'))
+                         self.source.directory_path / '2017')
         self.assertEqual(self.media.filename, '2017/mediakey.mkv')
         self.source.media_format = '{yyyy}/{yyyy_mm_dd}/{key}.{ext}'
         self.assertEqual(self.media.directory_path,
-                         str(self.source.directory_path / '2017/2017-09-11'))
+                         self.source.directory_path / '2017/2017-09-11')
         self.assertEqual(self.media.filename, '2017/2017-09-11/mediakey.mkv')
         # Check media specific media format keys work
         test_media = Media.objects.create(
