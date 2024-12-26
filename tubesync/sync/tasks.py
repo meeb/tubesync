@@ -49,6 +49,7 @@ def map_task_to_instance(task):
         'sync.tasks.check_source_directory_exists': Source,
         'sync.tasks.download_media_thumbnail': Media,
         'sync.tasks.download_media': Media,
+        'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
         'sync.tasks.rename_all_media_for_source': Source,
     }
@@ -118,6 +119,12 @@ def get_media_download_task(media_id):
     except IndexError:
         return False
 
+def get_media_metadata_task(media_id):
+    try:
+        return Task.objects.get_task('sync.tasks.download_media_metadata',
+                                     args=(str(media_id),))[0]
+    except IndexError:
+        return False
 
 def delete_task_by_source(task_name, source_id):
     return Task.objects.filter(task_name=task_name, queue=str(source_id)).delete()
@@ -194,7 +201,12 @@ def index_source_task(source_id):
             media.save()
             log.debug(f'Indexed media: {source} / {media}')
             # log the new media instances
-            if media.created >= source.last_crawl:
+            new_media_instance = (
+                media.created and
+                source.last_crawl and
+                media.created >= source.last_crawl
+            )
+            if new_media_instance:
                 log.info(f'Indexed new media: {source} / {media}')
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
