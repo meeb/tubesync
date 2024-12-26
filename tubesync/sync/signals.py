@@ -12,7 +12,8 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     download_media_thumbnail, download_media_metadata,
                     map_task_to_instance, check_source_directory_exists,
                     download_media, rescan_media_server, download_source_images,
-                    save_all_media_for_source, rename_all_media_for_source)
+                    save_all_media_for_source, rename_all_media_for_source,
+                    get_media_metadata_task)
 from .utils import delete_file
 from .filtering import filter_media
 
@@ -109,6 +110,10 @@ def task_task_failed(sender, task_id, completed_task, **kwargs):
         obj.has_failed = True
         obj.save()
 
+    if isinstance(obj, Media) and completed_task.task_name == "sync.tasks.download_media_metadata":
+        log.error(f'Permanent failure for media: {obj} task: {completed_task}')
+        obj.skip = True
+        obj.save()
 
 @receiver(post_save, sender=Media)
 def media_post_save(sender, instance, created, **kwargs):
@@ -140,7 +145,7 @@ def media_post_save(sender, instance, created, **kwargs):
         instance.save()
         post_save.connect(media_post_save, sender=Media)
     # If the media is missing metadata schedule it to be downloaded
-    if not instance.metadata:
+    if not instance.metadata and not instance.skip and not get_media_metadata_task(instance.pk):
         log.info(f'Scheduling task to download metadata for: {instance.url}')
         verbose_name = _('Downloading metadata for "{}"')
         download_media_metadata(

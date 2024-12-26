@@ -98,12 +98,19 @@
       {% if media.downloaded %}
       <tr title="The filename the media will be downloaded as">
         <td class="hide-on-small-only">Filename</td>
-        <td><span class="hide-on-med-and-up">Filename<br></span><strong>{{ media.filename }}</strong></td>
+        <td><span class="hide-on-med-and-up">Filename<br></span><strong>{{ filename_path.name }}</strong></td>
       </tr>
-      <tr title="The filename the media will be downloaded as">
+      <tr title="The directory the media will be downloaded to">
         <td class="hide-on-small-only">Directory</td>
         <td><span class="hide-on-med-and-up">Directory<br></span><strong>{{ media.directory_path }}</strong></td>
       </tr>
+      <tr title="The filepath the media was saved to">
+        <td class="hide-on-small-only">Database&nbsp;Filepath</td>
+        <td><span class="hide-on-med-and-up">DB&nbsp;Filepath<br></span><strong>{{ media_file_path }}</strong>
+          {% if media_file_path == media.filepath %}
+          <span class="green-text">&nbsp;(matched)</span>
+          {% endif %}
+        </td>                                                                   </tr>
       <tr title="Size of the file on disk">
         <td class="hide-on-small-only">File size</td>
         <td><span class="hide-on-med-and-up">File size<br></span><strong>{{ media.downloaded_filesize|filesizeformat }}</strong></td>
