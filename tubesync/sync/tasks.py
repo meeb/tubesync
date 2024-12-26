@@ -359,7 +359,7 @@ def download_media(media_id):
         return
     if media.skip:
         # Media was toggled to be skipped after the task was scheduled
-        log.warn(f'Download task triggered for  media: {media} (UUID: {media.pk}) but '
+        log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
                  f'it is now marked to be skipped, not downloading')
         return
     if media.downloaded and media.media_file:
@@ -430,7 +430,7 @@ def download_media(media_id):
             copyfile(media.thumb.path, media.thumbpath)
         # If selected, write an NFO file
         if media.source.write_nfo:
-            log.info(f'Writing media NFO file to: to: {media.nfopath}')
+            log.info(f'Writing media NFO file to: {media.nfopath}')
             write_text_file(media.nfopath, media.nfoxml)
         # Schedule a task to update media servers
         for mediaserver in MediaServer.objects.all():
@@ -446,7 +446,7 @@ def download_media(media_id):
     else:
         # Expected file doesn't exist on disk
         err = (f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
-               f'expected outfile does not exist: {media.filepath}')
+               f'expected outfile does not exist: {filepath}')
         log.error(err)
         # Raising an error here triggers the task to be re-attempted (or fail)
         raise DownloadFailedException(err)
