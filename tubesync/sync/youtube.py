@@ -82,6 +82,8 @@ def _subscriber_only(msg='', response=None):
             return True
         if ': Join this channel' in msg:
             return True
+        if 'Join this YouTube channel' in msg:
+            return True
     else:
         # ignore msg entirely
         if not isinstance(response, dict):
