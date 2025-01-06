@@ -154,7 +154,8 @@ def write_text_file(filepath, filedata):
         bytes_written = f.write(filedata)
     # chmod a+r temp_file
     old_mode = new_filepath.stat().st_mode
-    new_filepath.chmod(0o444 | old_mode)
+    if 0o444 != (0o444 & old_mode):
+        new_filepath.chmod(0o444 | old_mode)
     if not file_is_editable(new_filepath):
         new_filepath.unlink()
         raise ValueError(f'File cannot be edited or removed: {filepath}')

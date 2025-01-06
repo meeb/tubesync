@@ -447,7 +447,11 @@ def download_media(media_id):
         # If selected, write an NFO file
         if media.source.write_nfo:
             log.info(f'Writing media NFO file to: {media.nfopath}')
-            write_text_file(media.nfopath, media.nfoxml)
+            try:
+                write_text_file(media.nfopath, media.nfoxml)
+            except PermissionError as e:
+                log.warn(f'A permissions problem occured when writing the new media NFO file: {e.msg}')
+                pass
         # Schedule a task to update media servers
         for mediaserver in MediaServer.objects.all():
             log.info(f'Scheduling media server updates')
