@@ -176,7 +176,7 @@ def _url_keys(arg_dict, filter_func):
     for key in arg_dict.keys():
         if 'url' in key:
             result.update(
-                {key: (key, filter_func(key=key, url=arg_dict[key]),)}
+                {key: (filter_func(key=key, url=arg_dict[key]),)}
             )
     return result
 
@@ -184,9 +184,9 @@ def _url_keys(arg_dict, filter_func):
 def _drop_url_keys(arg_dict, key, filter_func):
     if key in arg_dict.keys():
         for val_dict in arg_dict[key]:
-            for url_key in _url_keys(val_dict, filter_func):
-                if url_key[1] is True:
-                    del val_dict[url_key[0]]
+            for url_key, remove in _url_keys(val_dict, filter_func).items():
+                if remove is True:
+                    del val_dict[url_key]
 
 
 def filter_response(response_dict):
