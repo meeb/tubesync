@@ -304,7 +304,7 @@ def download_media_metadata(media_id):
         return
     source = media.source
     metadata = media.index_metadata()
-    media.metadata = json.dumps(metadata, default=json_serial)
+    media.metadata = json.dumps(metadata, separators=(',', ':'), default=json_serial)
     upload_date = media.upload_date
     # Media must have a valid upload date
     if upload_date:
