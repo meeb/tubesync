@@ -1165,7 +1165,7 @@ class Media(models.Model):
             data = json.loads(self.metadata)
             if not isinstance(data, dict):
                 return {}
-            self.reduce_data(data)
+            self.reduce_data(json.loads(self.metadata))
             return data
         except Exception as e:
             return {}
