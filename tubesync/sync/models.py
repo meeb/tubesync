@@ -1163,7 +1163,7 @@ class Media(models.Model):
         try:
             self.reduce_data(json.loads(self.metadata))
         except Exception as e:
-            log.error(f'reduce_data: {e.msg}')
+            log.exception('reduce_data: %s', e)
             pass
 
         try:
