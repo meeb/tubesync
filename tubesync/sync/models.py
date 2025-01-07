@@ -1154,7 +1154,7 @@ class Media(models.Model):
         new_mdl = len(compact_metadata)
         if old_mdl > new_mdl:
             delta = old_mdl - new_mdl
-            log.info(f'{self.key}: metadata reduced by {delta,} characters ({old_mdl,} -> {new_mdl,})')
+            log.info(f'{self.key}: metadata reduced by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
 
 
     @property
