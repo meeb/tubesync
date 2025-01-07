@@ -202,6 +202,68 @@ def normalize_codec(codec_str):
     return result
 
 
+def _url_keys(arg_dict, filter_func):
+    result = {}
+    for key in arg_dict.keys():
+        if 'url' in key:
+            result.update(
+                {key: (key, filter_func(key=key, url=arg_dict[key]),)}
+            )
+    return result
+
+
+def _drop_url_keys(arg_dict, key, filter_func):
+    if key in arg_dict.keys():
+        for val_dict in arg_dict[key]:
+            for url_key in _url_keys(val_dict, filter_func):
+                if url_key[1] is True:
+                    del val_dict[url_key[0]]
+
+
+def filter_response(response_dict):
+    '''
+        Clean up the response so as to not store useless metadata in the database.
+    '''
+    # raise an exception for an unexpected argument type
+    if not isinstance(filedata, dict):
+        raise TypeError(f'filedata must be a dict, got "{type(filedata)}"')
+    # optimize the empty case
+    if not response_dict:
+        return response_dict
+
+    # beginning of formats cleanup {{{
+    # drop urls that expire, or restrict IPs
+    def drop_format_url(**kwargs):
+        url = kwargs['url']
+        return (
+            url
+            and '://' in url
+            and (
+                '/ip/' in url
+                or '/expire/' in url
+            )
+        )
+
+    _drop_url_keys(response_dict, 'formats', drop_format_url)
+    _drop_url_keys(response_dict, 'requested_formats', drop_format_url)
+    # end of formats cleanup }}}
+
+    # beginning of automatic_captions cleanup {{{
+    # drop urls that expire, or restrict IPs
+    def drop_auto_caption_url(**kwargs):
+        url = kwargs['url']
+        return (
+            url
+            and '://' in url
+            and '&expire=' in url
+        )
+
+    _drop_url_keys(response_dict, 'automatic_captions', drop_auto_caption_url)
+    # end of automatic_captions cleanup }}}
+
+    return response_dict
+
+
 def parse_media_format(format_dict):
     '''
         This parser primarily adapts the format dict returned by youtube-dl into a
