@@ -244,13 +244,13 @@ def filter_response(response_dict):
             )
         )
 
-    _drop_url_keys(response_dict, 'formats', drop_format_url)
-    _drop_url_keys(response_dict, 'requested_formats', drop_format_url)
+    for key in frozenset(('formats', 'requested_formats',)):
+        _drop_url_keys(response_dict, key, drop_format_url)
     # end of formats cleanup }}}
 
-    # beginning of automatic_captions cleanup {{{
-    # drop urls that expire, or restrict IPs
-    def drop_auto_caption_url(**kwargs):
+    # beginning of subtitles cleanup {{{
+    # drop urls that expire
+    def drop_subtitles_url(**kwargs):
         url = kwargs['url']
         return (
             url
@@ -258,12 +258,13 @@ def filter_response(response_dict):
             and '&expire=' in url
         )
 
-    ac_key = 'automatic_captions'
-    if ac_key in response_dict.keys():
-        ac_dict = response_dict[ac_key]
-        for lang_code in ac_dict:
-            _drop_url_keys(ac_dict, lang_code, drop_auto_caption_url)
-    # end of automatic_captions cleanup }}}
+    # beginning of automatic_captions cleanup {{{
+    for key in frozenset(('subtitles', 'automatic_captions',)):
+        if key in response_dict.keys():
+            key_dict = response_dict[key]
+            for lang_code in key_dict:
+                _drop_url_keys(key_dict, lang_code, drop_subtitles_url)
+    # end of subtitles cleanup }}}
 
     return response_dict
 
