@@ -207,7 +207,7 @@ def _url_keys(arg_dict, filter_func):
     for key in arg_dict.keys():
         if 'url' in key:
             result.update(
-                {key: (filter_func(key=key, url=arg_dict[key]),)}
+                {key: filter_func(key=key, url=arg_dict[key])}
             )
     return result
 
@@ -240,7 +240,9 @@ def filter_response(response_dict):
             and '://' in url
             and (
                 '/ip/' in url
+                or 'ip=' in url
                 or '/expire/' in url
+                or 'expire=' in url
             )
         )
 
