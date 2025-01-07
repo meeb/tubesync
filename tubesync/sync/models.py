@@ -19,7 +19,7 @@ from common.utils import clean_filename, clean_emoji
 from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media,
                       get_channel_image_info as get_youtube_channel_image_info)
-from .utils import seconds_to_timestr, parse_media_format
+from .utils import seconds_to_timestr, parse_media_format, filter_response
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
@@ -1143,12 +1143,27 @@ class Media(models.Model):
     def has_metadata(self):
         return self.metadata is not None
 
+
+    def reduce_data(self, data):
+        from common.logger import log
+        from common.utils import json_serial
+        # log the results of filtering / compacting on metadata size
+        filtered_data = filter_response(data)
+        compact_metadata = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
+        old_mdl = len(self.metadata)
+        new_mdl = len(compact_metadata)
+        if old_mdl > new_mdl:
+            delta = old_mdl - new_mdl
+            log.info(f'{self.key}: metadata reduced by {delta,} characters ({old_mdl,} -> {new_mdl,})')
+
+
     @property
     def loaded_metadata(self):
         try:
             data = json.loads(self.metadata)
             if not isinstance(data, dict):
                 return {}
+            self.reduce_data(data)
             return data
         except Exception as e:
             return {}
