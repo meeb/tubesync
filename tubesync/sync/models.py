@@ -1161,11 +1161,17 @@ class Media(models.Model):
 
     @property
     def loaded_metadata(self):
+        from common.logger import log
+        try:
+            self.reduce_data(json.loads(self.metadata))
+        except Exception as e:
+            log.error(f'reduce_data: {e.msg}')
+            pass
+
         try:
             data = json.loads(self.metadata)
             if not isinstance(data, dict):
                 return {}
-            self.reduce_data(json.loads(self.metadata))
             return data
         except Exception as e:
             return {}
