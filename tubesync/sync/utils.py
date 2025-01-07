@@ -244,8 +244,20 @@ def filter_response(response_dict):
             )
         )
 
+    # these format keys are not useful to us
+    drop_keys = frozenset((
+        'downloader_options',
+        'fragments',
+        'http_headers',
+        '__needs_testing',
+        '__working',
+    ))
     for key in frozenset(('formats', 'requested_formats',)):
         _drop_url_keys(response_dict, key, drop_format_url)
+        if key in response_dict.keys():
+            for format in response_dict[key]:
+                for drop_key in drop_keys:
+                    del format[drop_key]
     # end of formats cleanup }}}
 
     # beginning of subtitles cleanup {{{
@@ -258,7 +270,6 @@ def filter_response(response_dict):
             and '&expire=' in url
         )
 
-    # beginning of automatic_captions cleanup {{{
     for key in frozenset(('subtitles', 'automatic_captions',)):
         if key in response_dict.keys():
             key_dict = response_dict[key]
