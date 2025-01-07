@@ -225,8 +225,8 @@ def filter_response(response_dict):
         Clean up the response so as to not store useless metadata in the database.
     '''
     # raise an exception for an unexpected argument type
-    if not isinstance(filedata, dict):
-        raise TypeError(f'filedata must be a dict, got "{type(filedata)}"')
+    if not isinstance(response_dict, dict):
+        raise TypeError(f'response_dict must be a dict, got "{type(response_dict)}"')
     # optimize the empty case
     if not response_dict:
         return response_dict
@@ -258,7 +258,11 @@ def filter_response(response_dict):
             and '&expire=' in url
         )
 
-    _drop_url_keys(response_dict, 'automatic_captions', drop_auto_caption_url)
+    ac_key = 'automatic_captions'
+    if ac_key in response_dict.keys():
+        ac_dict = response_dict[ac_key]
+        for lang_code in ac_dict:
+            _drop_url_keys(ac_dict, lang_code, drop_auto_caption_url)
     # end of automatic_captions cleanup }}}
 
     return response_dict
