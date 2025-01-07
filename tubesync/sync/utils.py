@@ -257,7 +257,8 @@ def filter_response(response_dict):
         if key in response_dict.keys():
             for format in response_dict[key]:
                 for drop_key in drop_keys:
-                    del format[drop_key]
+                    if drop_key in format.keys():
+                        del format[drop_key]
     # end of formats cleanup }}}
 
     # beginning of subtitles cleanup {{{
