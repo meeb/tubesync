@@ -9,6 +9,7 @@ from pathlib import Path
 from django.conf import settings
 from copy import copy
 from common.logger import log
+from .utils import mkdir_p
 import yt_dlp
 
 
@@ -21,7 +22,7 @@ _youtubedl_tempdir = getattr(settings, 'YOUTUBE_DL_TEMPDIR', None)
 if _youtubedl_tempdir:
     _youtubedl_tempdir = str(_youtubedl_tempdir)
     _youtubedl_tempdir_path = Path(_youtubedl_tempdir)
-    _youtubedl_tempdir_path.mkdir(parents=True, exist_ok=True)
+    mkdir_p(_youtubedl_tempdir_path)
     (_youtubedl_tempdir_path / '.ignore').touch(exist_ok=True)
     _paths = _defaults.get('paths', {})
     _paths.update({ 'temp': _youtubedl_tempdir, })
