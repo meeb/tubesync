@@ -218,7 +218,7 @@ def filter_response(response_dict):
     # end of formats cleanup }}}
 
     # beginning of automatic_captions cleanup {{{
-    # drop urls that expire, or restrict IPs
+    # drop urls that expire
     def drop_auto_caption_url(**kwargs):
         url = kwargs['url']
         return (
