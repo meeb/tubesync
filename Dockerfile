@@ -1,4 +1,4 @@
-ARG FFMPEG_DATE="autobuild-2024-12-24-14-15"
+ARG FFMPEG_DATE="2024-12-24-14-15"
 ARG FFMPEG_VERSION="N-118163-g954d55c2a4"
 ARG SHA256_FFMPEG_AMD64="798a7e5a0724139e6bb70df8921522b23be27028f9f551dfa83c305ec4ffaf3a"
 ARG SHA256_FFMPEG_ARM64="c3e6cc0fec42cc7e3804014fbb02c1384a1a31ef13f6f9a36121f2e1216240c0"
@@ -129,7 +129,7 @@ RUN decide_arch() { \
       case "${1}" in \
         (ffmpeg) printf -- \
           'https://github.com/yt-dlp/FFmpeg-Builds/releases/download/%s/ffmpeg-%s-linux%s-gpl%s.tar.xz' \
-          "${FFMPEG_DATE}" \
+          "autobuild-${FFMPEG_DATE}" \
           "${FFMPEG_VERSION}" \
           "$(case "${2}" in \
             (amd64) printf -- '64' ;; \
