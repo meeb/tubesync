@@ -1,12 +1,83 @@
+ARG S6_VERSION="3.2.0.2"
+
+ARG SHA256_S6_AMD64="59289456ab1761e277bd456a95e737c06b03ede99158beb24f12b165a904f478"
+ARG SHA256_S6_ARM64="8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f66f785"
+ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae"
+
+ARG ALPINE_VERSION="latest"
+
+FROM alpine:${ALPINE_VERSION} AS s6-overlay-download
+RUN apk add --no-cache curl
+
+ARG S6_VERSION
+ARG S6_OVERLAY_VERSION="v${S6_VERSION}"
+
+ARG SHA256_S6_AMD64
+ARG SHA256_S6_ARM64
+ARG SHA256_S6_NOARCH
+
+RUN <<EOF
+    set -e
+
+    decide_expected() {
+      case "${1}" in
+        (amd64) printf -- '%s' "${SHA256_S6_AMD64}" ;;
+        (arm64) printf -- '%s' "${SHA256_S6_ARM64}" ;;
+        (noarch) printf -- '%s' "${SHA256_S6_NOARCH}" ;;
+      esac ;;
+    }
+
+    decide_url() {
+      printf -- \
+        'https://github.com/just-containers/s6-overlay/releases/download/v%s/s6-overlay-%s.tar.xz' \
+        "${S6_VERSION}" \
+        "$(case "${1:-$(uname -m)}" in
+          (amd64) printf -- 'x86_64' ;;
+          (arm64) printf -- 'aarch64' ;;
+          (armv7l) printf -- 'arm' ;;
+          (*) printf -- '%s' "${2}" ;;
+        esac)"
+    }
+
+    mkdir -v /downloaded /verified
+    cd /downloaded
+    for a in 'noarch' "${TARGETARCH}"
+    do
+      url="$(decide_url "${a}")"
+      curl \
+        --disable --remote-name-all --clobber --location --no-progress-meter \
+        --url "${url}" --url "${url}.sha256"
+
+      f="$(printf -- 's6-overlay-%s.tar.xz\n' "${a}")"
+      printf -- '%s  %s\n' "$(decide_expected "${a}")" "${f}" >| sha256
+      diff -us sha256 "${f}.sha256"
+      sha256sum -c < "${f}.sha256" || exit
+      sha256sum -c < sha256 || exit
+      ln -v "${f}" /verified/ || exit
+    done
+    unset -v a f url
+
+    mkdir -v /s6-overlay-rootfs
+    cd /s6-overlay-rootfs
+    for f in /verified/s6-overlay-*.tar.xz
+    do
+      tar -xpf "${f}" || exit
+    done
+    unset -v f
+EOF
+
+FROM scratch AS s6-overlay
+COPY --from=s6-overlay-download /s6-overlay-rootfs /
+
 FROM debian:bookworm-slim
 
 ARG TARGETARCH
 ARG TARGETPLATFORM
 
-ARG S6_VERSION="3.2.0.2"
-ARG SHA256_S6_AMD64="59289456ab1761e277bd456a95e737c06b03ede99158beb24f12b165a904f478"
-ARG SHA256_S6_ARM64="8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f66f785"
-ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae"
+ARG S6_VERSION
+ARG SHA256_S6_AMD64
+ARG SHA256_S6_ARM64
+ARG SHA256_S6_NOARCH
 
 ARG FFMPEG_DATE="autobuild-2024-12-24-14-15"
 ARG FFMPEG_VERSION="N-118163-g954d55c2a4"
@@ -26,6 +97,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
   S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
 
 # Install third party software
+COPY --from=s6-overlay / /
+
 # Reminder: the SHELL handles all variables
 RUN decide_arch() { \
       case "${TARGETARCH:=amd64}" in \
@@ -100,10 +173,10 @@ RUN decide_arch() { \
   # Install s6
   _file="/tmp/s6-overlay-noarch.tar.xz" && \
   download_expected_file s6 noarch "${_file}" && \
-  tar -C / -xpf "${_file}" && rm -f "${_file}" && \
+  #tar -C / -xpf "${_file}" && rm -f "${_file}" && \
   _file="/tmp/s6-overlay-${ARCH}.tar.xz" && \
   download_expected_file s6 "${TARGETARCH}" "${_file}" && \
-  tar -C / -xpf "${_file}" && rm -f "${_file}" && \
+  #tar -C / -xpf "${_file}" && rm -f "${_file}" && \
   file -L /command/s6-overlay-suexec && \
   # Install ffmpeg
   _file="/tmp/ffmpeg-${ARCH}.tar.xz" && \
