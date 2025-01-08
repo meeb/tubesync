@@ -112,7 +112,7 @@ RUN decide_arch() { \
   /usr/local/bin/ffmpeg -version && \
   file /usr/local/bin/ff* && \
   # Clean up
-  apt-get -y autoremove --purge curl file binutils xz-utils && \
+  apt-get -y autoremove --purge file binutils xz-utils && \
   rm -rf /var/lib/apt/lists/* && \
   rm -rf /var/cache/apt/* && \
   rm -rf /tmp/*
@@ -132,6 +132,8 @@ RUN set -x && \
   python3 \
   python3-wheel \
   redis-server \
+  curl \
+  less \
   && apt-get -y autoclean && \
   rm -rf /var/lib/apt/lists/* && \
   rm -rf /var/cache/apt/* && \
