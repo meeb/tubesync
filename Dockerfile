@@ -9,6 +9,8 @@ ARG ALPINE_VERSION="latest"
 FROM alpine:${ALPINE_VERSION} AS s6-overlay-download
 RUN apk add --no-cache curl
 
+ARG TARGETARCH
+
 ARG S6_VERSION
 ARG S6_OVERLAY_VERSION="v${S6_VERSION}"
 
