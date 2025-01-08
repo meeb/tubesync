@@ -1,3 +1,8 @@
+ARG FFMPEG_DATE="autobuild-2024-12-24-14-15"
+ARG FFMPEG_VERSION="N-118163-g954d55c2a4"
+ARG SHA256_FFMPEG_AMD64="798a7e5a0724139e6bb70df8921522b23be27028f9f551dfa83c305ec4ffaf3a"
+ARG SHA256_FFMPEG_ARM64="c3e6cc0fec42cc7e3804014fbb02c1384a1a31ef13f6f9a36121f2e1216240c0"
+
 ARG S6_VERSION="3.2.0.2"
 
 ARG SHA256_S6_AMD64="59289456ab1761e277bd456a95e737c06b03ede99158beb24f12b165a904f478"
@@ -84,14 +89,11 @@ ARG TARGETARCH
 ARG TARGETPLATFORM
 
 ARG S6_VERSION
-ARG SHA256_S6_AMD64
-ARG SHA256_S6_ARM64
-ARG SHA256_S6_NOARCH
 
-ARG FFMPEG_DATE="autobuild-2024-12-24-14-15"
-ARG FFMPEG_VERSION="N-118163-g954d55c2a4"
-ARG SHA256_FFMPEG_AMD64="798a7e5a0724139e6bb70df8921522b23be27028f9f551dfa83c305ec4ffaf3a"
-ARG SHA256_FFMPEG_ARM64="c3e6cc0fec42cc7e3804014fbb02c1384a1a31ef13f6f9a36121f2e1216240c0"
+ARG FFMPEG_DATE
+ARG FFMPEG_VERSION
+ARG SHA256_FFMPEG_AMD64
+ARG SHA256_FFMPEG_ARM64
 
 ENV S6_VERSION="${S6_VERSION}" \
   FFMPEG_DATE="${FFMPEG_DATE}" \
@@ -121,11 +123,6 @@ RUN decide_arch() { \
             (amd64) printf -- '%s' "${SHA256_FFMPEG_AMD64}" ;; \
             (arm64) printf -- '%s' "${SHA256_FFMPEG_ARM64}" ;; \
           esac ;; \
-        (s6) case "${2}" in \
-            (amd64) printf -- '%s' "${SHA256_S6_AMD64}" ;; \
-            (arm64) printf -- '%s' "${SHA256_S6_ARM64}" ;; \
-            (noarch) printf -- '%s' "${SHA256_S6_NOARCH}" ;; \
-          esac ;; \
       esac ; \
     } && \
     decide_url() { \
@@ -141,14 +138,6 @@ RUN decide_arch() { \
           "$(case "${FFMPEG_VERSION%%-*}" in \
             (n*) printf -- '-%s\n' "${FFMPEG_VERSION#n}" | cut -d '-' -f 1,2 ;; \
             (*) printf -- '' ;; \
-          esac)" ;; \
-        (s6) printf -- \
-          'https://github.com/just-containers/s6-overlay/releases/download/v%s/s6-overlay-%s.tar.xz' \
-          "${S6_VERSION}" \
-          "$(case "${2}" in \
-            (amd64) printf -- 'x86_64' ;; \
-            (arm64) printf -- 'aarch64' ;; \
-            (*) printf -- '%s' "${2}" ;; \
           esac)" ;; \
       esac ; \
     } && \
@@ -179,13 +168,7 @@ RUN decide_arch() { \
   locale-gen en_US.UTF-8 && \
   # Install required distro packages
   apt-get -y --no-install-recommends install curl ca-certificates file binutils xz-utils && \
-  # Install s6
-  _file="/tmp/s6-overlay-noarch.tar.xz" && \
-  download_expected_file s6 noarch "${_file}" && \
-  #tar -C / -xpf "${_file}" && rm -f "${_file}" && \
-  _file="/tmp/s6-overlay-${ARCH}.tar.xz" && \
-  download_expected_file s6 "${TARGETARCH}" "${_file}" && \
-  #tar -C / -xpf "${_file}" && rm -f "${_file}" && \
+  # Installed s6 (using COPY earlier)
   file -L /command/s6-overlay-suexec && \
   # Install ffmpeg
   _file="/tmp/ffmpeg-${ARCH}.tar.xz" && \
