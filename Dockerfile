@@ -24,7 +24,7 @@ RUN <<EOF
         (amd64) printf -- '%s' "${SHA256_S6_AMD64}" ;;
         (arm64) printf -- '%s' "${SHA256_S6_ARM64}" ;;
         (noarch) printf -- '%s' "${SHA256_S6_NOARCH}" ;;
-      esac ;;
+      esac
     }
 
     decide_url() {
