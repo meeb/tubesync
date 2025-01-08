@@ -239,7 +239,10 @@ def filter_response(response_dict):
         return (
             url
             and '://' in url
-            and '&expire=' in url
+            and (
+                '/expire/' in url
+                or '&expire=' in url
+            )
         )
 
     for key in frozenset(('subtitles', 'automatic_captions',)):
