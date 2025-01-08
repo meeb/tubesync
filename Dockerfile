@@ -35,7 +35,7 @@ RUN <<EOF
           (amd64) printf -- 'x86_64' ;;
           (arm64) printf -- 'aarch64' ;;
           (armv7l) printf -- 'arm' ;;
-          (*) printf -- '%s' "${2}" ;;
+          (*) printf -- '%s' "${1:-$(uname -m)}" ;;
         esac)"
     }
 
