@@ -9,17 +9,29 @@ ARG ALPINE_VERSION="latest"
 FROM alpine:${ALPINE_VERSION} AS s6-overlay-download
 RUN apk add --no-cache curl
 
-ARG TARGETARCH
-
 ARG S6_VERSION
-ARG S6_OVERLAY_VERSION="v${S6_VERSION}"
 
 ARG SHA256_S6_AMD64
 ARG SHA256_S6_ARM64
 ARG SHA256_S6_NOARCH
 
+ARG TARGETARCH
+
 RUN <<EOF
-    set -ex
+    set -eux
+
+    decide_arch() {
+      local arg1
+      arg1="${1:-$(uname -m)}"
+
+      case "${arg1}" in
+          (amd64) printf -- 'x86_64' ;;
+          (arm64) printf -- 'aarch64' ;;
+          (armv7l) printf -- 'arm' ;;
+          (*) printf -- '%s' "${arg1}" ;;
+      esac
+      unset -v arg1
+    }
 
     decide_expected() {
       case "${1}" in
@@ -33,12 +45,7 @@ RUN <<EOF
       printf -- \
         'https://github.com/just-containers/s6-overlay/releases/download/v%s/s6-overlay-%s.tar.xz' \
         "${S6_VERSION}" \
-        "$(case "${1:-$(uname -m)}" in
-          (amd64) printf -- 'x86_64' ;;
-          (arm64) printf -- 'aarch64' ;;
-          (armv7l) printf -- 'arm' ;;
-          (*) printf -- '%s' "${1:-$(uname -m)}" ;;
-        esac)"
+        "$(decide_arch "${1}")"
     }
 
     mkdir -v /downloaded /verified
@@ -50,7 +57,7 @@ RUN <<EOF
         --disable --remote-name-all --clobber --location --no-progress-meter \
         --url "${url}" --url "${url}.sha256"
 
-      f="$(printf -- 's6-overlay-%s.tar.xz\n' "${a}")"
+      f="$(printf -- 's6-overlay-%s.tar.xz' "$(decide_arch "${a}")")"
       printf -- '%s  %s\n' "$(decide_expected "${a}")" "${f}" >| sha256
       diff -us sha256 "${f}.sha256"
       sha256sum -c < "${f}.sha256" || exit
