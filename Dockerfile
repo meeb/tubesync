@@ -17,7 +17,7 @@ ARG SHA256_S6_ARM64
 ARG SHA256_S6_NOARCH
 
 RUN <<EOF
-    set -e
+    set -ex
 
     decide_expected() {
       case "${1}" in
