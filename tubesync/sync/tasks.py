@@ -8,6 +8,7 @@ import os
 import json
 import math
 import uuid
+from copy import deepcopy
 from io import BytesIO
 from hashlib import sha1
 from datetime import timedelta, datetime
@@ -26,7 +27,7 @@ from common.errors import NoMediaException, DownloadFailedException
 from common.utils import json_serial
 from .models import Source, Media, MediaServer
 from .utils import (get_remote_image, resize_image_to_height, delete_file,
-                    write_text_file)
+                    write_text_file, filter_response)
 from .filtering import filter_media
 
 
@@ -304,7 +305,11 @@ def download_media_metadata(media_id):
         return
     source = media.source
     metadata = media.index_metadata()
-    media.metadata = json.dumps(metadata, separators=(',', ':'), default=json_serial)
+    if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
+        response = filter_response(deepcopy(metadata))
+    else:
+        response = metadata
+    media.metadata = json.dumps(response, separators=(',', ':'), default=json_serial)
     upload_date = media.upload_date
     # Media must have a valid upload date
     if upload_date:
