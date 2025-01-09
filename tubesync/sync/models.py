@@ -1154,7 +1154,7 @@ class Media(models.Model):
             data = json.loads(self.metadata or "")
             compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
             
-            filtered_data = filter_response(data)
+            filtered_data = filter_response(data, True)
             filtered_json = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
         except Exception as e:
             log.exception('reduce_data: %s', e)
