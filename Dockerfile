@@ -12,22 +12,24 @@ ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4f
 ARG ALPINE_VERSION="latest"
 
 FROM scratch AS s6-overlay-download
+ARG DESTDIR="/downloaded"
+
 ARG S6_VERSION
 ARG S6_OVERLAY_URL="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}"
 
-ADD "${S6_OVERLAY_URL}/s6-overlay-x86_64.tar.xz.sha256" /downloaded/
-ADD "${S6_OVERLAY_URL}/s6-overlay-aarch64.tar.xz.sha256" /downloaded/
-ADD "${S6_OVERLAY_URL}/s6-overlay-noarch.tar.xz.sha256" /downloaded/
+ADD --link "${S6_OVERLAY_URL}/s6-overlay-x86_64.tar.xz.sha256" "${DESTDIR}/"
+ADD --link "${S6_OVERLAY_URL}/s6-overlay-aarch64.tar.xz.sha256" "${DESTDIR}/"
+ADD --link "${S6_OVERLAY_URL}/s6-overlay-noarch.tar.xz.sha256" "${DESTDIR}/"
 
 ARG SHA256_S6_AMD64
 ARG SHA256_S6_ARM64
 ARG SHA256_S6_NOARCH
-ADD "--checksum=sha256:${SHA256_S6_AMD64}" "${S6_OVERLAY_URL}/s6-overlay-x86_64.tar.xz" /downloaded/
-ADD "--checksum=sha256:${SHA256_S6_ARM64}" "${S6_OVERLAY_URL}/s6-overlay-aarch64.tar.xz" /downloaded/
-ADD "--checksum=sha256:${SHA256_S6_NOARCH}" "${S6_OVERLAY_URL}/s6-overlay-noarch.tar.xz" /downloaded/
+ADD --link --checksum="sha256:${SHA256_S6_AMD64}" "${S6_OVERLAY_URL}/s6-overlay-x86_64.tar.xz" "${DESTDIR}/"
+ADD --link --checksum="sha256:${SHA256_S6_ARM64}" "${S6_OVERLAY_URL}/s6-overlay-aarch64.tar.xz" "${DESTDIR}/"
+ADD --link --checksum="sha256:${SHA256_S6_NOARCH}" "${S6_OVERLAY_URL}/s6-overlay-noarch.tar.xz" "${DESTDIR}/"
 
 FROM alpine:${ALPINE_VERSION} AS s6-overlay-extracted
-COPY --link --from=s6-overlay-download /downloaded /downloaded
+COPY --from=s6-overlay-download /downloaded /downloaded
 
 RUN <<EOF
     set -eux
