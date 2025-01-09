@@ -204,9 +204,6 @@ RUN set -x && \
 # Copy over pip.conf to use piwheels
 COPY pip.conf /etc/pip.conf
 
-# Add Pipfile
-COPY Pipfile /app/Pipfile
-
 # Do not include compiled byte-code
 ENV PIP_NO_COMPILE=1 \
   PIP_NO_CACHE_DIR=1 \
@@ -216,7 +213,8 @@ ENV PIP_NO_COMPILE=1 \
 WORKDIR /app
 
 # Set up the app
-RUN set -x && \
+RUN --mount=type=bind,source=Pipfile,target=/app/Pipfile \ 
+  set -x && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -239,7 +237,6 @@ RUN set -x && \
   cp -at /tmp/ "${HOME}" && \
   PIPENV_VERBOSITY=64 HOME="/tmp/${HOME#/}" pipenv install --system --skip-lock && \
   # Clean up
-  rm /app/Pipfile && \
   pipenv --clear && \
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
