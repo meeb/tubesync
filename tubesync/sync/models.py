@@ -1152,7 +1152,7 @@ class Media(models.Model):
 
             old_mdl = len(self.metadata or "")
             data = json.loads(self.metadata or "")
-            compact_data = json.dumps(data, separators=(',', ':'), default=json_serial)
+            compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
             
             filtered_data = filter_response(data)
             filtered_json = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
@@ -1160,7 +1160,7 @@ class Media(models.Model):
             log.exception('reduce_data: %s', e)
         else:
             # log the results of filtering / compacting on metadata size
-            new_mdl = len(compact_data)
+            new_mdl = len(compact_json)
             if old_mdl > new_mdl:
                 delta = old_mdl - new_mdl
                 log.info(f'{self.key}: metadata compacted by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
