@@ -109,9 +109,10 @@ RUN decide_arch() { \
   _file="/tmp/ffmpeg-${ARCH}.tar.xz" && \
   download_expected_file ffmpeg "${TARGETARCH}" "${_file}" && \
   tar -xvvpf "${_file}" --strip-components=2 --no-anchored -C /usr/local/bin/ "ffmpeg" "ffprobe" && rm -f "${_file}" && \
+  /usr/local/bin/ffmpeg -version && \
   file /usr/local/bin/ff* && \
   # Clean up
-  apt-get -y autoremove --purge curl file binutils xz-utils && \
+  apt-get -y autoremove --purge file binutils xz-utils && \
   rm -rf /var/lib/apt/lists/* && \
   rm -rf /var/cache/apt/* && \
   rm -rf /tmp/*
@@ -131,6 +132,8 @@ RUN set -x && \
   python3 \
   python3-wheel \
   redis-server \
+  curl \
+  less \
   && apt-get -y autoclean && \
   rm -rf /var/lib/apt/lists/* && \
   rm -rf /var/cache/apt/* && \
@@ -217,10 +220,9 @@ RUN set -x && \
 
 # Append software versions
 RUN set -x && \
-  /usr/local/bin/ffmpeg -version && \
-  FFMPEG_VERSION=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
-  test -n "${FFMPEG_VERSION}" && \
-  printf -- "ffmpeg_version = '%s'\n" "${FFMPEG_VERSION}" >> /app/common/third_party_versions.py
+  ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
+  test -n "${ffmpeg_version}" && \
+  printf -- "ffmpeg_version = '%s'\n" "${ffmpeg_version}" >> /app/common/third_party_versions.py
 
 # Copy root
 COPY config/root /
