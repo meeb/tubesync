@@ -11,69 +11,40 @@ ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4f
 
 ARG ALPINE_VERSION="latest"
 
-FROM alpine:${ALPINE_VERSION} AS s6-overlay-download
-RUN apk add --no-cache curl
-
+FROM scratch AS s6-overlay-download-v${S6_VERSION}
 ARG S6_VERSION
+ARG S6_OVERLAY_URL="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}"
+
+ADD "${S6_OVERLAY_URL}/s6-overlay-x86_64.tar.xz.sha256" /downloaded/
+ADD "${S6_OVERLAY_URL}/s6-overlay-aarch64.tar.xz.sha256" /downloaded/
+ADD "${S6_OVERLAY_URL}/s6-overlay-noarch.tar.xz.sha256" /downloaded/
 
 ARG SHA256_S6_AMD64
 ARG SHA256_S6_ARM64
 ARG SHA256_S6_NOARCH
+ADD "--checksum=sha256:${SHA256_S6_AMD64}" "${S6_OVERLAY_URL}/s6-overlay-x86_64.tar.xz" /downloaded/
+ADD "--checksum=sha256:${SHA256_S6_ARM64}" "${S6_OVERLAY_URL}/s6-overlay-aarch64.tar.xz" /downloaded/
+ADD "--checksum=sha256:${SHA256_S6_NOARCH}" "${S6_OVERLAY_URL}/s6-overlay-noarch.tar.xz" /downloaded/
 
-ARG TARGETARCH
+FROM alpine:${ALPINE_VERSION} AS s6-overlay-extracted
+ARG S6_VERSION
+COPY --link --from="s6-overlay-download-v${S6_VERSION}" /downloaded /downloaded
 
 RUN <<EOF
     set -eux
 
-    decide_arch() {
-      local arg1
-      arg1="${1:-$(uname -m)}"
-
-      case "${arg1}" in
-          (amd64) printf -- 'x86_64' ;;
-          (arm64) printf -- 'aarch64' ;;
-          (armv7l) printf -- 'arm' ;;
-          (*) printf -- '%s' "${arg1}" ;;
-      esac
-      unset -v arg1
-    }
-
-    decide_expected() {
-      case "${1}" in
-        (amd64) printf -- '%s' "${SHA256_S6_AMD64}" ;;
-        (arm64) printf -- '%s' "${SHA256_S6_ARM64}" ;;
-        (noarch) printf -- '%s' "${SHA256_S6_NOARCH}" ;;
-      esac
-    }
-
-    decide_url() {
-      printf -- \
-        'https://github.com/just-containers/s6-overlay/releases/download/v%s/s6-overlay-%s.tar.xz' \
-        "${S6_VERSION}" \
-        "$(decide_arch "${1}")"
-    }
-
-    mkdir -v /downloaded /verified
+    mkdir -v /verified
     cd /downloaded
-    for a in 'noarch' "${TARGETARCH}"
+    for f in *.sha256
     do
-      url="$(decide_url "${a}")"
-      curl \
-        --disable --remote-name-all --clobber --location --no-progress-meter \
-        --url "${url}" --url "${url}.sha256"
-
-      f="$(printf -- 's6-overlay-%s.tar.xz' "$(decide_arch "${a}")")"
-      printf -- '%s  %s\n' "$(decide_expected "${a}")" "${f}" >| sha256
-      diff -us sha256 "${f}.sha256"
-      sha256sum -c < "${f}.sha256" || exit
-      sha256sum -c < sha256 || exit
-      ln -v "${f}" /verified/ || exit
+      sha256sum -c < "${f}" || exit
+      ln -v "${f%.sha256}" /verified/ || exit
     done
-    unset -v a f url
+    unset -v f
 
     mkdir -v /s6-overlay-rootfs
     cd /s6-overlay-rootfs
-    for f in /verified/s6-overlay-*.tar.xz
+    for f in /verified/*.tar*
     do
       tar -xpf "${f}" || exit
     done
@@ -81,7 +52,7 @@ RUN <<EOF
 EOF
 
 FROM scratch AS s6-overlay
-COPY --from=s6-overlay-download /s6-overlay-rootfs /
+COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
 FROM debian:bookworm-slim
 
