@@ -8,7 +8,6 @@ import os
 import json
 import math
 import uuid
-from copy import deepcopy
 from io import BytesIO
 from hashlib import sha1
 from datetime import timedelta, datetime
@@ -305,10 +304,9 @@ def download_media_metadata(media_id):
         return
     source = media.source
     metadata = media.index_metadata()
+    response = metadata
     if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
-        response = filter_response(deepcopy(metadata))
-    else:
-        response = metadata
+        response = filter_response(metadata, True)
     media.metadata = json.dumps(response, separators=(',', ':'), default=json_serial)
     upload_date = media.upload_date
     # Media must have a valid upload date
