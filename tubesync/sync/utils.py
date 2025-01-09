@@ -1,6 +1,7 @@
 import os
 import re
 import math
+from copy import deepcopy
 from operator import itemgetter
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -220,13 +221,18 @@ def _drop_url_keys(arg_dict, key, filter_func):
                     del val_dict[url_key]
 
 
-def filter_response(response_dict):
+def filter_response(arg_dict, copy_arg=False):
     '''
         Clean up the response so as to not store useless metadata in the database.
     '''
+    response_dict = arg_dict
     # raise an exception for an unexpected argument type
     if not isinstance(response_dict, dict):
         raise TypeError(f'response_dict must be a dict, got "{type(response_dict)}"')
+
+    if copy_arg:
+        response_dict = deepcopy(arg_dict)
+
     # optimize the empty case
     if not response_dict:
         return response_dict
