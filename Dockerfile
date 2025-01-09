@@ -12,22 +12,33 @@ ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4f
 ARG ALPINE_VERSION="latest"
 
 FROM scratch AS s6-overlay-download
-ARG DESTDIR="/downloaded"
-ARG CHECKSUM_ALGORITHM="sha256"
-
 ARG S6_VERSION
-ARG S6_OVERLAY_URL="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}"
-
-ADD --link "${S6_OVERLAY_URL}/s6-overlay-x86_64.tar.xz.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
-ADD --link "${S6_OVERLAY_URL}/s6-overlay-aarch64.tar.xz.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
-ADD --link "${S6_OVERLAY_URL}/s6-overlay-noarch.tar.xz.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
-
 ARG SHA256_S6_AMD64
 ARG SHA256_S6_ARM64
 ARG SHA256_S6_NOARCH
-ADD --link --checksum="${CHECKSUM_ALGORITHM}:${SHA256_S6_AMD64}" "${S6_OVERLAY_URL}/s6-overlay-x86_64.tar.xz" "${DESTDIR}/"
-ADD --link --checksum="${CHECKSUM_ALGORITHM}:${SHA256_S6_ARM64}" "${S6_OVERLAY_URL}/s6-overlay-aarch64.tar.xz" "${DESTDIR}/"
-ADD --link --checksum="${CHECKSUM_ALGORITHM}:${SHA256_S6_NOARCH}" "${S6_OVERLAY_URL}/s6-overlay-noarch.tar.xz" "${DESTDIR}/"
+
+ARG DESTDIR="/downloaded"
+ARG CHECKSUM_ALGORITHM="sha256"
+
+ARG S6_HASH_AMD64="${SHA256_S6_AMD64}"
+ARG S6_HASH_ARM64="${SHA256_S6_ARM64}"
+ARG S6_HASH_NOARCH="${SHA256_S6_NOARCH}"
+
+ARG S6_OVERLAY_URL="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}"
+ARG S6_PREFIX_FILE="s6-overlay-"
+ARG S6_SUFFIX_FILE=".tar.xz"
+
+ARG S6_FILE_AMD64="${S6_PREFIX_FILE}x86_64${S6_SUFFIX_FILE}"
+ARG S6_FILE_ARM64="${S6_PREFIX_FILE}aarch64${S6_SUFFIX_FILE}"
+ARG S6_FILE_NOARCH="${S6_PREFIX_FILE}noarch${S6_SUFFIX_FILE}"
+
+ADD --link "${S6_OVERLAY_URL}/${S6_FILE_AMD64}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
+ADD --link "${S6_OVERLAY_URL}/${S6_FILE_ARM64}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
+ADD --link "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
+
+ADD --link --checksum="${CHECKSUM_ALGORITHM}:${S6_HASH_AMD64}" "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" "${DESTDIR}/"
+ADD --link --checksum="${CHECKSUM_ALGORITHM}:${S6_HASH_ARM64}" "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
+ADD --link --checksum="${CHECKSUM_ALGORITHM}:${S6_HASH_NOARCH}" "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
 
 FROM alpine:${ALPINE_VERSION} AS s6-overlay-extracted
 COPY --from=s6-overlay-download /downloaded /downloaded
