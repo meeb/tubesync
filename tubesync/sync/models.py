@@ -1144,28 +1144,35 @@ class Media(models.Model):
         return self.metadata is not None
 
 
-    def reduce_data(self, data):
-        from common.logger import log
-        from common.utils import json_serial
-        # log the results of filtering / compacting on metadata size
-        filtered_data = filter_response(data)
-        compact_metadata = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
-        old_mdl = len(self.metadata)
-        new_mdl = len(compact_metadata)
-        if old_mdl > new_mdl:
-            delta = old_mdl - new_mdl
-            log.info(f'{self.key}: metadata reduced by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
+    @property
+    def reduce_data(self):
+        try:
+            from common.logger import log
+            from common.utils import json_serial
+
+            old_mdl = len(self.metadata or "")
+            data = json.loads(self.metadata or "")
+            compact_data = json.dumps(data, separators=(',', ':'), default=json_serial)
+            
+            filtered_data = filter_response(data)
+            filtered_json = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
+        except Exception as e:
+            log.exception('reduce_data: %s', e)
+        else:
+            # log the results of filtering / compacting on metadata size
+            new_mdl = len(compact_data)
+            if old_mdl > new_mdl:
+                delta = old_mdl - new_mdl
+                log.info(f'{self.key}: metadata compacted by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
+            new_mdl = len(filtered_json)
+            if old_mdl > new_mdl:
+                delta = old_mdl - new_mdl
+                log.info(f'{self.key}: metadata reduced by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
 
 
     @property
     def loaded_metadata(self):
-        from common.logger import log
-        try:
-            self.reduce_data(json.loads(self.metadata))
-        except Exception as e:
-            log.exception('reduce_data: %s', e)
-            pass
-
+        self.reduce_data
         try:
             data = json.loads(self.metadata)
             if not isinstance(data, dict):
