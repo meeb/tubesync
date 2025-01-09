@@ -31,8 +31,23 @@ ADD --link --checksum="sha256:${SHA256_S6_NOARCH}" "${S6_OVERLAY_URL}/s6-overlay
 FROM alpine:${ALPINE_VERSION} AS s6-overlay-extracted
 COPY --from=s6-overlay-download /downloaded /downloaded
 
+ARG TARGETARCH
+
 RUN <<EOF
-    set -eux
+    set -eu
+
+    decide_arch() {
+      local arg1
+      arg1="${1:-$(uname -m)}"
+
+      case "${arg1}" in
+        (amd64) printf -- 'x86_64' ;;
+        (arm64) printf -- 'aarch64' ;;
+        (armv7l) printf -- 'arm' ;;
+        (*) printf -- '%s' "${arg1}" ;;
+      esac
+      unset -v arg1
+    }
 
     mkdir -v /verified
     cd /downloaded
@@ -47,7 +62,10 @@ RUN <<EOF
     cd /s6-overlay-rootfs
     for f in /verified/*.tar*
     do
-      tar -xpf "${f}" || exit
+      case "${f}" in
+        (*-noarch.tar*|*-"$(decide_arch "${TARGETARCH}")".tar*)
+          tar -xvvpf "${f}" || exit ;;
+      esac
     done
     unset -v f
 EOF
