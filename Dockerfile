@@ -11,77 +11,82 @@ ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4f
 
 ARG ALPINE_VERSION="latest"
 
-FROM alpine:${ALPINE_VERSION} AS s6-overlay-download
-RUN apk add --no-cache curl
-
+FROM scratch AS s6-overlay-download
 ARG S6_VERSION
-
 ARG SHA256_S6_AMD64
 ARG SHA256_S6_ARM64
 ARG SHA256_S6_NOARCH
 
+ARG DESTDIR="/downloaded"
+ARG CHECKSUM_ALGORITHM="sha256"
+
+ARG S6_CHECKSUM_AMD64="${CHECKSUM_ALGORITHM}:${SHA256_S6_AMD64}"
+ARG S6_CHECKSUM_ARM64="${CHECKSUM_ALGORITHM}:${SHA256_S6_ARM64}"
+ARG S6_CHECKSUM_NOARCH="${CHECKSUM_ALGORITHM}:${SHA256_S6_NOARCH}"
+
+ARG S6_OVERLAY_URL="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}"
+ARG S6_PREFIX_FILE="s6-overlay-"
+ARG S6_SUFFIX_FILE=".tar.xz"
+
+ARG S6_FILE_AMD64="${S6_PREFIX_FILE}x86_64${S6_SUFFIX_FILE}"
+ARG S6_FILE_ARM64="${S6_PREFIX_FILE}aarch64${S6_SUFFIX_FILE}"
+ARG S6_FILE_NOARCH="${S6_PREFIX_FILE}noarch${S6_SUFFIX_FILE}"
+
+ADD --link "${S6_OVERLAY_URL}/${S6_FILE_AMD64}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
+ADD --link "${S6_OVERLAY_URL}/${S6_FILE_ARM64}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
+ADD --link "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
+
+ADD --link --checksum="${S6_CHECKSUM_AMD64}" "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" "${DESTDIR}/"
+ADD --link --checksum="${S6_CHECKSUM_ARM64}" "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
+ADD --link --checksum="${S6_CHECKSUM_NOARCH}" "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
+
+FROM alpine:${ALPINE_VERSION} AS s6-overlay-extracted
+COPY --from=s6-overlay-download /downloaded /downloaded
+
 ARG TARGETARCH
 
 RUN <<EOF
-    set -eux
+    set -eu
 
     decide_arch() {
       local arg1
       arg1="${1:-$(uname -m)}"
 
       case "${arg1}" in
-          (amd64) printf -- 'x86_64' ;;
-          (arm64) printf -- 'aarch64' ;;
-          (armv7l) printf -- 'arm' ;;
-          (*) printf -- '%s' "${arg1}" ;;
+        (amd64) printf -- 'x86_64' ;;
+        (arm64) printf -- 'aarch64' ;;
+        (armv7l) printf -- 'arm' ;;
+        (*) printf -- '%s' "${arg1}" ;;
       esac
       unset -v arg1
     }
 
-    decide_expected() {
-      case "${1}" in
-        (amd64) printf -- '%s' "${SHA256_S6_AMD64}" ;;
-        (arm64) printf -- '%s' "${SHA256_S6_ARM64}" ;;
-        (noarch) printf -- '%s' "${SHA256_S6_NOARCH}" ;;
-      esac
-    }
-
-    decide_url() {
-      printf -- \
-        'https://github.com/just-containers/s6-overlay/releases/download/v%s/s6-overlay-%s.tar.xz' \
-        "${S6_VERSION}" \
-        "$(decide_arch "${1}")"
-    }
-
-    mkdir -v /downloaded /verified
+    mkdir -v /verified
     cd /downloaded
-    for a in 'noarch' "${TARGETARCH}"
+    for f in *.sha256
     do
-      url="$(decide_url "${a}")"
-      curl \
-        --disable --remote-name-all --clobber --location --no-progress-meter \
-        --url "${url}" --url "${url}.sha256"
-
-      f="$(printf -- 's6-overlay-%s.tar.xz' "$(decide_arch "${a}")")"
-      printf -- '%s  %s\n' "$(decide_expected "${a}")" "${f}" >| sha256
-      diff -us sha256 "${f}.sha256"
-      sha256sum -c < "${f}.sha256" || exit
-      sha256sum -c < sha256 || exit
-      ln -v "${f}" /verified/ || exit
+      sha256sum -c < "${f}" || exit
+      ln -v "${f%.sha256}" /verified/ || exit
     done
-    unset -v a f url
+    unset -v f
 
+    S6_ARCH="$(decide_arch "${TARGETARCH}")"
+    set -x
     mkdir -v /s6-overlay-rootfs
     cd /s6-overlay-rootfs
-    for f in /verified/s6-overlay-*.tar.xz
+    for f in /verified/*.tar*
     do
-      tar -xpf "${f}" || exit
+      case "${f}" in
+        (*-noarch.tar*|*-"${S6_ARCH}".tar*)
+          tar -xvvpf "${f}" || exit ;;
+      esac
     done
+    set +x
     unset -v f
 EOF
 
 FROM scratch AS s6-overlay
-COPY --from=s6-overlay-download /s6-overlay-rootfs /
+COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
 FROM debian:bookworm-slim
 
@@ -108,7 +113,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
   S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
 
 # Install third party software
-COPY --from=s6-overlay / /
+COPY --link --from=s6-overlay / /
 
 # Reminder: the SHELL handles all variables
 RUN decide_arch() { \
@@ -207,9 +212,6 @@ RUN set -x && \
 # Copy over pip.conf to use piwheels
 COPY pip.conf /etc/pip.conf
 
-# Add Pipfile
-COPY Pipfile /app/Pipfile
-
 # Do not include compiled byte-code
 ENV PIP_NO_COMPILE=1 \
   PIP_NO_CACHE_DIR=1 \
@@ -219,7 +221,8 @@ ENV PIP_NO_COMPILE=1 \
 WORKDIR /app
 
 # Set up the app
-RUN set -x && \
+RUN --mount=type=bind,source=Pipfile,target=/app/Pipfile \ 
+  set -x && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -242,7 +245,6 @@ RUN set -x && \
   cp -at /tmp/ "${HOME}" && \
   PIPENV_VERBOSITY=64 HOME="/tmp/${HOME#/}" pipenv install --system --skip-lock && \
   # Clean up
-  rm /app/Pipfile && \
   pipenv --clear && \
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
