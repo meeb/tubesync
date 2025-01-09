@@ -1746,6 +1746,9 @@ class ResponseFilteringTestCase(TestCase):
         filtered = filter_response(self.media.loaded_metadata)
         self.assertIn('formats', unfiltered.keys())
         self.assertIn('formats', filtered.keys())
+        # filtered 'downloader_options'
+        self.assertIn('downloader_options', unfiltered['formats'][10].keys())
+        self.assertNotIn('downloader_options', filtered['formats'][10].keys())
         # filtered 'http_headers'
         self.assertIn('http_headers', unfiltered['formats'][0].keys())
         self.assertNotIn('http_headers', filtered['formats'][0].keys())
@@ -1753,6 +1756,10 @@ class ResponseFilteringTestCase(TestCase):
         self.assertEqual(48, len(unfiltered['formats']))
         self.assertEqual(48, len(filtered['formats']))
         self.assertEqual(len(unfiltered['formats']), len(filtered['formats']))
+        # did not remove everything with url
+        self.assertIn('original_url', unfiltered.keys())
+        self.assertIn('original_url', filtered.keys())
+        self.assertEqual(unfiltered['original_url'], filtered['original_url'])
         # did reduce the size of the metadata
         self.assertTrue(len(str(filtered)) < len(str(unfiltered)))
 
