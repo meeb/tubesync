@@ -13,20 +13,21 @@ ARG ALPINE_VERSION="latest"
 
 FROM scratch AS s6-overlay-download
 ARG DESTDIR="/downloaded"
+ARG CHECKSUM_ALGORITHM="sha256"
 
 ARG S6_VERSION
 ARG S6_OVERLAY_URL="https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}"
 
-ADD --link "${S6_OVERLAY_URL}/s6-overlay-x86_64.tar.xz.sha256" "${DESTDIR}/"
-ADD --link "${S6_OVERLAY_URL}/s6-overlay-aarch64.tar.xz.sha256" "${DESTDIR}/"
-ADD --link "${S6_OVERLAY_URL}/s6-overlay-noarch.tar.xz.sha256" "${DESTDIR}/"
+ADD --link "${S6_OVERLAY_URL}/s6-overlay-x86_64.tar.xz.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
+ADD --link "${S6_OVERLAY_URL}/s6-overlay-aarch64.tar.xz.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
+ADD --link "${S6_OVERLAY_URL}/s6-overlay-noarch.tar.xz.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
 
 ARG SHA256_S6_AMD64
 ARG SHA256_S6_ARM64
 ARG SHA256_S6_NOARCH
-ADD --link --checksum="sha256:${SHA256_S6_AMD64}" "${S6_OVERLAY_URL}/s6-overlay-x86_64.tar.xz" "${DESTDIR}/"
-ADD --link --checksum="sha256:${SHA256_S6_ARM64}" "${S6_OVERLAY_URL}/s6-overlay-aarch64.tar.xz" "${DESTDIR}/"
-ADD --link --checksum="sha256:${SHA256_S6_NOARCH}" "${S6_OVERLAY_URL}/s6-overlay-noarch.tar.xz" "${DESTDIR}/"
+ADD --link --checksum="${CHECKSUM_ALGORITHM}:${SHA256_S6_AMD64}" "${S6_OVERLAY_URL}/s6-overlay-x86_64.tar.xz" "${DESTDIR}/"
+ADD --link --checksum="${CHECKSUM_ALGORITHM}:${SHA256_S6_ARM64}" "${S6_OVERLAY_URL}/s6-overlay-aarch64.tar.xz" "${DESTDIR}/"
+ADD --link --checksum="${CHECKSUM_ALGORITHM}:${SHA256_S6_NOARCH}" "${S6_OVERLAY_URL}/s6-overlay-noarch.tar.xz" "${DESTDIR}/"
 
 FROM alpine:${ALPINE_VERSION} AS s6-overlay-extracted
 COPY --from=s6-overlay-download /downloaded /downloaded
@@ -58,13 +59,14 @@ RUN <<EOF
     done
     unset -v f
 
+    S6_ARCH="$(decide_arch "${TARGETARCH}")"
+    set -x
     mkdir -v /s6-overlay-rootfs
     cd /s6-overlay-rootfs
-    set -x
     for f in /verified/*.tar*
     do
       case "${f}" in
-        (*-noarch.tar*|*-"$(decide_arch "${TARGETARCH}")".tar*)
+        (*-noarch.tar*|*-"${S6_ARCH}".tar*)
           tar -xvvpf "${f}" || exit ;;
       esac
     done
