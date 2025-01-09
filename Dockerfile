@@ -60,6 +60,7 @@ RUN <<EOF
 
     mkdir -v /s6-overlay-rootfs
     cd /s6-overlay-rootfs
+    set -x
     for f in /verified/*.tar*
     do
       case "${f}" in
@@ -67,6 +68,7 @@ RUN <<EOF
           tar -xvvpf "${f}" || exit ;;
       esac
     done
+    set +x
     unset -v f
 EOF
 
@@ -98,7 +100,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
   S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
 
 # Install third party software
-COPY --from=s6-overlay / /
+COPY --link --from=s6-overlay / /
 
 # Reminder: the SHELL handles all variables
 RUN decide_arch() { \
