@@ -18,6 +18,7 @@ from background_task.models import Task
 from .models import Source, Media
 from .tasks import cleanup_old_media
 from .filtering import filter_media
+from .utils import filter_response
 
 
 class FrontEndTestCase(TestCase):
@@ -1707,6 +1708,43 @@ class FormatMatchingTestCase(TestCase):
                 expected_match_result,
                 msg=f'Media title "{self.media.title}" checked against regex "{self.source.filter_text}" failed '
                     f'expected {expected_match_result}')
+
+
+class ResponseFilteringTestCase(TestCase):
+
+    def setUp(self):
+        # Disable general logging for test case
+        logging.disable(logging.CRITICAL)
+        # Add a test source
+        self.source = Source.objects.create(
+            source_type=Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            key='testkey',
+            name='testname',
+            directory='testdirectory',
+            index_schedule=3600,
+            delete_old_media=False,
+            days_to_keep=14,
+            source_resolution=Source.SOURCE_RESOLUTION_1080P,
+            source_vcodec=Source.SOURCE_VCODEC_VP9,
+            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            prefer_60fps=False,
+            prefer_hdr=False,
+            fallback=Source.FALLBACK_FAIL
+        )
+        # Add some media
+        self.media = Media.objects.create(
+            key='mediakey',
+            source=self.source,
+            metadata='{}'
+        )
+
+    def test_metadata_20230629(self):
+        self.media.metadata = all_test_metadata['20230629']
+        self.media.save()
+
+        unfiltered = self.media.loaded_metadata
+        filtered = filter_response(self.media.loaded_metadata)
+        self.assertNotEqual(len(str(unfiltered)), len(str(filtered)))
 
 
 class TasksTestCase(TestCase):
