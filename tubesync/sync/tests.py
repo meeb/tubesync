@@ -1744,7 +1744,41 @@ class ResponseFilteringTestCase(TestCase):
 
         unfiltered = self.media.loaded_metadata
         filtered = filter_response(self.media.loaded_metadata)
-        self.assertNotEqual(len(str(unfiltered)), len(str(filtered)))
+        self.assertIn('formats', unfiltered.keys())
+        self.assertIn('formats', filtered.keys())
+        # filtered 'http_headers'
+        self.assertIn('http_headers', unfiltered['formats'][0].keys())
+        self.assertNotIn('http_headers', filtered['formats'][0].keys())
+        # did not lose any formats
+        self.assertEqual(48, len(unfiltered['formats']))
+        self.assertEqual(48, len(filtered['formats']))
+        self.assertEqual(len(unfiltered['formats']), len(filtered['formats']))
+        # did reduce the size of the metadata
+        self.assertTrue(len(str(filtered)) < len(str(unfiltered)))
+
+        url_keys = []
+        for format in unfiltered['formats']:
+            for key in format.keys():
+                if 'url' in key:
+                    url_keys.append((format['format_id'], key, format[key],))
+        unfiltered_url_keys = url_keys
+        self.assertEqual(63, len(unfiltered_url_keys), msg=str(unfiltered_url_keys))
+
+        url_keys = []
+        for format in filtered['formats']:
+            for key in format.keys():
+                if 'url' in key:
+                    url_keys.append((format['format_id'], key, format[key],))
+        filtered_url_keys = url_keys
+        self.assertEqual(3, len(filtered_url_keys), msg=str(filtered_url_keys))
+
+        url_keys = []
+        for lang_code, captions in filtered['automatic_captions'].items():
+            for caption in captions:
+                for key in caption.keys():
+                    if 'url' in key:
+                        url_keys.append((lang_code, caption['ext'], caption[key],))
+        self.assertEqual(0, len(url_keys), msg=str(url_keys))
 
 
 class TasksTestCase(TestCase):
