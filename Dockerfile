@@ -103,6 +103,8 @@ RUN <<EOF
       --no-anchored \
       -f "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" \
       'ffmpeg' 'ffprobe'
+
+    ls -alR /extracted
 EOF
 
 FROM scratch AS s6-overlay-download
