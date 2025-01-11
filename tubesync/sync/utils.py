@@ -1,6 +1,7 @@
 import os
 import re
 import math
+from copy import deepcopy
 from operator import itemgetter
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -93,6 +94,20 @@ def resize_image_to_height(image, width, height):
     return image
 
 
+def glob_quote(filestr):
+    _glob_specials = {
+        '?': '[?]',
+        '*': '[*]',
+        '[': '[[]',
+        ']': '[]]', # probably not needed, but it won't hurt
+    }
+
+    if not isinstance(filestr, str):
+        raise TypeError(f'filestr must be a str, got "{type(filestr)}"')
+
+    return filestr.translate(str.maketrans(_glob_specials))
+
+
 def file_is_editable(filepath):
     '''
         Checks that a file exists and the file is in an allowed predefined tuple of
@@ -112,6 +127,23 @@ def file_is_editable(filepath):
         if str(allowed_path) == os.path.commonpath([allowed_path, filepath]):
             return True
     return False
+
+
+def directory_and_stem(arg_path):
+    filepath = Path(arg_path)
+    stem = Path(filepath.stem)
+    while stem.suffixes and '' != stem.suffix:
+        stem = Path(stem.stem)
+    stem = str(stem)
+    return (filepath.parent, stem,)
+
+
+def mkdir_p(arg_path, mode=0o777):
+    '''
+        Reminder: mode only affects the last directory
+    '''
+    dirpath = Path(arg_path)
+    return dirpath.mkdir(mode=mode, parents=True, exist_ok=True)
 
 
 def write_text_file(filepath, filedata):
@@ -169,6 +201,95 @@ def normalize_codec(codec_str):
         prefix = result.rstrip('0123456789')
         result = prefix + str(int(result[len(prefix):]))
     return result
+
+
+def _url_keys(arg_dict, filter_func):
+    result = {}
+    for key in arg_dict.keys():
+        if 'url' in key:
+            result.update(
+                {key: filter_func(key=key, url=arg_dict[key])}
+            )
+    return result
+
+
+def _drop_url_keys(arg_dict, key, filter_func):
+    if key in arg_dict.keys():
+        for val_dict in arg_dict[key]:
+            for url_key, remove in _url_keys(val_dict, filter_func).items():
+                if remove is True:
+                    del val_dict[url_key]
+
+
+def filter_response(arg_dict, copy_arg=False):
+    '''
+        Clean up the response so as to not store useless metadata in the database.
+    '''
+    response_dict = arg_dict
+    # raise an exception for an unexpected argument type
+    if not isinstance(response_dict, dict):
+        raise TypeError(f'response_dict must be a dict, got "{type(response_dict)}"')
+
+    if copy_arg:
+        response_dict = deepcopy(arg_dict)
+
+    # optimize the empty case
+    if not response_dict:
+        return response_dict
+
+    # beginning of formats cleanup {{{
+    # drop urls that expire, or restrict IPs
+    def drop_format_url(**kwargs):
+        url = kwargs['url']
+        return (
+            url
+            and '://' in url
+            and (
+                '/ip/' in url
+                or 'ip=' in url
+                or '/expire/' in url
+                or 'expire=' in url
+            )
+        )
+
+    # these format keys are not useful to us
+    drop_keys = frozenset((
+        'downloader_options',
+        'fragments',
+        'http_headers',
+        '__needs_testing',
+        '__working',
+    ))
+    for key in frozenset(('formats', 'requested_formats',)):
+        _drop_url_keys(response_dict, key, drop_format_url)
+        if key in response_dict.keys():
+            for format in response_dict[key]:
+                for drop_key in drop_keys:
+                    if drop_key in format.keys():
+                        del format[drop_key]
+    # end of formats cleanup }}}
+
+    # beginning of subtitles cleanup {{{
+    # drop urls that expire
+    def drop_subtitles_url(**kwargs):
+        url = kwargs['url']
+        return (
+            url
+            and '://' in url
+            and (
+                '/expire/' in url
+                or '&expire=' in url
+            )
+        )
+
+    for key in frozenset(('subtitles', 'automatic_captions',)):
+        if key in response_dict.keys():
+            key_dict = response_dict[key]
+            for lang_code in key_dict:
+                _drop_url_keys(key_dict, lang_code, drop_subtitles_url)
+    # end of subtitles cleanup }}}
+
+    return response_dict
 
 
 def parse_media_format(format_dict):
