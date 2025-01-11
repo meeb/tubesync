@@ -28,7 +28,7 @@ ARG FFMPEG_URL="https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobu
 ARG DESTDIR="/downloaded"
 ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
-RUN set -eux ; \
+RUN set -eu ; \
     apk --no-cache --no-progress add cmd:aria2c cmd:awk ; \
 \
     aria2c_options() { \
