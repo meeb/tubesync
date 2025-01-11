@@ -267,7 +267,9 @@ ENV PIP_NO_COMPILE=1 \
 WORKDIR /app
 
 # Set up the app
-RUN --mount=type=bind,source=Pipfile,target=/app/Pipfile \ 
+#BuildKit#RUN --mount=type=bind,source=Pipfile,target=/app/Pipfile \
+COPY Pipfile /app/Pipfile
+RUN \
   set -x && \
   apt-get update && \
   # Install required build packages
