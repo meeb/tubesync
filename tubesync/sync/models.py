@@ -1527,10 +1527,13 @@ class Media(models.Model):
 
     def get_episode_str(self, use_padding=False):
         episode_number = self.calculate_episode_number()
+        if not episode_number:
+            return ''
+
         if use_padding:
-            return f'{episode_number:02}' if episode_number else ''
+            return f'{episode_number:02}'
         
-        return str(episode_number) if episode_number else ''
+        return str(episode_number)
 
 
 class MediaServer(models.Model):
