@@ -27,77 +27,73 @@ ARG FFMPEG_URL="https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobu
 
 ARG DESTDIR="/downloaded"
 ARG TARGETARCH
-ADD --link "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
-RUN <<EOF
-    set -eu
-    apk --no-cache --no-progress add cmd:aria2c cmd:awk
-
-    aria2c_options() {
-        algorithm="${CHECKSUM_ALGORITHM%[0-9]??}"
-        bytes="${CHECKSUM_ALGORITHM#${algorithm}}"
-        hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "${DESTDIR}/${FFMPEG_FILE_SUMS}" )"
-
+ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
+RUN set -eu ; \
+    apk --no-cache --no-progress add cmd:aria2c cmd:awk ; \
+\
+    aria2c_options() { \
+        algorithm="${CHECKSUM_ALGORITHM%[0-9]??}" ; \
+        bytes="${CHECKSUM_ALGORITHM#${algorithm}}" ; \
+        hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "${DESTDIR}/${FFMPEG_FILE_SUMS}" )" ; \
+\
         printf -- '\t%s\n' \
           'allow-overwrite=true' \
           'always-resume=false' \
           'check-integrity=true' \
           "checksum=${algorithm}-${bytes}=${hash}" \
           'max-connection-per-server=2' \
-
-        # the blank line above was intentional
-        printf -- '\n'
-    }
-    
-    decide_arch() {
-        case "${TARGETARCH}" in
-            (amd64) printf -- 'linux64' ;;
-            (arm64) printf -- 'linuxarm64' ;;
-        esac
-    }
-
-    FFMPEG_ARCH="$(decide_arch)"
-    # files to retrieve are in the sums file
-    for url in $(awk '
-      $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; }
-      ' "${DESTDIR}/${FFMPEG_FILE_SUMS}")
-    do
-        url="${FFMPEG_URL}/${url# }"
-        printf -- '%s\n' "${url}"
-        aria2c_options "${url}"
-        printf -- '\n'
-    done > /tmp/downloads
-    unset -v url
-
+; \
+        printf -- '\n' ; \
+    } ; \
+\
+    decide_arch() { \
+        case "${TARGETARCH}" in \
+            (amd64) printf -- 'linux64' ;; \
+            (arm64) printf -- 'linuxarm64' ;; \
+        esac ; \
+    } ; \
+\
+    FFMPEG_ARCH="$(decide_arch)" ; \
+    for url in $(awk ' \
+      $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; } \
+      ' "${DESTDIR}/${FFMPEG_FILE_SUMS}") ; \
+    do \
+        url="${FFMPEG_URL}/${url# }" ; \
+        printf -- '%s\n' "${url}" ; \
+        aria2c_options "${url}" ; \
+        printf -- '\n' ; \
+    done > /tmp/downloads ; \
+    unset -v url ; \
+\
     aria2c --no-conf=true \
       --dir /downloaded \
       --lowest-speed-limit='16K' \
       --show-console-readout=false \
       --summary-interval=0 \
-      --input-file /tmp/downloads
-
-    apk --no-cache --no-progress add cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum"
-    
-    decide_expected() {
+      --input-file /tmp/downloads ; \
+\
+    apk --no-cache --no-progress add cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum" ; \
+\    
+    decide_expected() { \
         case "${TARGETARCH}" in \
             (amd64) printf -- '%s' "${FFMPEG_CHECKSUM_AMD64}" ;; \
             (arm64) printf -- '%s' "${FFMPEG_CHECKSUM_ARM64}" ;; \
-        esac
-    }
-
-    FFMPEG_HASH="$(decide_expected)"
-
-    cd "${DESTDIR}"
-    if [ -n "${FFMPEG_HASH}" ]
-    then
-        printf -- '%s *%s\n' "${FFMPEG_HASH}" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" >> /tmp/SUMS
-        "${CHECKSUM_ALGORITHM}sum" --check --strict /tmp/SUMS || exit
-    fi
-    "${CHECKSUM_ALGORITHM}sum" --check --strict --ignore-missing "${DESTDIR}/${FFMPEG_FILE_SUMS}"
-
-    mkdir -v -p "/verified/${TARGETARCH}"
-    ln -v "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" "/verified/${TARGETARCH}/"
-    rm -rf "${DESTDIR}"
-EOF
+        esac ; \
+    } ; \
+\
+    FFMPEG_HASH="$(decide_expected)" ; \
+\
+    cd "${DESTDIR}" ; \
+    if [ -n "${FFMPEG_HASH}" ] ; \
+    then \
+        printf -- '%s *%s\n' "${FFMPEG_HASH}" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" >> /tmp/SUMS ; \
+        "${CHECKSUM_ALGORITHM}sum" --check --strict /tmp/SUMS || exit ; \
+    fi ; \
+    "${CHECKSUM_ALGORITHM}sum" --check --strict --ignore-missing "${DESTDIR}/${FFMPEG_FILE_SUMS}" ; \
+\
+    mkdir -v -p "/verified/${TARGETARCH}" ; \
+    ln -v "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" "/verified/${TARGETARCH}/" ; \
+    rm -rf "${DESTDIR}" ;
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-extracted
 COPY --link --from=ffmpeg-download /verified /verified
@@ -105,21 +101,20 @@ COPY --link --from=ffmpeg-download /verified /verified
 ARG FFMPEG_PREFIX_FILE
 ARG FFMPEG_SUFFIX_FILE
 ARG TARGETARCH
-RUN <<EOF
-    set -eu
-    apk --no-cache --no-progress add cmd:tar cmd:xz
-    
-    mkdir -v /extracted
-    cd /extracted
+RUN set -eu ; \
+    apk --no-cache --no-progress add cmd:tar cmd:xz ; \
+\
+    mkdir -v /extracted ; \
+    cd /extracted ; \
+    set -x ; \
     tar -xp \
       --strip-components=2 \
       --no-anchored \
       --no-same-owner \
       -f "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" \
-      'ffmpeg' 'ffprobe'
-
-    ls -AlR /extracted
-EOF
+      'ffmpeg' 'ffprobe' ; \
+\
+    ls -AlR /extracted ;
 
 FROM scratch AS s6-overlay-download
 ARG S6_VERSION
@@ -142,58 +137,56 @@ ARG S6_FILE_AMD64="${S6_PREFIX_FILE}x86_64${S6_SUFFIX_FILE}"
 ARG S6_FILE_ARM64="${S6_PREFIX_FILE}aarch64${S6_SUFFIX_FILE}"
 ARG S6_FILE_NOARCH="${S6_PREFIX_FILE}noarch${S6_SUFFIX_FILE}"
 
-ADD --link "${S6_OVERLAY_URL}/${S6_FILE_AMD64}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
-ADD --link "${S6_OVERLAY_URL}/${S6_FILE_ARM64}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
-ADD --link "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
+ADD "${S6_OVERLAY_URL}/${S6_FILE_AMD64}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
+ADD "${S6_OVERLAY_URL}/${S6_FILE_ARM64}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
+ADD "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
 
-ADD --link --checksum="${S6_CHECKSUM_AMD64}" "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" "${DESTDIR}/"
-ADD --link --checksum="${S6_CHECKSUM_ARM64}" "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
-ADD --link --checksum="${S6_CHECKSUM_NOARCH}" "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
+ADD --checksum="${S6_CHECKSUM_AMD64}" "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" "${DESTDIR}/"
+ADD --checksum="${S6_CHECKSUM_ARM64}" "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
+ADD --checksum="${S6_CHECKSUM_NOARCH}" "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
 
 FROM alpine:${ALPINE_VERSION} AS s6-overlay-extracted
 COPY --link --from=s6-overlay-download /downloaded /downloaded
 
 ARG TARGETARCH
 
-RUN <<EOF
-    set -eu
-
-    decide_arch() {
-      local arg1
-      arg1="${1:-$(uname -m)}"
-
-      case "${arg1}" in
-        (amd64) printf -- 'x86_64' ;;
-        (arm64) printf -- 'aarch64' ;;
-        (armv7l) printf -- 'arm' ;;
-        (*) printf -- '%s' "${arg1}" ;;
-      esac
-      unset -v arg1
-    }
-
-    mkdir -v /verified
-    cd /downloaded
-    for f in *.sha256
-    do
-      sha256sum -c < "${f}" || exit
-      ln -v "${f%.sha256}" /verified/ || exit
-    done
-    unset -v f
-
-    S6_ARCH="$(decide_arch "${TARGETARCH}")"
-    set -x
-    mkdir -v /s6-overlay-rootfs
-    cd /s6-overlay-rootfs
-    for f in /verified/*.tar*
-    do
-      case "${f}" in
-        (*-noarch.tar*|*-"${S6_ARCH}".tar*)
-          tar -xpf "${f}" || exit ;;
-      esac
-    done
-    set +x
-    unset -v f
-EOF
+RUN set -eu ; \
+\
+    decide_arch() { \
+      local arg1 ; \
+      arg1="${1:-$(uname -m)}" ; \
+\
+      case "${arg1}" in \
+        (amd64) printf -- 'x86_64' ;; \
+        (arm64) printf -- 'aarch64' ;; \
+        (armv7l) printf -- 'arm' ;; \
+        (*) printf -- '%s' "${arg1}" ;; \
+      esac ; \
+      unset -v arg1 ; \
+    } ; \
+\
+    mkdir -v /verified ; \
+    cd /downloaded ; \
+    for f in *.sha256 ; \
+    do \
+      sha256sum -c < "${f}" || exit ; \
+      ln -v "${f%.sha256}" /verified/ || exit ; \
+    done ; \
+    unset -v f ; \
+\
+    S6_ARCH="$(decide_arch "${TARGETARCH}")" ; \
+    set -x ; \
+    mkdir -v /s6-overlay-rootfs ; \
+    cd /s6-overlay-rootfs ; \
+    for f in /verified/*.tar* ; \
+    do \
+      case "${f}" in \
+        (*-noarch.tar*|*-"${S6_ARCH}".tar*) \
+          tar -xpf "${f}" || exit ;; \
+      esac ; \
+    done ; \
+    set +x ; \
+    unset -v f ;
 
 FROM debian:bookworm-slim AS tubesync
 
@@ -265,6 +258,9 @@ RUN set -x && \
 # Copy over pip.conf to use piwheels
 COPY pip.conf /etc/pip.conf
 
+# Add Pipfile
+COPY Pipfile /app/Pipfile
+
 # Do not include compiled byte-code
 ENV PIP_NO_COMPILE=1 \
   PIP_NO_CACHE_DIR=1 \
@@ -274,7 +270,8 @@ ENV PIP_NO_COMPILE=1 \
 WORKDIR /app
 
 # Set up the app
-RUN --mount=type=bind,source=Pipfile,target=/app/Pipfile \ 
+#BuildKit#RUN --mount=type=bind,source=Pipfile,target=/app/Pipfile \
+RUN \
   set -x && \
   apt-get update && \
   # Install required build packages
@@ -298,6 +295,7 @@ RUN --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   cp -at /tmp/ "${HOME}" && \
   PIPENV_VERBOSITY=64 HOME="/tmp/${HOME#/}" pipenv install --system --skip-lock && \
   # Clean up
+  rm /app/Pipfile && \
   pipenv --clear && \
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
