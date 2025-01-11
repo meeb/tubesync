@@ -79,7 +79,7 @@ RUN set -eux ; \
             (amd64) printf -- '%s' "${FFMPEG_CHECKSUM_AMD64}" ;; \
             (arm64) printf -- '%s' "${FFMPEG_CHECKSUM_ARM64}" ;; \
         esac ; \
-    } \
+    } ; \
 \
     FFMPEG_HASH="$(decide_expected)" ; \
 \
