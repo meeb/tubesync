@@ -101,6 +101,7 @@ RUN <<EOF
     tar -xvvp \
       --strip-components=2 \
       --no-anchored \
+      --no-same-owner \
       -f "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" \
       'ffmpeg' 'ffprobe'
 
