@@ -30,7 +30,7 @@ ARG DESTDIR="/downloaded"
 ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
 RUN <<EOF
-    set -eux
+    set -eu
     apk --no-cache --no-progress add cmd:aria2c cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum"
 
     aria2c_options() {
@@ -84,12 +84,18 @@ RUN <<EOF
       --input-file /tmp/downloads
 
     cd "${DESTDIR}"
+    printf -- '%s *%s\n' "$(decide_expected)" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" >> /tmp/SUMS
+    "${CHECKSUM_ALGORITHM}sum" --check --strict /tmp/SUMS
     "${CHECKSUM_ALGORITHM}sum" --check --strict --ignore-missing "${DESTDIR}/${FFMPEG_FILE_SUMS}"
 
     mkdir -v -p "/verified/${TARGETARCH}"
-    printf -- '%s *%s\n' "$(decide_expected)" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" | "${CHECKSUM_ALGORITHM}sum" --check --strict
     ln -v "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" "/verified/${TARGETARCH}/"
+EOF
 
+RUN <<EOF
+    set -eux
+    apk --no-cache --no-progress add cmd:tar
+    
     mkdir -v /extracted
     cd /extracted
     tar -xvvp \
