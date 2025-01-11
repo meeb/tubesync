@@ -214,7 +214,7 @@ RUN decide_arch() { \
         "Building for arch: ${2}|${ARCH}, downloading ${arg1} from: ${url}, expecting ${arg1} SHA256: ${expected}" && \
       rm -rf "${file}" && \
       { \
-        cp -v -l /tmp/downloaded/${url##*/}" "${file}" || \
+        cp -v -l /tmp/downloaded/"${url##*/}" "${file}" || \
         curl --disable --output "${file}" --clobber --location --no-progress-meter --url "${url}" ; \
       } && \
       verify_download "${expected}" "${file}" ; \
