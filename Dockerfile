@@ -34,8 +34,8 @@ RUN <<EOF
     apk --no-cache --no-progress add cmd:aria2c cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum"
 
     aria2c_options() {
-        algorithm="${CHECKSUM_ALGORITHM##[0-9]}"
-        bytes="${CHECKSUM_ALGORITHM%${algorithm}}"
+        algorithm="${CHECKSUM_ALGORITHM%[0-9]??}"
+        bytes="${CHECKSUM_ALGORITHM#${algorithm}}"
         hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "${DESTDIR}/${FFMPEG_FILE_SUMS}" )"
 
         printf -- '\t%s\n' \
