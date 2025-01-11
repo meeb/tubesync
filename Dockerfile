@@ -47,10 +47,18 @@ RUN <<EOF
         # the blank line above was intentional
         printf -- '\n'
     }
+    
+    decide_arch() {
+        case "${TARGETARCH}" in
+            (amd64) printf -- 'linux64' ;;
+            (arm64) printf -- 'linuxarm64' ;;
+        esac
+    }
 
+    FFMPEG_ARCH="$(decide_arch)"
     # files to retrieve are in the sums file
     for url in $(awk '
-      $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-linux/ { $1=""; print; }
+      $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; }
       ' "${DESTDIR}/${FFMPEG_FILE_SUMS}")
     do
         url="${FFMPEG_URL}/${url# }"
@@ -66,18 +74,8 @@ RUN <<EOF
       --show-console-readout=false \
       --summary-interval=0 \
       --input-file /tmp/downloads
-EOF
 
-RUN <<EOF
-    set -eu
     apk --no-cache --no-progress add cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum"
-
-    decide_arch() {
-        case "${TARGETARCH}" in
-            (amd64) printf -- 'linux64' ;;
-            (arm64) printf -- 'linuxarm64' ;;
-        esac
-    }
     
     decide_expected() {
         case "${TARGETARCH}" in \
@@ -86,7 +84,6 @@ RUN <<EOF
         esac
     }
 
-    FFMPEG_ARCH="$(decide_arch)"
     FFMPEG_HASH="$(decide_expected)"
 
     cd "${DESTDIR}"
@@ -99,6 +96,7 @@ RUN <<EOF
 
     mkdir -v -p "/verified/${TARGETARCH}"
     ln -v "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" "/verified/${TARGETARCH}/"
+    rm -rf "${DESTDIR}"
 EOF
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-extracted
