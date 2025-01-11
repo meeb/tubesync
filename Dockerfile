@@ -101,21 +101,20 @@ COPY --link --from=ffmpeg-download /verified /verified
 ARG FFMPEG_PREFIX_FILE
 ARG FFMPEG_SUFFIX_FILE
 ARG TARGETARCH
-RUN <<EOF
-    set -eu
-    apk --no-cache --no-progress add cmd:tar cmd:xz
-    
-    mkdir -v /extracted
-    cd /extracted
+RUN set -eu ; \
+    apk --no-cache --no-progress add cmd:tar cmd:xz ; \
+\
+    mkdir -v /extracted ; \
+    cd /extracted ; \
+    set -x ; \
     tar -xp \
       --strip-components=2 \
       --no-anchored \
       --no-same-owner \
       -f "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" \
-      'ffmpeg' 'ffprobe'
-
+      'ffmpeg' 'ffprobe' ; \
+\
     ls -AlR /extracted
-EOF
 
 FROM scratch AS s6-overlay-download
 ARG S6_VERSION
