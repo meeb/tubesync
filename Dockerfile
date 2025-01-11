@@ -1,7 +1,5 @@
 ARG FFMPEG_DATE="2025-01-10-19-43"
 ARG FFMPEG_VERSION="N-118280-g5cd49e1bfd"
-ARG SHA256_FFMPEG_AMD64="40842d6783e942904b0e8b5627e83e5d668c48e91396fe3629f440c75213027b"
-ARG SHA256_FFMPEG_ARM64="e022ee91d1146dca07fdc0bda9f35141e72d2f186ac89714ca63ff501b606b9f"
 
 ARG S6_VERSION="3.2.0.2"
 
@@ -10,21 +8,22 @@ ARG SHA256_S6_ARM64="8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f6
 ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae"
 
 ARG ALPINE_VERSION="latest"
+ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION%%-*}"
+ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 
-FROM alpine:${ALPINE_VERSION} AS ffmpeg-extracted
+FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
+ARG FFMPEG_PREFIX_FILE
+ARG FFMPEG_SUFFIX_FILE
 ARG SHA256_FFMPEG_AMD64
 ARG SHA256_FFMPEG_ARM64
 ARG CHECKSUM_ALGORITHM="sha256"
 ARG FFMPEG_CHECKSUM_AMD64="${SHA256_FFMPEG_AMD64}"
 ARG FFMPEG_CHECKSUM_ARM64="${SHA256_FFMPEG_ARM64}"
 
-ARG FFMPEG_URL="https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-${FFMPEG_DATE}"
-ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION%%-*}"
-ARG FFMPEG_SUFFIX_FILE=".tar.xz"
-
 ARG FFMPEG_FILE_SUMS="checksums.${CHECKSUM_ALGORITHM}"
+ARG FFMPEG_URL="https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-${FFMPEG_DATE}"
 
 ARG DESTDIR="/downloaded"
 ARG TARGETARCH
@@ -39,7 +38,11 @@ RUN <<EOF
         hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "${DESTDIR}/${FFMPEG_FILE_SUMS}" )"
 
         printf -- '\t%s\n' \
+          'allow-overwrite=true' \
+          'always-resume=false' \
+          'check-integrity=true' \
           "checksum=${algorithm}-${bytes}=${hash}" \
+          'max-connection-per-server=2' \
 
         # the blank line above was intentional
         printf -- '\n'
@@ -59,10 +62,6 @@ RUN <<EOF
 
     aria2c --no-conf=true \
       --dir /downloaded \
-      --check-integrity=true \
-      --always-resume=false \
-      --allow-overwrite=true \
-      --max-connection-per-server=2 \
       --lowest-speed-limit='16K' \
       --show-console-readout=false \
       --summary-interval=0 \
@@ -88,23 +87,33 @@ RUN <<EOF
     }
 
     FFMPEG_ARCH="$(decide_arch)"
+    FFMPEG_HASH="$(decide_expected)"
 
     cd "${DESTDIR}"
-    printf -- '%s *%s\n' "$(decide_expected)" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" >> /tmp/SUMS
-    "${CHECKSUM_ALGORITHM}sum" --check --strict /tmp/SUMS
+    if [ -n "${FFMPEG_HASH}" ]
+    then
+        printf -- '%s *%s\n' "${FFMPEG_HASH}" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" >> /tmp/SUMS
+        "${CHECKSUM_ALGORITHM}sum" --check --strict /tmp/SUMS || exit
+    fi
     "${CHECKSUM_ALGORITHM}sum" --check --strict --ignore-missing "${DESTDIR}/${FFMPEG_FILE_SUMS}"
 
     mkdir -v -p "/verified/${TARGETARCH}"
     ln -v "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" "/verified/${TARGETARCH}/"
 EOF
 
+FROM alpine:${ALPINE_VERSION} AS ffmpeg-extracted
+COPY --from=ffmpeg-download /verified /verified
+
+ARG FFMPEG_PREFIX_FILE
+ARG FFMPEG_SUFFIX_FILE
+ARG TARGETARCH
 RUN <<EOF
     set -eu
     apk --no-cache --no-progress add cmd:tar cmd:xz
     
     mkdir -v /extracted
     cd /extracted
-    tar -xvvp \
+    tar -xp \
       --strip-components=2 \
       --no-anchored \
       --no-same-owner \
@@ -113,6 +122,9 @@ RUN <<EOF
 
     ls -AlR /extracted
 EOF
+
+FROM scratch AS ffmpeg
+COPY --from=ffmpeg-extracted /extracted /usr/local/bin
 
 FROM scratch AS s6-overlay-download
 ARG S6_VERSION
@@ -181,7 +193,7 @@ RUN <<EOF
     do
       case "${f}" in
         (*-noarch.tar*|*-"${S6_ARCH}".tar*)
-          tar -xvvpf "${f}" || exit ;;
+          tar -xpf "${f}" || exit ;;
       esac
     done
     set +x
@@ -200,8 +212,6 @@ ARG S6_VERSION
 
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
-ARG SHA256_FFMPEG_AMD64
-ARG SHA256_FFMPEG_ARM64
 
 ENV S6_VERSION="${S6_VERSION}" \
   FFMPEG_DATE="${FFMPEG_DATE}" \
@@ -217,63 +227,10 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 
 # Install third party software
 COPY --link --from=s6-overlay / /
-COPY --link --from=ffmpeg-extracted /extracted/ /usr/local/bin/
+COPY --link --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
-RUN decide_arch() { \
-      case "${TARGETARCH:=amd64}" in \
-        (arm64) printf -- 'aarch64' ;; \
-        (*) printf -- '%s' "${TARGETARCH}" ;; \
-      esac ; \
-    } && \
-    decide_expected() { \
-      case "${1}" in \
-        (ffmpeg) case "${2}" in \
-            (amd64) printf -- '%s' "${SHA256_FFMPEG_AMD64}" ;; \
-            (arm64) printf -- '%s' "${SHA256_FFMPEG_ARM64}" ;; \
-          esac ;; \
-      esac ; \
-    } && \
-    decide_url() { \
-      case "${1}" in \
-        (ffmpeg) printf -- \
-          'https://github.com/yt-dlp/FFmpeg-Builds/releases/download/%s/ffmpeg-%s-linux%s-gpl%s.tar.xz' \
-          "autobuild-${FFMPEG_DATE}" \
-          "${FFMPEG_VERSION}" \
-          "$(case "${2}" in \
-            (amd64) printf -- '64' ;; \
-            (*) printf -- '%s' "${2}" ;; \
-          esac)" \
-          "$(case "${FFMPEG_VERSION%%-*}" in \
-            (n*) printf -- '-%s\n' "${FFMPEG_VERSION#n}" | cut -d '-' -f 1,2 ;; \
-            (*) printf -- '' ;; \
-          esac)" ;; \
-      esac ; \
-    } && \
-    verify_download() { \
-      while [ $# -ge 2 ] ; do \
-        sha256sum "${2}" ; \
-        printf -- '%s  %s\n' "${1}" "${2}" | sha256sum -c || return ; \
-        shift ; shift ; \
-      done ; \
-    } && \
-    download_expected_file() { \
-      local arg1 expected file url ; \
-      arg1="$(printf -- '%s\n' "${1}" | awk '{print toupper($0);}')" ; \
-      expected="$(decide_expected "${1}" "${2}")" ; \
-      file="${3}" ; \
-      url="$(decide_url "${1}" "${2}")" ; \
-      printf -- '%s\n' \
-        "Building for arch: ${2}|${ARCH}, downloading ${arg1} from: ${url}, expecting ${arg1} SHA256: ${expected}" && \
-      rm -rf "${file}" && \
-      { \
-        cp -v -l /tmp/downloaded/"${url##*/}" "${file}" || \
-        curl --disable --output "${file}" --clobber --location --no-progress-meter --url "${url}" ; \
-      } && \
-      verify_download "${expected}" "${file}" ; \
-    } && \
-  export ARCH="$(decide_arch)" && \
-  set -x && \
+RUN set -x && \
   apt-get update && \
   apt-get -y --no-install-recommends install locales && \
   printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
@@ -282,7 +239,7 @@ RUN decide_arch() { \
   apt-get -y --no-install-recommends install curl ca-certificates file binutils xz-utils && \
   # Installed s6 (using COPY earlier)
   file -L /command/s6-overlay-suexec && \
-  # Install ffmpeg (using COPY earlier)
+  # Installed ffmpeg (using COPY earlier)
   file /usr/local/bin/ff* && \
   # Clean up
   apt-get -y autoremove --purge curl file binutils xz-utils && \
