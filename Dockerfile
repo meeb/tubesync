@@ -56,7 +56,7 @@ RUN set -eux ; \
     FFMPEG_ARCH="$(decide_arch)" ; \
     for url in $(awk ' \
       $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; } \
-      ' "${DESTDIR}/${FFMPEG_FILE_SUMS}") \
+      ' "${DESTDIR}/${FFMPEG_FILE_SUMS}") ; \
     do \
         url="${FFMPEG_URL}/${url# }" ; \
         printf -- '%s\n' "${url}" ; \
