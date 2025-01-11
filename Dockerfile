@@ -163,6 +163,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 
 # Install third party software
 COPY --link --from=s6-overlay / /
+COPY --from=ffmpeg-extracted /downloaded /tmp/
 
 # Reminder: the SHELL handles all variables
 RUN decide_arch() { \
@@ -211,7 +212,10 @@ RUN decide_arch() { \
       printf -- '%s\n' \
         "Building for arch: ${2}|${ARCH}, downloading ${arg1} from: ${url}, expecting ${arg1} SHA256: ${expected}" && \
       rm -rf "${file}" && \
-      curl --disable --output "${file}" --clobber --location --no-progress-meter --url "${url}" && \
+      { \
+        cp -v -l /tmp/downloaded/${url##*/}" "${file}" || \
+        curl --disable --output "${file}" --clobber --location --no-progress-meter --url "${url}" ; \
+      } && \
       verify_download "${expected}" "${file}" ; \
     } && \
   export ARCH="$(decide_arch)" && \
