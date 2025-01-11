@@ -123,9 +123,6 @@ RUN <<EOF
     ls -AlR /extracted
 EOF
 
-FROM scratch AS ffmpeg
-COPY --link --from=ffmpeg-extracted /extracted /usr/local/bin
-
 FROM scratch AS s6-overlay-download
 ARG S6_VERSION
 ARG SHA256_S6_AMD64
@@ -200,10 +197,7 @@ RUN <<EOF
     unset -v f
 EOF
 
-FROM scratch AS s6-overlay
-COPY --link --from=s6-overlay-extracted /s6-overlay-rootfs /
-
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim AS tubesync
 
 ARG TARGETARCH
 ARG TARGETPLATFORM
@@ -226,8 +220,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
   S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
 
 # Install third party software
-COPY --link --from=s6-overlay / /
-COPY --link --from=ffmpeg /usr/local/bin/ /usr/local/bin/
+COPY --link --from=s6-overlay-extracted /s6-overlay-rootfs /
+COPY --link --from=ffmpeg-extracted /extracted /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
 RUN set -x && \
