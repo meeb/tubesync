@@ -31,7 +31,7 @@ ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
 RUN <<EOF
     set -eu
-    apk --no-cache --no-progress add cmd:aria2c cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum"
+    apk --no-cache --no-progress add cmd:aria2c cmd:awk
 
     aria2c_options() {
         algorithm="${CHECKSUM_ALGORITHM%[0-9]??}"
@@ -45,21 +45,6 @@ RUN <<EOF
         printf -- '\n'
     }
 
-    decide_arch() {
-        case "${TARGETARCH}" in
-            (amd64) printf -- 'linux64' ;;
-            (arm64) printf -- 'linuxarm64' ;;
-        esac
-    }
-
-    decide_expected() {
-        case "${TARGETARCH}" in \
-            (amd64) printf -- '%s' "${FFMPEG_CHECKSUM_AMD64}" ;; \
-            (arm64) printf -- '%s' "${FFMPEG_CHECKSUM_ARM64}" ;; \
-        esac
-    }
-
-    FFMPEG_ARCH="$(decide_arch)"
     # files to retrieve are in the sums file
     for url in $(awk '
       $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-linux/ { $1=""; print; }
@@ -82,6 +67,27 @@ RUN <<EOF
       --show-console-readout=false \
       --summary-interval=0 \
       --input-file /tmp/downloads
+EOF
+
+RUN <<EOF
+    set -eu
+    apk --no-cache --no-progress add cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum"
+
+    decide_arch() {
+        case "${TARGETARCH}" in
+            (amd64) printf -- 'linux64' ;;
+            (arm64) printf -- 'linuxarm64' ;;
+        esac
+    }
+    
+    decide_expected() {
+        case "${TARGETARCH}" in \
+            (amd64) printf -- '%s' "${FFMPEG_CHECKSUM_AMD64}" ;; \
+            (arm64) printf -- '%s' "${FFMPEG_CHECKSUM_ARM64}" ;; \
+        esac
+    }
+
+    FFMPEG_ARCH="$(decide_arch)"
 
     cd "${DESTDIR}"
     printf -- '%s *%s\n' "$(decide_expected)" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" >> /tmp/SUMS
@@ -93,7 +99,7 @@ RUN <<EOF
 EOF
 
 RUN <<EOF
-    set -eux
+    set -eu
     apk --no-cache --no-progress add cmd:tar cmd:xz
     
     mkdir -v /extracted
@@ -105,7 +111,7 @@ RUN <<EOF
       -f "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" \
       'ffmpeg' 'ffprobe'
 
-    ls -alR /extracted
+    ls -AlR /extracted
 EOF
 
 FROM scratch AS s6-overlay-download
