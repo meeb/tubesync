@@ -94,7 +94,7 @@ EOF
 
 RUN <<EOF
     set -eux
-    apk --no-cache --no-progress add cmd:tar
+    apk --no-cache --no-progress add cmd:tar cmd:xz
     
     mkdir -v /extracted
     cd /extracted
