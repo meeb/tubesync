@@ -55,6 +55,7 @@ RUN <<EOF
       --allow-overwrite=true \
       --max-connection-per-server=4 \
       --lowest-speed-limit='16K' \
+      --summary-interval=0 \
       --input-file /tmp/downloads
 
       ls -alR /downloaded
