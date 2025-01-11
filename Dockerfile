@@ -240,6 +240,7 @@ RUN set -x && \
   # Installed s6 (using COPY earlier)
   file -L /command/s6-overlay-suexec && \
   # Installed ffmpeg (using COPY earlier)
+  /usr/local/bin/ffmpeg -version && \
   file /usr/local/bin/ff* && \
   # Clean up
   apt-get -y autoremove --purge curl file binutils xz-utils && \
