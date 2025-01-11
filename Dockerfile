@@ -16,31 +16,54 @@ ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 ARG SHA256_FFMPEG_AMD64
 ARG SHA256_FFMPEG_ARM64
+ARG CHECKSUM_ALGORITHM="sha256"
+ARG FFMPEG_CHECKSUM_AMD64="${SHA256_FFMPEG_AMD64}"
+ARG FFMPEG_CHECKSUM_ARM64="${SHA256_FFMPEG_ARM64}"
 
 ARG FFMPEG_URL="https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-${FFMPEG_DATE}"
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION%%-*}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 
-ARG FFMPEG_FILE_SUMS="checksums.sha256"
+ARG FFMPEG_FILE_SUMS="checksums.${CHECKSUM_ALGORITHM}"
 
-ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" /downloaded/
+ARG DESTDIR="/downloaded"
+ARG TARGETARCH
+ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
 RUN <<EOF
     set -eux
-    apk --no-cache --no-progress add cmd:aria2c cmd:awk cmd:sha256sum
+    apk --no-cache --no-progress add cmd:aria2c cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum"
 
     aria2c_options() {
-        hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "/downloaded/${FFMPEG_FILE_SUMS}" )"
+        algorithm="${CHECKSUM_ALGORITHM##[0-9]}"
+        bytes="${CHECKSUM_ALGORITHM%${algorithm}}"
+        hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "${DESTDIR}/${FFMPEG_FILE_SUMS}" )"
+
         printf -- '\t%s\n' \
-        "checksum=sha-256=${hash}" \
+          "checksum=${algorithm}-${bytes}=${hash}" \
 
         # the blank line above was intentional
         printf -- '\n'
     }
 
+    decide_arch() {
+        case "${TARGETARCH}" in
+            (amd64) printf -- 'linux64' ;;
+            (arm64) printf -- 'linuxarm64' ;;
+        esac
+    }
+
+    decide_expected() {
+        case "${TARGETARCH}" in \
+            (amd64) printf -- '%s' "${FFMPEG_CHECKSUM_AMD64}" ;; \
+            (arm64) printf -- '%s' "${FFMPEG_CHECKSUM_ARM64}" ;; \
+        esac
+    }
+
+    FFMPEG_ARCH="$(decide_arch)"
     # files to retrieve are in the sums file
     for url in $(awk '
       $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-linux/ { $1=""; print; }
-      ' "/downloaded/${FFMPEG_FILE_SUMS}")
+      ' "${DESTDIR}/${FFMPEG_FILE_SUMS}")
     do
         url="${FFMPEG_URL}/${url# }"
         printf -- '%s\n' "${url}"
@@ -48,18 +71,32 @@ RUN <<EOF
         printf -- '\n'
     done > /tmp/downloads
     unset -v url
+
     aria2c --no-conf=true \
       --dir /downloaded \
       --check-integrity=true \
       --always-resume=false \
       --allow-overwrite=true \
-      --max-connection-per-server=4 \
+      --max-connection-per-server=2 \
       --lowest-speed-limit='16K' \
       --show-console-readout=false \
       --summary-interval=0 \
       --input-file /tmp/downloads
 
-      ls -alR /downloaded
+    cd "${DESTDIR}"
+    "${CHECKSUM_ALGORITHM}sum" --check --strict --ignore-missing "${DESTDIR}/${FFMPEG_FILE_SUMS}"
+
+    mkdir -v -p "/verified/${TARGETARCH}"
+    printf -- '%s *%s\n' "$(decide_expected)" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" | "${CHECKSUM_ALGORITHM}sum" --check --strict
+    ln -v "/verified/${TARGETARCH}/" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}"
+
+    mkdir -v /extracted
+    cd /extracted
+    tar -xvvp \
+      --strip-components=2 \
+      --no-anchored \
+      -f "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" \
+      'ffmpeg' 'ffprobe'
 EOF
 
 FROM scratch AS s6-overlay-download
@@ -165,7 +202,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 
 # Install third party software
 COPY --link --from=s6-overlay / /
-COPY --from=ffmpeg-extracted /downloaded/ /tmp/downloaded/
+COPY --link --from=ffmpeg-extracted /extracted/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
 RUN decide_arch() { \
@@ -230,10 +267,7 @@ RUN decide_arch() { \
   apt-get -y --no-install-recommends install curl ca-certificates file binutils xz-utils && \
   # Installed s6 (using COPY earlier)
   file -L /command/s6-overlay-suexec && \
-  # Install ffmpeg
-  _file="/tmp/ffmpeg-${ARCH}.tar.xz" && \
-  download_expected_file ffmpeg "${TARGETARCH}" "${_file}" && \
-  tar -xvvpf "${_file}" --strip-components=2 --no-anchored -C /usr/local/bin/ "ffmpeg" "ffprobe" && rm -f "${_file}" && \
+  # Install ffmpeg (using COPY earlier)
   file /usr/local/bin/ff* && \
   # Clean up
   apt-get -y autoremove --purge curl file binutils xz-utils && \
