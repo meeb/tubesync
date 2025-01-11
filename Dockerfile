@@ -114,7 +114,7 @@ RUN set -eu ; \
       -f "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" \
       'ffmpeg' 'ffprobe' ; \
 \
-    ls -AlR /extracted
+    ls -AlR /extracted ;
 
 FROM scratch AS s6-overlay-download
 ARG S6_VERSION
@@ -150,45 +150,43 @@ COPY --link --from=s6-overlay-download /downloaded /downloaded
 
 ARG TARGETARCH
 
-RUN <<EOF
-    set -eu
-
-    decide_arch() {
-      local arg1
-      arg1="${1:-$(uname -m)}"
-
-      case "${arg1}" in
-        (amd64) printf -- 'x86_64' ;;
-        (arm64) printf -- 'aarch64' ;;
-        (armv7l) printf -- 'arm' ;;
-        (*) printf -- '%s' "${arg1}" ;;
-      esac
-      unset -v arg1
-    }
-
-    mkdir -v /verified
-    cd /downloaded
-    for f in *.sha256
-    do
-      sha256sum -c < "${f}" || exit
-      ln -v "${f%.sha256}" /verified/ || exit
-    done
-    unset -v f
-
-    S6_ARCH="$(decide_arch "${TARGETARCH}")"
-    set -x
-    mkdir -v /s6-overlay-rootfs
-    cd /s6-overlay-rootfs
-    for f in /verified/*.tar*
-    do
-      case "${f}" in
-        (*-noarch.tar*|*-"${S6_ARCH}".tar*)
-          tar -xpf "${f}" || exit ;;
-      esac
-    done
-    set +x
-    unset -v f
-EOF
+RUN set -eu ; \
+\
+    decide_arch() { \
+      local arg1 ; \
+      arg1="${1:-$(uname -m)}" ; \
+\
+      case "${arg1}" in \
+        (amd64) printf -- 'x86_64' ;; \
+        (arm64) printf -- 'aarch64' ;; \
+        (armv7l) printf -- 'arm' ;; \
+        (*) printf -- '%s' "${arg1}" ;; \
+      esac ; \
+      unset -v arg1 ; \
+    } ; \
+\
+    mkdir -v /verified ; \
+    cd /downloaded ; \
+    for f in *.sha256 ; \
+    do \
+      sha256sum -c < "${f}" || exit ; \
+      ln -v "${f%.sha256}" /verified/ || exit ; \
+    done ; \
+    unset -v f ; \
+\
+    S6_ARCH="$(decide_arch "${TARGETARCH}")" ; \
+    set -x ; \
+    mkdir -v /s6-overlay-rootfs ; \
+    cd /s6-overlay-rootfs ; \
+    for f in /verified/*.tar* ; \
+    do \
+      case "${f}" in \
+        (*-noarch.tar*|*-"${S6_ARCH}".tar*) \
+          tar -xpf "${f}" || exit ;; \
+      esac ; \
+    done ; \
+    set +x ; \
+    unset -v f ;
 
 FROM debian:bookworm-slim AS tubesync
 
