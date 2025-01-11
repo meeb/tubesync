@@ -18,7 +18,7 @@ ARG SHA256_FFMPEG_AMD64
 ARG SHA256_FFMPEG_ARM64
 
 ARG FFMPEG_URL="https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-${FFMPEG_DATE}"
-ARG FFMPEG_PREFIX_FILE="ffmpeg-"
+ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION%%-*}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 
 ARG FFMPEG_FILE_SUMS="checksums.sha256"
