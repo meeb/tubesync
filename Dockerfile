@@ -29,7 +29,7 @@ ARG DESTDIR="/downloaded"
 ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
 RUN <<EOF
-    set -eu
+    set -eux
     apk --no-cache --no-progress add cmd:aria2c cmd:awk
 
     aria2c_options() {
