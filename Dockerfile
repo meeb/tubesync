@@ -11,6 +11,55 @@ ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4f
 
 ARG ALPINE_VERSION="latest"
 
+FROM alpine:${ALPINE_VERSION} AS ffmpeg-extracted
+ARG FFMPEG_DATE
+ARG FFMPEG_VERSION
+ARG SHA256_FFMPEG_AMD64
+ARG SHA256_FFMPEG_ARM64
+
+ARG FFMPEG_URL="https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-${FFMPEG_DATE}"
+ARG FFMPEG_PREFIX_FILE="ffmpeg-"
+ARG FFMPEG_SUFFIX_FILE=".tar.xz"
+
+ARG FFMPEG_FILE_SUMS="checksums.sha256"
+
+ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" /downloaded/
+RUN <<EOF
+    set -eux
+    apk --no-cache --no-progress add cmd:aria2c cmd:awk cmd:sha256sum
+
+    aria2c_options() {
+        hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "/downloaded/${FFMPEG_FILE_SUMS}" )"
+        printf -- '\t%s\n' \
+        "checksum=sha-256=${hash}" \
+
+        # the blank line above was intentional
+        printf -- '\n'
+    }
+
+    # files to retrieve are in the sums file
+    for url in $(awk '
+      $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-linux/ { $1=""; print; }
+      ' "/downloaded/${FFMPEG_FILE_SUMS}")
+    do
+        url="${FFMPEG_URL}/${url# }"
+        printf -- '%s\n' "${url}"
+        aria2c_options "${url}"
+        printf -- '\n'
+    done > /tmp/downloads
+    unset -v url
+    aria2c --no-conf=true \
+      --dir /downloaded \
+      --check-integrity=true \
+      --always-resume=false \
+      --allow-overwrite=true \
+      --max-connection-per-server=4 \
+      --lowest-speed-limit='16K' \
+      --input-file /tmp/downloads
+
+      ls -alR /downloaded
+EOF
+
 FROM scratch AS s6-overlay-download
 ARG S6_VERSION
 ARG SHA256_S6_AMD64
