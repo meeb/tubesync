@@ -1129,7 +1129,7 @@ class Media(models.Model):
             'key': self.key,
             'format': '-'.join(display_format['format']),
             'playlist_title': self.playlist_title,
-            'video_order': self.get_episode_str(),
+            'video_order': self.get_episode_str(True),
             'ext': self.source.extension,
             'resolution': display_format['resolution'],
             'height': display_format['height'],
@@ -1525,9 +1525,12 @@ class Media(models.Model):
                 return position_counter
             position_counter += 1
 
-    def get_episode_str(self):
+    def get_episode_str(self, use_padding=False):
         episode_number = self.calculate_episode_number()
-        return f'{episode_number:02}' if episode_number else ''
+        if use_padding:
+            return f'{episode_number:02}' if episode_number else ''
+        
+        return str(episode_number) if episode_number else ''
 
 
 class MediaServer(models.Model):
