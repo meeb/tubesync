@@ -164,7 +164,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 
 # Install third party software
 COPY --link --from=s6-overlay / /
-COPY --from=ffmpeg-extracted /downloaded /tmp/
+COPY --from=ffmpeg-extracted /downloaded/ /tmp/downloaded/
 
 # Reminder: the SHELL handles all variables
 RUN decide_arch() { \
