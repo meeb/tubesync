@@ -28,76 +28,72 @@ ARG FFMPEG_URL="https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobu
 ARG DESTDIR="/downloaded"
 ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
-RUN <<EOF
-    set -eux
-    apk --no-cache --no-progress add cmd:aria2c cmd:awk
-
-    aria2c_options() {
-        algorithm="${CHECKSUM_ALGORITHM%[0-9]??}"
-        bytes="${CHECKSUM_ALGORITHM#${algorithm}}"
-        hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "${DESTDIR}/${FFMPEG_FILE_SUMS}" )"
-
+RUN set -eux ; \
+    apk --no-cache --no-progress add cmd:aria2c cmd:awk ; \
+\
+    aria2c_options() { \
+        algorithm="${CHECKSUM_ALGORITHM%[0-9]??}" ; \
+        bytes="${CHECKSUM_ALGORITHM#${algorithm}}" ; \
+        hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "${DESTDIR}/${FFMPEG_FILE_SUMS}" )" ; \
+\
         printf -- '\t%s\n' \
           'allow-overwrite=true' \
           'always-resume=false' \
           'check-integrity=true' \
           "checksum=${algorithm}-${bytes}=${hash}" \
           'max-connection-per-server=2' \
-
-        # the blank line above was intentional
-        printf -- '\n'
-    }
-    
-    decide_arch() {
-        case "${TARGETARCH}" in
-            (amd64) printf -- 'linux64' ;;
-            (arm64) printf -- 'linuxarm64' ;;
-        esac
-    }
-
-    FFMPEG_ARCH="$(decide_arch)"
-    # files to retrieve are in the sums file
-    for url in $(awk '
-      $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; }
-      ' "${DESTDIR}/${FFMPEG_FILE_SUMS}")
-    do
-        url="${FFMPEG_URL}/${url# }"
-        printf -- '%s\n' "${url}"
-        aria2c_options "${url}"
-        printf -- '\n'
-    done > /tmp/downloads
-    unset -v url
-
+; \
+        printf -- '\n' ; \
+    } ; \
+\
+    decide_arch() { \
+        case "${TARGETARCH}" in \
+            (amd64) printf -- 'linux64' ;; \
+            (arm64) printf -- 'linuxarm64' ;; \
+        esac ; \
+    } ; \
+\
+    FFMPEG_ARCH="$(decide_arch)" ; \
+    for url in $(awk ' \
+      $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; } \
+      ' "${DESTDIR}/${FFMPEG_FILE_SUMS}") \
+    do \
+        url="${FFMPEG_URL}/${url# }" ; \
+        printf -- '%s\n' "${url}" ; \
+        aria2c_options "${url}" ; \
+        printf -- '\n' ; \
+    done > /tmp/downloads ; \
+    unset -v url ; \
+\
     aria2c --no-conf=true \
       --dir /downloaded \
       --lowest-speed-limit='16K' \
       --show-console-readout=false \
       --summary-interval=0 \
-      --input-file /tmp/downloads
-
-    apk --no-cache --no-progress add cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum"
-    
-    decide_expected() {
+      --input-file /tmp/downloads ; \
+\
+    apk --no-cache --no-progress add cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum" ; \
+\    
+    decide_expected() { \
         case "${TARGETARCH}" in \
             (amd64) printf -- '%s' "${FFMPEG_CHECKSUM_AMD64}" ;; \
             (arm64) printf -- '%s' "${FFMPEG_CHECKSUM_ARM64}" ;; \
-        esac
-    }
-
-    FFMPEG_HASH="$(decide_expected)"
-
-    cd "${DESTDIR}"
-    if [ -n "${FFMPEG_HASH}" ]
-    then
-        printf -- '%s *%s\n' "${FFMPEG_HASH}" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" >> /tmp/SUMS
-        "${CHECKSUM_ALGORITHM}sum" --check --strict /tmp/SUMS || exit
-    fi
-    "${CHECKSUM_ALGORITHM}sum" --check --strict --ignore-missing "${DESTDIR}/${FFMPEG_FILE_SUMS}"
-
-    mkdir -v -p "/verified/${TARGETARCH}"
-    ln -v "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" "/verified/${TARGETARCH}/"
-    rm -rf "${DESTDIR}"
-EOF
+        esac ; \
+    } \
+\
+    FFMPEG_HASH="$(decide_expected)" ; \
+\
+    cd "${DESTDIR}" ; \
+    if [ -n "${FFMPEG_HASH}" ] ; \
+    then \
+        printf -- '%s *%s\n' "${FFMPEG_HASH}" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" >> /tmp/SUMS ; \
+        "${CHECKSUM_ALGORITHM}sum" --check --strict /tmp/SUMS || exit ; \
+    fi ; \
+    "${CHECKSUM_ALGORITHM}sum" --check --strict --ignore-missing "${DESTDIR}/${FFMPEG_FILE_SUMS}" ; \
+\
+    mkdir -v -p "/verified/${TARGETARCH}" ; \
+    ln -v "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" "/verified/${TARGETARCH}/" ; \
+    rm -rf "${DESTDIR}" ;
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-extracted
 COPY --link --from=ffmpeg-download /verified /verified
