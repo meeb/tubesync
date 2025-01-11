@@ -589,6 +589,7 @@ class Source(models.Model):
             'key': 'SoMeUnIqUiD',
             'format': '-'.join(fmt),
             'playlist_title': 'Some Playlist Title',
+            'video_order': '1',
             'ext': self.extension,
             'resolution': self.source_resolution if self.source_resolution else '',
             'height': '720' if self.source_resolution else '',
@@ -1128,6 +1129,7 @@ class Media(models.Model):
             'key': self.key,
             'format': '-'.join(display_format['format']),
             'playlist_title': self.playlist_title,
+            'video_order': self.get_episode_str(),
             'ext': self.source.extension,
             'resolution': display_format['resolution'],
             'height': display_format['height'],
@@ -1373,8 +1375,7 @@ class Media(models.Model):
         nfo.append(season)
         # episode = number of video in the year
         episode = nfo.makeelement('episode', {})
-        episode_number = self.calculate_episode_number()
-        episode.text = str(episode_number) if episode_number else ''
+        episode.text = self.get_episode_str()
         episode.tail = '\n  '
         nfo.append(episode)
         # ratings = media metadata youtube rating
@@ -1523,6 +1524,10 @@ class Media(models.Model):
             if media == self:
                 return position_counter
             position_counter += 1
+
+    def get_episode_str(self):
+        episode_number = self.calculate_episode_number()
+        return f'{episode_number:02}' if episode_number else ''
 
 
 class MediaServer(models.Model):
