@@ -88,7 +88,7 @@ RUN <<EOF
 
     mkdir -v -p "/verified/${TARGETARCH}"
     printf -- '%s *%s\n' "$(decide_expected)" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" | "${CHECKSUM_ALGORITHM}sum" --check --strict
-    ln -v "/verified/${TARGETARCH}/" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}"
+    ln -v "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" "/verified/${TARGETARCH}/"
 
     mkdir -v /extracted
     cd /extracted
