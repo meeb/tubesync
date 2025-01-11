@@ -27,7 +27,7 @@ ARG FFMPEG_URL="https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobu
 
 ARG DESTDIR="/downloaded"
 ARG TARGETARCH
-ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
+ADD --link "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
 RUN <<EOF
     set -eu
     apk --no-cache --no-progress add cmd:aria2c cmd:awk
@@ -102,7 +102,7 @@ RUN <<EOF
 EOF
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-extracted
-COPY --from=ffmpeg-download /verified /verified
+COPY --link --from=ffmpeg-download /verified /verified
 
 ARG FFMPEG_PREFIX_FILE
 ARG FFMPEG_SUFFIX_FILE
@@ -124,7 +124,7 @@ RUN <<EOF
 EOF
 
 FROM scratch AS ffmpeg
-COPY --from=ffmpeg-extracted /extracted /usr/local/bin
+COPY --link --from=ffmpeg-extracted /extracted /usr/local/bin
 
 FROM scratch AS s6-overlay-download
 ARG S6_VERSION
@@ -156,7 +156,7 @@ ADD --link --checksum="${S6_CHECKSUM_ARM64}" "${S6_OVERLAY_URL}/${S6_FILE_ARM64}
 ADD --link --checksum="${S6_CHECKSUM_NOARCH}" "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
 
 FROM alpine:${ALPINE_VERSION} AS s6-overlay-extracted
-COPY --from=s6-overlay-download /downloaded /downloaded
+COPY --link --from=s6-overlay-download /downloaded /downloaded
 
 ARG TARGETARCH
 
@@ -201,7 +201,7 @@ RUN <<EOF
 EOF
 
 FROM scratch AS s6-overlay
-COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
+COPY --link --from=s6-overlay-extracted /s6-overlay-rootfs /
 
 FROM debian:bookworm-slim
 
