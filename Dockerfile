@@ -11,8 +11,11 @@ ARG SHA256_S6_ARM64="8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f6
 ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae"
 
 ARG ALPINE_VERSION="latest"
-ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION%%-*}"
+ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
+
+ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
+ARG S6_CHECKSUM_ALGORITHM="sha256"
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -21,7 +24,8 @@ ARG FFMPEG_PREFIX_FILE
 ARG FFMPEG_SUFFIX_FILE
 ARG SHA256_FFMPEG_AMD64
 ARG SHA256_FFMPEG_ARM64
-ARG CHECKSUM_ALGORITHM="sha256"
+ARG FFMPEG_CHECKSUM_ALGORITHM
+ARG CHECKSUM_ALGORITHM="${FFMPEG_CHECKSUM_ALGORITHM}"
 ARG FFMPEG_CHECKSUM_AMD64="${SHA256_FFMPEG_AMD64}"
 ARG FFMPEG_CHECKSUM_ARM64="${SHA256_FFMPEG_ARM64}"
 
@@ -57,6 +61,7 @@ RUN set -eu ; \
     } ; \
 \
     FFMPEG_ARCH="$(decide_arch)" ; \
+    FFMPEG_PREFIX_FILE="$( printf -- '%s' "${FFMPEG_PREFIX_FILE}" | cut -d '-' -f 1,2 )" ; \
     for url in $(awk ' \
       $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; } \
       ' "${DESTDIR}/${FFMPEG_FILE_SUMS}") ; \
@@ -75,7 +80,7 @@ RUN set -eu ; \
       --summary-interval=0 \
       --input-file /tmp/downloads ; \
 \
-    apk --no-cache --no-progress add cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum" ; \
+    apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" ; \
 \    
     decide_expected() { \
         case "${TARGETARCH}" in \
@@ -90,43 +95,44 @@ RUN set -eu ; \
     if [ -n "${FFMPEG_HASH}" ] ; \
     then \
         printf -- '%s *%s\n' "${FFMPEG_HASH}" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" >> /tmp/SUMS ; \
-        "${CHECKSUM_ALGORITHM}sum" --check --strict /tmp/SUMS || exit ; \
+        "${CHECKSUM_ALGORITHM}sum" --check --warn --strict /tmp/SUMS || exit ; \
     fi ; \
-    "${CHECKSUM_ALGORITHM}sum" --check --strict --ignore-missing "${DESTDIR}/${FFMPEG_FILE_SUMS}" ; \
+    "${CHECKSUM_ALGORITHM}sum" --check --warn --strict --ignore-missing "${DESTDIR}/${FFMPEG_FILE_SUMS}" ; \
 \
     mkdir -v -p "/verified/${TARGETARCH}" ; \
     ln -v "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" "/verified/${TARGETARCH}/" ; \
     rm -rf "${DESTDIR}" ;
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-extracted
-COPY --link --from=ffmpeg-download /verified /verified
+COPY --from=ffmpeg-download /verified /verified
 
 ARG FFMPEG_PREFIX_FILE
 ARG FFMPEG_SUFFIX_FILE
 ARG TARGETARCH
-RUN set -eu ; \
-    apk --no-cache --no-progress add cmd:tar cmd:xz ; \
-\
+RUN set -eux ; \
     mkdir -v /extracted ; \
     cd /extracted ; \
-    set -x ; \
-    tar -xp \
+    ln -s "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" "/tmp/ffmpeg${FFMPEG_SUFFIX_FILE}" ; \
+    tar -tf "/tmp/ffmpeg${FFMPEG_SUFFIX_FILE}" | grep '/bin/\(ffmpeg\|ffprobe\)' > /tmp/files ; \
+    tar -xop \
       --strip-components=2 \
-      --no-anchored \
-      --no-same-owner \
-      -f "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" \
-      'ffmpeg' 'ffprobe' ; \
+      -f "/tmp/ffmpeg${FFMPEG_SUFFIX_FILE}" \
+      -T /tmp/files ; \
 \
     ls -AlR /extracted ;
 
-FROM scratch AS s6-overlay-download
+FROM scratch AS ffmpeg
+COPY --from=ffmpeg-extracted /extracted /usr/local/bin/
+
+FROM alpine:${ALPINE_VERSION} AS s6-overlay-download
 ARG S6_VERSION
 ARG SHA256_S6_AMD64
 ARG SHA256_S6_ARM64
 ARG SHA256_S6_NOARCH
 
 ARG DESTDIR="/downloaded"
-ARG CHECKSUM_ALGORITHM="sha256"
+ARG S6_CHECKSUM_ALGORITHM
+ARG CHECKSUM_ALGORITHM="${S6_CHECKSUM_ALGORITHM}"
 
 ARG S6_CHECKSUM_AMD64="${CHECKSUM_ALGORITHM}:${SHA256_S6_AMD64}"
 ARG S6_CHECKSUM_ARM64="${CHECKSUM_ALGORITHM}:${SHA256_S6_ARM64}"
@@ -144,12 +150,28 @@ ADD "${S6_OVERLAY_URL}/${S6_FILE_AMD64}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
 ADD "${S6_OVERLAY_URL}/${S6_FILE_ARM64}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
 ADD "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
 
-ADD --checksum="${S6_CHECKSUM_AMD64}" "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" "${DESTDIR}/"
-ADD --checksum="${S6_CHECKSUM_ARM64}" "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
-ADD --checksum="${S6_CHECKSUM_NOARCH}" "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
+##ADD --checksum="${S6_CHECKSUM_AMD64}" "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" "${DESTDIR}/"
+##ADD --checksum="${S6_CHECKSUM_ARM64}" "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
+##ADD --checksum="${S6_CHECKSUM_NOARCH}" "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
+
+# --checksum wasn't recognized, so use busybox to check the sums instead
+ADD "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" "${DESTDIR}/"
+RUN set -eu ; checksum="${S6_CHECKSUM_AMD64}" ; file="${S6_FILE_AMD64}" ; cd "${DESTDIR}/" && \
+    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
+
+ADD "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
+RUN set -eu ; checksum="${S6_CHECKSUM_ARM64}" ; file="${S6_FILE_ARM64}" ; cd "${DESTDIR}/" && \
+    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
+
+ADD "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
+RUN set -eu ; checksum="${S6_CHECKSUM_NOARCH}" ; file="${S6_FILE_NOARCH}" ; cd "${DESTDIR}/" && \
+    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
 
 FROM alpine:${ALPINE_VERSION} AS s6-overlay-extracted
-COPY --link --from=s6-overlay-download /downloaded /downloaded
+COPY --from=s6-overlay-download /downloaded /downloaded
+
+ARG S6_CHECKSUM_ALGORITHM
+ARG CHECKSUM_ALGORITHM="${S6_CHECKSUM_ALGORITHM}"
 
 ARG TARGETARCH
 
@@ -168,11 +190,12 @@ RUN set -eu ; \
       unset -v arg1 ; \
     } ; \
 \
+    apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" ; \
     mkdir -v /verified ; \
     cd /downloaded ; \
     for f in *.sha256 ; \
     do \
-      sha256sum -c < "${f}" || exit ; \
+      "${CHECKSUM_ALGORITHM}sum" --check --warn --strict "${f}" || exit ; \
       ln -v "${f%.sha256}" /verified/ || exit ; \
     done ; \
     unset -v f ; \
@@ -190,6 +213,9 @@ RUN set -eu ; \
     done ; \
     set +x ; \
     unset -v f ;
+
+FROM scratch AS s6-overlay
+COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
 FROM debian:bookworm-slim AS tubesync
 
@@ -214,8 +240,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
   S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
 
 # Install third party software
-COPY --link --from=s6-overlay-extracted /s6-overlay-rootfs /
-COPY --link --from=ffmpeg-extracted /extracted /usr/local/bin/
+COPY --from=s6-overlay / /
+COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
 RUN set -x && \
