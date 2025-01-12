@@ -1,3 +1,6 @@
+# syntax=docker/dockerfile:1
+# check=error=true
+
 ARG FFMPEG_DATE="2025-01-10-19-43"
 ARG FFMPEG_VERSION="N-118280-g5cd49e1bfd"
 
