@@ -375,7 +375,7 @@ RUN set -x && \
 COPY config/root /
 
 # Create a healthcheck
-HEALTHCHECK --interval=1m --timeout=10s CMD /app/healthcheck.py http://127.0.0.1:8080/healthcheck
+HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
 
 # ENVS and ports
 ENV PYTHONPATH="/app" PYTHONPYCACHEPREFIX="/config/cache/pycache"
