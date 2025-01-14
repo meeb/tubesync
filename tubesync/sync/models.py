@@ -19,7 +19,7 @@ from common.utils import clean_filename, clean_emoji
 from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media,
                       get_channel_image_info as get_youtube_channel_image_info)
-from .utils import seconds_to_timestr, parse_media_format
+from .utils import seconds_to_timestr, parse_media_format, filter_response
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
@@ -1145,8 +1145,39 @@ class Media(models.Model):
     def has_metadata(self):
         return self.metadata is not None
 
+
+    @property
+    def reduce_data(self):
+        try:
+            from common.logger import log
+            from common.utils import json_serial
+
+            old_mdl = len(self.metadata or "")
+            data = json.loads(self.metadata or "")
+            compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
+            
+            filtered_data = filter_response(data, True)
+            filtered_json = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
+        except Exception as e:
+            log.exception('reduce_data: %s', e)
+        else:
+            # log the results of filtering / compacting on metadata size
+            new_mdl = len(compact_json)
+            if old_mdl > new_mdl:
+                delta = old_mdl - new_mdl
+                log.info(f'{self.key}: metadata compacted by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
+            new_mdl = len(filtered_json)
+            if old_mdl > new_mdl:
+                delta = old_mdl - new_mdl
+                log.info(f'{self.key}: metadata reduced by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
+                if getattr(settings, 'SHRINK_OLD_MEDIA_METADATA', False):
+                    self.metadata = filtered_json
+
+
     @property
     def loaded_metadata(self):
+        if getattr(settings, 'SHRINK_OLD_MEDIA_METADATA', False):
+            self.reduce_data
         try:
             data = json.loads(self.metadata)
             if not isinstance(data, dict):
