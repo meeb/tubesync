@@ -1174,7 +1174,8 @@ class Media(models.Model):
 
     @property
     def loaded_metadata(self):
-        self.reduce_data
+        if getattr(settings, 'SHRINK_OLD_MEDIA_METADATA', False):
+            self.reduce_data
         try:
             data = json.loads(self.metadata)
             if not isinstance(data, dict):
