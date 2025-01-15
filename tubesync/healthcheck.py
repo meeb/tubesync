@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 '''
 
     Perform an HTTP request to a URL and exit with an exit code of 1 if the
