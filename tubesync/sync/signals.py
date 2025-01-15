@@ -1,5 +1,6 @@
 import os
 import glob
+from pathlib import Path
 from django.conf import settings
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
 from django.dispatch import receiver
@@ -12,8 +13,9 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     download_media_thumbnail, download_media_metadata,
                     map_task_to_instance, check_source_directory_exists,
                     download_media, rescan_media_server, download_source_images,
-                    save_all_media_for_source, get_media_metadata_task)
-from .utils import delete_file
+                    save_all_media_for_source, rename_all_media_for_source,
+                    get_media_metadata_task)
+from .utils import delete_file, glob_quote
 from .filtering import filter_media
 
 
@@ -68,10 +70,17 @@ def source_post_save(sender, instance, created, **kwargs):
                 verbose_name=verbose_name.format(instance.name),
                 remove_existing_tasks=True
             )
+    verbose_name = _('Renaming all media for source "{}"')
+    rename_all_media_for_source(
+        str(instance.pk),
+        priority=0,
+        verbose_name=verbose_name.format(instance.name),
+        remove_existing_tasks=True
+    )
     verbose_name = _('Checking all media for source "{}"')
     save_all_media_for_source(
         str(instance.pk),
-        priority=0,
+        priority=1,
         verbose_name=verbose_name.format(instance.name),
         remove_existing_tasks=True
     )
@@ -189,19 +198,63 @@ def media_pre_delete(sender, instance, **kwargs):
     if thumbnail_url:
         delete_task_by_media('sync.tasks.download_media_thumbnail',
                              (str(instance.pk), thumbnail_url))
-    if instance.source.delete_files_on_disk and (instance.media_file or instance.thumb):
-        # Delete all media files if it contains filename
-        filepath = instance.media_file.path if instance.media_file else instance.thumb.path
-        barefilepath, fileext = os.path.splitext(filepath)
-        # Get all files that start with the bare file path
-        all_related_files = glob.glob(f'{barefilepath}.*')
-        for file in all_related_files:
-            log.info(f'Deleting file for: {instance} path: {file}')
-            delete_file(file)
 
 
 @receiver(post_delete, sender=Media)
 def media_post_delete(sender, instance, **kwargs):
+    # Remove thumbnail file for deleted media
+    if instance.thumb:
+        instance.thumb.delete(save=False)
+    # Remove the video file, when configured to do so
+    if instance.source.delete_files_on_disk and instance.media_file:
+        video_path = Path(str(instance.media_file.path)).resolve()
+        instance.media_file.delete(save=False)
+        # the other files we created have these known suffixes
+        for suffix in frozenset(('nfo', 'jpg', 'webp', 'info.json',)):
+            other_path = video_path.with_suffix(f'.{suffix}').resolve()
+            log.info(f'Deleting file for: {instance} path: {other_path!s}')
+            delete_file(other_path)
+        # Jellyfin creates .trickplay directories and posters
+        for suffix in frozenset(('.trickplay', '-poster.jpg', '-poster.webp',)):
+            # with_suffix insists on suffix beginning with '.' for no good reason
+            other_path = Path(str(video_path.with_suffix('')) + suffix).resolve()
+            if other_path.is_file():
+                log.info(f'Deleting file for: {instance} path: {other_path!s}')
+                delete_file(other_path)
+            elif other_path.is_dir():
+                # Delete the contents of the directory
+                paths = list(other_path.rglob('*'))
+                attempts = len(paths)
+                while paths and attempts > 0:
+                    attempts -= 1
+                    # delete files first
+                    for p in list(filter(lambda x: x.is_file(), paths)):
+                        log.info(f'Deleting file for: {instance} path: {p!s}')
+                        delete_file(p)
+                    # refresh the list
+                    paths = list(other_path.rglob('*'))
+                    # delete directories
+                    # a directory with a subdirectory will fail
+                    # we loop to try removing each of them
+                    # a/b/c: c then b then a, 3 times around the loop
+                    for p in list(filter(lambda x: x.is_dir(), paths)):
+                        try:
+                            p.rmdir()
+                            log.info(f'Deleted directory for: {instance} path: {p!s}')
+                        except OSError as e:
+                            pass
+                # Delete the directory itself
+                try:
+                    other_path.rmdir()
+                    log.info(f'Deleted directory for: {instance} path: {other_path!s}')
+                except OSError as e:
+                    pass
+        # Get all files that start with the bare file path
+        all_related_files = video_path.parent.glob(f'{glob_quote(video_path.with_suffix("").name)}*')
+        for file in all_related_files:
+            log.info(f'Deleting file for: {instance} path: {file}')
+            delete_file(file)
+
     # Schedule a task to update media servers
     for mediaserver in MediaServer.objects.all():
         log.info(f'Scheduling media server updates')
@@ -212,3 +265,4 @@ def media_post_delete(sender, instance, **kwargs):
             verbose_name=verbose_name.format(mediaserver),
             remove_existing_tasks=True
         )
+
