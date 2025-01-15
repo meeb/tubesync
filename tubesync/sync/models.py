@@ -591,6 +591,7 @@ class Source(models.Model):
             'key': 'SoMeUnIqUiD',
             'format': '-'.join(fmt),
             'playlist_title': 'Some Playlist Title',
+            'video_order': '01',
             'ext': self.extension,
             'resolution': self.source_resolution if self.source_resolution else '',
             'height': '720' if self.source_resolution else '',
@@ -1130,6 +1131,7 @@ class Media(models.Model):
             'key': self.key,
             'format': '-'.join(display_format['format']),
             'playlist_title': self.playlist_title,
+            'video_order': self.get_episode_str(True),
             'ext': self.source.extension,
             'resolution': display_format['resolution'],
             'height': display_format['height'],
@@ -1176,7 +1178,8 @@ class Media(models.Model):
 
     @property
     def loaded_metadata(self):
-        self.reduce_data
+        if getattr(settings, 'SHRINK_OLD_MEDIA_METADATA', False):
+            self.reduce_data
         try:
             data = json.loads(self.metadata)
             if not isinstance(data, dict):
@@ -1295,8 +1298,7 @@ class Media(models.Model):
 
     @property
     def directory_path(self):
-        dirname = self.source.directory_path / self.filename
-        return dirname.parent
+        return self.filepath.parent
 
     @property
     def filepath(self):
@@ -1405,8 +1407,7 @@ class Media(models.Model):
         nfo.append(season)
         # episode = number of video in the year
         episode = nfo.makeelement('episode', {})
-        episode_number = self.calculate_episode_number()
-        episode.text = str(episode_number) if episode_number else ''
+        episode.text = self.get_episode_str()
         episode.tail = '\n  '
         nfo.append(episode)
         # ratings = media metadata youtube rating
@@ -1555,6 +1556,18 @@ class Media(models.Model):
             if media == self:
                 return position_counter
             position_counter += 1
+
+
+    def get_episode_str(self, use_padding=False):
+        episode_number = self.calculate_episode_number()
+        if not episode_number:
+            return ''
+
+        if use_padding:
+            return f'{episode_number:02}'
+        
+        return str(episode_number)
+
 
     def rename_files(self):
         if self.downloaded and self.media_file:
