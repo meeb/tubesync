@@ -138,6 +138,8 @@ services:
       - PGID=1000
 ```
 
+> [!IMPORTANT]  
+> If the `/downloads` directory is mounted to a volume which points to a remote storage, make sure to suppy the `UID` and `GID` parameters in the driver options, to match the `PUID` and `PGID` specified as environment variables to prevent permission issues. [See this issue for details](https://github.com/meeb/tubesync/issues/616#issuecomment-2593458282)
 
 ## Optional authentication
 
