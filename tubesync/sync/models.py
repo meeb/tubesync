@@ -1418,7 +1418,7 @@ class Media(models.Model):
         rating_attrs = OrderedDict()
         rating_attrs['name'] = 'youtube'
         rating_attrs['max'] = '5'
-        rating_attrs['default'] = 'True'
+        rating_attrs['default'] = 'true'
         rating = nfo.makeelement('rating', rating_attrs)
         rating.text = '\n      '
         rating.append(value)
