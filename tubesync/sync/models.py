@@ -1426,7 +1426,8 @@ class Media(models.Model):
         rating.tail = '\n  '
         ratings = nfo.makeelement('ratings', {})
         ratings.text = '\n    '
-        ratings.append(rating)
+        if self.rating is not None:
+            ratings.append(rating)
         ratings.tail = '\n  '
         nfo.append(ratings)
         # plot = media metadata description
