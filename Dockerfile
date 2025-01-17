@@ -322,7 +322,6 @@ RUN --mount=type=tmpfs,target=/cache \
   cp -at /tmp/ "${HOME}" && \
   HOME="/tmp/${HOME#/}" \
   XDG_CACHE_HOME='/cache' \
-  # PIPENV_CACHE_DIR='/cache/pipenv'
   PIPENV_VERBOSITY=64 \
     pipenv install --system --skip-lock && \
   # Clean up
