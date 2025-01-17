@@ -220,6 +220,7 @@ COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 FROM debian:${DEBIAN_VERSION} AS cache-apt
 RUN \
     set -eu ; \
+    rm -f /etc/apt/apt.conf.d/docker-clean ; \
     DEBIAN_FRONTEND="noninteractive" apt-get update ; \
     cache_dir='/cache/apt' ; \
     mkdir -v -p "${cache_dir}" ; \
