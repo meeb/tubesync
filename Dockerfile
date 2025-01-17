@@ -36,7 +36,7 @@ ARG DESTDIR="/downloaded"
 ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
 RUN set -eu ; \
-    apk --no-cache --no-progress add cmd:aria2c cmd:awk ; \
+    apk --no-cache --no-progress add cmd:aria2c cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum" ; \
 \
     aria2c_options() { \
         algorithm="${CHECKSUM_ALGORITHM%[0-9]??}" ; \
@@ -80,8 +80,6 @@ RUN set -eu ; \
       --summary-interval=0 \
       --input-file /tmp/downloads ; \
 \
-    apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" ; \
-\    
     decide_expected() { \
         case "${TARGETARCH}" in \
             (amd64) printf -- '%s' "${FFMPEG_CHECKSUM_AMD64}" ;; \
