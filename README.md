@@ -139,7 +139,7 @@ services:
 ```
 
 > [!IMPORTANT]  
-> If the `/downloads` directory is mounted to a volume which points to a remote storage, make sure to suppy the `UID` and `GID` parameters in the driver options, to match the `PUID` and `PGID` specified as environment variables to prevent permission issues. [See this issue for details](https://github.com/meeb/tubesync/issues/616#issuecomment-2593458282)
+> If the `/downloads` directory is mounted to a [Samba volume](https://docs.docker.com/engine/storage/volumes/#create-cifssamba-volumes), make sure to suppy the `UID` and `GID` parameters in the driver options. These have to be the same as the `PUID` and `PGID`, which were specified as environment variables. This prevents issues when executing file actions (like writing metadata). [See this issue for details](https://github.com/meeb/tubesync/issues/616#issuecomment-2593458282)
 
 ## Optional authentication
 
