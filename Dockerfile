@@ -99,7 +99,7 @@ RUN set -eu ; \
 \
     mkdir -v -p "/verified/${TARGETARCH}" ; \
     ln -v "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" "/verified/${TARGETARCH}/" ; \
-    rm -rf "${DESTDIR}" ;
+    rm -rf "${DESTDIR}" ; ls -alR /*ed ;
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-extracted
 COPY --from=ffmpeg-download /verified /verified
