@@ -225,7 +225,8 @@ COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
 FROM debian:${DEBIAN_VERSION} AS cache-apt
 ARG DEBIAN_PKGS
-RUN --mount=type=cache,id=apt-cache,sharing=private,target=/cache/apt \
+RUN --mount=type=cache,id=apt-lib,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache,sharing=locked,target=/var/cache/apt \
     set -eu ; \
     rm -f /etc/apt/apt.conf.d/docker-clean ; \
     DEBIAN_FRONTEND='noninteractive'; export DEBIAN_FRONTEND ; \
@@ -236,7 +237,7 @@ RUN --mount=type=cache,id=apt-cache,sharing=private,target=/cache/apt \
     mkdir -v -p "${cache_dir}" ; \
     tar -C /var/cache -cf "${cache_dir}/cache.tar" apt ; \
     tar -C /var/lib -cf "${cache_dir}/lib.tar" apt ; \
-    apt-get --assume-yes clean ; \
+    apt-get --assume-yes autoclean ; \
     file="${cache_dir}/apt.sh" ; \
     printf -- '#!/bin/sh\n\n' >| "${file}" ; \
     chmod -v a+rx "${file}" ; \
