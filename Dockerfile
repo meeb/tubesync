@@ -230,15 +230,15 @@ RUN \
     ${DEBIAN_PKGS} ; \
     cache_dir='/cache/apt' ; \
     mkdir -v -p "${cache_dir}" ; \
-    tar -C /var/cache -cJf "${cache_dir}/cache.tar.xz" apt ; \
-    tar -C /var/lib -cJf "${cache_dir}/lib.tar.xz" apt ; \
+    tar -C /var/cache -cf "${cache_dir}/cache.tar" apt ; \
+    tar -C /var/lib -cf "${cache_dir}/lib.tar" apt ; \
     file="${cache_dir}/apt.sh" ; \
     printf -- '#!/bin/sh\n\n' >| "${file}" ; \
     chmod -v a+rx "${file}" ; \
     printf -- '%s\n' >> "${file}" \
         'cd "$(dirname "$0")" ;' \
-        'tar -C /var/cache -xpf cache.tar.xz ;' \
-        'tar -C /var/lib -xpf lib.tar.xz ;'
+        'tar -C /var/cache -xpf cache.tar ;' \
+        'tar -C /var/lib -xpf lib.tar ;'
 
 FROM debian:${DEBIAN_VERSION} AS tubesync
 
