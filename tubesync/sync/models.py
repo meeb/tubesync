@@ -1444,7 +1444,8 @@ class Media(models.Model):
         mpaa = nfo.makeelement('mpaa', {})
         mpaa.text = str(self.age_limit)
         mpaa.tail = '\n  '
-        nfo.append(mpaa)
+        if self.age_limit and self.age_limit > 0:
+            nfo.append(mpaa)
         # runtime = media metadata duration in seconds
         runtime = nfo.makeelement('runtime', {})
         runtime.text = str(self.duration)
