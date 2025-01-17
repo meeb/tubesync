@@ -321,8 +321,11 @@ ENV PIP_NO_COMPILE=1 \
 WORKDIR /app
 
 # Set up the app
-RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
+RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
+    --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
+    --mount=type=cache,id=apt-cache,readonly,from=cache-apt,source=/cache/apt,target=/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
+  unset -v PIP_NO_CACHE_DIR ; \
   set -x && \
   { test -x /cache/apt.sh && /cache/apt.sh || apt-get update ; } && \
   # Install required build packages
@@ -344,9 +347,12 @@ RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
   useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
   cp -at /tmp/ "${HOME}" && \
-  PIPENV_VERBOSITY=64 HOME="/tmp/${HOME#/}" pipenv install --system --skip-lock && \
+  HOME="/tmp/${HOME#/}" \
+  PIPENV_VERBOSITY=64 \
+  PIP_CACHE_DIR='/cache/pip' \
+  PIPENV_CACHE_DIR='/cache/pipenv' \
+    pipenv install --system --skip-lock && \
   # Clean up
-  pipenv --clear && \
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
   g++ \
