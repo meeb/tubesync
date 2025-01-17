@@ -225,17 +225,20 @@ ARG S6_VERSION
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 
-ENV S6_VERSION="${S6_VERSION}" \
-  FFMPEG_DATE="${FFMPEG_DATE}" \
-  FFMPEG_VERSION="${FFMPEG_VERSION}"
-
 ENV DEBIAN_FRONTEND="noninteractive" \
-  HOME="/root" \
-  LANGUAGE="en_US.UTF-8" \
-  LANG="en_US.UTF-8" \
-  LC_ALL="en_US.UTF-8" \
-  TERM="xterm" \
-  S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
+    HOME="/root" \
+    LANGUAGE="en_US.UTF-8" \
+    LANG="en_US.UTF-8" \
+    LC_ALL="en_US.UTF-8" \
+    TERM="xterm" \
+    # Do not include compiled byte-code
+    PIP_NO_COMPILE=1 \
+    PIP_ROOT_USER_ACTION='ignore' \
+    S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
+
+ENV S6_VERSION="${S6_VERSION}" \
+    FFMPEG_DATE="${FFMPEG_DATE}" \
+    FFMPEG_VERSION="${FFMPEG_VERSION}"
 
 # Install third party software
 COPY --from=s6-overlay / /
@@ -285,10 +288,6 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
 # Copy over pip.conf to use piwheels
 COPY pip.conf /etc/pip.conf
 
-# Do not include compiled byte-code
-ENV PIP_NO_COMPILE=1 \
-  PIP_ROOT_USER_ACTION='ignore'
-
 # Switch workdir to the the app
 WORKDIR /app
 
@@ -323,8 +322,8 @@ RUN --mount=type=tmpfs,target=/cache \
   cp -at /tmp/ "${HOME}" && \
   HOME="/tmp/${HOME#/}" \
   XDG_CACHE_HOME='/cache' \
+  # PIPENV_CACHE_DIR='/cache/pipenv'
   PIPENV_VERBOSITY=64 \
-  PIPENV_CACHE_DIR='/cache/pipenv' \
     pipenv install --system --skip-lock && \
   # Clean up
   apt-get -y autoremove --purge \
@@ -342,7 +341,7 @@ RUN --mount=type=tmpfs,target=/cache \
   && \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
-  rm -rf /tmp/*
+  rm -v -rf /tmp/*
 
 # Copy app
 COPY tubesync /app
@@ -373,7 +372,8 @@ COPY config/root /
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
 
 # ENVS and ports
-ENV PYTHONPATH="/app" PYTHONPYCACHEPREFIX="/config/cache/pycache"
+ENV PYTHONPATH="/app" \
+    PYTHONPYCACHEPREFIX="/config/cache/pycache"
 EXPOSE 4848
 
 # Volumes
