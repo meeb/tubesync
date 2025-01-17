@@ -346,7 +346,7 @@ RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
   cp -at /tmp/ "${HOME}" && \
   PIPENV_VERBOSITY=64 HOME="/tmp/${HOME#/}" pipenv install --system --skip-lock && \
   # Clean up
-  rm /app/Pipfile && \
+  rm -f /app/Pipfile && \
   pipenv --clear && \
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
