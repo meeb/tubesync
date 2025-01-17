@@ -19,11 +19,6 @@ ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 
-ARG DEBIAN_PKGS="\
-    binutils build-essential ca-certificates curl file gcc g++ less \
-    libjpeg-dev libjson-perl libssl-dev libwebp-dev locales make \
-    nginx-light pipenv python3-dev python3-pip python3-setuptools xz-utils \
-    "
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -223,31 +218,6 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
-FROM debian:${DEBIAN_VERSION} AS cache-apt
-ARG DEBIAN_PKGS
-RUN --mount=type=cache,id=apt-lib,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache,sharing=locked,target=/var/cache/apt \
-    set -eu ; \
-    rm -f /etc/apt/apt.conf.d/docker-clean ; \
-    DEBIAN_FRONTEND='noninteractive'; export DEBIAN_FRONTEND ; \
-    apt-get update && \
-    apt-get --assume-yes install --download-only --no-install-recommends \
-    ${DEBIAN_PKGS} ; \
-    cache_dir='/cache/apt' ; \
-    mkdir -v -p "${cache_dir}" ; \
-    tar -C /var/cache -cf "${cache_dir}/cache.tar" apt ; \
-    tar -C /var/lib -cf "${cache_dir}/lib.tar" apt ; \
-    apt-get --assume-yes autoclean ; \
-    file="${cache_dir}/apt.sh" ; \
-    printf -- '#!/bin/sh\n\n' >| "${file}" ; \
-    chmod -v a+rx "${file}" ; \
-    printf -- '%s\n' >> "${file}" \
-        'rm -f /etc/apt/apt.conf.d/docker-clean ;' \
-        'set -e ;' \
-        'cd "$(dirname "$0")" ;' \
-        'tar -C /var/cache -xpf cache.tar ;' \
-        'tar -C /var/lib -xpf lib.tar ;'
-
 FROM debian:${DEBIAN_VERSION} AS tubesync
 
 ARG S6_VERSION
@@ -272,13 +242,14 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
+RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
   set -x && \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
-  # Update from the cache and/or the network
-  { test '!' -x /cache/apt.sh || /cache/apt.sh ; } && \
+  # Update from the network and keep cache
+  rm -f /etc/apt/apt.conf.d/docker-clean ; \
   apt-get update && \
   # Install locales
   apt-get -y --no-install-recommends install locales && \
@@ -311,7 +282,7 @@ RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
   && \
   # Clean up
   apt-get -y autopurge && \
-  apt-get -y clean && \
+  apt-get -y autoclean && \
   rm -rf /tmp/*
 
 # Copy over pip.conf to use piwheels
@@ -328,11 +299,12 @@ WORKDIR /app
 # Set up the app
 RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
-    --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache/apt \
+    --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   unset -v PIP_NO_CACHE_DIR ; \
   set -x && \
-  { test '!' -x /cache/apt/apt.sh || /cache/apt/apt.sh ; } && \
+  rm -f /etc/apt/apt.conf.d/docker-clean ; \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -370,7 +342,7 @@ RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
   zlib1g-dev \
   && \
   apt-get -y autopurge && \
-  apt-get -y clean && \
+  apt-get -y autoclean && \
   rm -rf /tmp/*
 
 # Copy app
