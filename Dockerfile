@@ -240,6 +240,8 @@ RUN \
     printf -- '#!/bin/sh\n\n' >| "${file}" ; \
     chmod -v a+rx "${file}" ; \
     printf -- '%s\n' >> "${file}" \
+        'rm -f /etc/apt/apt.conf.d/docker-clean ;' \
+        'set -e ;' \
         'cd "$(dirname "$0")" ;' \
         'tar -C /var/cache -xpf cache.tar ;' \
         'tar -C /var/lib -xpf lib.tar ;'
