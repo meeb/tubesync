@@ -19,6 +19,8 @@ ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 
+ARG DEBIAN_PKGS="bin-utils ca-certificates curl file gcc g++ less locales make nginx-light pipenv python3-dev xz-utils"
+
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
@@ -218,21 +220,25 @@ FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
 FROM debian:${DEBIAN_VERSION} AS cache-apt
+ARG DEBIAN_PKGS
 RUN \
     set -eu ; \
     rm -f /etc/apt/apt.conf.d/docker-clean ; \
-    DEBIAN_FRONTEND="noninteractive" apt-get update ; \
+    DEBIAN_FRONTEND="noninteractive"; export DEBIAN_FRONTEND ; \
+    apt-get --quiet update ; \
+    apt-get --quiet --assume-yes install --download-only --no-install-recommends \
+    ${DEBIAN_PKGS} ; \
     cache_dir='/cache/apt' ; \
     mkdir -v -p "${cache_dir}" ; \
-    tar -C /var/cache -cf "${cache_dir}"/cache.tar apt ; \
-    tar -C /var/lib -cf "${cache_dir}"/lib.tar apt ; \
+    tar -C /var/cache -cJf "${cache_dir}"/cache.tar.xz apt ; \
+    tar -C /var/lib -cJf "${cache_dir}"/lib.tar.xz apt ; \
     file="${cache_dir}/apt.sh" ; \
     printf -- '#!/bin/sh\n\n' >| "${file}" ; \
     chmod -v a+rx "${file}" ; \
     printf -- '%s\n' >> "${file}" \
         'cd "$(dirname "$0")" ;' \
-        'tar -C /var/cache -xpf cache.tar ;' \
-        'tar -C /var/lib -xpf lib.tar ;'
+        'tar -C /var/cache -xpf cache.tar.xz ;' \
+        'tar -C /var/lib -xpf lib.tar.xz ;'
 
 FROM debian:${DEBIAN_VERSION} AS tubesync
 
