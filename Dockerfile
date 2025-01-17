@@ -274,7 +274,7 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
+RUN --mount=type=cache,id=apt-cache,readonly,target=/cache \
   set -x && \
   { test -x /cache/apt.sh && /cache/apt.sh ; } && \
   apt-get update && \
@@ -295,7 +295,7 @@ RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
   rm -rf /tmp/*
 
 # Install dependencies we keep
-RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
+RUN --mount=type=cache,id=apt-cache,readonly,target=/cache \
   set -x && \
   { test -x /cache/apt.sh && /cache/apt.sh ; } && \
   apt-get update && \
@@ -332,7 +332,7 @@ WORKDIR /app
 # Set up the app
 RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
-    --mount=type=cache,id=apt-cache,readonly,from=cache-apt,source=/cache/apt,target=/cache/apt \
+    --mount=type=cache,id=apt-cache,readonly,target=/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   unset -v PIP_NO_CACHE_DIR ; \
   set -x && \
