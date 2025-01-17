@@ -245,9 +245,6 @@ COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
   set -x && \
-  # Create a 'app' user which the application will run as
-  groupadd app && \
-  useradd -M -d /app -s /bin/false -g app app && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean ; \
   apt-get update && \
@@ -304,6 +301,10 @@ RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   unset -v PIP_NO_CACHE_DIR ; \
   set -x && \
+  # Create a 'app' user which the application will run as
+  groupadd app && \
+  useradd -M -d /app -s /bin/false -g app app && \
+  # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean ; \
   apt-get update && \
   # Install required build packages
