@@ -229,8 +229,9 @@ RUN \
     printf -- '#!/bin/sh\n\n' >| "${file}" ; \
     chmod -v a+rx "${file}" ; \
     printf -- '%s\n' >> "${file}" \
-        'tar -C /var/cache -xpf '"${cache_dir}"'/cache.tar ;' \
-        'tar -C /var/lib -xpf '"${cache_dir}"'/lib.tar ;'
+        'cd "$(dirname "$0")" ;' \
+        'tar -C /var/cache -xpf cache.tar ;' \
+        'tar -C /var/lib -xpf lib.tar ;'
 
 FROM debian:${DEBIAN_VERSION} AS tubesync
 
