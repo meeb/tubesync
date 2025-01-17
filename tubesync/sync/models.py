@@ -1599,7 +1599,7 @@ class Media(models.Model):
                     new_video_path = new_video_path.resolve(strict=True)
 
                     # update the media_file in the db
-                    self.media_file.name = str(new_video_path.relative_to(media_file_storage.location))
+                    self.media_file.name = str(new_video_path.relative_to(self.media_file.storage.location))
                     self.save(update_fields={'media_file'})
                     self.refresh_from_db(fields={'media_file'})
                     log.info(f'Updated "media_file" in the database for: {self!s}')
