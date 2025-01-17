@@ -327,7 +327,7 @@ RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   unset -v PIP_NO_CACHE_DIR ; \
   set -x && \
-  { test -x /cache/apt.sh && /cache/apt.sh || apt-get update ; } && \
+  { test -x /cache/apt/apt.sh && /cache/apt/apt.sh || apt-get update ; } && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
   default-libmysqlclient-dev \
