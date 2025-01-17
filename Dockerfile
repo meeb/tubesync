@@ -276,7 +276,7 @@ COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 # Reminder: the SHELL handles all variables
 RUN --mount=type=cache,id=apt-cache,readonly,target=/cache \
   set -x && \
-  { test -x /cache/apt.sh && /cache/apt.sh ; } && \
+  { test -x /cache/apt.sh && /cache/apt.sh || : ; } && \
   apt-get update && \
   apt-get -y --no-install-recommends install locales && \
   printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
@@ -297,7 +297,7 @@ RUN --mount=type=cache,id=apt-cache,readonly,target=/cache \
 # Install dependencies we keep
 RUN --mount=type=cache,id=apt-cache,readonly,target=/cache \
   set -x && \
-  { test -x /cache/apt.sh && /cache/apt.sh ; } && \
+  { test -x /cache/apt.sh && /cache/apt.sh || : ; } && \
   apt-get update && \
   # Install required distro packages
   apt-get -y --no-install-recommends install \
@@ -336,7 +336,7 @@ RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   unset -v PIP_NO_CACHE_DIR ; \
   set -x && \
-  { test -x /cache/apt/apt.sh && /cache/apt/apt.sh ; } && \
+  { test -x /cache/apt/apt.sh && /cache/apt/apt.sh || : ; } && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
