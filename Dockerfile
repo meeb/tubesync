@@ -19,7 +19,7 @@ ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 
-ARG DEBIAN_PKGS="binutils ca-certificates curl file gcc g++ less locales make nginx-light pipenv python3-dev xz-utils"
+ARG DEBIAN_PKGS="binutils ca-certificates curl file gcc g++ less libjpeg-dev libwebp-dev locales make nginx-light pipenv python3-dev xz-utils"
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
