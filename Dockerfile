@@ -11,6 +11,8 @@ ARG SHA256_S6_ARM64="8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f6
 ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae"
 
 ARG ALPINE_VERSION="latest"
+ARG DEBIAN_VERSION="bookworm-slim"
+
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 
@@ -215,7 +217,22 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
-FROM debian:bookworm-slim AS tubesync
+FROM debian:${DEBIAN_VERSION} AS cache-apt
+RUN \
+    set -eu ; \
+    DEBIAN_FRONTEND="noninteractive" apt-get update ; \
+    cache_dir='/cache/apt' ; \
+    mkdir -v -p "${cache_dir}" ; \
+    tar -C /var/cache -cf "${cache_dir}"/cache.tar apt ; \
+    tar -C /var/lib -cf "${cache_dir}"/lib.tar apt ; \
+    file="${cache_dir}/apt.sh" ; \
+    printf -- '#!/bin/sh\n\n' >| "${file}" ; \
+    chmod -v a+rx "${file}" ; \
+    printf -- '%s\n' >> "${file}" \
+        'tar -C /var/cache -xpf "${cache_dir}"/cache.tar ;' \
+        'tar -C /var/lib -xpf "${cache_dir}"/lib.tar ;'
+
+FROM debian:${DEBIAN_VERSION} AS tubesync
 
 ARG TARGETARCH
 ARG TARGETPLATFORM
@@ -242,8 +259,9 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
-RUN set -x && \
-  apt-get update && \
+RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
+  set -x && \
+  { test -x /cache/apt.sh && /cache/apt.sh || apt-get update ; } && \
   apt-get -y --no-install-recommends install locales && \
   printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
   locale-gen en_US.UTF-8 && \
@@ -261,8 +279,9 @@ RUN set -x && \
   rm -rf /tmp/*
 
 # Install dependencies we keep
-RUN set -x && \
-  apt-get update && \
+RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
+  set -x && \
+  { test -x /cache/apt.sh && /cache/apt.sh || apt-get update ; } && \
   # Install required distro packages
   apt-get -y --no-install-recommends install \
   libjpeg62-turbo \
@@ -285,9 +304,6 @@ RUN set -x && \
 # Copy over pip.conf to use piwheels
 COPY pip.conf /etc/pip.conf
 
-# Add Pipfile
-COPY Pipfile /app/Pipfile
-
 # Do not include compiled byte-code
 ENV PIP_NO_COMPILE=1 \
   PIP_NO_CACHE_DIR=1 \
@@ -297,10 +313,10 @@ ENV PIP_NO_COMPILE=1 \
 WORKDIR /app
 
 # Set up the app
-#BuildKit#RUN --mount=type=bind,source=Pipfile,target=/app/Pipfile \
-RUN \
+RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
+    --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
-  apt-get update && \
+  { test -x /cache/apt.sh && /cache/apt.sh || apt-get update ; } && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
   default-libmysqlclient-dev \
