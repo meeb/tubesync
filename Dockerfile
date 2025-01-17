@@ -287,14 +287,14 @@ COPY pip.conf /etc/pip.conf
 
 # Do not include compiled byte-code
 ENV PIP_NO_COMPILE=1 \
-  PIP_NO_CACHE_DIR=1 \
   PIP_ROOT_USER_ACTION='ignore'
 
 # Switch workdir to the the app
 WORKDIR /app
 
 # Set up the app
-RUN --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
+RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
@@ -322,6 +322,7 @@ RUN --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
   # Install non-distro packages
   cp -at /tmp/ "${HOME}" && \
   HOME="/tmp/${HOME#/}" \
+  XDG_CACHE_HOME='/cache' \
   PIPENV_VERBOSITY=64 \
   PIPENV_CACHE_DIR='/cache/pipenv' \
     pipenv install --system --skip-lock && \
