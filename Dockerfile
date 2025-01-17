@@ -19,7 +19,7 @@ ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 
-ARG DEBIAN_PKGS="bin-utils ca-certificates curl file gcc g++ less locales make nginx-light pipenv python3-dev xz-utils"
+ARG DEBIAN_PKGS="binutils ca-certificates curl file gcc g++ less locales make nginx-light pipenv python3-dev xz-utils"
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -224,14 +224,14 @@ ARG DEBIAN_PKGS
 RUN \
     set -eu ; \
     rm -f /etc/apt/apt.conf.d/docker-clean ; \
-    DEBIAN_FRONTEND="noninteractive"; export DEBIAN_FRONTEND ; \
-    apt-get --quiet update ; \
-    apt-get --quiet --assume-yes install --download-only --no-install-recommends \
+    DEBIAN_FRONTEND='noninteractive'; export DEBIAN_FRONTEND ; \
+    apt-get update && \
+    apt-get --assume-yes install --download-only --no-install-recommends \
     ${DEBIAN_PKGS} ; \
     cache_dir='/cache/apt' ; \
     mkdir -v -p "${cache_dir}" ; \
-    tar -C /var/cache -cJf "${cache_dir}"/cache.tar.xz apt ; \
-    tar -C /var/lib -cJf "${cache_dir}"/lib.tar.xz apt ; \
+    tar -C /var/cache -cJf "${cache_dir}/cache.tar.xz" apt ; \
+    tar -C /var/lib -cJf "${cache_dir}/lib.tar.xz" apt ; \
     file="${cache_dir}/apt.sh" ; \
     printf -- '#!/bin/sh\n\n' >| "${file}" ; \
     chmod -v a+rx "${file}" ; \
