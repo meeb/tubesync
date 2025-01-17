@@ -389,7 +389,7 @@ RUN set -x && \
   mkdir -v -p /config/media && \
   mkdir -v -p /config/cache/pycache && \
   mkdir -v -p /downloads/audio && \
-  mkdir -v -p /downloads/video \
+  mkdir -v -p /downloads/video && \
   # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
