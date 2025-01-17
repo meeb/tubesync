@@ -246,7 +246,7 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
   set -x && \
   # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean ; \
+  rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
   # Install locales
   apt-get -y --no-install-recommends install locales && \
@@ -305,7 +305,7 @@ RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean ; \
+  rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
