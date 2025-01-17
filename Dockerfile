@@ -294,12 +294,10 @@ ENV PIP_NO_COMPILE=1 \
 WORKDIR /app
 
 # Set up the app
-RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
-    --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
+RUN --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
-  unset -v PIP_NO_CACHE_DIR ; \
   set -x && \
   # Create a 'app' user which the application will run as
   groupadd app && \
@@ -325,7 +323,6 @@ RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
   cp -at /tmp/ "${HOME}" && \
   HOME="/tmp/${HOME#/}" \
   PIPENV_VERBOSITY=64 \
-  PIP_CACHE_DIR='/cache/pip' \
   PIPENV_CACHE_DIR='/cache/pipenv' \
     pipenv install --system --skip-lock && \
   # Clean up
