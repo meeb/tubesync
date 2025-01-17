@@ -250,9 +250,6 @@ RUN --mount=type=cache,id=apt-lib,sharing=locked,target=/var/lib/apt \
 
 FROM debian:${DEBIAN_VERSION} AS tubesync
 
-ARG TARGETARCH
-ARG TARGETPLATFORM
-
 ARG S6_VERSION
 
 ARG FFMPEG_DATE
@@ -277,29 +274,26 @@ COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 # Reminder: the SHELL handles all variables
 RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
   set -x && \
-  { test -x /cache/apt.sh && /cache/apt.sh || : ; } && \
+  # Create a 'app' user which the application will run as
+  groupadd app && \
+  useradd -M -d /app -s /bin/false -g app app && \
+  # Update from the cache and/or the network
+  { test '!' -x /cache/apt.sh || /cache/apt.sh ; } && \
   apt-get update && \
+  # Install locales
   apt-get -y --no-install-recommends install locales && \
   printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
   locale-gen en_US.UTF-8 && \
-  # Install required distro packages
-  apt-get -y --no-install-recommends install curl ca-certificates file binutils xz-utils && \
+  # Install file
+  apt-get -y --no-install-recommends install file && \
   # Installed s6 (using COPY earlier)
   file -L /command/s6-overlay-suexec && \
   # Installed ffmpeg (using COPY earlier)
   /usr/local/bin/ffmpeg -version && \
   file /usr/local/bin/ff* && \
-  # Clean up
-  apt-get -y autoremove --purge file binutils xz-utils && \
-  rm -rf /var/lib/apt/lists/* && \
-  rm -rf /var/cache/apt/* && \
-  rm -rf /tmp/*
-
-# Install dependencies we keep
-RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
-  set -x && \
-  { test -x /cache/apt.sh && /cache/apt.sh || : ; } && \
-  apt-get update && \
+  # Clean up file
+  apt-get -y autoremove --purge file && \
+  # Install dependencies we keep
   # Install required distro packages
   apt-get -y --no-install-recommends install \
   libjpeg62-turbo \
@@ -314,9 +308,10 @@ RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
   redis-server \
   curl \
   less \
-  && apt-get -y autoclean && \
-  rm -rf /var/lib/apt/lists/* && \
-  rm -rf /var/cache/apt/* && \
+  && \
+  # Clean up
+  apt-get -y autopurge && \
+  apt-get -y clean && \
   rm -rf /tmp/*
 
 # Copy over pip.conf to use piwheels
@@ -337,7 +332,7 @@ RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   unset -v PIP_NO_CACHE_DIR ; \
   set -x && \
-  { test -x /cache/apt/apt.sh && /cache/apt/apt.sh || : ; } && \
+  { test '!' -x /cache/apt/apt.sh || /cache/apt/apt.sh ; } && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -353,9 +348,6 @@ RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
   python3-pip \
   zlib1g-dev \
   && \
-  # Create a 'app' user which the application will run as
-  groupadd app && \
-  useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
   cp -at /tmp/ "${HOME}" && \
   HOME="/tmp/${HOME#/}" \
@@ -377,12 +369,9 @@ RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
   python3-pip \
   zlib1g-dev \
   && \
-  apt-get -y autoremove && \
-  apt-get -y autoclean && \
-  rm -rf /var/lib/apt/lists/* && \
-  rm -rf /var/cache/apt/* && \
+  apt-get -y autopurge && \
+  apt-get -y clean && \
   rm -rf /tmp/*
-
 
 # Copy app
 COPY tubesync /app
@@ -400,11 +389,8 @@ RUN set -x && \
   mkdir -v -p /config/media && \
   mkdir -v -p /config/cache/pycache && \
   mkdir -v -p /downloads/audio && \
-  mkdir -v -p /downloads/video
-
-
-# Append software versions
-RUN set -x && \
+  mkdir -v -p /downloads/video \
+  # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
   printf -- "ffmpeg_version = '%s'\n" "${ffmpeg_version}" >> /app/common/third_party_versions.py
