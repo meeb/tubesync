@@ -19,7 +19,11 @@ ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 
-ARG DEBIAN_PKGS="binutils ca-certificates curl file gcc g++ less libjpeg-dev libwebp-dev locales make nginx-light pipenv python3-dev xz-utils"
+ARG DEBIAN_PKGS="\
+    binutils build-essential ca-certificates curl file gcc g++ less \
+    libjpeg-dev libjson-perl libssl-dev libwebp-dev locales make \
+    nginx-light pipenv python3-dev python3-pip python3-setuptools xz-utils \
+    "
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -269,7 +273,8 @@ COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 # Reminder: the SHELL handles all variables
 RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
   set -x && \
-  { test -x /cache/apt.sh && /cache/apt.sh || apt-get update ; } && \
+  { test -x /cache/apt.sh && /cache/apt.sh ; } && \
+  apt-get update && \
   apt-get -y --no-install-recommends install locales && \
   printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
   locale-gen en_US.UTF-8 && \
@@ -289,7 +294,8 @@ RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
 # Install dependencies we keep
 RUN --mount=type=cache,readonly,from=cache-apt,source=/cache/apt,target=/cache \
   set -x && \
-  { test -x /cache/apt.sh && /cache/apt.sh || apt-get update ; } && \
+  { test -x /cache/apt.sh && /cache/apt.sh ; } && \
+  apt-get update && \
   # Install required distro packages
   apt-get -y --no-install-recommends install \
   libjpeg62-turbo \
@@ -327,7 +333,8 @@ RUN --mount=type=cache,id=pip-cache,sharing=locked,target=/cache/pip \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   unset -v PIP_NO_CACHE_DIR ; \
   set -x && \
-  { test -x /cache/apt/apt.sh && /cache/apt/apt.sh || apt-get update ; } && \
+  { test -x /cache/apt/apt.sh && /cache/apt/apt.sh ; } && \
+  apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
   default-libmysqlclient-dev \
