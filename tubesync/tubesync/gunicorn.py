@@ -10,9 +10,10 @@ def get_num_workers():
         num_workers = int(os.getenv('GUNICORN_WORKERS', 3))
     except ValueError:
         num_workers = cpu_workers
-    if 0 > num_workers > cpu_workers:
-        num_workers = cpu_workers
-    return num_workers
+    if 0 < num_workers < cpu_workers:
+        return num_workers
+    else:
+        return cpu_workers
 
 
 def get_bind():
