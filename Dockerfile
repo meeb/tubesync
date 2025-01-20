@@ -11,11 +11,14 @@ ARG SHA256_S6_ARM64="8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f6
 ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae"
 
 ARG ALPINE_VERSION="latest"
+ARG DEBIAN_VERSION="bookworm-slim"
+
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
+
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -36,7 +39,7 @@ ARG DESTDIR="/downloaded"
 ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
 RUN set -eu ; \
-    apk --no-cache --no-progress add cmd:aria2c cmd:awk ; \
+    apk --no-cache --no-progress add cmd:aria2c cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum" ; \
 \
     aria2c_options() { \
         algorithm="${CHECKSUM_ALGORITHM%[0-9]??}" ; \
@@ -80,8 +83,6 @@ RUN set -eu ; \
       --summary-interval=0 \
       --input-file /tmp/downloads ; \
 \
-    apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" ; \
-\    
     decide_expected() { \
         case "${TARGETARCH}" in \
             (amd64) printf -- '%s' "${FFMPEG_CHECKSUM_AMD64}" ;; \
@@ -217,54 +218,53 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
-FROM debian:bookworm-slim AS tubesync
-
-ARG TARGETARCH
-ARG TARGETPLATFORM
+FROM debian:${DEBIAN_VERSION} AS tubesync
 
 ARG S6_VERSION
 
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 
-ENV S6_VERSION="${S6_VERSION}" \
-  FFMPEG_DATE="${FFMPEG_DATE}" \
-  FFMPEG_VERSION="${FFMPEG_VERSION}"
-
 ENV DEBIAN_FRONTEND="noninteractive" \
-  HOME="/root" \
-  LANGUAGE="en_US.UTF-8" \
-  LANG="en_US.UTF-8" \
-  LC_ALL="en_US.UTF-8" \
-  TERM="xterm" \
-  S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
+    HOME="/root" \
+    LANGUAGE="en_US.UTF-8" \
+    LANG="en_US.UTF-8" \
+    LC_ALL="en_US.UTF-8" \
+    TERM="xterm" \
+    # Do not include compiled byte-code
+    PIP_NO_COMPILE=1 \
+    PIP_ROOT_USER_ACTION='ignore' \
+    S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
+
+ENV S6_VERSION="${S6_VERSION}" \
+    FFMPEG_DATE="${FFMPEG_DATE}" \
+    FFMPEG_VERSION="${FFMPEG_VERSION}"
 
 # Install third party software
 COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
-RUN set -x && \
+RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+  set -x && \
+  # Update from the network and keep cache
+  rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
+  # Install locales
   apt-get -y --no-install-recommends install locales && \
   printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
   locale-gen en_US.UTF-8 && \
-  # Install required distro packages
-  apt-get -y --no-install-recommends install curl ca-certificates file binutils xz-utils && \
+  # Install file
+  apt-get -y --no-install-recommends install file && \
   # Installed s6 (using COPY earlier)
   file -L /command/s6-overlay-suexec && \
   # Installed ffmpeg (using COPY earlier)
   /usr/local/bin/ffmpeg -version && \
   file /usr/local/bin/ff* && \
-  # Clean up
-  apt-get -y autoremove --purge file binutils xz-utils && \
-  rm -rf /var/lib/apt/lists/* && \
-  rm -rf /var/cache/apt/* && \
-  rm -rf /tmp/*
-
-# Install dependencies we keep
-RUN set -x && \
-  apt-get update && \
+  # Clean up file
+  apt-get -y autoremove --purge file && \
+  # Install dependencies we keep
   # Install required distro packages
   apt-get -y --no-install-recommends install \
   libjpeg62-turbo \
@@ -279,29 +279,27 @@ RUN set -x && \
   redis-server \
   curl \
   less \
-  && apt-get -y autoclean && \
-  rm -rf /var/lib/apt/lists/* && \
-  rm -rf /var/cache/apt/* && \
+  && \
+  # Clean up
+  apt-get -y autopurge && \
+  apt-get -y autoclean && \
   rm -rf /tmp/*
 
 # Copy over pip.conf to use piwheels
 COPY pip.conf /etc/pip.conf
 
-# Add Pipfile
-COPY Pipfile /app/Pipfile
-
-# Do not include compiled byte-code
-ENV PIP_NO_COMPILE=1 \
-  PIP_NO_CACHE_DIR=1 \
-  PIP_ROOT_USER_ACTION='ignore'
-
 # Switch workdir to the the app
 WORKDIR /app
 
 # Set up the app
-#BuildKit#RUN --mount=type=bind,source=Pipfile,target=/app/Pipfile \
-RUN \
+RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
+    --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+    --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
+  # Update from the network and keep cache
+  rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -322,10 +320,11 @@ RUN \
   useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
   cp -at /tmp/ "${HOME}" && \
-  PIPENV_VERBOSITY=64 HOME="/tmp/${HOME#/}" pipenv install --system --skip-lock && \
+  HOME="/tmp/${HOME#/}" \
+  XDG_CACHE_HOME='/cache' \
+  PIPENV_VERBOSITY=64 \
+    pipenv install --system --skip-lock && \
   # Clean up
-  rm /app/Pipfile && \
-  pipenv --clear && \
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
   g++ \
@@ -339,12 +338,9 @@ RUN \
   python3-pip \
   zlib1g-dev \
   && \
-  apt-get -y autoremove && \
+  apt-get -y autopurge && \
   apt-get -y autoclean && \
-  rm -rf /var/lib/apt/lists/* && \
-  rm -rf /var/cache/apt/* && \
-  rm -rf /tmp/*
-
+  rm -v -rf /tmp/*
 
 # Copy app
 COPY tubesync /app
@@ -362,11 +358,8 @@ RUN set -x && \
   mkdir -v -p /config/media && \
   mkdir -v -p /config/cache/pycache && \
   mkdir -v -p /downloads/audio && \
-  mkdir -v -p /downloads/video
-
-
-# Append software versions
-RUN set -x && \
+  mkdir -v -p /downloads/video && \
+  # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
   printf -- "ffmpeg_version = '%s'\n" "${ffmpeg_version}" >> /app/common/third_party_versions.py
@@ -378,7 +371,8 @@ COPY config/root /
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
 
 # ENVS and ports
-ENV PYTHONPATH="/app" PYTHONPYCACHEPREFIX="/config/cache/pycache"
+ENV PYTHONPATH="/app" \
+    PYTHONPYCACHEPREFIX="/config/cache/pycache"
 EXPOSE 4848
 
 # Volumes
