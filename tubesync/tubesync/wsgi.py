@@ -15,7 +15,7 @@ def application(environ, start_response):
         else:
             raise Exception(f'DJANGO_URL_PREFIX must end with a /, '
                             f'got: {DJANGO_URL_PREFIX}')
-    if script_name:
+    if script_name is not None:
         environ['SCRIPT_NAME'] = script_name
         path_info = environ['PATH_INFO']
         if path_info.startswith(script_name):
