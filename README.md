@@ -353,7 +353,12 @@ etc.). Configuration of this is beyond the scope of this README.
 
 ### What architectures does the container support?
 
-Just `amd64` for the moment. Others may be made available if there is demand.
+Only two are supported, for the moment:
+- `amd64` (most desktop PCs and servers)
+-  `arm64`
+(modern ARM computers, such as the Rasperry Pi 3 or later)
+
+Others may be made available, if there is demand.
 
 ### The pipenv install fails with "Locking failed"!
 
