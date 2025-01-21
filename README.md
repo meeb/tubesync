@@ -138,6 +138,11 @@ services:
       - PGID=1000
 ```
 
+> [!IMPORTANT]  
+> If the `/downloads` directory is mounted from a [Samba volume](https://docs.docker.com/engine/storage/volumes/#create-cifssamba-volumes), be sure to also supply the `uid` and `gid` mount parameters in the driver options.
+> These must be matched to the `PUID` and `PGID` values, which were specified as environment variables.
+> 
+> Matching these user and group ID numbers prevents issues when executing file actions, such as writing metadata. See [this issue](https://github.com/meeb/tubesync/issues/616#issuecomment-2593458282) for details.
 
 ## Optional authentication
 
