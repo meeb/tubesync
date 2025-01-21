@@ -26,5 +26,13 @@ pip3() {
 warning_message
 test -n "${TUBESYNC_DEBUG}" || exit 1
 
-pip3 install --upgrade --break-system-packages yt-dlp
+# Use the flag added in 23.0.1, if possible.
+# https://github.com/pypa/pip/pull/11780
+break_system_packages='--break-system-packages'
+pip_version="$(pip3 --version | awk '$1 = "pip" { print $2; exit; }')"
+if [[ "${pip_version}" < "23.0.1" ]]; then
+    break_system_packages=''
+fi
+
+pip3 install --upgrade ${break_system_packages} yt-dlp
 
