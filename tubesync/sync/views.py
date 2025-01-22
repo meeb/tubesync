@@ -199,10 +199,15 @@ class ValidateSourceView(FormView):
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: ('https://www.youtube.com/playlist?list='
                                               'PL590L5WQmH8dpP0RyH5pCfIaDEdt9nk7r')
     }
+    _youtube_domains = frozenset({
+        'youtube.com',
+        'm.youtube.com',
+        'www.youtube.com',
+    })
     validation_urls = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: {
             'scheme': 'https',
-            'domains': ('m.youtube.com', 'www.youtube.com'),
+            'domains': _youtube_domains,
             'path_regex': '^\/(c\/)?([^\/]+)(\/videos)?$',
             'path_must_not_match': ('/playlist', '/c/playlist'),
             'qs_args': [],
@@ -211,7 +216,7 @@ class ValidateSourceView(FormView):
         },
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: {
             'scheme': 'https',
-            'domains': ('m.youtube.com', 'www.youtube.com'),
+            'domains': _youtube_domains,
             'path_regex': '^\/channel\/([^\/]+)(\/videos)?$',
             'path_must_not_match': ('/playlist', '/c/playlist'),
             'qs_args': [],
@@ -220,7 +225,7 @@ class ValidateSourceView(FormView):
         },
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: {
             'scheme': 'https',
-            'domains': ('m.youtube.com', 'www.youtube.com'),
+            'domains': _youtube_domains,
             'path_regex': '^\/(playlist|watch)$',
             'path_must_not_match': (),
             'qs_args': ('list',),
