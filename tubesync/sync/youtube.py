@@ -62,14 +62,15 @@ def get_channel_id(url):
     with yt_dlp.YoutubeDL(opts) as y:
         try:
             response = y.extract_info(url, download=False)
-            
-            channel_id = response['channel_id']
-            playlist_id = response['playlist_id']
-            playlist_channel_id = response['playlist_channel_id']
         except yt_dlp.utils.DownloadError as e:
             raise YouTubeError(f'Failed to extract channel ID for "{url}": {e}') from e
         else:
-            return playlist_channel_id or playlist_id or channel_id
+            try:
+                channel_id = response['channel_id']
+            except Exception as e:
+                raise YouTubeError(f'Failed to extract channel ID for "{url}": {e}') from e
+            else:
+                return channel_id
 
 def get_channel_image_info(url):
     opts = get_yt_opts()

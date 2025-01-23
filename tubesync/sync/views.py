@@ -303,12 +303,23 @@ class ValidateSourceView(FormView):
             '@' == self.key[0]
         )
         if use_channel_id:
+            old_key = self.key
+            old_source_type = self.source_type
+            old_source_type_str = self.source_type_str
+
             self.source_type_str = 'youtube-channel-id'
             self.source_type = self.source_types.get(self.source_type_str, None)
-            url = Source.create_index_url(self.source_type, self.key, 'videos')
-            self.key = youtube.get_channel_id(
-                url.replace('/channel/', '/')
-            )
+            index_url = Source.create_index_url(self.source_type, self.key, 'videos')
+            try:
+                self.key = youtube.get_channel_id(
+                    index_url.replace('/channel/', '/')
+                )
+            except youtube.YouTubeError as e:
+                # It did not work, revert to previous behavior
+                self.key = old_key
+                self.source_type = old_source_type
+                self.source_type_str = old_source_type_str
+
         for field in fields_to_populate:
             if field == 'source_type':
                 fields[field] = self.source_type
