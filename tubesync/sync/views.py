@@ -86,11 +86,11 @@ class DashboardView(TemplateView):
         data['downloads_dir'] = str(settings.DOWNLOAD_ROOT)
         data['database_connection'] = settings.DATABASE_CONNECTION_STR
         # Add the database filesize when using db.sqlite3
+        data['database_filesize'] = None
         db_name = str(connection.get_connection_params()['database'])
         db_path = pathlib.Path(db_name) if '/' == db_name[0] else None
         if db_path and 'sqlite' == connection.vendor:
-            db_size = db_path.stat().st_size
-            data['database_connection'] += f' ({db_size:,} bytes)'
+            data['database_filesize'] = db_path.stat().st_size
         return data
 
 
