@@ -125,7 +125,7 @@
       </tr>
       <tr title="Database connection used by TubeSync">
         <td class="hide-on-small-only">Database</td>
-        <td><span class="hide-on-med-and-up">Database<br></span><strong>{{ database_connection }}</strong></td>
+        <td><span class="hide-on-med-and-up">Database<br></span><strong>{{ database_connection }}{% if database_filesize %} {{ database_filesize|filesizeformat }}{% endif %}</strong></td>
       </tr>
     </table>
   </div>
