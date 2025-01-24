@@ -146,7 +146,7 @@
           <div>
             ID: <strong>{{ format.format_id }}</strong>
             {% if format.vcodec|lower != 'none' %}, {{ format.format_note }} ({{ format.width }}x{{ format.height }}), fps:{{ format.fps|lower }}, video:{{ format.vcodec }} @{{ format.tbr }}k{% endif %}
-            {% if format.acodec|lower != 'none' %}, audio:{{ format.acodec }} @{{ format.abr }}k / {{ format.asr }}Hz{% endif %}
+            {% if format.acodec|lower != 'none' %}, audio:{{ format.acodec }} @{{ format.abr }}k / {{ format.asr }}Hz {{ format.format_note }}{% endif %}
             {% if format.format_id == combined_format or format.format_id == audio_format or format.format_id == video_format %}<strong>(matched)</strong>{% endif %}
           </div>
           {% empty %}
