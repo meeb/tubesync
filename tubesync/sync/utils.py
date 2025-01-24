@@ -335,6 +335,7 @@ def parse_media_format(format_dict):
     return {
         'id': format_dict.get('format_id', ''),
         'format': format_str,
+        'format_note': format_dict.get('format_note', ''),
         'format_verbose': format_dict.get('format', ''),
         'height': height,
         'width': width,
