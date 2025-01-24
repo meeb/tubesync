@@ -291,11 +291,36 @@ class ValidateSourceView(FormView):
         url = reverse_lazy('sync:add-source')
         fields_to_populate = self.prepopulate_fields.get(self.source_type)
         fields = {}
+        value = self.key
+        use_channel_id = (
+            'youtube-channel' == self.source_type_str and
+            '@' == self.key[0]
+        )
+        if use_channel_id:
+            old_key = self.key
+            old_source_type = self.source_type
+            old_source_type_str = self.source_type_str
+
+            self.source_type_str = 'youtube-channel-id'
+            self.source_type = self.source_types.get(self.source_type_str, None)
+            index_url = Source.create_index_url(self.source_type, self.key, 'videos')
+            try:
+                self.key = youtube.get_channel_id(
+                    index_url.replace('/channel/', '/')
+                )
+            except youtube.YouTubeError as e:
+                # It did not work, revert to previous behavior
+                self.key = old_key
+                self.source_type = old_source_type
+                self.source_type_str = old_source_type_str
+
         for field in fields_to_populate:
             if field == 'source_type':
                 fields[field] = self.source_type
-            elif field in ('key', 'name', 'directory'):
+            elif field == 'key':
                 fields[field] = self.key
+            elif field in ('name', 'directory'):
+                fields[field] = value
         return append_uri_params(url, fields)
 
 

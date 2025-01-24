@@ -45,6 +45,32 @@ def get_yt_opts():
         opts.update({'cookiefile': cookie_file_path})
     return opts
 
+def get_channel_id(url):
+    # yt-dlp --simulate --no-check-formats --playlist-items 1
+    #   --print 'pre_process:%(playlist_channel_id,playlist_id,channel_id)s'
+    opts = get_yt_opts()
+    opts.update({
+        'skip_download': True,
+        'simulate': True,
+        'logger': log,
+        'extract_flat': True,  # Change to False to get detailed info
+        'check_formats': False,
+        'playlist_items': '1',
+    })
+
+    with yt_dlp.YoutubeDL(opts) as y:
+        try:
+            response = y.extract_info(url, download=False)
+        except yt_dlp.utils.DownloadError as e:
+            raise YouTubeError(f'Failed to extract channel ID for "{url}": {e}') from e
+        else:
+            try:
+                channel_id = response['channel_id']
+            except Exception as e:
+                raise YouTubeError(f'Failed to extract channel ID for "{url}": {e}') from e
+            else:
+                return channel_id
+
 def get_channel_image_info(url):
     opts = get_yt_opts()
     opts.update({
