@@ -17,7 +17,7 @@ urlpatterns = [
     path('',
          DashboardView.as_view(),
          name='dashboard'),
-    
+
     # Source URLs
 
     path('sources',
