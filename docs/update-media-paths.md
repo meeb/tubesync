@@ -2,14 +2,14 @@
 
 ## Advanced usage guide - update media paths from the command line
 
-This command allows you to all media paths. You might want to use
-this if you have renamed the Media Format for a source especially 
-if the folders are changed.
+This command updates all media paths with what is current in the database.
+This may want to be done when the Media Format has been changed for a source,
+especially if the folder structure has changed.
 
 
 ## Requirements
 
-You have added some sources and media
+At least one source and media is present
 
 ## Steps
 
