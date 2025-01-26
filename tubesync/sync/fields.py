@@ -60,7 +60,7 @@ class CommaSepChoiceField(models.Field):
 
         for t in self.possible_choices:
             choiceArray.append(t)
-        
+
         return choiceArray
 
     def formfield(self, **kwargs):
