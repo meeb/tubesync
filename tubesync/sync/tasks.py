@@ -444,8 +444,12 @@ def download_media(media_id):
         # If selected, copy the thumbnail over as well
         if media.source.copy_thumbnails:
             if not media.thumb_file_exists:
-                if download_media_thumbnail.now(str(media.pk), media.thumbnail):
-                    media.refresh_from_db()
+                thumbnail_url = media.thumbnail
+                if thumbnail_url:
+                    args = ( str(media.pk), thumbnail_url, )
+                    delete_task_by_media('sync.tasks.download_media_thumbnail', args)
+                    if download_media_thumbnail.now(*args):
+                        media.refresh_from_db()
             if media.thumb_file_exists:
                 log.info(f'Copying media thumbnail from: {media.thumb.path} '
                          f'to: {media.thumbpath}')
