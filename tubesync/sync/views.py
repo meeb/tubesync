@@ -112,7 +112,7 @@ class SourcesView(ListView):
             sobj = Source.objects.get(pk=kwargs["pk"])
             if sobj is None:
                 return HttpResponseNotFound()
-            
+
             verbose_name = _('Index media from source "{}" once')
             index_source_task(
                 str(sobj.pk),
@@ -354,7 +354,7 @@ class EditSourceMixin:
         obj = form.save(commit=False)
         source_type = form.cleaned_data['media_format']
         example_media_file = obj.get_example_media_format()
-        
+
         if example_media_file == '':
             form.add_error(
                 'media_format',
@@ -776,18 +776,18 @@ class MediaContent(DetailView):
                 pth = pth[1]
             else:
                 pth = pth[0]
-            
-            
+
+
             # build final path
             filepth = pathlib.Path(str(settings.DOWNLOAD_ROOT) + pth)
-            
+
             if filepth.exists():
                 # return file
                 response = FileResponse(open(filepth,'rb'))
                 return response
             else:
                 return HttpResponseNotFound()
-            
+
         else:
             headers = {
                 'Content-Type': self.object.content_type,
