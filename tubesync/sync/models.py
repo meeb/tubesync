@@ -1310,7 +1310,7 @@ class Media(models.Model):
             filename = str(mf_path.relative_to(self.source.directory_path))
         else:
             filename = self.filename
-        prefix, ext = os.path.splitext(filename)
+        prefix, ext = os.path.splitext(os.path.basename(filename))
         return prefix
 
     @property
