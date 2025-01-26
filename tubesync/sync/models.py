@@ -1304,10 +1304,12 @@ class Media(models.Model):
 
     def filename_prefix(self):
         if self.downloaded and self.media_file:
-            mf_path = Path(self.media_file.path)
-            filename = str(mf_path.relative_to(self.source.directory_path))
+            filename = self.media_file.path
         else:
             filename = self.filename
+        # The returned prefix should not contain any directories.
+        # So, we do not care about the different directories
+        # used for filename in the cases above.
         prefix, ext = os.path.splitext(os.path.basename(filename))
         return prefix
 
