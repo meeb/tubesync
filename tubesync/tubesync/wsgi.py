@@ -1,5 +1,4 @@
 import os
-from urllib.parse import urljoin
 from django.core.wsgi import get_wsgi_application
 
 
@@ -16,10 +15,9 @@ def application(environ, start_response):
         else:
             raise Exception(f'DJANGO_URL_PREFIX must end with a /, '
                             f'got: {DJANGO_URL_PREFIX}')
-    if script_name:
-        static_url = urljoin(script_name, 'static/')
+    if script_name is not None:
         environ['SCRIPT_NAME'] = script_name
         path_info = environ['PATH_INFO']
-        if path_info.startswith(script_name) and not path_info.startswith(static_url):
+        if path_info.startswith(script_name):
             environ['PATH_INFO'] = path_info[len(script_name) - 1:]
     return _application(environ, start_response)

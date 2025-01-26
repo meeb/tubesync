@@ -26,7 +26,7 @@ from common.errors import NoMediaException, DownloadFailedException
 from common.utils import json_serial
 from .models import Source, Media, MediaServer
 from .utils import (get_remote_image, resize_image_to_height, delete_file,
-                    write_text_file)
+                    write_text_file, filter_response)
 from .filtering import filter_media
 
 
@@ -305,7 +305,10 @@ def download_media_metadata(media_id):
         return
     source = media.source
     metadata = media.index_metadata()
-    media.metadata = json.dumps(metadata, default=json_serial)
+    response = metadata
+    if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
+        response = filter_response(metadata, True)
+    media.metadata = json.dumps(response, separators=(',', ':'), default=json_serial)
     upload_date = media.upload_date
     # Media must have a valid upload date
     if upload_date:
@@ -447,7 +450,11 @@ def download_media(media_id):
         # If selected, write an NFO file
         if media.source.write_nfo:
             log.info(f'Writing media NFO file to: {media.nfopath}')
-            write_text_file(media.nfopath, media.nfoxml)
+            try:
+                write_text_file(media.nfopath, media.nfoxml)
+            except PermissionError as e:
+                log.warn(f'A permissions problem occured when writing the new media NFO file: {e.msg}')
+                pass
         # Schedule a task to update media servers
         for mediaserver in MediaServer.objects.all():
             log.info(f'Scheduling media server updates')
