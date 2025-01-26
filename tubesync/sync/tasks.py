@@ -442,10 +442,14 @@ def download_media(media_id):
                 media.downloaded_format = 'audio'
         media.save()
         # If selected, copy the thumbnail over as well
-        if media.source.copy_thumbnails and media.thumb:
-            log.info(f'Copying media thumbnail from: {media.thumb.path} '
-                     f'to: {media.thumbpath}')
-            copyfile(media.thumb.path, media.thumbpath)
+        if media.source.copy_thumbnails:
+            if not media.thumb_file_exists:
+                if download_media_thumbnail.now(str(media.pk), media.thumbnail):
+                    media.refresh_from_db()
+            if media.thumb_file_exists:
+                log.info(f'Copying media thumbnail from: {media.thumb.path} '
+                         f'to: {media.thumbpath}')
+                copyfile(media.thumb.path, media.thumbpath)
         # If selected, write an NFO file
         if media.source.write_nfo:
             log.info(f'Writing media NFO file to: {media.nfopath}')
