@@ -66,9 +66,9 @@ jobs:
         id: origin
         run: |
           user_lowercase="$(printf -- '%s\n' "${GITHUB_ACTOR}" | awk '{print tolower($0);}')" ;
-          printf >> "$GITHUB_OUTPUT" -- '%s=ghcr.io/%s/%s:latest\n' \
-            ref "${user_lowercase}" "${IMAGE_NAME}" \
-            tag "${user_lowercase}" "${IMAGE_NAME}" ;
+          printf >> "$GITHUB_OUTPUT" -- '%s=ghcr.io/%s/%s:%s\n' \
+            'ref' "${user_lowercase}" "${IMAGE_NAME}" 'cache' \
+            'tag' "${user_lowercase}" "${IMAGE_NAME}" 'latest' ;
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
