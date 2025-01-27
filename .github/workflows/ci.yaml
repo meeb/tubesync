@@ -44,7 +44,7 @@ jobs:
           GH_UPSTREAM_REPO='.parent.name' ;
           GH_UPSTREAM_SLUG='.parent.full_name' ;
           {
-            for var in GH_UPSTREAM_OWNER GH_UPSTREAM_REPO GH_UPSTREAM_SLUG
+            for var in GH_UPSTREAM_OWNER # GH_UPSTREAM_REPO GH_UPSTREAM_SLUG
             do
               # jq_arg="$( eval printf -- "'%s\n'" "$(printf -- '"${%s}"' "${var}")" )"
               jq_arg="$( eval printf -- "'%s\n'" '"${'"${var}"'}"' )"
@@ -53,6 +53,7 @@ jobs:
               gh api repos/:owner/:repo --cache 5m --jq "${jq_arg}" ;
               printf -- '%s\n' "${delim}" ;
             done
+            unset -v delim jq_arg var
           } >> "$GITHUB_ENV"
       - name: Upstream registry ref
         id: upstream
