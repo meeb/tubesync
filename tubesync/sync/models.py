@@ -1155,7 +1155,7 @@ class Media(models.Model):
             from common.utils import json_serial
 
             old_mdl = len(self.metadata or "")
-            data = json.loads(self.metadata or "")
+            data = json.loads(self.metadata or "{}")
             compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
 
             filtered_data = filter_response(data, True)
