@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% load static %}
+{% extends 'base.html' %}{% load static %}{% load humanize %}
 
 {% block headtitle %}Media - {{ media.key }}{% endblock %}
 
@@ -146,7 +146,7 @@
           <div>
             ID: <strong>{{ format.id }}</strong>
             {% if format.vcodec|lower != 'none' %}, {{ format.format_note }} ({{ format.width }}x{{ format.height }}), fps:{{ format.fps|lower }}, video:{{ format.vcodec }} @{{ format.vbr }}k{% endif %}
-            {% if format.acodec|lower != 'none' %}, audio:{{ format.acodec }} @{{ format.abr }}k / {{ format.asr }}Hz{% if format.language_code %} [{{ format.language_code }}]{% endif %} {{ format.format_note }}{% endif %}
+            {% if format.acodec|lower != 'none' %}, audio:{{ format.acodec }} {% if format.abr %}@{{ format.abr }}k / {% endif %}{{ format.asr|intcomma }}Hz{% if format.language_code and format.abr %} [{{ format.language_code }}]{% endif %} {{ format.format_note }}{% endif %}
             {% if format.id == combined_format or format.id == audio_format or format.id == video_format %}<strong>(matched)</strong>{% endif %}
           </div>
           {% empty %}
