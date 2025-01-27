@@ -47,23 +47,22 @@ jobs:
             gh api repos/:owner/:repo --jq .parent.full_name ;
             printf -- '%s\n' "${delim}" ;
           } >> "$GITHUB_ENV"
+          gh api repos/:owner/:repo --jq .parent || :
       - name: Upstream registry ref
         id: upstream
         run: |
           user="$(printf -- '%s\n' "${GH_UPSTREAM_SLUG}" | cut -d '/' -f 1)"
           user_lowercase="$(printf -- '%s\n' "${user}" | awk '{print tolower($0);}')" ;
-          printf -- 'ref=ghcr.io/%s/%s:latest\n' \
-            "${user_lowercase}" "${IMAGE_NAME}" >> "$GITHUB_OUTPUT" ;
-          printf -- 'tag=ghcr.io/%s/%s:latest\n' \
-            "${user_lowercase}" "${IMAGE_NAME}" >> "$GITHUB_OUTPUT" ;
+          printf >> "$GITHUB_OUTPUT" -- '%s=ghcr.io/%s/%s:latest\n' \
+            ref "${user_lowercase}" "${IMAGE_NAME}" \
+            tag "${user_lowercase}" "${IMAGE_NAME}" ;
       - name: Registry ref
         id: origin
         run: |
           user_lowercase="$(printf -- '%s\n' "${GITHUB_ACTOR}" | awk '{print tolower($0);}')" ;
-          printf -- 'ref=ghcr.io/%s/%s:latest\n' \
-            "${user_lowercase}" "${IMAGE_NAME}" >> "$GITHUB_OUTPUT" ;
-          printf -- 'tag=ghcr.io/%s/%s:latest\n' \
-            "${user_lowercase}" "${IMAGE_NAME}" >> "$GITHUB_OUTPUT" ;
+          printf >> "$GITHUB_OUTPUT" -- '%s=ghcr.io/%s/%s:latest\n' \
+            ref "${user_lowercase}" "${IMAGE_NAME}" \
+            tag "${user_lowercase}" "${IMAGE_NAME}" ;
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -79,6 +78,6 @@ jobs:
           cache-from: |
             type=registry,ref=${{ steps.upstream.outputs.ref }}
             type=registry,ref=${{ steps.origin.outputs.ref }}
-          cache-to: type=inline
+          cache-to: type=registry,ref=${{ steps.origin.outputs.ref }},mode=max
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
