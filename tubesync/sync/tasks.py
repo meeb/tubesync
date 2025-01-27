@@ -381,7 +381,7 @@ def download_media(media_id):
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
                  f'it is now marked to be skipped, not downloading')
         return
-    if media.downloaded and media.media_file:
+    if media.downloaded and media.media_file and media.media_file.name:
         # Media has been marked as downloaded before the download_media task was fired,
         # skip it
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
@@ -443,10 +443,18 @@ def download_media(media_id):
                 media.downloaded_format = 'audio'
         media.save()
         # If selected, copy the thumbnail over as well
-        if media.source.copy_thumbnails and media.thumb:
-            log.info(f'Copying media thumbnail from: {media.thumb.path} '
-                     f'to: {media.thumbpath}')
-            copyfile(media.thumb.path, media.thumbpath)
+        if media.source.copy_thumbnails:
+            if not media.thumb_file_exists:
+                thumbnail_url = media.thumbnail
+                if thumbnail_url:
+                    args = ( str(media.pk), thumbnail_url, )
+                    delete_task_by_media('sync.tasks.download_media_thumbnail', args)
+                    if download_media_thumbnail.now(*args):
+                        media.refresh_from_db()
+            if media.thumb_file_exists:
+                log.info(f'Copying media thumbnail from: {media.thumb.path} '
+                         f'to: {media.thumbpath}')
+                copyfile(media.thumb.path, media.thumbpath)
         # If selected, write an NFO file
         if media.source.write_nfo:
             log.info(f'Writing media NFO file to: {media.nfopath}')
