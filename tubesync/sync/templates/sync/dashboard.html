@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% load humanize %}  
+{% extends 'base.html' %}{% load humanize %}{% load filters %}
 
 {% block headtitle %}Dashboard{% endblock %}
 
@@ -57,9 +57,9 @@
     <div class="card dashcard">
       <a href="{% url 'sync:media' %}">
         <div class="card-content">
-          <h3 class="truncate">{{ disk_usage_bytes|filesizeformat }}</h3>
+          <h3 class="truncate">{{ disk_usage_bytes|bytesformat }}</h3>
           <div class="desc truncate">{{ disk_usage_bytes|intcomma }} bytes</div>
-          <div class="truncate">Avg. <strong>{{ average_bytes_per_media|filesizeformat }}</strong> per media</div>
+          <div class="truncate">Avg. <strong>{{ average_bytes_per_media|bytesformat }}</strong> per media</div>
         </div>
       </a>
     </div>
@@ -89,7 +89,7 @@
           {% for media in largest_downloads %}
             <a href="{% url 'sync:media-item' pk=media.pk %}" class="collection-item">
               <div class="truncate">{{ media.name }}</div>
-              <div class="truncate"><strong>{{ media.downloaded_filesize|filesizeformat }}</strong>{% if media.downloaded_format %} in {{ media.downloaded_format }}{% endif %} from &quot;{{ media.source.name }}&quot;</div>
+              <div class="truncate"><strong>{{ media.downloaded_filesize|bytesformat }}</strong>{% if media.downloaded_format %} in {{ media.downloaded_format }}{% endif %} from &quot;{{ media.source.name }}&quot;</div>
             </a>
           {% empty %}
             <span class="collection-item">No media has been downloaded.</span>
@@ -125,7 +125,7 @@
       </tr>
       <tr title="Database connection used by TubeSync">
         <td class="hide-on-small-only">Database</td>
-        <td><span class="hide-on-med-and-up">Database<br></span><strong>{{ database_connection }}{% if database_filesize %} {{ database_filesize|filesizeformat }}{% endif %}</strong></td>
+        <td><span class="hide-on-med-and-up">Database<br></span><strong>{{ database_connection }}{% if database_filesize %} ({{ database_filesize|bytesformat }}){% endif %}</strong></td>
       </tr>
     </table>
   </div>

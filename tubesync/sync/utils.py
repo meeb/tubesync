@@ -94,6 +94,20 @@ def resize_image_to_height(image, width, height):
     return image
 
 
+def glob_quote(filestr):
+    _glob_specials = {
+        '?': '[?]',
+        '*': '[*]',
+        '[': '[[]',
+        ']': '[]]', # probably not needed, but it won't hurt
+    }
+
+    if not isinstance(filestr, str):
+        raise TypeError(f'filestr must be a str, got "{type(filestr)}"')
+
+    return filestr.translate(str.maketrans(_glob_specials))
+
+
 def file_is_editable(filepath):
     '''
         Checks that a file exists and the file is in an allowed predefined tuple of
@@ -113,6 +127,23 @@ def file_is_editable(filepath):
         if str(allowed_path) == os.path.commonpath([allowed_path, filepath]):
             return True
     return False
+
+
+def directory_and_stem(arg_path):
+    filepath = Path(arg_path)
+    stem = Path(filepath.stem)
+    while stem.suffixes and '' != stem.suffix:
+        stem = Path(stem.stem)
+    stem = str(stem)
+    return (filepath.parent, stem,)
+
+
+def mkdir_p(arg_path, mode=0o777):
+    '''
+        Reminder: mode only affects the last directory
+    '''
+    dirpath = Path(arg_path)
+    return dirpath.mkdir(mode=mode, parents=True, exist_ok=True)
 
 
 def write_text_file(filepath, filedata):
@@ -301,11 +332,13 @@ def parse_media_format(format_dict):
             format_str = f'{height}P'
         else:
             format_str = None
+    language = format_dict.get('language', None)
     return {
         'id': format_dict.get('format_id', ''),
         'format': format_str,
         'format_note': format_dict.get('format_note', ''),
         'format_verbose': format_dict.get('format', ''),
+        'language_code': language,
         'height': height,
         'width': width,
         'vcodec': vcodec,

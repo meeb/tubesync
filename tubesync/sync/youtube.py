@@ -12,6 +12,7 @@ from copy import copy, deepcopy
 from pathlib import Path
 
 from django.conf import settings
+from .utils import mkdir_p
 import yt_dlp
 
 
@@ -24,7 +25,7 @@ _youtubedl_tempdir = getattr(settings, 'YOUTUBE_DL_TEMPDIR', None)
 if _youtubedl_tempdir:
     _youtubedl_tempdir = str(_youtubedl_tempdir)
     _youtubedl_tempdir_path = Path(_youtubedl_tempdir)
-    _youtubedl_tempdir_path.mkdir(parents=True, exist_ok=True)
+    mkdir_p(_youtubedl_tempdir_path)
     (_youtubedl_tempdir_path / '.ignore').touch(exist_ok=True)
     _paths = _defaults.get('paths', {})
     _paths.update({ 'temp': _youtubedl_tempdir, })
@@ -86,7 +87,7 @@ def get_channel_image_info(url):
     with yt_dlp.YoutubeDL(opts) as y:
         try:
             response = y.extract_info(url, download=False)
-            
+
             avatar_url = None
             banner_url = None
             for thumbnail in response['thumbnails']:
@@ -96,7 +97,7 @@ def get_channel_image_info(url):
                     banner_url = thumbnail['url']
                 if banner_url != None and avatar_url != None:
                     break
-                    
+
             return avatar_url, banner_url
         except yt_dlp.utils.DownloadError as e:
             raise YouTubeError(f'Failed to extract channel info for "{url}": {e}') from e
