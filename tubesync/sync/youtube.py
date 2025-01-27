@@ -5,10 +5,14 @@
 
 
 import os
-from pathlib import Path
-from django.conf import settings
-from copy import copy
+
+from collections import namedtuple
 from common.logger import log
+from copy import copy, deepcopy
+from pathlib import Path
+
+from django.conf import settings
+from .utils import mkdir_p
 import yt_dlp
 
 
@@ -21,7 +25,7 @@ _youtubedl_tempdir = getattr(settings, 'YOUTUBE_DL_TEMPDIR', None)
 if _youtubedl_tempdir:
     _youtubedl_tempdir = str(_youtubedl_tempdir)
     _youtubedl_tempdir_path = Path(_youtubedl_tempdir)
-    _youtubedl_tempdir_path.mkdir(parents=True, exist_ok=True)
+    mkdir_p(_youtubedl_tempdir_path)
     (_youtubedl_tempdir_path / '.ignore').touch(exist_ok=True)
     _paths = _defaults.get('paths', {})
     _paths.update({ 'temp': _youtubedl_tempdir, })
@@ -83,7 +87,7 @@ def get_channel_image_info(url):
     with yt_dlp.YoutubeDL(opts) as y:
         try:
             response = y.extract_info(url, download=False)
-            
+
             avatar_url = None
             banner_url = None
             for thumbnail in response['thumbnails']:
@@ -93,7 +97,7 @@ def get_channel_image_info(url):
                     banner_url = thumbnail['url']
                 if banner_url != None and avatar_url != None:
                     break
-                    
+
             return avatar_url, banner_url
         except yt_dlp.utils.DownloadError as e:
             raise YouTubeError(f'Failed to extract channel info for "{url}": {e}') from e
@@ -207,6 +211,21 @@ def download_media(url, media_format, extension, output_file, info_json,
             log.warn(f'[youtube-dl] unknown event: {str(event)}')
 
     hook.download_progress = 0
+
+    default_opts = yt_dlp.parse_options([]).options
+    pp_opts = deepcopy(default_opts.__dict__)
+    pp_opts.update({
+        'embedthumbnail': embed_thumbnail,
+        'addmetadata': embed_metadata,
+        'addchapters': True,
+        'embed_infojson': False,
+        'force_keyframes_at_cuts': True,
+    })
+
+    if skip_sponsors:
+        pp_opts['sponsorblock_mark'].update('all,-chapter'.split(','))
+        pp_opts['sponsorblock_remove'].update(sponsor_categories or {})
+
     ytopts = {
         'format': media_format,
         'merge_output_format': extension,
@@ -221,27 +240,22 @@ def download_media(url, media_format, extension, output_file, info_json,
         'writeautomaticsub': auto_subtitles,
         'subtitleslangs': sub_langs.split(','),
     }
-    if not sponsor_categories:
-        sponsor_categories = []
-    sbopt = {
-        'key': 'SponsorBlock',
-        'categories': sponsor_categories
-    }
-    ffmdopt = {
-        'key': 'FFmpegMetadata',
-        'add_chapters': embed_metadata,
-        'add_metadata': embed_metadata
-    }
     opts = get_yt_opts()
     ytopts['paths'] = opts.get('paths', {})
     ytopts['paths'].update({
         'home': os.path.dirname(output_file),
     })
-    if embed_thumbnail:
-        ytopts['postprocessors'].append({'key': 'EmbedThumbnail'})
-    if skip_sponsors:
-        ytopts['postprocessors'].append(sbopt)
-    ytopts['postprocessors'].append(ffmdopt)
+
+    # clean-up incompatible keys
+    pp_opts = {k: v for k, v in pp_opts.items() if not k.startswith('_')}
+
+    # convert dict to namedtuple
+    yt_dlp_opts = namedtuple('yt_dlp_opts', pp_opts)
+    pp_opts = yt_dlp_opts(**pp_opts)
+
+    # create the post processors list
+    ytopts['postprocessors'] = list(yt_dlp.get_postprocessors(pp_opts))
+
     opts.update(ytopts)
 
     with yt_dlp.YoutubeDL(opts) as y:
