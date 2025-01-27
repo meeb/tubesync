@@ -301,13 +301,13 @@ def parse_media_format(format_dict):
             format_str = f'{height}P'
         else:
             format_str = None
-    language = format_dict.get('language', None)
+
     return {
         'id': format_dict.get('format_id', ''),
         'format': format_str,
         'format_note': format_dict.get('format_note', ''),
         'format_verbose': format_dict.get('format', ''),
-        'language_code': language,
+        'language_code': format_dict.get('language', None),
         'height': height,
         'width': width,
         'vcodec': vcodec,
@@ -315,6 +315,7 @@ def parse_media_format(format_dict):
         'vbr': format_dict.get('tbr', 0),
         'acodec': acodec,
         'abr': format_dict.get('abr', 0),
+        'asr': format_dict.get('asr', 0),
         'is_60fps': fps > 50,
         'is_hdr': 'HDR' in format_dict.get('format', '').upper(),
         'is_hls': is_hls,
