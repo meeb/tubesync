@@ -1302,13 +1302,20 @@ class Media(models.Model):
     def filepath(self):
         return self.source.directory_path / self.filename
 
-    @property
-    def thumbname(self):
+    def filename_prefix(self):
         if self.downloaded and self.media_file:
             filename = self.media_file.path
         else:
             filename = self.filename
+        # The returned prefix should not contain any directories.
+        # So, we do not care about the different directories
+        # used for filename in the cases above.
         prefix, ext = os.path.splitext(os.path.basename(filename))
+        return prefix
+
+    @property
+    def thumbname(self):
+        prefix = self.filename_prefix()
         return f'{prefix}.jpg'
 
     @property
@@ -1317,11 +1324,7 @@ class Media(models.Model):
 
     @property
     def nfoname(self):
-        if self.downloaded and self.media_file:
-            filename = self.media_file.path
-        else:
-            filename = self.filename
-        prefix, ext = os.path.splitext(os.path.basename(filename))
+        prefix = self.filename_prefix()
         return f'{prefix}.nfo'
 
     @property
@@ -1330,11 +1333,7 @@ class Media(models.Model):
 
     @property
     def jsonname(self):
-        if self.downloaded and self.media_file:
-            filename = self.media_file.path
-        else:
-            filename = self.filename
-        prefix, ext = os.path.splitext(os.path.basename(filename))
+        prefix = self.filename_prefix()
         return f'{prefix}.info.json'
 
     @property
