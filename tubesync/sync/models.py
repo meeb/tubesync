@@ -537,7 +537,7 @@ class Source(models.Model):
     def get_image_url(self):
         if self.source_type == self.SOURCE_TYPE_YOUTUBE_PLAYLIST:
             raise SuspiciousOperation('This source is a playlist so it doesn\'t have thumbnail.')
-        
+
         return get_youtube_channel_image_info(self.url)
 
 
@@ -967,7 +967,7 @@ class Media(models.Model):
 
     def get_best_video_format(self):
         return get_best_video_format(self)
-    
+
     def get_format_str(self):
         '''
             Returns a youtube-dl compatible format string for the best matches
@@ -992,7 +992,7 @@ class Media(models.Model):
                 else:
                     return False
         return False
-    
+ 
     def get_display_format(self, format_str):
         '''
             Returns a tuple used in the format component of the output filename. This
@@ -1155,7 +1155,7 @@ class Media(models.Model):
             old_mdl = len(self.metadata or "")
             data = json.loads(self.metadata or "")
             compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
-            
+
             filtered_data = filter_response(data, True)
             filtered_json = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
         except Exception as e:
@@ -1323,7 +1323,7 @@ class Media(models.Model):
             filename = self.filename
         prefix, ext = os.path.splitext(os.path.basename(filename))
         return f'{prefix}.nfo'
-    
+
     @property
     def nfopath(self):
         return self.directory_path / self.nfoname
@@ -1336,7 +1336,7 @@ class Media(models.Model):
             filename = self.filename
         prefix, ext = os.path.splitext(os.path.basename(filename))
         return f'{prefix}.info.json'
-    
+
     @property
     def jsonpath(self):
         return self.directory_path / self.jsonname
@@ -1564,7 +1564,7 @@ class Media(models.Model):
 
         if use_padding:
             return f'{episode_number:02}'
-        
+
         return str(episode_number)
 
 
