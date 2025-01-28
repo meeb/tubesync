@@ -524,20 +524,15 @@ class MediaView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
+        q = Media.objects.all()
+
         if self.filter_source:
-            if self.show_skipped:
-                q = Media.objects.filter(source=self.filter_source)
-            elif self.only_skipped:
-                q = Media.objects.filter(Q(source=self.filter_source) & (Q(skip=True) | Q(manual_skip=True)))
-            else:
-                q = Media.objects.filter(Q(source=self.filter_source) & (Q(skip=False) & Q(manual_skip=False)))
-        else:
-            if self.show_skipped:
-                q = Media.objects.all()
-            elif self.only_skipped:
-                q = Media.objects.filter(Q(skip=True)|Q(manual_skip=True))
-            else:
-                q = Media.objects.filter(Q(skip=False)&Q(manual_skip=False))
+            q = q.filter(source=self.filter_source)
+        if self.only_skipped:
+            q = q.filter(Q(can_download=False) | Q(skip=True) | Q(manual_skip=True))
+        elif not self.show_skipped:
+            q = q.filter(Q(can_download=True) & Q(skip=False) & Q(manual_skip=False))
+
         return q.order_by('-published', '-created')
 
     def get_context_data(self, *args, **kwargs):
