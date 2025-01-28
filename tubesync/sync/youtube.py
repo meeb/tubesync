@@ -245,6 +245,22 @@ def download_media(url, media_format, extension, output_file, info_json,
         'home': os.path.dirname(output_file),
     })
 
+    codec_options = []
+    ofn = os.path.basename(output_file)
+    if 'av1-' in ofn:
+        codec_options = ['-c:v', 'libsvtav1', '-preset', '8', '-crf', '35']
+    elif 'vp9-' in ofn:
+        codec_options = ['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '31']
+    ytopts['postprocessor_args'] = opts.get('postprocessor_args', {})
+    set_ffmpeg_codec = not (
+        ytopts['postprocessor_args'] and
+        ytopts['postprocessor_args']['modifychapters+ffmpeg']
+    )
+    if set_ffmpeg_codec and codec_options:
+        ytopts['postprocessor_args'].update({
+            'modifychapters+ffmpeg': codec_options,
+        })
+
     # clean-up incompatible keys
     pp_opts = {k: v for k, v in pp_opts.items() if not k.startswith('_')}
 
