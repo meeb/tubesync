@@ -218,7 +218,9 @@ def download_media(url, media_format, extension, output_file, info_json,
         'addmetadata': embed_metadata,
         'addchapters': True,
         'embed_infojson': False,
+        'writethumbnail': False,
         'force_keyframes_at_cuts': True,
+        'sponskrub': False,
     })
 
     if skip_sponsors:
