@@ -213,8 +213,8 @@ def download_media(url, media_format, extension, output_file, info_json,
     hook.download_progress = 0
 
     default_opts = yt_dlp.parse_options([]).options
-    pp_opts = deepcopy(default_opts.__dict__)
-    pp_opts.update({
+    pp_opts = deepcopy(default_opts)
+    pp_opts.__dict__.update({
         'embedthumbnail': embed_thumbnail,
         'addmetadata': embed_metadata,
         'addchapters': True,
@@ -223,8 +223,8 @@ def download_media(url, media_format, extension, output_file, info_json,
     })
 
     if skip_sponsors:
-        pp_opts['sponsorblock_mark'].update('all,-chapter'.split(','))
-        pp_opts['sponsorblock_remove'].update(sponsor_categories or {})
+        pp_opts.sponsorblock_mark.update('all,-chapter'.split(','))
+        pp_opts.sponsorblock_remove.update(sponsor_categories or {})
 
     ytopts = {
         'format': media_format,
@@ -261,13 +261,6 @@ def download_media(url, media_format, extension, output_file, info_json,
         ytopts['postprocessor_args'].update({
             'modifychapters+ffmpeg': codec_options,
         })
-
-    # clean-up incompatible keys
-    pp_opts = {k: v for k, v in pp_opts.items() if not k.startswith('_')}
-
-    # convert dict to namedtuple
-    yt_dlp_opts = namedtuple('yt_dlp_opts', pp_opts)
-    pp_opts = yt_dlp_opts(**pp_opts)
 
     # create the post processors list
     ytopts['postprocessors'] = list(yt_dlp.get_postprocessors(pp_opts))
