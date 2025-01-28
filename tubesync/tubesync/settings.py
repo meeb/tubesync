@@ -177,6 +177,10 @@ COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'
 
 
+RENAME_ALL_SOURCES = False
+RENAME_SOURCES = None
+
+
 try:
     from .local_settings import *
 except ImportError as e:
