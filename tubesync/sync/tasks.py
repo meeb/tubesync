@@ -51,6 +51,7 @@ def map_task_to_instance(task):
         'sync.tasks.download_media': Media,
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
+        'sync.tasks.rename_all_media_for_source': Source,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
@@ -442,10 +443,18 @@ def download_media(media_id):
                 media.downloaded_format = 'audio'
         media.save()
         # If selected, copy the thumbnail over as well
-        if media.source.copy_thumbnails and media.thumb:
-            log.info(f'Copying media thumbnail from: {media.thumb.path} '
-                     f'to: {media.thumbpath}')
-            copyfile(media.thumb.path, media.thumbpath)
+        if media.source.copy_thumbnails:
+            if not media.thumb_file_exists:
+                thumbnail_url = media.thumbnail
+                if thumbnail_url:
+                    args = ( str(media.pk), thumbnail_url, )
+                    delete_task_by_media('sync.tasks.download_media_thumbnail', args)
+                    if download_media_thumbnail.now(*args):
+                        media.refresh_from_db()
+            if media.thumb_file_exists:
+                log.info(f'Copying media thumbnail from: {media.thumb.path} '
+                         f'to: {media.thumbpath}')
+                copyfile(media.thumb.path, media.thumbpath)
         # If selected, write an NFO file
         if media.source.write_nfo:
             log.info(f'Writing media NFO file to: {media.nfopath}')
@@ -508,3 +517,18 @@ def save_all_media_for_source(source_id):
     # flags may need to be recalculated
     for media in Media.objects.filter(source=source):
         media.save()
+
+
+@background(schedule=0)
+def rename_all_media_for_source(source_id):
+    try:
+        source = Source.objects.get(pk=source_id)
+    except Source.DoesNotExist:
+        # Task triggered but the source no longer exists, do nothing
+        log.error(f'Task rename_all_media_for_source(pk={source_id}) called but no '
+                  f'source exists with ID: {source_id}')
+        return
+    for media in Media.objects.filter(source=source):
+        media.rename_files()
+
+
