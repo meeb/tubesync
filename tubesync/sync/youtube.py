@@ -253,11 +253,12 @@ def download_media(url, media_format, extension, output_file, info_json,
         v_key = parse_qs(urlsplit(url).query).get('v').pop()
         temp_dir_parent = ytopts['paths']['temp']
         temp_dir_prefix = f'{temp_dir_prefix}{v_key}-'
-    temp_dir = TemporaryDirectory(prefix=temp_dir_prefix,dir=temp_dir_parent)
-    (Path(temp_dir.name) / '.ignore').touch(exist_ok=True)
+    temp_dir_obj = TemporaryDirectory(prefix=temp_dir_prefix,dir=temp_dir_parent)
+    temp_dir_path = Path(temp_dir_obj.name)
+    (temp_dir_path / '.ignore').touch(exist_ok=True)
     ytopts['paths'].update({
-        'home': output_dir,
-        'temp': temp_dir.name,
+        'home': str(output_dir),
+        'temp': str(temp_dir_path),
     })
 
     codec_options = []
