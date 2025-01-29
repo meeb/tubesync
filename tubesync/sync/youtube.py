@@ -209,7 +209,7 @@ def download_media(url, media_format, extension, output_file, info_json,
         'subtitleslangs': sub_langs.split(','),
         'paths': opts.get('paths', dict()),
         'postprocessors': opts.get('postprocessors', list()),
-        'postprocessor_args': opts.get('postprocessor_args', dict())
+        'postprocessor_args': opts.get('postprocessor_args', dict()),
         'progress_hooks': opts.get('progress_hooks', list()),
     }
     output_dir = os.path.dirname(output_file)
