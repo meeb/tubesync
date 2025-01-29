@@ -54,7 +54,7 @@ class CommaSepChoiceField(models.Field):
     # If 'text' isn't correct add the vendor override here.
     _DB_TYPES = {}
 
-    def __init__(self, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, *args, **kwargs):
+    def __init__(self, *args, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.separator = str(separator)
         self.possible_choices = possible_choices
