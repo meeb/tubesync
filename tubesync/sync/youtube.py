@@ -5,10 +5,13 @@
 
 
 import os
-from pathlib import Path
-from django.conf import settings
-from copy import copy
+
+from collections import namedtuple
 from common.logger import log
+from copy import copy, deepcopy
+from pathlib import Path
+
+from django.conf import settings
 from .utils import mkdir_p
 import yt_dlp
 
@@ -208,6 +211,23 @@ def download_media(url, media_format, extension, output_file, info_json,
             log.warn(f'[youtube-dl] unknown event: {str(event)}')
 
     hook.download_progress = 0
+
+    default_opts = yt_dlp.parse_options([]).options
+    pp_opts = deepcopy(default_opts)
+    pp_opts.__dict__.update({
+        'embedthumbnail': embed_thumbnail,
+        'addmetadata': embed_metadata,
+        'addchapters': True,
+        'embed_infojson': False,
+        'writethumbnail': False,
+        'force_keyframes_at_cuts': True,
+        'sponskrub': False,
+    })
+
+    if skip_sponsors:
+        pp_opts.sponsorblock_mark.update('all,-chapter'.split(','))
+        pp_opts.sponsorblock_remove.update(sponsor_categories or {})
+
     ytopts = {
         'format': media_format,
         'merge_output_format': extension,
@@ -222,27 +242,31 @@ def download_media(url, media_format, extension, output_file, info_json,
         'writeautomaticsub': auto_subtitles,
         'subtitleslangs': sub_langs.split(','),
     }
-    if not sponsor_categories:
-        sponsor_categories = []
-    sbopt = {
-        'key': 'SponsorBlock',
-        'categories': sponsor_categories
-    }
-    ffmdopt = {
-        'key': 'FFmpegMetadata',
-        'add_chapters': embed_metadata,
-        'add_metadata': embed_metadata
-    }
     opts = get_yt_opts()
     ytopts['paths'] = opts.get('paths', {})
     ytopts['paths'].update({
         'home': os.path.dirname(output_file),
     })
-    if embed_thumbnail:
-        ytopts['postprocessors'].append({'key': 'EmbedThumbnail'})
-    if skip_sponsors:
-        ytopts['postprocessors'].append(sbopt)
-    ytopts['postprocessors'].append(ffmdopt)
+
+    codec_options = []
+    ofn = os.path.basename(output_file)
+    if 'av1-' in ofn:
+        codec_options = ['-c:v', 'libsvtav1', '-preset', '8', '-crf', '35']
+    elif 'vp9-' in ofn:
+        codec_options = ['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '31']
+    ytopts['postprocessor_args'] = opts.get('postprocessor_args', {})
+    set_ffmpeg_codec = not (
+        ytopts['postprocessor_args'] and
+        ytopts['postprocessor_args']['modifychapters+ffmpeg']
+    )
+    if set_ffmpeg_codec and codec_options:
+        ytopts['postprocessor_args'].update({
+            'modifychapters+ffmpeg': codec_options,
+        })
+
+    # create the post processors list
+    ytopts['postprocessors'] = list(yt_dlp.get_postprocessors(pp_opts))
+
     opts.update(ytopts)
 
     with yt_dlp.YoutubeDL(opts) as y:
