@@ -32,24 +32,28 @@ class CustomCheckboxSelectMultiple(CheckboxSelectMultiple):
 class CommaSepChoiceField(models.Field):
     "Implements comma-separated storage of lists"
 
+    # If 'text' isn't correct add the vendor override here.
+    _DB_TYPES = {}
+
     def __init__(self, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, *args, **kwargs):
-        self.separator = separator
+        super().__init__(*args, **kwargs)
+        self.separator = str(separator)
         self.possible_choices = possible_choices
         self.selected_choices = []
         self.allow_all = allow_all
         self.all_label = all_label
         self.all_choice = all_choice
-        super().__init__(*args, **kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
-        if self.separator != ",":
+        if ',' != self.separator:
             kwargs['separator'] = self.separator
         kwargs['possible_choices'] = self.possible_choices
         return name, path, args, kwargs
 
     def db_type(self, connection):
-        return 'text'
+        value = self._DB_TYPES.get(connection.vendor, None)
+        return value if value is not None else 'text'
 
     def get_my_choices(self):
         choiceArray = []
@@ -72,21 +76,13 @@ class CommaSepChoiceField(models.Field):
                     'label': '',
                     'required': False}
         defaults.update(kwargs)
-        #del defaults.required
         return super().formfield(**defaults)
 
-    def deconstruct(self):
-        name, path, args, kwargs = super().deconstruct()
-        # Only include kwarg if it's not the default
-        if self.separator != ",":
-            kwargs['separator'] = self.separator
-        return name, path, args, kwargs
-
     def from_db_value(self, value, expr, conn):
-        if value is None:
+        if 0 == len(value) or value is None:
             self.selected_choices = []
         else:
-            self.selected_choices = value.split(",")
+            self.selected_choices = value.split(self.separator)
 
         return self
 
@@ -97,7 +93,7 @@ class CommaSepChoiceField(models.Field):
             return ""
 
         if self.all_choice not in value:
-            return ",".join(value)
+            return self.separator.join(value)
         else:
             return self.all_choice
 
