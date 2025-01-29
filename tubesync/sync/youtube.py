@@ -14,6 +14,7 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit, parse_qs
 
 from django.conf import settings
+from .hooks import progress_hook
 from .utils import mkdir_p
 import yt_dlp
 
@@ -177,42 +178,6 @@ def download_media(url, media_format, extension, output_file, info_json,
         Downloads a YouTube URL to a file on disk.
     '''
 
-    def hook(event):
-        filename = os.path.basename(event['filename'])
-
-        if event.get('downloaded_bytes') is None or event.get('total_bytes') is None:
-            return None
-
-        if event['status'] == 'error':
-            log.error(f'[youtube-dl] error occured downloading: {filename}')
-        elif event['status'] == 'downloading':
-            downloaded_bytes = event.get('downloaded_bytes', 0)
-            total_bytes = event.get('total_bytes', 0)
-            eta = event.get('_eta_str', '?').strip()
-            percent_done = event.get('_percent_str', '?').strip()
-            speed = event.get('_speed_str', '?').strip()
-            total = event.get('_total_bytes_str', '?').strip()
-            if downloaded_bytes > 0 and total_bytes > 0:
-                p = round((event['downloaded_bytes'] / event['total_bytes']) * 100)
-                if (p % 5 == 0) and p > hook.download_progress:
-                    hook.download_progress = p
-                    log.info(f'[youtube-dl] downloading: {filename} - {percent_done} '
-                             f'of {total} at {speed}, {eta} remaining')
-            else:
-                # No progress to monitor, just spam every 10 download messages instead
-                hook.download_progress += 1
-                if hook.download_progress % 10 == 0:
-                    log.info(f'[youtube-dl] downloading: {filename} - {percent_done} '
-                                f'of {total} at {speed}, {eta} remaining')
-        elif event['status'] == 'finished':
-            total_size_str = event.get('_total_bytes_str', '?').strip()
-            elapsed_str = event.get('_elapsed_str', '?').strip()
-            log.info(f'[youtube-dl] finished downloading: {filename} - '
-                     f'{total_size_str} in {elapsed_str}')
-        else:
-            log.warn(f'[youtube-dl] unknown event: {str(event)}')
-
-    hook.download_progress = 0
 
     default_opts = yt_dlp.parse_options([]).options
     pp_opts = deepcopy(default_opts)
@@ -230,6 +195,7 @@ def download_media(url, media_format, extension, output_file, info_json,
         pp_opts.sponsorblock_mark.update('all,-chapter'.split(','))
         pp_opts.sponsorblock_remove.update(sponsor_categories or {})
 
+    opts = get_yt_opts()
     ytopts = {
         'format': media_format,
         'merge_output_format': extension,
@@ -237,15 +203,15 @@ def download_media(url, media_format, extension, output_file, info_json,
         'quiet': False if settings.DEBUG else True,
         'verbose': True if settings.DEBUG else False,
         'noprogress': None if settings.DEBUG else True,
-        'progress_hooks': [hook],
         'writeinfojson': info_json,
-        'postprocessors': [],
         'writesubtitles': write_subtitles,
         'writeautomaticsub': auto_subtitles,
         'subtitleslangs': sub_langs.split(','),
+        'paths': opts.get('paths', dict()),
+        'postprocessors': opts.get('postprocessors', list()),
+        'postprocessor_args': opts.get('postprocessor_args', dict())
+        'progress_hooks': opts.get('progress_hooks', list()),
     }
-    opts = get_yt_opts()
-    ytopts['paths'] = opts.get('paths', {})
     output_dir = os.path.dirname(output_file)
     temp_dir_parent = output_dir
     temp_dir_prefix = '.yt_dlp-'
@@ -261,13 +227,16 @@ def download_media(url, media_format, extension, output_file, info_json,
         'temp': str(temp_dir_path),
     })
 
-    codec_options = []
+    progress_hook_func = progress_hook.get('function', None)
+    if progress_hook_func:
+        ytopts['progress_hooks'].append(progress_hook_func)
+
+    codec_options = list()
     ofn = ytopts['outtmpl']
     if 'av1-' in ofn:
         codec_options = ['-c:v', 'libsvtav1', '-preset', '8', '-crf', '35']
     elif 'vp9-' in ofn:
         codec_options = ['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '31']
-    ytopts['postprocessor_args'] = opts.get('postprocessor_args', {})
     set_ffmpeg_codec = not (
         ytopts['postprocessor_args'] and
         ytopts['postprocessor_args']['modifychapters+ffmpeg']
@@ -278,7 +247,7 @@ def download_media(url, media_format, extension, output_file, info_json,
         })
 
     # create the post processors list
-    ytopts['postprocessors'] = list(yt_dlp.get_postprocessors(pp_opts))
+    ytopts['postprocessors'].extend(list(yt_dlp.get_postprocessors(pp_opts)))
 
     opts.update(ytopts)
 
