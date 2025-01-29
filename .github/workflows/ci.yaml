@@ -80,6 +80,7 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           push: true
+          provenance: false
           tags: ${{ steps.origin.outputs.tag }}
           cache-from: |
             type=registry,ref=${{ steps.upstream.outputs.ref }}
