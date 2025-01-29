@@ -11,8 +11,11 @@ class ProgressHookStatus:
 
 
 def yt_dlp_progress_hook(event):
-    hook = progress_hook.get('status', hook)
+    hook = progress_hook.get('status', None)
     filename = os.path.basename(event['filename'])
+    if hook is None:
+        log.error('yt_dlp_progress_hook: failed to get hook status object')
+        return None
 
     if event.get('downloaded_bytes') is None or event.get('total_bytes') is None:
         return None
