@@ -254,10 +254,10 @@ def download_media(url, media_format, extension, output_file, info_json,
         temp_dir_parent = ytopts['paths']['temp']
         temp_dir_prefix = f'{temp_dir_prefix}{v_key}-'
     temp_dir = TemporaryDirectory(prefix=temp_dir_prefix,dir=temp_dir_parent)
-    (Path(temp_dir) / '.ignore').touch(exist_ok=True)
+    (Path(temp_dir.name) / '.ignore').touch(exist_ok=True)
     ytopts['paths'].update({
         'home': output_dir,
-        'temp': temp_dir,
+        'temp': temp_dir.name,
     })
 
     codec_options = []
