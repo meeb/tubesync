@@ -8,8 +8,10 @@ import os
 
 from collections import namedtuple
 from common.logger import log
-from copy import copy, deepcopy
+from copy import deepcopy
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from urllib.parse import urlsplit, parse_qs
 
 from django.conf import settings
 from .utils import mkdir_p
@@ -41,7 +43,7 @@ class YouTubeError(yt_dlp.utils.DownloadError):
 
 
 def get_yt_opts():
-    opts = copy(_defaults)
+    opts = deepcopy(_defaults)
     cookie_file = settings.COOKIES_FILE
     if cookie_file.is_file():
         cookie_file_path = str(cookie_file.resolve())
@@ -244,12 +246,22 @@ def download_media(url, media_format, extension, output_file, info_json,
     }
     opts = get_yt_opts()
     ytopts['paths'] = opts.get('paths', {})
+    output_dir = os.path.dirname(output_file)
+    temp_dir_parent = output_dir
+    temp_dir_prefix = '.yt_dlp-'
+    if 'temp' in ytopts['paths']:
+        v_key = parse_qs(urlsplit(url).query).get('v').pop()
+        temp_dir_parent = ytopts['paths']['temp']
+        temp_dir_prefix = f'{temp_dir_prefix}{v_key}-'
+    temp_dir = TemporaryDirectory(prefix=temp_dir_prefix,dir=temp_dir_parent)
+    (Path(temp_dir.name) / '.ignore').touch(exist_ok=True)
     ytopts['paths'].update({
-        'home': os.path.dirname(output_file),
+        'home': output_dir,
+        'temp': temp_dir.name,
     })
 
     codec_options = []
-    ofn = os.path.basename(output_file)
+    ofn = ytopts['outtmpl']
     if 'av1-' in ofn:
         codec_options = ['-c:v', 'libsvtav1', '-preset', '8', '-crf', '35']
     elif 'vp9-' in ofn:
