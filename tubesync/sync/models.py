@@ -25,7 +25,7 @@ from .utils import (seconds_to_timestr, parse_media_format, filter_response,
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
-from .fields import CommaSepChoiceField
+from .fields import CommaSepChoiceField, SponsorBlock_Category
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 
@@ -116,21 +116,9 @@ class Source(models.Model):
     EXTENSION_MKV = 'mkv'
     EXTENSIONS = (EXTENSION_M4A, EXTENSION_OGG, EXTENSION_MKV)
 
-    # as stolen from: https://wiki.sponsor.ajay.app/w/Types / https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/postprocessor/sponsorblock.py
-    SPONSORBLOCK_CATEGORIES_CHOICES = (
-        ('sponsor', 'Sponsor'),
-        ('intro', 'Intermission/Intro Animation'),
-        ('outro', 'Endcards/Credits'),
-        ('selfpromo', 'Unpaid/Self Promotion'),
-        ('preview', 'Preview/Recap'),
-        ('filler', 'Filler Tangent'),
-        ('interaction', 'Interaction Reminder'),
-        ('music_offtopic', 'Non-Music Section'),
-    )
-
     sponsorblock_categories = CommaSepChoiceField(
         _(''),
-        possible_choices=SPONSORBLOCK_CATEGORIES_CHOICES,
+        possible_choices=SponsorBlock_Category.choices,
         all_choice='all',
         allow_all=True,
         all_label='(all options)',
