@@ -114,21 +114,26 @@ class Source(models.Model):
     EXTENSION_MKV = 'mkv'
     EXTENSIONS = (EXTENSION_M4A, EXTENSION_OGG, EXTENSION_MKV)
 
-    # as stolen from: https://wiki.sponsor.ajay.app/w/Types / https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/postprocessor/sponsorblock.py
-    SPONSORBLOCK_CATEGORIES_CHOICES = (
-        ('sponsor', 'Sponsor'),
-        ('intro', 'Intermission/Intro Animation'),
-        ('outro', 'Endcards/Credits'),
-        ('selfpromo', 'Unpaid/Self Promotion'),
-        ('preview', 'Preview/Recap'),
-        ('filler', 'Filler Tangent'),
-        ('interaction', 'Interaction Reminder'),
-        ('music_offtopic', 'Non-Music Section'),
-    )
+    # as stolen from:
+    # - https://wiki.sponsor.ajay.app/w/Types
+    # - https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/postprocessor/sponsorblock.py
+    #
+    # The spacing is a little odd, it is for easy copy/paste selection.
+    # Please don't change it.
+    # Every possible category fits in a string < 128 characters
+    class SponsorBlock_Category(models.TextChoices):
+        SPONSOR = 'sponsor', _( 'Sponsor' )
+        INTRO = 'intro', _( 'Intermission/Intro Animation' )
+        OUTRO = 'outro', _( 'Endcards/Credits' )
+        SELFPROMO = 'selfpromo', _( 'Unpaid/Self Promotion' )
+        PREVIEW = 'preview', _( 'Preview/Recap' )
+        FILLER = 'filler', _( 'Filler Tangent' )
+        INTERACTION = 'interaction', _( 'Interaction Reminder' )
+        MUSIC_OFFTOPIC = 'music_offtopic', _( 'Non-Music Section' )
 
     sponsorblock_categories = CommaSepChoiceField(
         _(''),
-        possible_choices=SPONSORBLOCK_CATEGORIES_CHOICES,
+        possible_choices=SponsorBlock_Category.choices,
         all_choice='all',
         allow_all=True,
         all_label='(all options)',
