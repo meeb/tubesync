@@ -6,8 +6,26 @@ from django.conf import settings
 
 
 class ProgressHookStatus:
+    valid = frozenset((
+        'downloading',
+        'finished',
+        'error',
+    ))
+
     def __init__(self):
         self.download_progress = 0
+
+class PPHookStatus:
+    valid = frozenset((
+        'started',
+        'processing',
+        'finished',
+    ))
+
+    def __init__(self, *args, status=None, postprocessor=None, info_dict={}, **kwargs):
+        self.info = info_dict
+        self.name = postprocessor
+        self.status = status
 
 
 def yt_dlp_progress_hook(event):
@@ -15,6 +33,10 @@ def yt_dlp_progress_hook(event):
     filename = os.path.basename(event['filename'])
     if hook is None:
         log.error('yt_dlp_progress_hook: failed to get hook status object')
+        return None
+
+    if event['status'] not in ProgressHookStatus.valid:
+        log.warn(f'[youtube-dl] unknown event: {str(event)}')
         return None
 
     if event.get('downloaded_bytes') is None or event.get('total_bytes') is None:
@@ -46,11 +68,25 @@ def yt_dlp_progress_hook(event):
         elapsed_str = event.get('_elapsed_str', '?').strip()
         log.info(f'[youtube-dl] finished downloading: {filename} - '
                  f'{total_size_str} in {elapsed_str}')
-    else:
+
+def yt_dlp_postprocessor_hook(event):
+    if event['status'] not in PPHookStatus.valid:
         log.warn(f'[youtube-dl] unknown event: {str(event)}')
+        return None
+
+    postprocessor_hook['status'] = PPHookStatus(*event)
+    if 'started' == event['status']:
+        log.debug(repr(event['info_dict']))
+    log.info(f'[{event['postprocessor']}] {event['status']}')
+
 
 progress_hook = {
     'status': ProgressHookStatus(),
     'function': yt_dlp_progress_hook,
+}
+
+postprocessor_hook = {
+    'status': PPHookStatus(),
+    'function': yt_dlp_postprocessor_hook,
 }
 
