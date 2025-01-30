@@ -77,7 +77,7 @@ def yt_dlp_postprocessor_hook(event):
     postprocessor_hook['status'] = PPHookStatus(*event)
     if 'started' == event['status']:
         log.debug(repr(event['info_dict']))
-    log.info(f'[{event['postprocessor']}] {event['status']}')
+    log.info(f'[{event["postprocessor"]}] {event["status"]}')
 
 
 progress_hook = {
