@@ -191,7 +191,7 @@ def download_media(
     # We fake up this option to make it easier for the user to add post processors.
     postprocessors = opts.get('add_postprocessors', pp_opts.add_postprocessors)
     if isinstance(postprocessors, str):
-        # NAME1[:ARGS],NAME2[:ARGS]
+        # NAME1[:ARGS], NAME2[:ARGS]
         # ARGS are a semicolon ";" delimited list of NAME=VALUE
         #
         # This means that "," cannot be present in NAME or VALUE.
@@ -206,7 +206,7 @@ def download_media(
         postprocessors = list(
             dict(
                 _postprocessor_opts_parser( *val.split(':', 1) )
-            ) for val in postprocessors.split(',')
+            ) for val in map(str.strip, postprocessors.split(','))
         )
     if not isinstance(postprocessors, list):
         postprocessors = list()
