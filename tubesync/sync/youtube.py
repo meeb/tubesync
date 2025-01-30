@@ -14,7 +14,7 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit, parse_qs
 
 from django.conf import settings
-from .hooks import progress_hook
+from .hooks import postprocessor_hook, progress_hook
 from .utils import mkdir_p
 import yt_dlp
 from yt_dlp.utils import remove_end
@@ -250,6 +250,7 @@ def download_media(
         'sleep_interval_requests': 30,
         'paths': opts.get('paths', dict()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),
+        'postprocessor_hooks': opts.get('postprocessor_hooks', list()),
         'progress_hooks': opts.get('progress_hooks', list()),
     }
     output_dir = os.path.dirname(output_file)
@@ -265,6 +266,10 @@ def download_media(
         'home': output_dir,
         'temp': temp_dir.name,
     })
+
+    postprocessor_hook_func = postprocessor_hook.get('function', None)
+    if postprocessor_hook_func:
+        ytopts['postprocessor_hooks'].append(postprocessor_hook_func)
 
     progress_hook_func = progress_hook.get('function', None)
     if progress_hook_func:
