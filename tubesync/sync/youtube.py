@@ -35,7 +35,6 @@ if _youtubedl_tempdir:
     _defaults['paths'] = _paths
 
 
-
 class YouTubeError(yt_dlp.utils.DownloadError):
     '''
         Generic wrapped error for all errors that could be raised by youtube-dl.
@@ -170,18 +169,35 @@ def get_media_info(url):
     return response
 
 
-def download_media(url, media_format, extension, output_file, info_json,
-                   sponsor_categories=None,
-                   embed_thumbnail=False, embed_metadata=False, skip_sponsors=True,
-                   write_subtitles=False, auto_subtitles=False, sub_langs='en'):
+# Yes, this looks odd. But, it works.
+# It works without also causing indentation problems.
+# I'll take ease of editing, thanks.
+def download_media(
+    url, media_format, extension, output_file,
+    info_json, sponsor_categories=None,
+    embed_thumbnail=False, embed_metadata=False,
+    skip_sponsors=True, write_subtitles=False,
+    auto_subtitles=False, sub_langs='en'
+):
     '''
         Downloads a YouTube URL to a file on disk.
     '''
 
-
+    opts = get_yt_opts()
     default_opts = yt_dlp.parse_options([]).options
     pp_opts = deepcopy(default_opts)
+
+    # We fake up this option to make it easier for the user to add post processors.
+    postprocessors = opts.get('add_postprocessors', pp_opts.add_postprocessors)
+    if isinstance(postprocessors, str):
+        postprocessors = postprocessors.split(',')
+    if not isinstance(postprocessors, list):
+        postprocessors = list()
+    # Add any post processors configured the 'hard' way also.
+    postprocessors.extend( opts.get('postprocessors', list()) )
+
     pp_opts.__dict__.update({
+        'add_postprocessors': postprocessors,
         'embedthumbnail': embed_thumbnail,
         'addmetadata': embed_metadata,
         'addchapters': True,
@@ -195,7 +211,6 @@ def download_media(url, media_format, extension, output_file, info_json,
         pp_opts.sponsorblock_mark.update('all,-chapter'.split(','))
         pp_opts.sponsorblock_remove.update(sponsor_categories or {})
 
-    opts = get_yt_opts()
     ytopts = {
         'format': media_format,
         'merge_output_format': extension,
@@ -208,7 +223,6 @@ def download_media(url, media_format, extension, output_file, info_json,
         'writeautomaticsub': auto_subtitles,
         'subtitleslangs': sub_langs.split(','),
         'paths': opts.get('paths', dict()),
-        'postprocessors': opts.get('postprocessors', list()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),
         'progress_hooks': opts.get('progress_hooks', list()),
     }
@@ -245,8 +259,9 @@ def download_media(url, media_format, extension, output_file, info_json,
             'modifychapters+ffmpeg': codec_options,
         })
 
-    # create the post processors list
-    ytopts['postprocessors'].extend(list(yt_dlp.get_postprocessors(pp_opts)))
+    # Create the post processors list.
+    # It already included user configured post processors as well.
+    ytopts['postprocessors'] = list(yt_dlp.get_postprocessors(pp_opts))
 
     opts.update(ytopts)
 
