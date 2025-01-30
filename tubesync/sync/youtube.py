@@ -225,7 +225,10 @@ def download_media(
     })
 
     if skip_sponsors:
-        pp_opts.sponsorblock_mark.update('all,-chapter'.split(','))
+        # Let yt_dlp convert from human for us.
+        pp_opts.sponsorblock_mark = yt_dlp.parse_options(
+            ['--sponsorblock-mark=all,-chapter']
+        ).options.sponsorblock_mark
         pp_opts.sponsorblock_remove.update(sponsor_categories or {})
 
     ytopts = {
