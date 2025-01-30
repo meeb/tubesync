@@ -17,6 +17,7 @@ from django.conf import settings
 from .hooks import progress_hook
 from .utils import mkdir_p
 import yt_dlp
+from yt_dlp.utils import remove_end
 
 
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
@@ -190,7 +191,23 @@ def download_media(
     # We fake up this option to make it easier for the user to add post processors.
     postprocessors = opts.get('add_postprocessors', pp_opts.add_postprocessors)
     if isinstance(postprocessors, str):
-        postprocessors = postprocessors.split(',')
+        # NAME1[:ARGS],NAME2[:ARGS]
+        # ARGS are a semicolon ";" delimited list of NAME=VALUE
+        #
+        # This means that "," cannot be present in NAME or VALUE.
+        # If you need to support that, then use the 'postprocessors' key,
+        # in your settings dictionary instead.
+        _postprocessor_opts_parser = lambda key, val='': (
+            *(
+                item.split('=', 1) for item in (val.split(';') if val else [])
+            ),
+            ( 'key', remove_end(key, 'PP'), )
+        )
+        postprocessors = list(
+            dict(
+                _postprocessor_opts_parser( *val.split(':', 1) )
+            ) for val in postprocessors.split(',')
+        )
     if not isinstance(postprocessors, list):
         postprocessors = list()
     # Add any post processors configured the 'hard' way also.
