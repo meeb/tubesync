@@ -243,6 +243,12 @@ def download_media(url, media_format, extension, output_file, info_json,
         'writesubtitles': write_subtitles,
         'writeautomaticsub': auto_subtitles,
         'subtitleslangs': sub_langs.split(','),
+        'writethumbnail': True,
+        'check_formats': False,
+        'overwrites': None,
+        'sleep_interval': 30,
+        'max_sleep_interval': 600,
+        'sleep_interval_requests': 30,
     }
     opts = get_yt_opts()
     ytopts['paths'] = opts.get('paths', {})
