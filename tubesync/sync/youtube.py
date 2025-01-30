@@ -17,6 +17,7 @@ from django.conf import settings
 from .hooks import progress_hook
 from .utils import mkdir_p
 import yt_dlp
+from yt_dlp.utils import remove_end
 
 
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
@@ -33,7 +34,6 @@ if _youtubedl_tempdir:
     _paths = _defaults.get('paths', {})
     _paths.update({ 'temp': _youtubedl_tempdir, })
     _defaults['paths'] = _paths
-
 
 
 class YouTubeError(yt_dlp.utils.DownloadError):
@@ -170,18 +170,51 @@ def get_media_info(url):
     return response
 
 
-def download_media(url, media_format, extension, output_file, info_json,
-                   sponsor_categories=None,
-                   embed_thumbnail=False, embed_metadata=False, skip_sponsors=True,
-                   write_subtitles=False, auto_subtitles=False, sub_langs='en'):
+# Yes, this looks odd. But, it works.
+# It works without also causing indentation problems.
+# I'll take ease of editing, thanks.
+def download_media(
+    url, media_format, extension, output_file,
+    info_json, sponsor_categories=None,
+    embed_thumbnail=False, embed_metadata=False,
+    skip_sponsors=True, write_subtitles=False,
+    auto_subtitles=False, sub_langs='en'
+):
     '''
         Downloads a YouTube URL to a file on disk.
     '''
 
-
+    opts = get_yt_opts()
     default_opts = yt_dlp.parse_options([]).options
     pp_opts = deepcopy(default_opts)
+
+    # We fake up this option to make it easier for the user to add post processors.
+    postprocessors = opts.get('add_postprocessors', pp_opts.add_postprocessors)
+    if isinstance(postprocessors, str):
+        # NAME1[:ARGS], NAME2[:ARGS]
+        # ARGS are a semicolon ";" delimited list of NAME=VALUE
+        #
+        # This means that "," cannot be present in NAME or VALUE.
+        # If you need to support that, then use the 'postprocessors' key,
+        # in your settings dictionary instead.
+        _postprocessor_opts_parser = lambda key, val='': (
+            *(
+                item.split('=', 1) for item in (val.split(';') if val else [])
+            ),
+            ( 'key', remove_end(key, 'PP'), )
+        )
+        postprocessors = list(
+            dict(
+                _postprocessor_opts_parser( *val.split(':', 1) )
+            ) for val in map(str.strip, postprocessors.split(','))
+        )
+    if not isinstance(postprocessors, list):
+        postprocessors = list()
+    # Add any post processors configured the 'hard' way also.
+    postprocessors.extend( opts.get('postprocessors', list()) )
+
     pp_opts.__dict__.update({
+        'add_postprocessors': postprocessors,
         'embedthumbnail': embed_thumbnail,
         'addmetadata': embed_metadata,
         'addchapters': True,
@@ -192,10 +225,12 @@ def download_media(url, media_format, extension, output_file, info_json,
     })
 
     if skip_sponsors:
-        pp_opts.sponsorblock_mark.update('all,-chapter'.split(','))
+        # Let yt_dlp convert from human for us.
+        pp_opts.sponsorblock_mark = yt_dlp.parse_options(
+            ['--sponsorblock-mark=all,-chapter']
+        ).options.sponsorblock_mark
         pp_opts.sponsorblock_remove.update(sponsor_categories or {})
 
-    opts = get_yt_opts()
     ytopts = {
         'format': media_format,
         'merge_output_format': extension,
@@ -214,7 +249,6 @@ def download_media(url, media_format, extension, output_file, info_json,
         'max_sleep_interval': 600,
         'sleep_interval_requests': 30,
         'paths': opts.get('paths', dict()),
-        'postprocessors': opts.get('postprocessors', list()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),
         'progress_hooks': opts.get('progress_hooks', list()),
     }
@@ -252,8 +286,9 @@ def download_media(url, media_format, extension, output_file, info_json,
             'modifychapters+ffmpeg': codec_options,
         })
 
-    # create the post processors list
-    ytopts['postprocessors'].extend(list(yt_dlp.get_postprocessors(pp_opts)))
+    # Create the post processors list.
+    # It already included user configured post processors as well.
+    ytopts['postprocessors'] = list(yt_dlp.get_postprocessors(pp_opts))
 
     opts.update(ytopts)
 
