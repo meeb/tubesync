@@ -52,6 +52,7 @@ class CommaSepChoiceField(models.Field):
     "Implements comma-separated storage of lists"
 
     def __init__(self, *args, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, **kwargs):
+        kwargs.setdefault('max_length', 128)
         super().__init__(*args, **kwargs)
         self.separator = str(separator)
         self.possible_choices = possible_choices
@@ -59,6 +60,10 @@ class CommaSepChoiceField(models.Field):
         self.allow_all = allow_all
         self.all_label = all_label
         self.all_choice = all_choice
+        self.choices = self.get_choices()
+
+    def get_internal_type(self):
+        return 'CharField'
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -67,56 +72,51 @@ class CommaSepChoiceField(models.Field):
         kwargs['possible_choices'] = self.possible_choices
         return name, path, args, kwargs
 
-    def get_internal_type(self):
-        return 'CharField'
-
-    def get_my_choices(self):
-        choiceArray = []
+    def get_choices(self, *args, **kwargs):
+        choice_list = list()
         if self.possible_choices is None:
-            return choiceArray
+            return choice_list
         if self.allow_all:
-            choiceArray.append((self.all_choice, _(self.all_label)))
+            choice_list.append((self.all_choice, _(self.all_label)))
 
         for t in self.possible_choices:
-            choiceArray.append(t)
+            choice_list.append(t)
 
-        return choiceArray
+        return choice_list
 
     def formfield(self, **kwargs):
         # This is a fairly standard way to set up some defaults
         # while letting the caller override them.
-        defaults = {'form_class': MultipleChoiceField, 
-                    'choices': self.get_my_choices,
-                    'widget': CustomCheckboxSelectMultiple,
-                    'label': '',
-                    'required': False}
+        defaults = {
+            'form_class': MultipleChoiceField,
+            'choices_form_class': MultipleChoiceField,
+            'widget': CustomCheckboxSelectMultiple,
+            'label': '',
+            'required': False,
+        }
         defaults.update(kwargs)
         return super().formfield(self, **defaults)
 
-    def from_db_value(self, value, expr, conn):
-        if 0 == len(value) or value is None:
-            self.selected_choices = []
-        else:
-            self.selected_choices = value.split(self.separator)
-
-        return self
-
     def get_prep_value(self, value):
-        if value is None:
-            return ""
-        if not isinstance(value,list):
-            return ""
+        value = super().get_prep_value(value)
+        return self.to_python(value)
 
-        if self.all_choice not in value:
-            return self.separator.join(value)
-        else:
-            return self.all_choice
+    def to_python(self, value):
+        # string to list
+        value = super().to_python(value)
+        if isinstance(value, str) and len(value) > 0:
+            value = value.split(self.separator)
+        if not isinstance(value, list):
+            value = list()
 
-    def pre_save(self, model_instance, add):
-        obj = super().pre_save(model_instance, add)
-        if isinstance(obj, str):
-            self.from_db_value(obj, None, None)
-        return self.get_prep_value(self.selected_choices)
+    def value_to_string(self, obj):
+        # selected_choices to a string
+        if not isinstance(obj, self.__class__):
+            return ''
+        value = self.value_from_object(obj)
+        if obj.all_choice in value:
+            return obj.all_choice
+        return obj.separator.join(value)
 
     def get_text_for_value(self, val):
         fval = [i for i in self.possible_choices if i[0] == val]
