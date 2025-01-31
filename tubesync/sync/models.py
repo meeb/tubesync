@@ -1546,6 +1546,7 @@ class Media(models.Model):
                 return position_counter
             position_counter += 1
 
+
     def get_episode_str(self, use_padding=False):
         episode_number = self.calculate_episode_number()
         if not episode_number:
