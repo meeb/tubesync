@@ -108,6 +108,7 @@ class CommaSepChoiceField(models.Field):
             value = value.split(self.separator)
         if not isinstance(value, list):
             value = list()
+        return value
 
     def value_to_string(self, obj):
         # selected_choices to a string
