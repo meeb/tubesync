@@ -188,6 +188,12 @@ except ImportError as e:
     sys.stderr.write(f'Unable to import local_settings: {e}\n')
     sys.exit(1)
 
+# Formulas: Do not touch! Modify the inputs instead.
+DOWNLOAD_MEDIA_DELAY = 60 + int(MAX_RUN_TIME / 20)
+
+if BACKGROUND_TASK_ASYNC_THREADS > MAX_BACKGROUND_TASK_ASYNC_THREADS:
+    BACKGROUND_TASK_ASYNC_THREADS = MAX_BACKGROUND_TASK_ASYNC_THREADS
+
 
 from .dbutils import patch_ensure_connection
 patch_ensure_connection()
