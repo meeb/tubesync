@@ -78,6 +78,8 @@ def yt_dlp_postprocessor_hook(event):
     if 'started' == event['status']:
         if 'formats' in event['info_dict']:
             del event['info_dict']['formats']
+        if 'automatic_captions' in event['info_dict']:
+            del event['info_dict']['automatic_captions']
         log.debug(repr(event['info_dict']))
     key = 'Unknown'
     name = key
