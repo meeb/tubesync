@@ -75,20 +75,28 @@ def yt_dlp_postprocessor_hook(event):
         return None
 
     postprocessor_hook['status'] = PPHookStatus(*event)
+
+    name = key = 'Unknown'
+    if 'display_id' in event['info_dict']:
+        key = event['info_dict']['display_id']
+    elif 'id' in event['info_dict']:
+        key = event['info_dict']['id']
+
+    title = None
+    if 'fulltitle' in event['info_dict']:
+        title = event['info_dict']['fulltitle']
+    elif 'title' in event['info_dict']:
+        title = event['info_dict']['title']
+
+    if title:
+        name = f'{key}: {title}'
+
     if 'started' == event['status']:
         if 'formats' in event['info_dict']:
             del event['info_dict']['formats']
         if 'automatic_captions' in event['info_dict']:
             del event['info_dict']['automatic_captions']
         log.debug(repr(event['info_dict']))
-    key = 'Unknown'
-    name = key
-    if 'id' in event['info_dict']:
-        key = event['info_dict']['id']
-    title = None
-    if 'title' in event['info_dict']:
-        title = event['info_dict']['title']
-        name = f'{key}: {title}'
 
     log.info(f'[{event["postprocessor"]}] {event["status"]} for: {name}')
 
