@@ -3,6 +3,25 @@ from django.db import models
 from typing import Any, Optional, Dict
 from django.utils.translation import gettext_lazy as _
 
+
+# as stolen from:
+# - https://wiki.sponsor.ajay.app/w/Types
+# - https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/postprocessor/sponsorblock.py
+#
+# The spacing is a little odd, it is for easy copy/paste selection.
+# Please don't change it.
+# Every possible category fits in a string < 128 characters
+class SponsorBlock_Category(models.TextChoices):
+    SPONSOR = 'sponsor', _( 'Sponsor' )
+    INTRO = 'intro', _( 'Intermission/Intro Animation' )
+    OUTRO = 'outro', _( 'Endcards/Credits' )
+    SELFPROMO = 'selfpromo', _( 'Unpaid/Self Promotion' )
+    PREVIEW = 'preview', _( 'Preview/Recap' )
+    FILLER = 'filler', _( 'Filler Tangent' )
+    INTERACTION = 'interaction', _( 'Interaction Reminder' )
+    MUSIC_OFFTOPIC = 'music_offtopic', _( 'Non-Music Section' )
+
+
 # this is a form field!
 class CustomCheckboxSelectMultiple(CheckboxSelectMultiple):
     template_name = 'widgets/checkbox_select.html'
@@ -32,24 +51,28 @@ class CustomCheckboxSelectMultiple(CheckboxSelectMultiple):
 class CommaSepChoiceField(models.Field):
     "Implements comma-separated storage of lists"
 
-    def __init__(self, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, *args, **kwargs):
-        self.separator = separator
+    # If 'text' isn't correct add the vendor override here.
+    _DB_TYPES = {}
+
+    def __init__(self, *args, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.separator = str(separator)
         self.possible_choices = possible_choices
         self.selected_choices = []
         self.allow_all = allow_all
         self.all_label = all_label
         self.all_choice = all_choice
-        super().__init__(*args, **kwargs)
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
-        if self.separator != ",":
+        if ',' != self.separator:
             kwargs['separator'] = self.separator
         kwargs['possible_choices'] = self.possible_choices
         return name, path, args, kwargs
 
     def db_type(self, connection):
-        return 'text'
+        value = self._DB_TYPES.get(connection.vendor, None)
+        return value if value is not None else 'text'
 
     def get_my_choices(self):
         choiceArray = []
@@ -60,7 +83,7 @@ class CommaSepChoiceField(models.Field):
 
         for t in self.possible_choices:
             choiceArray.append(t)
-        
+
         return choiceArray
 
     def formfield(self, **kwargs):
@@ -72,21 +95,13 @@ class CommaSepChoiceField(models.Field):
                     'label': '',
                     'required': False}
         defaults.update(kwargs)
-        #del defaults.required
         return super().formfield(**defaults)
 
-    def deconstruct(self):
-        name, path, args, kwargs = super().deconstruct()
-        # Only include kwarg if it's not the default
-        if self.separator != ",":
-            kwargs['separator'] = self.separator
-        return name, path, args, kwargs
-
     def from_db_value(self, value, expr, conn):
-        if value is None:
+        if 0 == len(value) or value is None:
             self.selected_choices = []
         else:
-            self.selected_choices = value.split(",")
+            self.selected_choices = value.split(self.separator)
 
         return self
 
@@ -97,7 +112,7 @@ class CommaSepChoiceField(models.Field):
             return ""
 
         if self.all_choice not in value:
-            return ",".join(value)
+            return self.separator.join(value)
         else:
             return self.all_choice
 

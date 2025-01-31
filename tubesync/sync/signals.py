@@ -12,7 +12,8 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     download_media_thumbnail, download_media_metadata,
                     map_task_to_instance, check_source_directory_exists,
                     download_media, rescan_media_server, download_source_images,
-                    save_all_media_for_source, get_media_metadata_task)
+                    save_all_media_for_source, rename_all_media_for_source,
+                    get_media_metadata_task)
 from .utils import delete_file
 from .filtering import filter_media
 
@@ -53,7 +54,7 @@ def source_post_save(sender, instance, created, **kwargs):
         if instance.source_type != Source.SOURCE_TYPE_YOUTUBE_PLAYLIST and instance.copy_channel_images:
             download_source_images(
                 str(instance.pk),
-                priority=0,
+                priority=2,
                 verbose_name=verbose_name.format(instance.name)
             )
         if instance.index_schedule > 0:
@@ -68,10 +69,28 @@ def source_post_save(sender, instance, created, **kwargs):
                 verbose_name=verbose_name.format(instance.name),
                 remove_existing_tasks=True
             )
+    # Check settings before any rename tasks are scheduled
+    rename_sources_setting = settings.RENAME_SOURCES or list()
+    create_rename_task = (
+        (
+            instance.directory and
+            instance.directory in rename_sources_setting
+        ) or
+        settings.RENAME_ALL_SOURCES
+    )
+    if create_rename_task:
+        verbose_name = _('Renaming all media for source "{}"')
+        rename_all_media_for_source(
+            str(instance.pk),
+            queue=str(instance.pk),
+            priority=1,
+            verbose_name=verbose_name.format(instance.name),
+            remove_existing_tasks=False
+        )
     verbose_name = _('Checking all media for source "{}"')
     save_all_media_for_source(
         str(instance.pk),
-        priority=0,
+        priority=2,
         verbose_name=verbose_name.format(instance.name),
         remove_existing_tasks=True
     )
@@ -174,7 +193,7 @@ def media_post_save(sender, instance, created, **kwargs):
         download_media(
             str(instance.pk),
             queue=str(instance.source.pk),
-            priority=15,
+            priority=10,
             verbose_name=verbose_name.format(instance.name),
             remove_existing_tasks=True
         )

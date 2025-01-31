@@ -112,7 +112,7 @@ class SourcesView(ListView):
             sobj = Source.objects.get(pk=kwargs["pk"])
             if sobj is None:
                 return HttpResponseNotFound()
-            
+
             verbose_name = _('Index media from source "{}" once')
             index_source_task(
                 str(sobj.pk),
@@ -354,7 +354,7 @@ class EditSourceMixin:
         obj = form.save(commit=False)
         source_type = form.cleaned_data['media_format']
         example_media_file = obj.get_example_media_format()
-        
+
         if example_media_file == '':
             form.add_error(
                 'media_format',
@@ -524,20 +524,15 @@ class MediaView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
+        q = Media.objects.all()
+
         if self.filter_source:
-            if self.show_skipped:
-                q = Media.objects.filter(source=self.filter_source)
-            elif self.only_skipped:
-                q = Media.objects.filter(Q(source=self.filter_source) & (Q(skip=True) | Q(manual_skip=True)))
-            else:
-                q = Media.objects.filter(Q(source=self.filter_source) & (Q(skip=False) & Q(manual_skip=False)))
-        else:
-            if self.show_skipped:
-                q = Media.objects.all()
-            elif self.only_skipped:
-                q = Media.objects.filter(Q(skip=True)|Q(manual_skip=True))
-            else:
-                q = Media.objects.filter(Q(skip=False)&Q(manual_skip=False))
+            q = q.filter(source=self.filter_source)
+        if self.only_skipped:
+            q = q.filter(Q(can_download=False) | Q(skip=True) | Q(manual_skip=True))
+        elif not self.show_skipped:
+            q = q.filter(Q(can_download=True) & Q(skip=False) & Q(manual_skip=False))
+
         return q.order_by('-published', '-created')
 
     def get_context_data(self, *args, **kwargs):
@@ -776,18 +771,18 @@ class MediaContent(DetailView):
                 pth = pth[1]
             else:
                 pth = pth[0]
-            
-            
+
+
             # build final path
             filepth = pathlib.Path(str(settings.DOWNLOAD_ROOT) + pth)
-            
+
             if filepth.exists():
                 # return file
                 response = FileResponse(open(filepth,'rb'))
                 return response
             else:
                 return HttpResponseNotFound()
-            
+
         else:
             headers = {
                 'Content-Type': self.object.content_type,
