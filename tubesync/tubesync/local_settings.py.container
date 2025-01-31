@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 from urllib.parse import urljoin
-from common.logger import log
 from common.utils import parse_database_connection_string
 
 
