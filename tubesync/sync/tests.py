@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from xml.etree import ElementTree
 from django.conf import settings
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.utils import timezone
 from background_task.models import Task
 from .models import Source, Media
@@ -1738,6 +1738,7 @@ class ResponseFilteringTestCase(TestCase):
             metadata='{}'
         )
 
+    @override_settings(SHRINK_OLD_MEDIA_METADATA=False, SHRINK_NEW_MEDIA_METADATA=False)
     def test_metadata_20230629(self):
         self.media.metadata = all_test_metadata['20230629']
         self.media.save()
