@@ -31,8 +31,8 @@ if database_connection_env:
 
 
 if database_dict:
-    if not logging:
-        from common.logger import log
+    # check that logging was already imported a better way
+    from common.logger import log
     log.info(f'Using database connection: {database_dict["ENGINE"]}://'
              f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
              f'{database_dict["PORT"]}/{database_dict["NAME"]}')
