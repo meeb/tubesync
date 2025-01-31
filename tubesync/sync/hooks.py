@@ -76,8 +76,19 @@ def yt_dlp_postprocessor_hook(event):
 
     postprocessor_hook['status'] = PPHookStatus(*event)
     if 'started' == event['status']:
+        if 'formats' in event['info_dict']:
+            del event['info_dict']['formats']
         log.debug(repr(event['info_dict']))
-    log.info(f'[{event["postprocessor"]}] {event["status"]}')
+    key = 'Unknown'
+    name = key
+    if 'id' in event['info_dict']:
+        key = event['info_dict']['id']
+    title = None
+    if 'title' in event['info_dict']:
+        title = event['info_dict']['title']
+        name = f'{key}: {title}'
+
+    log.info(f'[{event["postprocessor"]}] {event["status"]} for: {name}')
 
 
 progress_hook = {
