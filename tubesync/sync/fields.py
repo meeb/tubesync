@@ -60,7 +60,8 @@ class CommaSepChoiceField(models.Field):
         self.allow_all = allow_all
         self.all_label = all_label
         self.all_choice = all_choice
-        self.choices = self.get_choices()
+        self.choices = None
+        # self.choices = self.get_all_choices()
 
     def get_internal_type(self):
         return 'CharField'
@@ -72,7 +73,7 @@ class CommaSepChoiceField(models.Field):
         kwargs['possible_choices'] = self.possible_choices
         return name, path, args, kwargs
 
-    def get_choices(self, *args, **kwargs):
+    def get_all_choices(self):
         choice_list = list()
         if self.possible_choices is None:
             return choice_list
@@ -89,13 +90,14 @@ class CommaSepChoiceField(models.Field):
         # while letting the caller override them.
         defaults = {
             'form_class': MultipleChoiceField,
-            'choices_form_class': MultipleChoiceField,
+            # 'choices_form_class': MultipleChoiceField,
             'widget': CustomCheckboxSelectMultiple,
+            'choices': self.get_all_choices(),
             'label': '',
             'required': False,
         }
         defaults.update(kwargs)
-        return super().formfield(self, **defaults)
+        return super().formfield(**defaults)
 
     def get_prep_value(self, value):
         value = super().get_prep_value(value)
