@@ -48,11 +48,8 @@ class CustomCheckboxSelectMultiple(CheckboxSelectMultiple):
         return { 'widget': ctx }
 
 # this is a database field!
-class CommaSepChoiceField(models.Field):
+class CommaSepChoiceField(models.CharField):
     "Implements comma-separated storage of lists"
-
-    # If 'text' isn't correct add the vendor override here.
-    _DB_TYPES = {}
 
     def __init__(self, *args, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, **kwargs):
         super().__init__(*args, **kwargs)
@@ -70,9 +67,8 @@ class CommaSepChoiceField(models.Field):
         kwargs['possible_choices'] = self.possible_choices
         return name, path, args, kwargs
 
-    def db_type(self, connection):
-        value = self._DB_TYPES.get(connection.vendor, None)
-        return value if value is not None else 'text'
+    def get_internal_type(self):
+        return super().get_internal_type()
 
     def get_my_choices(self):
         choiceArray = []
@@ -115,6 +111,10 @@ class CommaSepChoiceField(models.Field):
             return self.separator.join(value)
         else:
             return self.all_choice
+
+    def pre_save(self, model_instance, add=False):
+        obj = super().pre_save(model_instance, add)
+        return self.get_prep_value(obj.selected_choices)
 
     def get_text_for_value(self, val):
         fval = [i for i in self.possible_choices if i[0] == val]
