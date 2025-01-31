@@ -14,16 +14,18 @@ from django.core.validators import RegexValidator
 from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from common.logger import log
 from common.errors import NoFormatException
 from common.utils import clean_filename, clean_emoji
 from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media,
                       get_channel_image_info as get_youtube_channel_image_info)
-from .utils import seconds_to_timestr, parse_media_format
+from .utils import (seconds_to_timestr, parse_media_format, filter_response,
+                    write_text_file, mkdir_p, directory_and_stem, glob_quote)
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
-from .fields import CommaSepChoiceField
+from .fields import CommaSepChoiceField, SponsorBlock_Category
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 
@@ -114,21 +116,9 @@ class Source(models.Model):
     EXTENSION_MKV = 'mkv'
     EXTENSIONS = (EXTENSION_M4A, EXTENSION_OGG, EXTENSION_MKV)
 
-    # as stolen from: https://wiki.sponsor.ajay.app/w/Types / https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/postprocessor/sponsorblock.py
-    SPONSORBLOCK_CATEGORIES_CHOICES = (
-        ('sponsor', 'Sponsor'),
-        ('intro', 'Intermission/Intro Animation'),
-        ('outro', 'Endcards/Credits'),
-        ('selfpromo', 'Unpaid/Self Promotion'),
-        ('preview', 'Preview/Recap'),
-        ('filler', 'Filler Tangent'),
-        ('interaction', 'Interaction Reminder'),
-        ('music_offtopic', 'Non-Music Section'),
-    )
-
     sponsorblock_categories = CommaSepChoiceField(
         _(''),
-        possible_choices=SPONSORBLOCK_CATEGORIES_CHOICES,
+        possible_choices=SponsorBlock_Category.choices,
         all_choice='all',
         allow_all=True,
         all_label='(all options)',
@@ -537,7 +527,7 @@ class Source(models.Model):
     def get_image_url(self):
         if self.source_type == self.SOURCE_TYPE_YOUTUBE_PLAYLIST:
             raise SuspiciousOperation('This source is a playlist so it doesn\'t have thumbnail.')
-        
+
         return get_youtube_channel_image_info(self.url)
 
 
@@ -589,6 +579,7 @@ class Source(models.Model):
             'key': 'SoMeUnIqUiD',
             'format': '-'.join(fmt),
             'playlist_title': 'Some Playlist Title',
+            'video_order': '01',
             'ext': self.extension,
             'resolution': self.source_resolution if self.source_resolution else '',
             'height': '720' if self.source_resolution else '',
@@ -966,7 +957,7 @@ class Media(models.Model):
 
     def get_best_video_format(self):
         return get_best_video_format(self)
-    
+
     def get_format_str(self):
         '''
             Returns a youtube-dl compatible format string for the best matches
@@ -991,7 +982,7 @@ class Media(models.Model):
                 else:
                     return False
         return False
-    
+ 
     def get_display_format(self, format_str):
         '''
             Returns a tuple used in the format component of the output filename. This
@@ -1128,6 +1119,7 @@ class Media(models.Model):
             'key': self.key,
             'format': '-'.join(display_format['format']),
             'playlist_title': self.playlist_title,
+            'video_order': self.get_episode_str(True),
             'ext': self.source.extension,
             'resolution': display_format['resolution'],
             'height': display_format['height'],
@@ -1143,8 +1135,39 @@ class Media(models.Model):
     def has_metadata(self):
         return self.metadata is not None
 
+
+    @property
+    def reduce_data(self):
+        try:
+            from common.logger import log
+            from common.utils import json_serial
+
+            old_mdl = len(self.metadata or "")
+            data = json.loads(self.metadata or "{}")
+            compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
+
+            filtered_data = filter_response(data, True)
+            filtered_json = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
+        except Exception as e:
+            log.exception('reduce_data: %s', e)
+        else:
+            # log the results of filtering / compacting on metadata size
+            new_mdl = len(compact_json)
+            if old_mdl > new_mdl:
+                delta = old_mdl - new_mdl
+                log.info(f'{self.key}: metadata compacted by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
+            new_mdl = len(filtered_json)
+            if old_mdl > new_mdl:
+                delta = old_mdl - new_mdl
+                log.info(f'{self.key}: metadata reduced by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
+                if getattr(settings, 'SHRINK_OLD_MEDIA_METADATA', False):
+                    self.metadata = filtered_json
+
+
     @property
     def loaded_metadata(self):
+        if getattr(settings, 'SHRINK_OLD_MEDIA_METADATA', False):
+            self.reduce_data
         try:
             data = json.loads(self.metadata)
             if not isinstance(data, dict):
@@ -1263,20 +1286,26 @@ class Media(models.Model):
 
     @property
     def directory_path(self):
-        dirname = self.source.directory_path / self.filename
-        return dirname.parent
+        return self.filepath.parent
 
     @property
     def filepath(self):
         return self.source.directory_path / self.filename
 
-    @property
-    def thumbname(self):
+    def filename_prefix(self):
         if self.downloaded and self.media_file:
             filename = self.media_file.path
         else:
             filename = self.filename
+        # The returned prefix should not contain any directories.
+        # So, we do not care about the different directories
+        # used for filename in the cases above.
         prefix, ext = os.path.splitext(os.path.basename(filename))
+        return prefix
+
+    @property
+    def thumbname(self):
+        prefix = self.filename_prefix()
         return f'{prefix}.jpg'
 
     @property
@@ -1285,26 +1314,18 @@ class Media(models.Model):
 
     @property
     def nfoname(self):
-        if self.downloaded and self.media_file:
-            filename = self.media_file.path
-        else:
-            filename = self.filename
-        prefix, ext = os.path.splitext(os.path.basename(filename))
+        prefix = self.filename_prefix()
         return f'{prefix}.nfo'
-    
+
     @property
     def nfopath(self):
         return self.directory_path / self.nfoname
 
     @property
     def jsonname(self):
-        if self.downloaded and self.media_file:
-            filename = self.media_file.path
-        else:
-            filename = self.filename
-        prefix, ext = os.path.splitext(os.path.basename(filename))
+        prefix = self.filename_prefix()
         return f'{prefix}.info.json'
-    
+
     @property
     def jsonpath(self):
         return self.directory_path / self.jsonname
@@ -1373,8 +1394,7 @@ class Media(models.Model):
         nfo.append(season)
         # episode = number of video in the year
         episode = nfo.makeelement('episode', {})
-        episode_number = self.calculate_episode_number()
-        episode.text = str(episode_number) if episode_number else ''
+        episode.text = self.get_episode_str()
         episode.tail = '\n  '
         nfo.append(episode)
         # ratings = media metadata youtube rating
@@ -1387,7 +1407,7 @@ class Media(models.Model):
         rating_attrs = OrderedDict()
         rating_attrs['name'] = 'youtube'
         rating_attrs['max'] = '5'
-        rating_attrs['default'] = 'True'
+        rating_attrs['default'] = 'true'
         rating = nfo.makeelement('rating', rating_attrs)
         rating.text = '\n      '
         rating.append(value)
@@ -1395,7 +1415,8 @@ class Media(models.Model):
         rating.tail = '\n  '
         ratings = nfo.makeelement('ratings', {})
         ratings.text = '\n    '
-        ratings.append(rating)
+        if self.rating is not None:
+            ratings.append(rating)
         ratings.tail = '\n  '
         nfo.append(ratings)
         # plot = media metadata description
@@ -1412,7 +1433,8 @@ class Media(models.Model):
         mpaa = nfo.makeelement('mpaa', {})
         mpaa.text = str(self.age_limit)
         mpaa.tail = '\n  '
-        nfo.append(mpaa)
+        if self.age_limit and self.age_limit > 0:
+            nfo.append(mpaa)
         # runtime = media metadata duration in seconds
         runtime = nfo.makeelement('runtime', {})
         runtime.text = str(self.duration)
@@ -1523,6 +1545,89 @@ class Media(models.Model):
             if media == self:
                 return position_counter
             position_counter += 1
+
+    def get_episode_str(self, use_padding=False):
+        episode_number = self.calculate_episode_number()
+        if not episode_number:
+            return ''
+
+        if use_padding:
+            return f'{episode_number:02}'
+
+        return str(episode_number)
+
+    def rename_files(self):
+        if self.downloaded and self.media_file:
+            old_video_path = Path(self.media_file.path)
+            new_video_path = Path(get_media_file_path(self, None))
+            if old_video_path.exists() and not new_video_path.exists():
+                old_video_path = old_video_path.resolve(strict=True)
+
+                # move video to destination
+                mkdir_p(new_video_path.parent)
+                log.debug(f'{self!s}: {old_video_path!s} => {new_video_path!s}')
+                old_video_path.rename(new_video_path)
+                log.info(f'Renamed video file for: {self!s}')
+
+                # collect the list of files to move
+                # this should not include the video we just moved
+                (old_prefix_path, old_stem) = directory_and_stem(old_video_path)
+                other_paths = list(old_prefix_path.glob(glob_quote(old_stem) + '*'))
+                log.info(f'Collected {len(other_paths)} other paths for: {self!s}')
+
+                # adopt orphaned files, if possible
+                media_format = str(self.source.media_format)
+                top_dir_path = Path(self.source.directory_path)
+                if '{key}' in media_format:
+                    fuzzy_paths = list(top_dir_path.rglob('*' + glob_quote(str(self.key)) + '*'))
+                    log.info(f'Collected {len(fuzzy_paths)} fuzzy paths for: {self!s}')
+
+                if new_video_path.exists():
+                    new_video_path = new_video_path.resolve(strict=True)
+
+                    # update the media_file in the db
+                    self.media_file.name = str(new_video_path.relative_to(self.media_file.storage.location))
+                    self.save()
+                    log.info(f'Updated "media_file" in the database for: {self!s}')
+
+                    (new_prefix_path, new_stem) = directory_and_stem(new_video_path)
+
+                    # move and change names to match stem
+                    for other_path in other_paths:
+                        old_file_str = other_path.name
+                        new_file_str = new_stem + old_file_str[len(old_stem):]
+                        new_file_path = Path(new_prefix_path / new_file_str)
+                        log.debug(f'Considering replace for: {self!s}\n\t{other_path!s}\n\t{new_file_path!s}')
+                        # it should exist, but check anyway 
+                        if other_path.exists():
+                            log.debug(f'{self!s}: {other_path!s} => {new_file_path!s}')
+                            other_path.replace(new_file_path)
+
+                    for fuzzy_path in fuzzy_paths:
+                        (fuzzy_prefix_path, fuzzy_stem) = directory_and_stem(fuzzy_path)
+                        old_file_str = fuzzy_path.name
+                        new_file_str = new_stem + old_file_str[len(fuzzy_stem):]
+                        new_file_path = Path(new_prefix_path / new_file_str)
+                        log.debug(f'Considering rename for: {self!s}\n\t{fuzzy_path!s}\n\t{new_file_path!s}')
+                        # it quite possibly was renamed already
+                        if fuzzy_path.exists() and not new_file_path.exists():
+                            log.debug(f'{self!s}: {fuzzy_path!s} => {new_file_path!s}')
+                            fuzzy_path.rename(new_file_path)
+
+                    # The thumbpath inside the .nfo file may have changed
+                    if self.source.write_nfo and self.source.copy_thumbnails:
+                        write_text_file(new_prefix_path / self.nfopath.name, self.nfoxml)
+                        log.info(f'Wrote new ".nfo" file for: {self!s}')
+
+                    # try to remove empty dirs
+                    parent_dir = old_video_path.parent
+                    try:
+                        while parent_dir.is_dir():
+                            parent_dir.rmdir()
+                            log.info(f'Removed empty directory: {parent_dir!s}')
+                            parent_dir = parent_dir.parent
+                    except OSError as e:
+                        pass
 
 
 class MediaServer(models.Model):

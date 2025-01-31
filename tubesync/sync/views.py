@@ -14,7 +14,7 @@ from django.views.generic.detail import SingleObjectMixin
 from django.core.exceptions import SuspiciousFileOperation
 from django.http import HttpResponse
 from django.urls import reverse_lazy
-from django.db import IntegrityError
+from django.db import connection, IntegrityError
 from django.db.models import Q, Count, Sum, When, Case
 from django.forms import Form, ValidationError
 from django.utils.text import slugify
@@ -85,6 +85,12 @@ class DashboardView(TemplateView):
         data['config_dir'] = str(settings.CONFIG_BASE_DIR)
         data['downloads_dir'] = str(settings.DOWNLOAD_ROOT)
         data['database_connection'] = settings.DATABASE_CONNECTION_STR
+        # Add the database filesize when using db.sqlite3
+        data['database_filesize'] = None
+        db_name = str(connection.get_connection_params()['database'])
+        db_path = pathlib.Path(db_name) if '/' == db_name[0] else None
+        if db_path and 'sqlite' == connection.vendor:
+            data['database_filesize'] = db_path.stat().st_size
         return data
 
 
@@ -106,7 +112,7 @@ class SourcesView(ListView):
             sobj = Source.objects.get(pk=kwargs["pk"])
             if sobj is None:
                 return HttpResponseNotFound()
-            
+
             verbose_name = _('Index media from source "{}" once')
             index_source_task(
                 str(sobj.pk),
@@ -193,10 +199,15 @@ class ValidateSourceView(FormView):
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: ('https://www.youtube.com/playlist?list='
                                               'PL590L5WQmH8dpP0RyH5pCfIaDEdt9nk7r')
     }
+    _youtube_domains = frozenset({
+        'youtube.com',
+        'm.youtube.com',
+        'www.youtube.com',
+    })
     validation_urls = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: {
             'scheme': 'https',
-            'domains': ('m.youtube.com', 'www.youtube.com'),
+            'domains': _youtube_domains,
             'path_regex': '^\/(c\/)?([^\/]+)(\/videos)?$',
             'path_must_not_match': ('/playlist', '/c/playlist'),
             'qs_args': [],
@@ -205,7 +216,7 @@ class ValidateSourceView(FormView):
         },
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: {
             'scheme': 'https',
-            'domains': ('m.youtube.com', 'www.youtube.com'),
+            'domains': _youtube_domains,
             'path_regex': '^\/channel\/([^\/]+)(\/videos)?$',
             'path_must_not_match': ('/playlist', '/c/playlist'),
             'qs_args': [],
@@ -214,7 +225,7 @@ class ValidateSourceView(FormView):
         },
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: {
             'scheme': 'https',
-            'domains': ('m.youtube.com', 'www.youtube.com'),
+            'domains': _youtube_domains,
             'path_regex': '^\/(playlist|watch)$',
             'path_must_not_match': (),
             'qs_args': ('list',),
@@ -286,11 +297,36 @@ class ValidateSourceView(FormView):
         url = reverse_lazy('sync:add-source')
         fields_to_populate = self.prepopulate_fields.get(self.source_type)
         fields = {}
+        value = self.key
+        use_channel_id = (
+            'youtube-channel' == self.source_type_str and
+            '@' == self.key[0]
+        )
+        if use_channel_id:
+            old_key = self.key
+            old_source_type = self.source_type
+            old_source_type_str = self.source_type_str
+
+            self.source_type_str = 'youtube-channel-id'
+            self.source_type = self.source_types.get(self.source_type_str, None)
+            index_url = Source.create_index_url(self.source_type, self.key, 'videos')
+            try:
+                self.key = youtube.get_channel_id(
+                    index_url.replace('/channel/', '/')
+                )
+            except youtube.YouTubeError as e:
+                # It did not work, revert to previous behavior
+                self.key = old_key
+                self.source_type = old_source_type
+                self.source_type_str = old_source_type_str
+
         for field in fields_to_populate:
             if field == 'source_type':
                 fields[field] = self.source_type
-            elif field in ('key', 'name', 'directory'):
+            elif field == 'key':
                 fields[field] = self.key
+            elif field in ('name', 'directory'):
+                fields[field] = value
         return append_uri_params(url, fields)
 
 
@@ -318,7 +354,7 @@ class EditSourceMixin:
         obj = form.save(commit=False)
         source_type = form.cleaned_data['media_format']
         example_media_file = obj.get_example_media_format()
-        
+
         if example_media_file == '':
             form.add_error(
                 'media_format',
@@ -488,20 +524,15 @@ class MediaView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
+        q = Media.objects.all()
+
         if self.filter_source:
-            if self.show_skipped:
-                q = Media.objects.filter(source=self.filter_source)
-            elif self.only_skipped:
-                q = Media.objects.filter(Q(source=self.filter_source) & (Q(skip=True) | Q(manual_skip=True)))
-            else:
-                q = Media.objects.filter(Q(source=self.filter_source) & (Q(skip=False) & Q(manual_skip=False)))
-        else:
-            if self.show_skipped:
-                q = Media.objects.all()
-            elif self.only_skipped:
-                q = Media.objects.filter(Q(skip=True)|Q(manual_skip=True))
-            else:
-                q = Media.objects.filter(Q(skip=False)&Q(manual_skip=False))
+            q = q.filter(source=self.filter_source)
+        if self.only_skipped:
+            q = q.filter(Q(can_download=False) | Q(skip=True) | Q(manual_skip=True))
+        elif not self.show_skipped:
+            q = q.filter(Q(can_download=True) & Q(skip=False) & Q(manual_skip=False))
+
         return q.order_by('-published', '-created')
 
     def get_context_data(self, *args, **kwargs):
@@ -740,18 +771,18 @@ class MediaContent(DetailView):
                 pth = pth[1]
             else:
                 pth = pth[0]
-            
-            
+
+
             # build final path
             filepth = pathlib.Path(str(settings.DOWNLOAD_ROOT) + pth)
-            
+
             if filepth.exists():
                 # return file
                 response = FileResponse(open(filepth,'rb'))
                 return response
             else:
                 return HttpResponseNotFound()
-            
+
         else:
             headers = {
                 'Content-Type': self.object.content_type,

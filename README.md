@@ -138,6 +138,11 @@ services:
       - PGID=1000
 ```
 
+> [!IMPORTANT]  
+> If the `/downloads` directory is mounted from a [Samba volume](https://docs.docker.com/engine/storage/volumes/#create-cifssamba-volumes), be sure to also supply the `uid` and `gid` mount parameters in the driver options.
+> These must be matched to the `PUID` and `PGID` values, which were specified as environment variables.
+> 
+> Matching these user and group ID numbers prevents issues when executing file actions, such as writing metadata. See [this issue](https://github.com/meeb/tubesync/issues/616#issuecomment-2593458282) for details.
 
 ## Optional authentication
 
@@ -320,7 +325,7 @@ Notable libraries and software used:
  * [django-sass](https://github.com/coderedcorp/django-sass/)
  * The container bundles with `s6-init` and `nginx`
 
-See the [Pipefile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full list.
+See the [Pipfile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full list.
 
 ### Can I get access to the full Django admin?
 
@@ -348,7 +353,12 @@ etc.). Configuration of this is beyond the scope of this README.
 
 ### What architectures does the container support?
 
-Just `amd64` for the moment. Others may be made available if there is demand.
+Only two are supported, for the moment:
+- `amd64` (most desktop PCs and servers)
+-  `arm64`
+(modern ARM computers, such as the Rasperry Pi 3 or later)
+
+Others may be made available, if there is demand.
 
 ### The pipenv install fails with "Locking failed"!
 
