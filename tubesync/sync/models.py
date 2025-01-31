@@ -118,6 +118,7 @@ class Source(models.Model):
 
     sponsorblock_categories = CommaSepChoiceField(
         _(''),
+        max_length=128,
         possible_choices=SponsorBlock_Category.choices,
         all_choice='all',
         allow_all=True,
