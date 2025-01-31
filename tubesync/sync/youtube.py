@@ -14,8 +14,10 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit, parse_qs
 
 from django.conf import settings
+from .hooks import postprocessor_hook, progress_hook
 from .utils import mkdir_p
 import yt_dlp
+from yt_dlp.utils import remove_end
 
 
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
@@ -32,7 +34,6 @@ if _youtubedl_tempdir:
     _paths = _defaults.get('paths', {})
     _paths.update({ 'temp': _youtubedl_tempdir, })
     _defaults['paths'] = _paths
-
 
 
 class YouTubeError(yt_dlp.utils.DownloadError):
@@ -169,54 +170,51 @@ def get_media_info(url):
     return response
 
 
-def download_media(url, media_format, extension, output_file, info_json,
-                   sponsor_categories=None,
-                   embed_thumbnail=False, embed_metadata=False, skip_sponsors=True,
-                   write_subtitles=False, auto_subtitles=False, sub_langs='en'):
+# Yes, this looks odd. But, it works.
+# It works without also causing indentation problems.
+# I'll take ease of editing, thanks.
+def download_media(
+    url, media_format, extension, output_file,
+    info_json, sponsor_categories=None,
+    embed_thumbnail=False, embed_metadata=False,
+    skip_sponsors=True, write_subtitles=False,
+    auto_subtitles=False, sub_langs='en'
+):
     '''
         Downloads a YouTube URL to a file on disk.
     '''
 
-    def hook(event):
-        filename = os.path.basename(event['filename'])
-
-        if event.get('downloaded_bytes') is None or event.get('total_bytes') is None:
-            return None
-
-        if event['status'] == 'error':
-            log.error(f'[youtube-dl] error occured downloading: {filename}')
-        elif event['status'] == 'downloading':
-            downloaded_bytes = event.get('downloaded_bytes', 0)
-            total_bytes = event.get('total_bytes', 0)
-            eta = event.get('_eta_str', '?').strip()
-            percent_done = event.get('_percent_str', '?').strip()
-            speed = event.get('_speed_str', '?').strip()
-            total = event.get('_total_bytes_str', '?').strip()
-            if downloaded_bytes > 0 and total_bytes > 0:
-                p = round((event['downloaded_bytes'] / event['total_bytes']) * 100)
-                if (p % 5 == 0) and p > hook.download_progress:
-                    hook.download_progress = p
-                    log.info(f'[youtube-dl] downloading: {filename} - {percent_done} '
-                             f'of {total} at {speed}, {eta} remaining')
-            else:
-                # No progress to monitor, just spam every 10 download messages instead
-                hook.download_progress += 1
-                if hook.download_progress % 10 == 0:
-                    log.info(f'[youtube-dl] downloading: {filename} - {percent_done} '
-                                f'of {total} at {speed}, {eta} remaining')
-        elif event['status'] == 'finished':
-            total_size_str = event.get('_total_bytes_str', '?').strip()
-            elapsed_str = event.get('_elapsed_str', '?').strip()
-            log.info(f'[youtube-dl] finished downloading: {filename} - '
-                     f'{total_size_str} in {elapsed_str}')
-        else:
-            log.warn(f'[youtube-dl] unknown event: {str(event)}')
-
-    hook.download_progress = 0
-
+    opts = get_yt_opts()
     default_opts = yt_dlp.parse_options([]).options
     pp_opts = deepcopy(default_opts)
+
+    # We fake up this option to make it easier for the user to add post processors.
+    postprocessors = opts.get('add_postprocessors', pp_opts.add_postprocessors)
+    if isinstance(postprocessors, str):
+        # NAME1[:ARGS], NAME2[:ARGS]
+        # ARGS are a semicolon ";" delimited list of NAME=VALUE
+        #
+        # This means that "," cannot be present in NAME or VALUE.
+        # If you need to support that, then use the 'postprocessors' key,
+        # in your settings dictionary instead.
+        _postprocessor_opts_parser = lambda key, val='': (
+            *(
+                item.split('=', 1) for item in (val.split(';') if val else [])
+            ),
+            ( 'key', remove_end(key, 'PP'), )
+        )
+        postprocessors = list(
+            dict(
+                _postprocessor_opts_parser( *val.split(':', 1) )
+            ) for val in map(str.strip, postprocessors.split(','))
+        )
+    if not isinstance(postprocessors, list):
+        postprocessors = list()
+    # Add any post processors configured the 'hard' way also.
+    postprocessors.extend( opts.get('postprocessors', list()) )
+
     pp_opts.__dict__.update({
+        'add_postprocessors': postprocessors,
         'embedthumbnail': embed_thumbnail,
         'addmetadata': embed_metadata,
         'addchapters': True,
@@ -227,7 +225,10 @@ def download_media(url, media_format, extension, output_file, info_json,
     })
 
     if skip_sponsors:
-        pp_opts.sponsorblock_mark.update('all,-chapter'.split(','))
+        # Let yt_dlp convert from human for us.
+        pp_opts.sponsorblock_mark = yt_dlp.parse_options(
+            ['--sponsorblock-mark=all,-chapter']
+        ).options.sponsorblock_mark
         pp_opts.sponsorblock_remove.update(sponsor_categories or {})
 
     ytopts = {
@@ -237,9 +238,7 @@ def download_media(url, media_format, extension, output_file, info_json,
         'quiet': False if settings.DEBUG else True,
         'verbose': True if settings.DEBUG else False,
         'noprogress': None if settings.DEBUG else True,
-        'progress_hooks': [hook],
         'writeinfojson': info_json,
-        'postprocessors': [],
         'writesubtitles': write_subtitles,
         'writeautomaticsub': auto_subtitles,
         'subtitleslangs': sub_langs.split(','),
@@ -249,9 +248,11 @@ def download_media(url, media_format, extension, output_file, info_json,
         'sleep_interval': 30,
         'max_sleep_interval': 600,
         'sleep_interval_requests': 30,
+        'paths': opts.get('paths', dict()),
+        'postprocessor_args': opts.get('postprocessor_args', dict()),
+        'postprocessor_hooks': opts.get('postprocessor_hooks', list()),
+        'progress_hooks': opts.get('progress_hooks', list()),
     }
-    opts = get_yt_opts()
-    ytopts['paths'] = opts.get('paths', {})
     output_dir = os.path.dirname(output_file)
     temp_dir_parent = output_dir
     temp_dir_prefix = '.yt_dlp-'
@@ -267,13 +268,20 @@ def download_media(url, media_format, extension, output_file, info_json,
         'temp': str(temp_dir_path),
     })
 
-    codec_options = []
+    postprocessor_hook_func = postprocessor_hook.get('function', None)
+    if postprocessor_hook_func:
+        ytopts['postprocessor_hooks'].append(postprocessor_hook_func)
+
+    progress_hook_func = progress_hook.get('function', None)
+    if progress_hook_func:
+        ytopts['progress_hooks'].append(progress_hook_func)
+
+    codec_options = list()
     ofn = ytopts['outtmpl']
     if 'av1-' in ofn:
         codec_options = ['-c:v', 'libsvtav1', '-preset', '8', '-crf', '35']
     elif 'vp9-' in ofn:
         codec_options = ['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '31']
-    ytopts['postprocessor_args'] = opts.get('postprocessor_args', {})
     set_ffmpeg_codec = not (
         ytopts['postprocessor_args'] and
         ytopts['postprocessor_args']['modifychapters+ffmpeg']
@@ -283,7 +291,8 @@ def download_media(url, media_format, extension, output_file, info_json,
             'modifychapters+ffmpeg': codec_options,
         })
 
-    # create the post processors list
+    # Create the post processors list.
+    # It already included user configured post processors as well.
     ytopts['postprocessors'] = list(yt_dlp.get_postprocessors(pp_opts))
 
     opts.update(ytopts)
