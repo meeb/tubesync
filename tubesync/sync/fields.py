@@ -48,7 +48,7 @@ class CustomCheckboxSelectMultiple(CheckboxSelectMultiple):
         return { 'widget': ctx }
 
 # this is a database field!
-class CommaSepChoiceField(models.CharField):
+class CommaSepChoiceField(models.Field):
     "Implements comma-separated storage of lists"
 
     def __init__(self, *args, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, **kwargs):
@@ -68,7 +68,7 @@ class CommaSepChoiceField(models.CharField):
         return name, path, args, kwargs
 
     def get_internal_type(self):
-        return super().get_internal_type()
+        return 'CharField'
 
     def get_my_choices(self):
         choiceArray = []
@@ -91,8 +91,7 @@ class CommaSepChoiceField(models.CharField):
                     'label': '',
                     'required': False}
         defaults.update(kwargs)
-        # CharField calls with an extra 'max_length' that we must avoid.
-        return models.Field.formfield(self, **defaults)
+        return super().formfield(self, **defaults)
 
     def from_db_value(self, value, expr, conn):
         if 0 == len(value) or value is None:
@@ -113,12 +112,11 @@ class CommaSepChoiceField(models.CharField):
         else:
             return self.all_choice
 
-    def pre_save(self, model_instance, add=False):
+    def pre_save(self, model_instance, add):
         obj = super().pre_save(model_instance, add)
         if isinstance(obj, str):
             self.from_db_value(obj, None, None)
-        selected = self.selected_choices
-        return self.get_prep_value(selected)
+        return self.get_prep_value(self.selected_choices)
 
     def get_text_for_value(self, val):
         fval = [i for i in self.possible_choices if i[0] == val]
