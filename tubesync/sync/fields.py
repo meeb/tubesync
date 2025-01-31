@@ -114,7 +114,10 @@ class CommaSepChoiceField(models.CharField):
 
     def pre_save(self, model_instance, add=False):
         obj = super().pre_save(model_instance, add)
-        return self.get_prep_value(obj.selected_choices)
+        if isinstance(obj, str):
+            self.from_db_value(obj, None, None)
+        selected = self.selected_choices
+        return self.get_prep_value(selected)
 
     def get_text_for_value(self, val):
         fval = [i for i in self.possible_choices if i[0] == val]
