@@ -29,6 +29,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='source',
             name='sponsorblock_categories',
-            field=sync.models.CommaSepChoiceField(default='all', possible_choices=(('all', 'All'), ('sponsor', 'Sponsor'), ('intro', 'Intermission/Intro Animation'), ('outro', 'Endcards/Credits'), ('selfpromo', 'Unpaid/Self Promotion'), ('preview', 'Preview/Recap'), ('filler', 'Filler Tangent'), ('interaction', 'Interaction Reminder'), ('music_offtopic', 'Non-Music Section'))),
+            field=sync.models.CommaSepChoiceField(default='all', max_length=128, possible_choices=(('all', 'All'), ('sponsor', 'Sponsor'), ('intro', 'Intermission/Intro Animation'), ('outro', 'Endcards/Credits'), ('selfpromo', 'Unpaid/Self Promotion'), ('preview', 'Preview/Recap'), ('filler', 'Filler Tangent'), ('interaction', 'Interaction Reminder'), ('music_offtopic', 'Non-Music Section'))),
         ),
     ]
