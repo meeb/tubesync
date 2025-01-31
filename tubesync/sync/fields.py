@@ -101,7 +101,11 @@ class CommaSepChoiceField(models.Field):
 
     def get_prep_value(self, value):
         value = super().get_prep_value(value)
-        return self.to_python(value)
+        if not isinstance(value, list):
+            return value
+        if self.all_choice in value:
+            return self.all_choice
+        return self.separator.join(value)
 
     def to_python(self, value):
         # string to list
@@ -114,8 +118,8 @@ class CommaSepChoiceField(models.Field):
 
     def value_to_string(self, obj):
         # selected_choices to a string
-        if not isinstance(obj, self.__class__):
-            return ''
+        # if not isinstance(obj, self.__class__):
+        #     return ''
         value = self.value_from_object(obj)
         if obj.all_choice in value:
             return obj.all_choice
