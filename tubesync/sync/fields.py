@@ -91,7 +91,8 @@ class CommaSepChoiceField(models.CharField):
                     'label': '',
                     'required': False}
         defaults.update(kwargs)
-        return super().formfield(**defaults)
+        # CharField calls with an extra 'max_length' that we must avoid.
+        return models.Field.formfield(self, **defaults)
 
     def from_db_value(self, value, expr, conn):
         if 0 == len(value) or value is None:
