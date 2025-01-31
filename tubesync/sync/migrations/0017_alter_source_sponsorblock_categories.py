@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='source',
             name='sponsorblock_categories',
-            field=sync.fields.CommaSepChoiceField(default='all', help_text='Select the sponsorblocks you want to enforce', separator=''),
+            field=sync.fields.CommaSepChoiceField(default='all', max_length=128, help_text='Select the sponsorblocks you want to enforce', separator=''),
         ),
     ]
