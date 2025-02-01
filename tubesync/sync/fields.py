@@ -39,52 +39,32 @@ CommaSepChoice = namedtuple(
 class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
     template_name = 'widgets/checkbox_select.html'
     option_template_name = 'widgets/checkbox_option.html'
-    from common.logger import log
 
     def get_context(self, name: str, value: Any, attrs) -> Dict[str, Any]:
-        # self.log.debug(f'wgc:1: {type(name)} {repr(name)}')
-        # self.log.debug(f'wgc:2: {type(value)} {repr(value)}')
-        # self.log.debug(f'wgc:3: {type(attrs)} {repr(attrs)}')
         data = value
         select_all = False
         if isinstance(data, CommaSepChoice):
             select_all = (data.allow_all and data.all_choice in data.selected_choices)
             value = data.selected_choices
         ctx = super().get_context(name, value, attrs)['widget']
-        # self.log.debug(f'wgc:4: {type(ctx)} {repr(ctx)}')
-        ctx["multipleChoiceProperties"] = []
+        ctx["multipleChoiceProperties"] = list()
         for _group, options, _index in ctx["optgroups"]:
-            # self.log.debug(f'wgc:5: {type(options)} {repr(options)}')
+            # `options` is a list containing a single dictionary.
+            # That naming was a bit misleading,
+            # I may change it to `option_list`, or a better alternative, later.
             for option in options:
+                # Using `checked` instead of `selected` here is sub-optimal.
                 option["checked"] = option["selected"] or select_all
                 ctx["multipleChoiceProperties"].append(option)
 
         return { 'widget': ctx }
 
-class Disabled:
-    pass
-    def value_to_string(self, obj):
-        # selected_choices to a string
-        # if not isinstance(obj, self.__class__):
-        #     return ''
-        self.log.info("vts:1: %s %s", type(obj), repr(obj))
-        value = self.value_from_object(obj)
-        self.log.info("vts:2: %s %s", type(value), repr(value))
-        if obj.all_choice in value:
-            return obj.all_choice
-        return obj.separator.join(value)
-
-    def get_text_for_value(self, val):
-        fval = [i for i in self.possible_choices if i[0] == val]
-        if len(fval) <= 0:
-            return []
-        else:
-            return fval[0][1]
-
 
 # this is a database field!
 class CommaSepChoiceField(models.CharField):
-    "Implements comma-separated storage of lists"
+    '''
+    Implements comma-separated storage of lists
+    '''
 
     widget = CustomCheckboxSelectMultiple
     from common.logger import log
@@ -111,6 +91,7 @@ class CommaSepChoiceField(models.CharField):
         return super().get_internal_type()
 
 
+    # standard functions for this class
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
         if ',' != self.separator:
@@ -123,18 +104,6 @@ class CommaSepChoiceField(models.CharField):
             if 'All' != self.all_label:
                 kwargs['all_label'] = self.all_label
         return name, path, args, kwargs
-
-    def get_all_choices(self):
-        choice_list = list()
-        if self.possible_choices is None:
-            return choice_list
-        if self.allow_all:
-            choice_list.append((self.all_choice, _(self.all_label)))
-
-        for t in self.possible_choices:
-            choice_list.append(t)
-
-        return choice_list
 
     def formfield(self, **kwargs):
         # This is a fairly standard way to set up some defaults
@@ -152,6 +121,13 @@ class CommaSepChoiceField(models.CharField):
 
     @lru_cache(maxsize=10)
     def from_db_value(self, value, expression, connection):
+        '''
+        Create a data structure to be used in Python code.
+
+        This is called quite often with the same input,
+        because the database value doesn't change often.
+        So, it's being cached to prevent excessive logging.
+        '''
         self.log.debug(f'fdbv:1: {type(value)} {repr(value)}')
         if isinstance(value, str) and len(value) > 0:
             value = value.split(self.separator)
@@ -167,6 +143,9 @@ class CommaSepChoiceField(models.CharField):
             )
 
     def get_prep_value(self, value):
+        '''
+        Create a value to be stored in the database.
+        '''
         self.log.debug(f'gpv:1: {type(value)} {repr(value)}')
         s_value = super().get_prep_value(value)
         self.log.debug(f'gpv:2: {type(s_value)} {repr(s_value)}')
@@ -179,4 +158,16 @@ class CommaSepChoiceField(models.CharField):
             return data.all_choice
         return data.separator.join(value)
 
+    # extra functions not used by any parent classes
+    def get_all_choices(self):
+        choice_list = list()
+        if self.possible_choices is None:
+            return choice_list
+        if self.allow_all:
+            choice_list.append((self.all_choice, _(self.all_label)))
+
+        for t in self.possible_choices:
+            choice_list.append(t)
+
+        return choice_list
 
