@@ -168,8 +168,8 @@ class CommaSepChoiceField(models.CharField):
         if self.allow_all:
             choice_list.append((self.all_choice, _(self.all_label)))
 
-        for t in self.possible_choices:
-            choice_list.append(t)
+        for choice in self.possible_choices:
+            choice_list.append(choice)
 
         return choice_list
 
