@@ -113,7 +113,7 @@ class CommaSepChoiceField(models.CharField):
     # maybe useful?
     def check(self, **kwargs):
         errors = super().check(**kwargs)
-        return eerrors
+        return errors
 
     # maybe useful?
     def validate(self, value, model_instance):
