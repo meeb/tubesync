@@ -47,6 +47,7 @@ CommaSepChoice = namedtuple(
 class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
     template_name = 'widgets/checkbox_select.html'
     option_template_name = 'widgets/checkbox_option.html'
+    # checked_attribute = {'checked': True, 'selected': True}
     from common.logger import log
 
     def format_value(self, value):
@@ -85,33 +86,29 @@ class CommaSepChoiceField(models.CharField):
 
     def __init__(self, *args, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, **kwargs):
         kwargs.setdefault('max_length', 128)
-        super().__init__(*args, **kwargs)
         self.separator = str(separator)
-        self.possible_choices = possible_choices
+        self.possible_choices = possible_choices or choices
         self.selected_choices = list()
         self.allow_all = allow_all
         self.all_label = all_label
         self.all_choice = all_choice
         self.choices = self.get_all_choices()
+        super().__init__(*args, **kwargs)
         self.validators.clear()
 
 
     # Override these functions to prevent unwanted behaviors
     def to_python(self, value):
-        self.log.debug(f'to_py:1: {type(value)} {repr(value)}')
         return value
 
     def get_internal_type(self):
         return super().get_internal_type()
 
-    # maybe useful?
-    def value_to_string(self, obj):
-        return self.value_from_object(obj)
-
 
     # standard functions for this class
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
+        del kwargs['choices']
         if ',' != self.separator:
             kwargs['separator'] = self.separator
         kwargs['possible_choices'] = self.possible_choices
@@ -124,11 +121,6 @@ class CommaSepChoiceField(models.CharField):
         return name, path, args, kwargs
 
     # maybe useful?
-    def check(self, **kwargs):
-        errors = super().check(**kwargs)
-        return errors
-
-    # maybe useful?
     def validate(self, value, model_instance):
         super().validate(value, model_instance)
 
@@ -139,7 +131,7 @@ class CommaSepChoiceField(models.CharField):
             'form_class': self.form_class,
             # 'choices_form_class': self.form_class,
             'widget': self.widget,
-            'choices': self.get_all_choices(),
+            'choices': self.choices,
             'label': '',
             'required': False,
         }
