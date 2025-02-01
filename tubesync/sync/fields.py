@@ -119,6 +119,11 @@ class CommaSepChoiceField(models.CharField):
         }
         defaults.update(kwargs)
         return super().formfield(**defaults)
+        # This is a more compact way to do the same thing
+        # return super().formfield(**{
+        #     'form_class': forms.MultipleChoiceField,
+        #     **kwargs,
+        # })
 
     @lru_cache(maxsize=10)
     def from_db_value(self, value, expression, connection):
