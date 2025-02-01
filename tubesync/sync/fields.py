@@ -107,8 +107,11 @@ class CommaSepChoiceField(models.CharField):
 
     # standard functions for this class
     def deconstruct(self):
+        # set it back to the default for models.Field
+        # this way it is never in the returned values
+        self.choices = None
         name, path, args, kwargs = super().deconstruct()
-        del kwargs['choices']
+        self.choices = self.get_all_choices()
         if ',' != self.separator:
             kwargs['separator'] = self.separator
         kwargs['possible_choices'] = self.possible_choices
