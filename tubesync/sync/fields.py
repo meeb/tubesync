@@ -55,12 +55,10 @@ class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
             select_all = (data.allow_all and data.all_choice in data.selected_choices)
             value = data.selected_choices
         ctx = super().get_context(name, value, attrs)['widget']
+        options = ctx["optgroups"]
         ctx["multipleChoiceProperties"] = list()
-        for _group, options, _index in ctx["optgroups"]:
-            # `options` is a list containing a single dictionary.
-            # That naming was a bit misleading,
-            # I may change it to `option_list`, or a better alternative, later.
-            for option in options:
+        for _group, single_option_list, _index in options:
+            for option in single_option_list:
                 option["selected"] |= select_all
                 ctx["multipleChoiceProperties"].append(option)
 
