@@ -10,5 +10,5 @@ def bytesformat(input):
     output = filesizeformat(input)
     if not (output and output.endswith('B', -1)):
         return output
-    return output[: -1 ] + output[ -1 :].replace('B', 'iB', 1)
+    return output[: -1 ] + 'iB'
 
