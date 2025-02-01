@@ -62,7 +62,7 @@ class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
             # I may change it to `option_list`, or a better alternative, later.
             for option in options:
                 # Using `checked` instead of `selected` here is sub-optimal.
-                option["checked"] = option["selected"] or select_all
+                option["selected"] = option["selected"] or select_all
                 ctx["multipleChoiceProperties"].append(option)
 
         return { 'widget': ctx }
