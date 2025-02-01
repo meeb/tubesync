@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from urllib.parse import urljoin
 from common.utils import parse_database_connection_string
@@ -31,7 +32,7 @@ if database_connection_env:
 
 
 if database_dict:
-    if not logging:
+    if 'logging' not in sys.modules:
         from common.logger import log
     log.info(f'Using database connection: {database_dict["ENGINE"]}://'
              f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
