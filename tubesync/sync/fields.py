@@ -32,6 +32,7 @@ CommaSepChoice = namedtuple(
         'all_label',
         'possible_choices',
         'selected_choices',
+        'separator',
     ])
 )
 
@@ -140,6 +141,7 @@ class CommaSepChoiceField(models.CharField):
                 all_label=self.all_label,
                 possible_choices=self.choices,
                 selected_choices=self.selected_choices,
+                separator=self.separator,
             )
 
     def get_prep_value(self, value):
