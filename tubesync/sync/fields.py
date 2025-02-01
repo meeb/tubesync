@@ -47,22 +47,30 @@ CommaSepChoice = namedtuple(
 class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
     template_name = 'widgets/checkbox_select.html'
     option_template_name = 'widgets/checkbox_option.html'
+    from common.logger import log
+
+    def format_value(self, value):
+        self.log.debug(f'widget_format_v:1: {type(value)} {repr(value)}')
+        return super().format_value(value)
 
     def get_context(self, name: str, value: Any, attrs) -> Dict[str, Any]:
         data = value
         select_all = False
         if isinstance(data, CommaSepChoice):
             select_all = (data.allow_all and data.all_choice in data.selected_choices)
-            value = data.selected_choices
-        ctx = super().get_context(name, value, attrs)['widget']
-        options = ctx["optgroups"]
-        ctx["multipleChoiceProperties"] = list()
+            value = list(data.selected_choices)
+        context = super().get_context(name, value, attrs)
+        widget = context['widget']
+        options = widget['optgroups']
+        _value = widget['multipleChoiceProperties'] if 'multipleChoiceProperties' in widget else (None, 'Key not in widget')
+        self.log.debug(f'widget_get_c:1: {type(_value)} {repr(_value)}')
+        widget['multipleChoiceProperties'] = list()
         for _group, single_option_list, _index in options:
             for option in single_option_list:
-                option["selected"] |= select_all
-                ctx["multipleChoiceProperties"].append(option)
+                option['selected'] |= select_all
+                widget['multipleChoiceProperties'].append(option)
 
-        return { 'widget': ctx }
+        return { 'widget': widget }
 
 
 # this is a database field!
