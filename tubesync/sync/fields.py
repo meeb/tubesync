@@ -135,14 +135,8 @@ class CommaSepChoiceField(models.CharField):
         if not isinstance(value, list):
             value = list()
         self.selected_choices = value
-        return CommaSepChoice(
-                allow_all=self.allow_all,
-                all_choice=self.all_choice,
-                all_label=self.all_label,
-                possible_choices=self.choices,
-                selected_choices=self.selected_choices,
-                separator=self.separator,
-            )
+        args_dict = {key: self.__dict__[key] for key in CommaSepChoice._fields}
+        return CommaSepChoice(**args_dict)
 
     def get_prep_value(self, value):
         '''
