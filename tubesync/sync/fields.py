@@ -1,6 +1,6 @@
 from collections import namedtuple
 from functools import lru_cache
-from typing import Any, Optional, Dict
+from typing import Any, Dict
 from django import forms
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -25,40 +25,52 @@ class SponsorBlock_Category(models.TextChoices):
 
 
 CommaSepChoice = namedtuple(
-    'CommaSepChoice',
-    ' '.join([
+    'CommaSepChoice', [
         'allow_all',
         'all_choice',
         'all_label',
         'possible_choices',
         'selected_choices',
         'separator',
-    ])
+    ],
+    defaults = (
+        False,
+        None,
+        'All',
+        list(),
+        list(),
+        ',',
+    ),
 )
 
 # this is a form field!
 class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
     template_name = 'widgets/checkbox_select.html'
     option_template_name = 'widgets/checkbox_option.html'
+    from common.logger import log
+
+    def format_value(self, value):
+        self.log.debug(f'widget_format_v:1: {type(value)} {repr(value)}')
+        return super().format_value(value)
 
     def get_context(self, name: str, value: Any, attrs) -> Dict[str, Any]:
         data = value
         select_all = False
         if isinstance(data, CommaSepChoice):
             select_all = (data.allow_all and data.all_choice in data.selected_choices)
-            value = data.selected_choices
-        ctx = super().get_context(name, value, attrs)['widget']
-        ctx["multipleChoiceProperties"] = list()
-        for _group, options, _index in ctx["optgroups"]:
-            # `options` is a list containing a single dictionary.
-            # That naming was a bit misleading,
-            # I may change it to `option_list`, or a better alternative, later.
-            for option in options:
-                # Using `checked` instead of `selected` here is sub-optimal.
-                option["checked"] = option["selected"] or select_all
-                ctx["multipleChoiceProperties"].append(option)
+            value = list(data.selected_choices)
+        context = super().get_context(name, value, attrs)
+        widget = context['widget']
+        options = widget['optgroups']
+        _value = widget['multipleChoiceProperties'] if 'multipleChoiceProperties' in widget else (None, 'Key not in widget')
+        self.log.debug(f'widget_get_c:1: {type(_value)} {repr(_value)}')
+        widget['multipleChoiceProperties'] = list()
+        for _group, single_option_list, _index in options:
+            for option in single_option_list:
+                option['selected'] |= select_all
+                widget['multipleChoiceProperties'].append(option)
 
-        return { 'widget': ctx }
+        return { 'widget': widget }
 
 
 # this is a database field!
@@ -67,6 +79,7 @@ class CommaSepChoiceField(models.CharField):
     Implements comma-separated storage of lists
     '''
 
+    form_class = forms.MultipleChoiceField
     widget = CustomCheckboxSelectMultiple
     from common.logger import log
 
@@ -91,6 +104,10 @@ class CommaSepChoiceField(models.CharField):
     def get_internal_type(self):
         return super().get_internal_type()
 
+    # maybe useful?
+    def value_to_string(self, obj):
+        return self.value_from_object(obj)
+
 
     # standard functions for this class
     def deconstruct(self):
@@ -106,12 +123,21 @@ class CommaSepChoiceField(models.CharField):
                 kwargs['all_label'] = self.all_label
         return name, path, args, kwargs
 
+    # maybe useful?
+    def check(self, **kwargs):
+        errors = super().check(**kwargs)
+        return errors
+
+    # maybe useful?
+    def validate(self, value, model_instance):
+        super().validate(value, model_instance)
+
     def formfield(self, **kwargs):
         # This is a fairly standard way to set up some defaults
         # while letting the caller override them.
         defaults = {
-            'form_class': forms.MultipleChoiceField,
-            # 'choices_form_class': forms.MultipleChoiceField,
+            'form_class': self.form_class,
+            # 'choices_form_class': self.form_class,
             'widget': self.widget,
             'choices': self.get_all_choices(),
             'label': '',
@@ -119,6 +145,11 @@ class CommaSepChoiceField(models.CharField):
         }
         defaults.update(kwargs)
         return super().formfield(**defaults)
+        # This is a more compact way to do the same thing
+        # return super().formfield(**{
+        #     'form_class': self.form_class,
+        #     **kwargs,
+        # })
 
     @lru_cache(maxsize=10)
     def from_db_value(self, value, expression, connection):
@@ -135,14 +166,8 @@ class CommaSepChoiceField(models.CharField):
         if not isinstance(value, list):
             value = list()
         self.selected_choices = value
-        return CommaSepChoice(
-                allow_all=self.allow_all,
-                all_choice=self.all_choice,
-                all_label=self.all_label,
-                possible_choices=self.choices,
-                selected_choices=self.selected_choices,
-                separator=self.separator,
-            )
+        args_dict = {key: self.__dict__[key] for key in CommaSepChoice._fields}
+        return CommaSepChoice(**args_dict)
 
     def get_prep_value(self, value):
         '''
