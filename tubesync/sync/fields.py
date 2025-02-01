@@ -2,7 +2,7 @@ from collections import namedtuple
 from functools import lru_cache
 from typing import Any, Dict
 from django import forms
-from django.db import models
+from django.db import connection, models
 from django.utils.translation import gettext_lazy as _
 
 
@@ -138,8 +138,14 @@ class CommaSepChoiceField(models.CharField):
             'label': '',
             'required': False,
         }
+        # Keep the part from CharField we want,
+        # then call Field to skip the 'max_length' entry.
+        db_empty_string_as_null = connection.features.interprets_empty_strings_as_nulls
+        if self.null and not db_empty_string_as_null:
+            defaults['empty_value'] = None
         defaults.update(kwargs)
-        return super().formfield(**defaults)
+        grandparent = super(super(), self)
+        return grandparent.formfield(**defaults)
         # This is a more compact way to do the same thing
         # return super().formfield(**{
         #     'form_class': self.form_class,
