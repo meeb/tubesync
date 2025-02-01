@@ -71,6 +71,7 @@ class CommaSepChoiceField(models.CharField):
     Implements comma-separated storage of lists
     '''
 
+    form_class = forms.MultipleChoiceField
     widget = CustomCheckboxSelectMultiple
     from common.logger import log
 
@@ -127,8 +128,8 @@ class CommaSepChoiceField(models.CharField):
         # This is a fairly standard way to set up some defaults
         # while letting the caller override them.
         defaults = {
-            'form_class': forms.MultipleChoiceField,
-            # 'choices_form_class': forms.MultipleChoiceField,
+            'form_class': self.form_class,
+            # 'choices_form_class': self.form_class,
             'widget': self.widget,
             'choices': self.get_all_choices(),
             'label': '',
@@ -138,7 +139,7 @@ class CommaSepChoiceField(models.CharField):
         return super().formfield(**defaults)
         # This is a more compact way to do the same thing
         # return super().formfield(**{
-        #     'form_class': forms.MultipleChoiceField,
+        #     'form_class': self.form_class,
         #     **kwargs,
         # })
 
