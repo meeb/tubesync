@@ -1,6 +1,6 @@
 from collections import namedtuple
 from functools import lru_cache
-from typing import Any, Optional, Dict
+from typing import Any, Dict
 from django import forms
 from django.db import models
 from django.utils.translation import gettext_lazy as _
