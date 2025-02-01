@@ -25,15 +25,22 @@ class SponsorBlock_Category(models.TextChoices):
 
 
 CommaSepChoice = namedtuple(
-    'CommaSepChoice',
-    ' '.join([
+    'CommaSepChoice', [
         'allow_all',
         'all_choice',
         'all_label',
         'possible_choices',
         'selected_choices',
         'separator',
-    ])
+    ],
+    defaults = (
+        False,
+        None,
+        'All',
+        list(),
+        list(),
+        ',',
+    ),
 )
 
 # this is a form field!
