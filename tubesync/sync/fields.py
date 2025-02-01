@@ -91,6 +91,10 @@ class CommaSepChoiceField(models.CharField):
     def get_internal_type(self):
         return super().get_internal_type()
 
+    # maybe useful?
+    def value_to_string(self, obj):
+        return self.value_from_object(obj)
+
 
     # standard functions for this class
     def deconstruct(self):
@@ -105,6 +109,15 @@ class CommaSepChoiceField(models.CharField):
             if 'All' != self.all_label:
                 kwargs['all_label'] = self.all_label
         return name, path, args, kwargs
+
+    # maybe useful?
+    def check(self, **kwargs):
+        errors = super().check(**kwargs)
+        return eerrors
+
+    # maybe useful?
+    def validate(self, value, model_instance):
+        super().validate(value, model_instance)
 
     def formfield(self, **kwargs):
         # This is a fairly standard way to set up some defaults
