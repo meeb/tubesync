@@ -32,9 +32,11 @@ if database_connection_env:
 
 
 if database_dict:
-    print(f'Using database connection: {database_dict["ENGINE"]}://'
-          f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
-          f'{database_dict["PORT"]}/{database_dict["NAME"]}', file=sys.stdout)
+    if 'log' not in locals() and 'common.logger' in sys.modules:
+        from common.logger import log
+    log.info(f'Using database connection: {database_dict["ENGINE"]}://'
+             f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
+             f'{database_dict["PORT"]}/{database_dict["NAME"]}')
     DATABASES = {
         'default': database_dict,
     }
