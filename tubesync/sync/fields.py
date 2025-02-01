@@ -144,7 +144,8 @@ class CommaSepChoiceField(models.CharField):
         if self.null and not db_empty_string_as_null:
             defaults['empty_value'] = None
         defaults.update(kwargs)
-        return super(super(), self).formfield(**defaults)
+        grandparent = super(super(), self)
+        return grandparent.formfield(**defaults)
         # This is a more compact way to do the same thing
         # return super().formfield(**{
         #     'form_class': self.form_class,
