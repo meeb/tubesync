@@ -134,7 +134,7 @@ class CommaSepChoiceField(models.CharField):
             'form_class': self.form_class,
             # 'choices_form_class': self.form_class,
             'widget': self.widget,
-            'choices': self.choices,
+            'choices': self.get_all_choices,
             'label': '',
             'required': False,
         }
@@ -144,8 +144,7 @@ class CommaSepChoiceField(models.CharField):
         if self.null and not db_empty_string_as_null:
             defaults['empty_value'] = None
         defaults.update(kwargs)
-        grandparent = super(super(), self)
-        return grandparent.formfield(**defaults)
+        return models.Field.formfield(self, **defaults)
         # This is a more compact way to do the same thing
         # return super().formfield(**{
         #     'form_class': self.form_class,
@@ -178,8 +177,12 @@ class CommaSepChoiceField(models.CharField):
         s_value = super().get_prep_value(value)
         self.log.debug(f'gpv:2: {type(s_value)} {repr(s_value)}')
         data = value
-        if isinstance(value, CommaSepChoice):
-            value = value.selected_choices
+        if not isinstance(data, CommaSepChoice):
+            # The data was lost; we can regenerate it.
+            args_dict = {key: self.__dict__[key] for key in CommaSepChoice._fields}
+            args_dict['selected_choices'] = list(value)
+            data = CommaSepChoice(**args_dict)
+        value = data.selected_choices
         if not isinstance(value, list):
             return ''
         if data.all_choice in value:
