@@ -52,6 +52,7 @@ def map_task_to_instance(task):
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
         'sync.tasks.rename_all_media_for_source': Source,
+        'sync.tasks.wait_for_media_premiere': Media,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
@@ -122,6 +123,13 @@ def get_media_download_task(media_id):
 def get_media_metadata_task(media_id):
     try:
         return Task.objects.get_task('sync.tasks.download_media_metadata',
+                                     args=(str(media_id),))[0]
+    except IndexError:
+        return False
+
+def get_media_premiere_task(media_id):
+    try:
+        return Task.objects.get_task('sync.tasks.wait_for_media_premiere',
                                      args=(str(media_id),))[0]
     except IndexError:
         return False
@@ -531,4 +539,29 @@ def rename_all_media_for_source(source_id):
     for media in Media.objects.filter(source=source):
         media.rename_files()
 
+@background(repeat=3600, schedule=0)
+def wait_for_media_premiere(media_id):
+    td = lambda p, now=timezone.now(): (p - now)
+    hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
+
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist:
+        return
+    if media.published < timezone.now():
+        media.manual_skip = False
+        media.skip = False
+        # start the download tasks
+        media.save()
+    else:
+        media.manual_skip = True
+        media.title = _(f'Premieres in {hours(td(media.published))} hours')
+        task = get_media_premiere_task(str(media.pk))
+        if task:
+            task.verbose_name = _(f'Waiting for premiere of "{media.key}" '
+                                  f'in {hours(td(media.published))} hours')
+            if not task.repeat_until:
+                task.repeat_until = media.published + timedelta(hours=2)
+            task.save()
+        media.save()
 
