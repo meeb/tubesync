@@ -181,6 +181,13 @@ RENAME_ALL_SOURCES = False
 RENAME_SOURCES = None
 
 
+# WARNING WARNING WARNING
+# Below this line, the logic and formulas must remain as they are.
+# Changing them is very likely to break the software in weird ways.
+# To change anything, you should adjust a variable above or in the
+# 'local_settings.py' file instead.
+# You have been warned!
+
 try:
     from .local_settings import *
 except ImportError as e:
@@ -190,6 +197,23 @@ except ImportError as e:
 
 # Formulas: Do not touch! Modify the inputs instead.
 DOWNLOAD_MEDIA_DELAY = 60 + int(MAX_RUN_TIME / 20)
+
+if BACKGROUND_TASK_ASYNC_THREADS > MAX_BACKGROUND_TASK_ASYNC_THREADS:
+    BACKGROUND_TASK_ASYNC_THREADS = MAX_BACKGROUND_TASK_ASYNC_THREADS
+
+
+try:
+    MAX_RUN_TIME = int(str(MAX_RUN_TIME), base=10)
+except:
+    # fall back to the default value from:
+    # https://github.com/django-background-tasks/django-background-tasks/blob/12c8f328e4ba704bd7d91534bb6569e70197b949/background_task/settings.py#L28
+    MAX_RUN_TIME = 3600
+
+# Tasks scheduled with `background_task` need a chance to finish
+if MAX_RUN_TIME < 600:
+    MAX_RUN_TIME = 600
+
+DOWNLOAD_MEDIA_DELAY = 60 + (MAX_RUN_TIME / 20)
 
 if BACKGROUND_TASK_ASYNC_THREADS > MAX_BACKGROUND_TASK_ASYNC_THREADS:
     BACKGROUND_TASK_ASYNC_THREADS = MAX_BACKGROUND_TASK_ASYNC_THREADS
