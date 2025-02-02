@@ -28,6 +28,7 @@ from .models import Source, Media, MediaServer
 from .utils import (get_remote_image, resize_image_to_height, delete_file,
                     write_text_file, filter_response)
 from .filtering import filter_media
+from .youtube import YouTubeError
 
 
 def get_hash(task_name, pk):
@@ -312,7 +313,34 @@ def download_media_metadata(media_id):
         log.info(f'Task for ID: {media_id} / {media} skipped, due to task being manually skipped.')
         return
     source = media.source
-    metadata = media.index_metadata()
+    try:
+        metadata = media.index_metadata()
+    except YouTubeError as e:
+        e_str = str(e)
+        if ': Premieres in' in e_str:
+            published_datetime = None
+            now = timezone.now()
+            parts = e_str.rsplit(' ', 2)
+            try:
+                if 'hours' == parts[-1].lower():
+                    published_datetime = now + timedelta(hours=int(parts[-2], base=10))
+                elif 'days' == parts[-1].lower():
+                    published_datetime = now + timedelta(days=int(parts[-2], base=10))
+            except Exception as ee:
+                log.exception(ee)
+                pass
+            if published_datetime:
+                media.published = published_datetime
+                media.manual_skip = True
+                media.save()
+                wait_for_media_premiere(
+                    str(media.pk),
+                    priority=15,
+                    queue=str(media.pk),
+                )
+        log.exception(e)
+        log.debug(str(e))
+        return
     response = metadata
     if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
         response = filter_response(metadata, True)
