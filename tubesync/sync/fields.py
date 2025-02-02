@@ -47,12 +47,8 @@ CommaSepChoice = namedtuple(
 class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
     template_name = 'widgets/checkbox_select.html'
     option_template_name = 'widgets/checkbox_option.html'
+    # perhaps set the 'selected' attribute too?
     # checked_attribute = {'checked': True, 'selected': True}
-    from common.logger import log
-
-    def format_value(self, value):
-        self.log.debug(f'widget_format_v:1: {type(value)} {repr(value)}')
-        return super().format_value(value)
 
     def get_context(self, name: str, value: Any, attrs) -> Dict[str, Any]:
         data = value
@@ -63,8 +59,7 @@ class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
         context = super().get_context(name, value, attrs)
         widget = context['widget']
         options = widget['optgroups']
-        _value = widget['multipleChoiceProperties'] if 'multipleChoiceProperties' in widget else (None, 'Key not in widget')
-        self.log.debug(f'widget_get_c:1: {type(_value)} {repr(_value)}')
+        # This is a new key in widget
         widget['multipleChoiceProperties'] = list()
         for _group, single_option_list, _index in options:
             for option in single_option_list:
@@ -123,10 +118,6 @@ class CommaSepChoiceField(models.CharField):
                 kwargs['all_label'] = self.all_label
         return name, path, args, kwargs
 
-    # maybe useful?
-    def validate(self, value, model_instance):
-        super().validate(value, model_instance)
-
     def formfield(self, **kwargs):
         # This is a fairly standard way to set up some defaults
         # while letting the caller override them.
@@ -134,6 +125,7 @@ class CommaSepChoiceField(models.CharField):
             'form_class': self.form_class,
             # 'choices_form_class': self.form_class,
             'widget': self.widget,
+            # use a callable for choices
             'choices': self.get_all_choices,
             'label': '',
             'required': False,
@@ -173,9 +165,6 @@ class CommaSepChoiceField(models.CharField):
         '''
         Create a value to be stored in the database.
         '''
-        self.log.debug(f'gpv:1: {type(value)} {repr(value)}')
-        s_value = super().get_prep_value(value)
-        self.log.debug(f'gpv:2: {type(s_value)} {repr(s_value)}')
         data = value
         if not isinstance(data, CommaSepChoice):
             # The data was lost; we can regenerate it.
@@ -183,6 +172,10 @@ class CommaSepChoiceField(models.CharField):
             args_dict['selected_choices'] = list(value)
             data = CommaSepChoice(**args_dict)
         value = data.selected_choices
+        s_value = super().get_prep_value(value)
+        if set(s_value) != set(value):
+            self.log.warn(f'CommaSepChoiceField:get_prep_value: values did not match. '
+                          f'CommaSepChoiceField({value}) versus CharField({s_value})')
         if not isinstance(value, list):
             return ''
         if data.all_choice in value:
