@@ -118,12 +118,13 @@ class Source(models.Model):
 
     sponsorblock_categories = CommaSepChoiceField(
         _(''),
+        max_length=128,
         possible_choices=SponsorBlock_Category.choices,
         all_choice='all',
         allow_all=True,
-        all_label='(all options)',
+        all_label='(All Categories)',
         default='all',
-        help_text=_('Select the sponsorblocks you want to enforce')
+        help_text=_('Select the SponsorBlock categories that you wish to be removed from downloaded videos.')
     )
     embed_metadata = models.BooleanField(
         _('embed metadata'),
