@@ -21,9 +21,9 @@ find /app -type f ! -iname healthcheck.py -exec chmod 640 {} \;
 chmod 0755 /app/healthcheck.py
 
 # Optionally reset the download dir permissions
-TUBESYNC_RESET_DOWNLOAD_DIR="${TUBESYNC_RESET_DOWNLOAD_DIR:-True}"
-if [ "$TUBESYNC_RESET_DOWNLOAD_DIR" == "True" ]
+if [ "${TUBESYNC_RESET_DOWNLOAD_DIR:=True}" == "True" ]
 then
+    export TUBESYNC_RESET_DOWNLOAD_DIR
     echo "TUBESYNC_RESET_DOWNLOAD_DIR=True, Resetting /downloads directory permissions"
     chown -R app:app /downloads
     chmod -R 0755 /downloads
