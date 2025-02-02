@@ -318,26 +318,32 @@ def download_media_metadata(media_id):
     except YouTubeError as e:
         e_str = str(e)
         if ': Premieres in' in e_str:
-            published_datetime = None
             now = timezone.now()
+            published_datetime = None
+
             parts = e_str.rsplit(' ', 2)
+            unit = lambda p: str(p)[-1].lower()
+            number = lambda p: int(str(p)[-2], base=10)
             try:
-                if 'hours' == parts[-1].lower():
-                    published_datetime = now + timedelta(hours=int(parts[-2], base=10))
-                elif 'days' == parts[-1].lower():
-                    published_datetime = now + timedelta(days=int(parts[-2], base=10))
+                if 'hours' == unit(parts):
+                    published_datetime = now + timedelta(hours=number(parts))
+                elif 'days' == unit(parts):
+                    published_datetime = now + timedelta(days=number(parts))
             except Exception as ee:
                 log.exception(ee)
                 pass
+
             if published_datetime:
                 media.published = published_datetime
                 media.manual_skip = True
                 media.save()
+                verbose_name = _('Waiting for the premiere of "{}"')
                 wait_for_media_premiere(
                     str(media.pk),
                     priority=15,
                     queue=str(media.pk),
                     repeat=Task.HOURLY,
+                    verbose_name=verbose_name.format(media.key),
                 )
         log.exception(e)
         log.debug(str(e))
