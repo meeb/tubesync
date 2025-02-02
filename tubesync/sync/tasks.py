@@ -28,6 +28,7 @@ from .models import Source, Media, MediaServer
 from .utils import (get_remote_image, resize_image_to_height, delete_file,
                     write_text_file, filter_response)
 from .filtering import filter_media
+from .youtube import YouTubeError
 
 
 def get_hash(task_name, pk):
@@ -52,6 +53,7 @@ def map_task_to_instance(task):
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
         'sync.tasks.rename_all_media_for_source': Source,
+        'sync.tasks.wait_for_media_premiere': Media,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
@@ -122,6 +124,13 @@ def get_media_download_task(media_id):
 def get_media_metadata_task(media_id):
     try:
         return Task.objects.get_task('sync.tasks.download_media_metadata',
+                                     args=(str(media_id),))[0]
+    except IndexError:
+        return False
+
+def get_media_premiere_task(media_id):
+    try:
+        return Task.objects.get_task('sync.tasks.wait_for_media_premiere',
                                      args=(str(media_id),))[0]
     except IndexError:
         return False
@@ -311,7 +320,34 @@ def download_media_metadata(media_id):
         log.info(f'Task for ID: {media_id} / {media} skipped, due to task being manually skipped.')
         return
     source = media.source
-    metadata = media.index_metadata()
+    try:
+        metadata = media.index_metadata()
+    except YouTubeError as e:
+        e_str = str(e)
+        if ': Premieres in' in e_str:
+            published_datetime = None
+            now = timezone.now()
+            parts = e_str.rsplit(' ', 2)
+            try:
+                if 'hours' == parts[-1].lower():
+                    published_datetime = now + timedelta(hours=int(parts[-2], base=10))
+                elif 'days' == parts[-1].lower():
+                    published_datetime = now + timedelta(days=int(parts[-2], base=10))
+            except Exception as ee:
+                log.exception(ee)
+                pass
+            if published_datetime:
+                media.published = published_datetime
+                media.manual_skip = True
+                media.save()
+                wait_for_media_premiere(
+                    str(media.pk),
+                    priority=15,
+                    queue=str(media.pk),
+                )
+        log.exception(e)
+        log.debug(str(e))
+        return
     response = metadata
     if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
         response = filter_response(metadata, True)
@@ -538,4 +574,29 @@ def rename_all_media_for_source(source_id):
     for media in Media.objects.filter(source=source):
         media.rename_files()
 
+@background(repeat=3600, schedule=0)
+def wait_for_media_premiere(media_id):
+    td = lambda p, now=timezone.now(): (p - now)
+    hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
+
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist:
+        return
+    if media.published < timezone.now():
+        media.manual_skip = False
+        media.skip = False
+        # start the download tasks
+        media.save()
+    else:
+        media.manual_skip = True
+        media.title = _(f'Premieres in {hours(td(media.published))} hours')
+        task = get_media_premiere_task(str(media.pk))
+        if task:
+            task.verbose_name = _(f'Waiting for premiere of "{media.key}" '
+                                  f'in {hours(td(media.published))} hours')
+            if not task.repeat_until:
+                task.repeat_until = media.published + timedelta(hours=2)
+            task.save()
+        media.save()
 
