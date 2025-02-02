@@ -190,6 +190,7 @@ class FrontEndTestCase(TestCase):
             'prefer_60fps': False,
             'prefer_hdr': False,
             'fallback': 'f',
+            'sponsorblock_categories': ('preview', 'sponsor',),
             'sub_langs': 'en',
         }
         response = c.post('/source-add', data)
@@ -203,6 +204,9 @@ class FrontEndTestCase(TestCase):
         source_uuid = path_parts[1]
         source = Source.objects.get(pk=source_uuid)
         self.assertEqual(str(source.pk), source_uuid)
+        # Check that the SponsorBlock categories were saved
+        self.assertEqual(source.sponsorblock_categories.selected_choices,
+                         ['sponsor', 'preview'])
         # Check a task was created to index the media for the new source
         source_uuid = str(source.pk)
         task = Task.objects.get_task('sync.tasks.index_source_task',
@@ -215,6 +219,13 @@ class FrontEndTestCase(TestCase):
         # Check the source detail page loads
         response = c.get(f'/source/{source_uuid}')
         self.assertEqual(response.status_code, 200)
+        # save and refresh the Source
+        source.refresh_from_db()
+        source.save()
+        source.refresh_from_db()
+        # Check that the SponsorBlock categories remain saved
+        self.assertEqual(source.sponsorblock_categories.selected_choices,
+                         ['sponsor', 'preview'])
         # Update the source key
         data = {
             'source_type': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
@@ -234,6 +245,7 @@ class FrontEndTestCase(TestCase):
             'prefer_60fps': False,
             'prefer_hdr': False,
             'fallback': Source.FALLBACK_FAIL,
+            'sponsorblock_categories': ('preview', 'sponsor',),
             'sub_langs': 'en',
         }
         response = c.post(f'/source-update/{source_uuid}', data)
@@ -247,6 +259,9 @@ class FrontEndTestCase(TestCase):
         source_uuid = path_parts[1]
         source = Source.objects.get(pk=source_uuid)
         self.assertEqual(source.key, 'updatedkey')
+        # Check that the SponsorBlock categories remain saved
+        self.assertEqual(source.sponsorblock_categories.selected_choices,
+                         ['sponsor', 'preview'])
         # Update the source index schedule which should recreate the scheduled task
         data = {
             'source_type': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
