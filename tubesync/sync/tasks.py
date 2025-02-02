@@ -458,7 +458,6 @@ def download_media(media_id):
         # If selected, write an NFO file
         if media.source.write_nfo:
             log.info(f'Writing media NFO file to: {media.nfopath}')
-
             try:
                 write_text_file(media.nfopath, media.nfoxml)
             except PermissionError as e:
