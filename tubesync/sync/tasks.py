@@ -337,6 +337,7 @@ def download_media_metadata(media_id):
                     str(media.pk),
                     priority=15,
                     queue=str(media.pk),
+                    repeat=Task.HOURLY,
                 )
         log.exception(e)
         log.debug(str(e))
@@ -567,7 +568,7 @@ def rename_all_media_for_source(source_id):
     for media in Media.objects.filter(source=source):
         media.rename_files()
 
-@background(repeat=3600, schedule=0)
+@background(schedule=0)
 def wait_for_media_premiere(media_id):
     td = lambda p, now=timezone.now(): (p - now)
     hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
