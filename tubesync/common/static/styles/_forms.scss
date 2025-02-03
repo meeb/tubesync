@@ -46,3 +46,7 @@ select {
         background-color: $main-button-background-hover-colour !important;
     }
 }
+
+.no-text-transform {
+    text-transform: none;
+}
