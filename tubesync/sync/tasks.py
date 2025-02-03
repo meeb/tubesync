@@ -324,7 +324,7 @@ def download_media_metadata(media_id):
         metadata = media.index_metadata()
     except YouTubeError as e:
         e_str = str(e)
-        if ': Premieres in' in e_str:
+        if ': Premieres in ' in e_str:
             now = timezone.now()
             published_datetime = None
 
@@ -332,7 +332,9 @@ def download_media_metadata(media_id):
             unit = lambda p: str(p)[-1].lower()
             number = lambda p: int(str(p)[-2], base=10)
             try:
-                if 'hours' == unit(parts):
+                if 'minutes' == unit(parts):
+                    published_datetime = now + timedelta(minutes=number(parts))
+                elif 'hours' == unit(parts):
                     published_datetime = now + timedelta(hours=number(parts))
                 elif 'days' == unit(parts):
                     published_datetime = now + timedelta(days=number(parts))
