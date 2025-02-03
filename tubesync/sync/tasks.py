@@ -347,7 +347,7 @@ def download_media_metadata(media_id):
                 verbose_name = _('Waiting for the premiere of "{}"')
                 wait_for_media_premiere(
                     str(media.pk),
-                    priority=15,
+                    priority=0,
                     queue=str(media.pk),
                     repeat=Task.HOURLY,
                     verbose_name=verbose_name.format(media.key),
