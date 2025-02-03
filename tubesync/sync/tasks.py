@@ -127,11 +127,18 @@ def get_media_metadata_task(media_id):
         return False
 
 def delete_task_by_source(task_name, source_id):
-    return Task.objects.filter(task_name=task_name, queue=str(source_id)).delete()
+    now = timezone.now()
+    unlocked = Task.objects.unlocked(now)
+    return unlocked.filter(task_name=task_name, queue=str(source_id)).delete()
 
 
 def delete_task_by_media(task_name, args):
-    return Task.objects.drop_task(task_name, args=args)
+    max_run_time = getattr(settings, 'MAX_RUN_TIME', 3600)
+    now = timezone.now()
+    expires_at = now - timedelta(seconds=max_run_time)
+    task_qs = Task.objects.get_task(task_name, args=args)
+    unlocked = task_qs.filter(locked_by=None) | task_qs.filter(locked_at__lt=expires_at)
+    return unlocked.delete()
 
 
 def cleanup_completed_tasks():
