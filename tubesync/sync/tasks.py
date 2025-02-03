@@ -352,6 +352,7 @@ def download_media_metadata(media_id):
                     repeat=Task.HOURLY,
                     repeat_until = published_datetime + timedelta(hours=2),
                     verbose_name=verbose_name.format(media.key),
+                    remove_existing_tasks=True,
                 )
         log.exception(e)
         log.debug(str(e))
