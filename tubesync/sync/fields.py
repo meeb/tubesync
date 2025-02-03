@@ -180,7 +180,8 @@ class CommaSepChoiceField(models.CharField):
             return ''
         if data.all_choice in value:
             return data.all_choice
-        return data.separator.join(set(reversed(value)))
+        ordered_unique = list(dict.fromkeys(value))
+        return data.separator.join(ordered_unique)
 
     # extra functions not used by any parent classes
     def get_all_choices(self):
