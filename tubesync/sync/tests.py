@@ -223,6 +223,7 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         # save and refresh the Source
         source.refresh_from_db()
+        source.sponsorblock_categories.selected_choices.append('sponsor')
         source.save()
         source.refresh_from_db()
         # Check that the SponsorBlock categories remain saved
