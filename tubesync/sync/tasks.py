@@ -350,7 +350,7 @@ def download_media_metadata(media_id):
                     queue=str(media.pk),
                     repeat=Task.HOURLY,
                     repeat_until = published_datetime + timedelta(hours=2),
-                    verbose_name=verbose_name.format(media.key, published_datetime),
+                    verbose_name=verbose_name.format(media.key, published_datetime.isoformat(' ', 'seconds')),
                     remove_existing_tasks=True,
                 )
                 log_exception = False
