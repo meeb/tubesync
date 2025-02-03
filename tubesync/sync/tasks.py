@@ -337,12 +337,13 @@ def download_media_metadata(media_id):
                 media.published = published_datetime
                 media.manual_skip = True
                 media.save()
-                verbose_name = _('Waiting for the premiere of "{}"')
+                verbose_name = _('Waiting for the premiere of "{}" at: {published_datetime}')
                 wait_for_media_premiere(
                     str(media.pk),
                     priority=0,
                     queue=str(media.pk),
                     repeat=Task.HOURLY,
+                    repeat_until = published_datetime + timedelta(hours=2),
                     verbose_name=verbose_name.format(media.key),
                 )
         log.exception(e)
@@ -583,6 +584,8 @@ def wait_for_media_premiere(media_id):
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist:
         return
+    if media.metadata:
+        return
     if media.published < timezone.now():
         media.manual_skip = False
         media.skip = False
@@ -595,8 +598,6 @@ def wait_for_media_premiere(media_id):
         if task:
             task.verbose_name = _(f'Waiting for premiere of "{media.key}" '
                                   f'in {hours(td(media.published))} hours')
-            if not task.repeat_until:
-                task.repeat_until = media.published + timedelta(hours=2)
             task.save()
         media.save()
 
