@@ -172,7 +172,7 @@ class FrontEndTestCase(TestCase):
         response = c.get('/source-add')
         self.assertEqual(response.status_code, 200)
         # Create a new source
-        data_categories = ('sponsor', 'preview',)
+        data_categories = ('sponsor', 'preview', 'preview', 'sponsor',)
         expected_categories = ['sponsor', 'preview']
         data = {
             'source_type': 'c',
