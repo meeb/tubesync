@@ -353,6 +353,7 @@ def download_media_metadata(media_id):
                     verbose_name=verbose_name.format(media.key, published_datetime),
                     remove_existing_tasks=True,
                 )
+                log_exception = False
         if log_exception:
             log.exception(e)
         log.debug(str(e))
