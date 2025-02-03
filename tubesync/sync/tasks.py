@@ -333,14 +333,15 @@ def download_media_metadata(media_id):
             unit = lambda p: str(p[-1]).lower()
             number = lambda p: int(str(p[-2]), base=10)
             log.debug(parts)
-            log.debug(unit(parts))
             try:
+                if 'days' == unit(parts):
+                    published_datetime = now + timedelta(days=number(parts))
+                if 'hours' == unit(parts):
+                    published_datetime = now + timedelta(hours=number(parts))
                 if 'minutes' == unit(parts):
                     published_datetime = now + timedelta(minutes=number(parts))
-                elif 'hours' == unit(parts):
-                    published_datetime = now + timedelta(hours=number(parts))
-                elif 'days' == unit(parts):
-                    published_datetime = now + timedelta(days=number(parts))
+                log.debug(unit(parts))
+                log.debug(number(parts))
             except Exception as ee:
                 log.exception(ee)
                 pass
