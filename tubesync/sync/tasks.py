@@ -595,13 +595,14 @@ def wait_for_media_premiere(media_id):
         return
     if media.metadata:
         return
-    if media.published < timezone.now():
+    now = timezone.now()
+    if media.published < now:
         media.manual_skip = False
         media.skip = False
         # start the download tasks
         media.save()
     else:
         media.manual_skip = True
-        media.title = _(f'Premieres in {hours(td(media.published))} hours')
+        media.title = _(f'Premieres in {hours(td(media.published, now))} hours')
         media.save()
 
