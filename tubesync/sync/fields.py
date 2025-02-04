@@ -1,5 +1,4 @@
 from collections import namedtuple
-from functools import lru_cache
 from typing import Any, Dict
 from django import forms
 from django.db import connection, models
@@ -143,16 +142,10 @@ class CommaSepChoiceField(models.CharField):
         #     **kwargs,
         # })
 
-    @lru_cache(maxsize=10)
     def from_db_value(self, value, expression, connection):
         '''
         Create a data structure to be used in Python code.
-
-        This is called quite often with the same input,
-        because the database value doesn't change often.
-        So, it's being cached to prevent excessive logging.
         '''
-        self.log.debug(f'fdbv:1: {type(value)} {repr(value)}')
         if isinstance(value, str) and len(value) > 0:
             value = value.split(self.separator)
         if not isinstance(value, list):
@@ -180,7 +173,8 @@ class CommaSepChoiceField(models.CharField):
             return ''
         if data.all_choice in value:
             return data.all_choice
-        return data.separator.join(value)
+        ordered_unique = list(dict.fromkeys(value))
+        return data.separator.join(ordered_unique)
 
     # extra functions not used by any parent classes
     def get_all_choices(self):
