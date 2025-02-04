@@ -586,7 +586,6 @@ def rename_all_media_for_source(source_id):
 
 @background(schedule=0)
 def wait_for_media_premiere(media_id):
-    td = lambda p, now=timezone.now(): (p - now)
     hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
 
     try:
@@ -603,6 +602,6 @@ def wait_for_media_premiere(media_id):
         media.save()
     else:
         media.manual_skip = True
-        media.title = _(f'Premieres in {hours(td(media.published, now))} hours')
+        media.title = _(f'Premieres in {hours(media.published - now)} hours')
         media.save()
 
