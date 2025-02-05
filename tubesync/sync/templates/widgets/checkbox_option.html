@@ -1,7 +1,7 @@
 <!--<input type="{{ option.type }}" name="{{ option.name }}" value="{{ option.value }}" id="{{ option.value }}"><BR>
     <label for="{{ option.value }}">{{option.label}}</label>-->
 
-<div>
+<label>
     <input type="{{ option.type }}" name="{{ option.name }}" value="{{ option.value }}" id="{{ option.value }}" {% if option.selected %}checked{% endif %}>
-    <span>{{option.label}}</span>
-</div>
+    <span class="no-text-transform">{{option.label}}</span>
+</label>
