@@ -586,7 +586,6 @@ def rename_all_media_for_source(source_id):
 
 @background(schedule=0)
 def wait_for_media_premiere(media_id):
-    td = lambda p, now=timezone.now(): (p - now)
     hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
 
     try:
@@ -595,18 +594,14 @@ def wait_for_media_premiere(media_id):
         return
     if media.metadata:
         return
-    if media.published < timezone.now():
+    now = timezone.now()
+    if media.published < now:
         media.manual_skip = False
         media.skip = False
         # start the download tasks
         media.save()
     else:
         media.manual_skip = True
-        media.title = _(f'Premieres in {hours(td(media.published))} hours')
-        task = get_media_premiere_task(str(media.pk))
-        if task:
-            task.verbose_name = _(f'Waiting for premiere of "{media.key}" '
-                                  f'in {hours(td(media.published))} hours')
-            task.save()
+        media.title = _(f'Premieres in {hours(media.published - now)} hours')
         media.save()
 
