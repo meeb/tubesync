@@ -30,7 +30,6 @@ class PPHookStatus:
 
 def yt_dlp_progress_hook(event):
     hook = progress_hook.get('status', None)
-    filename = os.path.basename(event['filename'])
     if hook is None:
         log.error('yt_dlp_progress_hook: failed to get hook status object')
         return None
@@ -39,31 +38,29 @@ def yt_dlp_progress_hook(event):
         log.warn(f'[youtube-dl] unknown event: {str(event)}')
         return None
 
-    if event.get('downloaded_bytes') is None or event.get('total_bytes') is None:
-        return None
-
-    if event['status'] == 'error':
+    filename = os.path.basename(event.get('filename', '???'))
+    if 'error' == event['status']:
         log.error(f'[youtube-dl] error occured downloading: {filename}')
-    elif event['status'] == 'downloading':
-        downloaded_bytes = event.get('downloaded_bytes', 0)
-        total_bytes = event.get('total_bytes', 0)
+    elif 'downloading' == event['status']:
+        downloaded_bytes = event.get('downloaded_bytes', 0) or 0
+        total_bytes = event.get('total_bytes', 0) or 0
         eta = event.get('_eta_str', '?').strip()
         percent_done = event.get('_percent_str', '?').strip()
         speed = event.get('_speed_str', '?').strip()
         total = event.get('_total_bytes_str', '?').strip()
         if downloaded_bytes > 0 and total_bytes > 0:
-            p = round((event['downloaded_bytes'] / event['total_bytes']) * 100)
-            if (p % 5 == 0) and p > hook.download_progress:
+            p = round(100 * downloaded_bytes / total_bytes)
+            if (0 == p % 5) and p > hook.download_progress:
                 hook.download_progress = p
                 log.info(f'[youtube-dl] downloading: {filename} - {percent_done} '
                          f'of {total} at {speed}, {eta} remaining')
         else:
             # No progress to monitor, just spam every 10 download messages instead
-            hook.download_progress += 1
-            if hook.download_progress % 10 == 0:
+            if 0 == hook.download_progress % 10:
                 log.info(f'[youtube-dl] downloading: {filename} - {percent_done} '
                          f'of {total} at {speed}, {eta} remaining')
-    elif event['status'] == 'finished':
+            hook.download_progress += 1
+    elif 'finished' == event['status']:
         total_size_str = event.get('_total_bytes_str', '?').strip()
         elapsed_str = event.get('_elapsed_str', '?').strip()
         log.info(f'[youtube-dl] finished downloading: {filename} - '
