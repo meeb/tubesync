@@ -824,6 +824,11 @@ class TasksView(ListView):
         queryset = self.get_queryset()
         now = timezone.now()
         for task in queryset:
+            # There is broken logic in Task.objects.locked(), work around it.
+            # Without this, the queue never resumes properly.
+            if task.locked_by and not task.locked_by_pid_running():
+                task.locked_by = None
+                task.save()
             obj, url = map_task_to_instance(task)
             if not obj:
                 # Orphaned task, ignore it (it will be deleted when it fires)
