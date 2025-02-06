@@ -367,6 +367,10 @@ RUN set -x && \
 # Copy root
 COPY config/root /
 
+# patch background_task
+ADD https://github.com/tcely/django-background-tasks/raw/refs/heads/locked-logic-fix/background_task/models.py \
+    /usr/local/lib/python3*/dist-packages/background_task/models.py
+
 # Create a healthcheck
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
 
