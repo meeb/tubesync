@@ -102,7 +102,7 @@ def yt_dlp_progress_hook(event):
         if status is None:
             status = ProgressHookStatus(**event)
             status.register(key, filename, status.filename)
-            log.info(ProgressHookStatus.status_dict)
+            log.info(str(ProgressHookStatus.status_dict))
 
         downloaded_bytes = event.get('downloaded_bytes', 0) or 0
         total_bytes_estimate = event.get('total_bytes_estimate', 0) or 0
@@ -128,7 +128,7 @@ def yt_dlp_progress_hook(event):
         if status is None:
             status = ProgressHookStatus(**event)
             status.register(key, filename, status.filename)
-            log.info(ProgressHookStatus.status_dict)
+            log.info(str(ProgressHookStatus.status_dict))
         status.download_progress = 100
 
         total_size_str = event.get('_total_bytes_str', '?').strip()
