@@ -13,6 +13,7 @@ postprocessor_hook = {
     'status': dict(),
 }
 
+
 class BaseStatus:
     valid = set()
 
@@ -54,6 +55,11 @@ class ProgressHookStatus(BaseStatus):
         self.info = info_dict
         self.status = status
         self.download_progress = 0
+
+    def next_progress(self):
+        if 0 == self.download_progress:
+            return 0
+        return 5 + self.download_progress
 
 class PPHookStatus(BaseStatus):
     valid = frozenset((
@@ -109,10 +115,10 @@ def yt_dlp_progress_hook(event):
             pass
         if downloaded_bytes > 0 and total_bytes > 0:
             percent = round(100 * downloaded_bytes / total_bytes)
-        if percent and (0 < percent) and (0 == percent % 5):
+        if percent and (self.next_progress() < percent) and (0 == percent % 5):
+            status.download_progress = percent
             log.info(f'[youtube-dl] downloading: {filename} - {percent_str} '
                      f'of {total} at {speed}, {eta} remaining')
-        status.download_progress = percent or 0
     elif 'finished' == event['status']:
         # update the status for key to the finished value
         status = ProgressHookStatus.get(key)
