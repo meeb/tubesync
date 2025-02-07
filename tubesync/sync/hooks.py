@@ -61,7 +61,7 @@ class ProgressHookStatus(BaseStatus):
     def next_progress(self):
         if 0 == self.download_progress:
             return 0
-        return 5 + self.download_progress
+        return 1 + self.download_progress
 
 class PPHookStatus(BaseStatus):
     status_dict = postprocessor_hook['status']
