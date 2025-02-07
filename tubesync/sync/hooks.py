@@ -59,7 +59,7 @@ class ProgressHookStatus(BaseStatus):
         self.download_progress = 0
 
     def __str__(self):
-        return f'{self.__name__}: {self.status} ({self.download_progress}) file: {self.filename}'
+        return f'{self!r}: {self.status} ({self.download_progress}) file: {self.filename}'
 
     def next_progress(self):
         if 0 == self.download_progress:
