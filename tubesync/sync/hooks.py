@@ -58,6 +58,9 @@ class ProgressHookStatus(BaseStatus):
         self.status = status
         self.download_progress = 0
 
+    def __str__(self):
+        return f'{self.__name__}: {self.status} ({self.download_progress}) file: {self.filename}'
+
     def next_progress(self):
         if 0 == self.download_progress:
             return 0
@@ -134,7 +137,6 @@ def yt_dlp_progress_hook(event):
                  f'{total_size_str} in {elapsed_str}')
 
         status.cleanup()
-        log.info(ProgressHookStatus.status_dict)
 
 def yt_dlp_postprocessor_hook(event):
     if not PPHookStatus.valid_status(event['status']):
