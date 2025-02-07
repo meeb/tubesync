@@ -114,10 +114,10 @@ def yt_dlp_progress_hook(event):
             percent = int(float(percent_str.rstrip('%')))
         except:
             pass
-        if fragment_index > 0 and fragment_count > 0:
+        if fragment_index >= 0 and fragment_count > 0:
             percent = round(100 * fragment_index / fragment_count)
             percent_str = f'{percent}%'
-        elif downloaded_bytes > 0 and total_bytes > 0:
+        elif downloaded_bytes >= 0 and total_bytes > 0:
             percent = round(100 * downloaded_bytes / total_bytes)
         if percent and (status.next_progress() < percent) and (0 == percent % 5):
             status.download_progress = percent
