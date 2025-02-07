@@ -30,7 +30,7 @@ class PPHookStatus:
 
 def yt_dlp_progress_hook(event):
     if event['status'] not in ProgressHookStatus.valid:
-        log.warn(f'[youtube-dl] unknown event: {str(event)}')
+        log.warn(f'[youtube-dl] unknown progress event: {str(event)}')
         return None
 
     name = key = 'Unknown'
@@ -84,7 +84,7 @@ def yt_dlp_progress_hook(event):
 
 def yt_dlp_postprocessor_hook(event):
     if event['status'] not in PPHookStatus.valid:
-        log.warn(f'[youtube-dl] unknown event: {str(event)}')
+        log.warn(f'[youtube-dl] unknown postprocessor event: {str(event)}')
         return None
 
     name = key = 'Unknown'
