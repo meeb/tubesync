@@ -5,72 +5,66 @@ from common.logger import log
 from django.conf import settings
 
 
-class ProgressHookStatus:
+class BaseStatus:
+    valid = set()
+
+    @classmethod
+    def valid_status(cls, status):
+        return status in cls.valid
+
+    def __init__(self, hook_status_dict=None):
+        self._status_dict = hook_status_dict or dict()
+        self._registered_keys = set()
+
+    def register(self, *args):
+        additions = dict()
+        for key in args:
+            if key is not None:
+                self._registered_keys.add(key)
+                additions[key] = self
+        self._status_dict.update(additions)
+
+    def cleanup(self):
+        for key in self._registered_keys:
+            if key in self._status_dict:
+                del self._status_dict[key]
+
+class ProgressHookStatus(BaseStatus):
     valid = frozenset((
         'downloading',
         'finished',
         'error',
     ))
 
-    def valid_status(status):
-        return status in ProgressHookStatus.valid
-
+    @staticmethod
     def get(key):
         return progress_hook['status'].get(key, None)
 
     def __init__(self, *args, status=None, info_dict={}, filename=None, **kwargs):
+        super().__init__(progress_hook['status'])
         self.filename = filename
         self.info = info_dict
         self.status = status
         self.download_progress = 0
-        self._registered_keys = set()
 
-    def register(self, *args):
-        additions = dict()
-        for key in args:
-            if key is not None:
-                self._registered_keys.add(key)
-                additions[key] = self
-        progress_hook['status'].update(additions)
-
-    def cleanup(self):
-        for key in self._registered_keys:
-            if key in progress_hook['status']:
-                del progress_hook['status'][key]
-
-class PPHookStatus:
+class PPHookStatus(BaseStatus):
     valid = frozenset((
         'started',
         'processing',
         'finished',
     ))
 
-    def valid_status(status):
-        return status in PPHookStatus.valid
-
+    @staticmethod
     def get(key):
         return postprocessor_hook['status'].get(key, None)
 
     def __init__(self, *args, status=None, postprocessor=None, info_dict={}, filename=None, **kwargs):
+        super().__init__(postprocessor_hook['status'])
         self.filename = filename
         self.info = info_dict
         self.media_name = None
         self.name = postprocessor
         self.status = status
-        self._registered_keys = set()
-
-    def register(self, *args):
-        additions = dict()
-        for key in args:
-            if key is not None:
-                self._registered_keys.add(key)
-                additions[key] = self
-        postprocessor_hook['status'].update(additions)
-
-    def cleanup(self):
-        for key in self._registered_keys:
-            if key in postprocessor_hook['status']:
-                del postprocessor_hook['status'][key]
 
 def yt_dlp_progress_hook(event):
     if not ProgressHookStatus.valid_status(event['status']):
