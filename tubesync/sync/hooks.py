@@ -58,9 +58,6 @@ class ProgressHookStatus(BaseStatus):
         self.status = status
         self.download_progress = 0
 
-    def __str__(self):
-        return f'{self!r}: {self.status} ({self.download_progress}) file: {self.filename}'
-
     def next_progress(self):
         if 0 == self.download_progress:
             return 0
@@ -87,7 +84,7 @@ def yt_dlp_progress_hook(event):
         log.warn(f'[youtube-dl] unknown progress event: {str(event)}')
         return None
 
-    key = 'Unknown'
+    key = None
     if 'display_id' in event['info_dict']:
         key = event['info_dict']['display_id']
     elif 'id' in event['info_dict']:
@@ -97,12 +94,11 @@ def yt_dlp_progress_hook(event):
     if 'error' == event['status']:
         log.error(f'[youtube-dl] error occured downloading: {filename}')
     elif 'downloading' == event['status']:
-        # get or create the status for key
-        status = ProgressHookStatus.get(key)
+        # get or create the status for filename
+        status = ProgressHookStatus.get(filename)
         if status is None:
             status = ProgressHookStatus(**event)
             status.register(key, filename, status.filename)
-            log.info(str(ProgressHookStatus.status_dict))
 
         downloaded_bytes = event.get('downloaded_bytes', 0) or 0
         total_bytes_estimate = event.get('total_bytes_estimate', 0) or 0
@@ -123,12 +119,11 @@ def yt_dlp_progress_hook(event):
             log.info(f'[youtube-dl] downloading: {filename} - {percent_str} '
                      f'of {total} at {speed}, {eta} remaining')
     elif 'finished' == event['status']:
-        # update the status for key to the finished value
-        status = ProgressHookStatus.get(key)
+        # update the status for filename to the finished value
+        status = ProgressHookStatus.get(filename)
         if status is None:
             status = ProgressHookStatus(**event)
             status.register(key, filename, status.filename)
-            log.info(str(ProgressHookStatus.status_dict))
         status.download_progress = 100
 
         total_size_str = event.get('_total_bytes_str', '?').strip()
