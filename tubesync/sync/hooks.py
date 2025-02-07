@@ -43,7 +43,8 @@ def yt_dlp_progress_hook(event):
         log.error(f'[youtube-dl] error occured downloading: {filename}')
     elif 'downloading' == event['status']:
         downloaded_bytes = event.get('downloaded_bytes', 0) or 0
-        total_bytes = event.get('total_bytes', 0) or 0
+        total_bytes_estimate = event.get('total_bytes_estimate', 0) or 0
+        total_bytes = event.get('total_bytes', 0) or total_bytes_estimate
         eta = event.get('_eta_str', '?').strip()
         percent_done = event.get('_percent_str', '?').strip()
         speed = event.get('_speed_str', '?').strip()
@@ -57,6 +58,7 @@ def yt_dlp_progress_hook(event):
         else:
             # No progress to monitor, just spam every 10 download messages instead
             if 0 == hook.download_progress % 10:
+                hook.download_progress = 0
                 log.info(f'[youtube-dl] downloading: {filename} - {percent_done} '
                          f'of {total} at {speed}, {eta} remaining')
             hook.download_progress += 1
