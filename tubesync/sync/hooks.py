@@ -115,7 +115,7 @@ def yt_dlp_progress_hook(event):
             pass
         if downloaded_bytes > 0 and total_bytes > 0:
             percent = round(100 * downloaded_bytes / total_bytes)
-        if percent and (self.next_progress() < percent) and (0 == percent % 5):
+        if percent and (status.next_progress() < percent) and (0 == percent % 5):
             status.download_progress = percent
             log.info(f'[youtube-dl] downloading: {filename} - {percent_str} '
                      f'of {total} at {speed}, {eta} remaining')
