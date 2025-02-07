@@ -5,6 +5,14 @@ from common.logger import log
 from django.conf import settings
 
 
+progress_hook = {
+    'status': dict(),
+}
+
+postprocessor_hook = {
+    'status': dict(),
+}
+
 class BaseStatus:
     valid = set()
 
@@ -158,15 +166,13 @@ def yt_dlp_postprocessor_hook(event):
         status.cleanup()
 
 
-progress_hook = {
+progress_hook.update({
     'class': ProgressHookStatus(),
     'function': yt_dlp_progress_hook,
-    'status': dict(),
-}
+})
 
-postprocessor_hook = {
+postprocessor_hook.update({
     'class': PPHookStatus(),
     'function': yt_dlp_postprocessor_hook,
-    'status': dict(),
-}
+})
 
