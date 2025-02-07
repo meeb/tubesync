@@ -368,7 +368,7 @@ RUN set -x && \
 COPY config/root /
 
 # patch background_task
-ADD https://github.com/tcely/django-background-tasks/raw/refs/heads/locked-logic-fix/background_task/models.py \
+COPY patches/models.py \
     /usr/local/lib/python3.*/dist-packages/background_task/models.py
 
 # Create a healthcheck
