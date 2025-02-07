@@ -15,14 +15,19 @@ postprocessor_hook = {
 
 
 class BaseStatus:
+    status_dict = dict()
     valid = set()
+
+    @classmethod
+    def get(cls, key):
+        return cls.status_dict.get(key, None)
 
     @classmethod
     def valid_status(cls, status):
         return status in cls.valid
 
     def __init__(self, hook_status_dict=None):
-        self._status_dict = hook_status_dict or dict()
+        self._status_dict = hook_status_dict or self.status_dict
         self._registered_keys = set()
 
     def register(self, *args):
@@ -39,18 +44,15 @@ class BaseStatus:
                 del self._status_dict[key]
 
 class ProgressHookStatus(BaseStatus):
+    status_dict = progress_hook['status']
     valid = frozenset((
         'downloading',
         'finished',
         'error',
     ))
 
-    @staticmethod
-    def get(key):
-        return progress_hook['status'].get(key, None)
-
     def __init__(self, *args, status=None, info_dict={}, filename=None, **kwargs):
-        super().__init__(progress_hook['status'])
+        super().__init__(self.status_dict)
         self.filename = filename
         self.info = info_dict
         self.status = status
@@ -62,18 +64,15 @@ class ProgressHookStatus(BaseStatus):
         return 5 + self.download_progress
 
 class PPHookStatus(BaseStatus):
+    status_dict = postprocessor_hook['status']
     valid = frozenset((
         'started',
         'processing',
         'finished',
     ))
 
-    @staticmethod
-    def get(key):
-        return postprocessor_hook['status'].get(key, None)
-
     def __init__(self, *args, status=None, postprocessor=None, info_dict={}, filename=None, **kwargs):
-        super().__init__(postprocessor_hook['status'])
+        super().__init__(self.status_dict)
         self.filename = filename
         self.info = info_dict
         self.media_name = None
@@ -100,6 +99,7 @@ def yt_dlp_progress_hook(event):
         if status is None:
             status = ProgressHookStatus(**event)
             status.register(key, filename, status.filename)
+            log.info(ProgressHookStatus.status_dict)
 
         downloaded_bytes = event.get('downloaded_bytes', 0) or 0
         total_bytes_estimate = event.get('total_bytes_estimate', 0) or 0
@@ -125,6 +125,7 @@ def yt_dlp_progress_hook(event):
         if status is None:
             status = ProgressHookStatus(**event)
             status.register(key, filename, status.filename)
+            log.info(ProgressHookStatus.status_dict)
         status.download_progress = 100
 
         total_size_str = event.get('_total_bytes_str', '?').strip()
@@ -133,6 +134,7 @@ def yt_dlp_progress_hook(event):
                  f'{total_size_str} in {elapsed_str}')
 
         status.cleanup()
+        log.info(ProgressHookStatus.status_dict)
 
 def yt_dlp_postprocessor_hook(event):
     if not PPHookStatus.valid_status(event['status']):
