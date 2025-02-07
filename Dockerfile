@@ -368,7 +368,7 @@ RUN set -x && \
 COPY config/root /
 
 # patch background_task
-COPY patches/models.py \
+COPY patches/background_task/models.py \
     /usr/local/lib/python3.*/dist-packages/background_task/models.py
 
 # Create a healthcheck
