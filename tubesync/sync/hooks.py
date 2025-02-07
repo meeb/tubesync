@@ -13,7 +13,7 @@ class ProgressHookStatus:
     ))
 
     def valid_status(status):
-        return status in self.valid
+        return status in ProgressHookStatus.valid
 
     def get(key):
         return progress_hook['status'].get(key, None)
@@ -46,7 +46,7 @@ class PPHookStatus:
     ))
 
     def valid_status(status):
-        return status in self.valid
+        return status in PPHookStatus.valid
 
     def get(key):
         return postprocessor_hook['status'].get(key, None)
