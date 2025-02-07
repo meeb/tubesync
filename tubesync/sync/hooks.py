@@ -12,8 +12,31 @@ class ProgressHookStatus:
         'error',
     ))
 
-    def __init__(self):
+    def valid_status(status):
+        return status in self.valid
+
+    def get(key):
+        return progress_hook['status'].get(key, None)
+
+    def __init__(self, *args, status=None, info_dict={}, filename=None, **kwargs):
+        self.filename = filename
+        self.info = info_dict
+        self.status = status
         self.download_progress = 0
+        self._registered_keys = set()
+
+    def register(self, *args):
+        additions = dict()
+        for key in args:
+            if key is not None:
+                self._registered_keys.add(key)
+                additions[key] = self
+        progress_hook['status'].update(additions)
+
+    def cleanup(self):
+        for key in self._registered_keys:
+            if key in progress_hook['status']:
+                del progress_hook['status'][key]
 
 class PPHookStatus:
     valid = frozenset((
@@ -22,18 +45,39 @@ class PPHookStatus:
         'finished',
     ))
 
-    def __init__(self, *args, status=None, postprocessor=None, info_dict={}, **kwargs):
+    def valid_status(status):
+        return status in self.valid
+
+    def get(key):
+        return postprocessor_hook['status'].get(key, None)
+
+    def __init__(self, *args, status=None, postprocessor=None, info_dict={}, filename=None, **kwargs):
+        self.filename = filename
         self.info = info_dict
+        self.media_name = None
         self.name = postprocessor
         self.status = status
+        self._registered_keys = set()
 
+    def register(self, *args):
+        additions = dict()
+        for key in args:
+            if key is not None:
+                self._registered_keys.add(key)
+                additions[key] = self
+        postprocessor_hook['status'].update(additions)
+
+    def cleanup(self):
+        for key in self._registered_keys:
+            if key in postprocessor_hook['status']:
+                del postprocessor_hook['status'][key]
 
 def yt_dlp_progress_hook(event):
-    if event['status'] not in ProgressHookStatus.valid:
+    if not ProgressHookStatus.valid_status(event['status']):
         log.warn(f'[youtube-dl] unknown progress event: {str(event)}')
         return None
 
-    name = key = 'Unknown'
+    key = 'Unknown'
     if 'display_id' in event['info_dict']:
         key = event['info_dict']['display_id']
     elif 'id' in event['info_dict']:
@@ -44,9 +88,10 @@ def yt_dlp_progress_hook(event):
         log.error(f'[youtube-dl] error occured downloading: {filename}')
     elif 'downloading' == event['status']:
         # get or create the status for key
-        status = progress_hook['status'].get(key, None)
+        status = ProgressHookStatus.get(key)
         if status is None:
-            progress_hook['status'].update({key: ProgressHookStatus()})
+            status = ProgressHookStatus(**event)
+            status.register(key, filename, status.filename)
 
         downloaded_bytes = event.get('downloaded_bytes', 0) or 0
         total_bytes_estimate = event.get('total_bytes_estimate', 0) or 0
@@ -68,9 +113,10 @@ def yt_dlp_progress_hook(event):
         status.download_progress = percent or 0
     elif 'finished' == event['status']:
         # update the status for key to the finished value
-        status = progress_hook['status'].get(key, None)
+        status = ProgressHookStatus.get(key)
         if status is None:
-            progress_hook['status'].update({key: ProgressHookStatus()})
+            status = ProgressHookStatus(**event)
+            status.register(key, filename, status.filename)
         status.download_progress = 100
 
         total_size_str = event.get('_total_bytes_str', '?').strip()
@@ -78,22 +124,22 @@ def yt_dlp_progress_hook(event):
         log.info(f'[youtube-dl] finished downloading: {filename} - '
                  f'{total_size_str} in {elapsed_str}')
 
-        # clean up the status for key
-        if key in progress_hook['status']:
-            del progress_hook['status'][key]
+        status.cleanup()
 
 def yt_dlp_postprocessor_hook(event):
-    if event['status'] not in PPHookStatus.valid:
+    if not PPHookStatus.valid_status(event['status']):
         log.warn(f'[youtube-dl] unknown postprocessor event: {str(event)}')
         return None
 
     name = key = 'Unknown'
+    filename = os.path.basename(event.get('filename', '???'))
     if 'display_id' in event['info_dict']:
         key = event['info_dict']['display_id']
     elif 'id' in event['info_dict']:
         key = event['info_dict']['id']
 
-    postprocessor_hook['status'].update({key: PPHookStatus(*event)})
+    status = PPHookStatus(**event)
+    status.register(key, filename, status.filename)
 
     title = None
     if 'fulltitle' in event['info_dict']:
@@ -104,6 +150,8 @@ def yt_dlp_postprocessor_hook(event):
     if title:
         name = f'{key}: {title}'
 
+    status.media_name = name
+
     if 'started' == event['status']:
         if 'formats' in event['info_dict']:
             del event['info_dict']['formats']
@@ -112,8 +160,8 @@ def yt_dlp_postprocessor_hook(event):
         log.debug(repr(event['info_dict']))
 
     log.info(f'[{event["postprocessor"]}] {event["status"]} for: {name}')
-    if 'finished' == event['status'] and key in postprocessor_hook['status']:
-        del postprocessor_hook['status'][key]
+    if 'finished' == event['status']:
+        status.cleanup()
 
 
 progress_hook = {
