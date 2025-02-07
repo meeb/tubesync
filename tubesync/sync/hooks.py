@@ -103,6 +103,8 @@ def yt_dlp_progress_hook(event):
         downloaded_bytes = event.get('downloaded_bytes', 0) or 0
         total_bytes_estimate = event.get('total_bytes_estimate', 0) or 0
         total_bytes = event.get('total_bytes', 0) or total_bytes_estimate
+        fragment_index = event.get('fragment_index', 0) or 0
+        fragment_count = event.get('fragment_count', 0) or 0
         eta = event.get('_eta_str', '?').strip()
         percent_str = event.get('_percent_str', '?').strip()
         speed = event.get('_speed_str', '?').strip()
@@ -114,6 +116,8 @@ def yt_dlp_progress_hook(event):
             pass
         if downloaded_bytes > 0 and total_bytes > 0:
             percent = round(100 * downloaded_bytes / total_bytes)
+        if fragment_index > 0 and fragment_count > 0:
+            percent = round(100 * fragment_index / fragment_count)
         if percent and (status.next_progress() < percent) and (0 == percent % 5):
             status.download_progress = percent
             log.info(f'[youtube-dl] downloading: {filename} - {percent_str} '
