@@ -274,6 +274,9 @@ def download_media(
 
     progress_hook_func = progress_hook.get('function', None)
     if progress_hook_func:
+        hook = progress_hook.get('status', None)
+        if hook:
+            hook.download_progress = 0
         ytopts['progress_hooks'].append(progress_hook_func)
 
     codec_options = list()
