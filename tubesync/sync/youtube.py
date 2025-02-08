@@ -281,7 +281,7 @@ def download_media(
     if 'av1-' in ofn:
         codec_options.extend(['-c:v', 'libsvtav1', '-preset', '8', '-crf', '35'])
     elif 'vp9-' in ofn:
-        codec_options.extend(['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '31', '-row-mt', '1'])
+        codec_options.extend(['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '31', '-row-mt', '1', '-tile-columns', '2'])
     if '-opus' in ofn:
         codec_options.extend(['-c:a', 'libopus'])
     set_ffmpeg_codec = not (
