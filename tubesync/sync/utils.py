@@ -282,11 +282,15 @@ def filter_response(arg_dict, copy_arg=False):
             )
         )
 
-    for key in frozenset(('subtitles', 'requested_subtitles', 'automatic_captions',)):
+    for key in frozenset(('subtitles', 'automatic_captions',)):
         if key in response_dict.keys():
             key_dict = response_dict[key]
             for lang_code in key_dict:
                 _drop_url_keys(key_dict, lang_code, drop_subtitles_url)
+
+    for key in frozenset(('requested_subtitles',)):
+        if key in response_dict.keys():
+            _drop_url_keys(response_dict, key, drop_subtitles_url)
     # end of subtitles cleanup }}}
  
     # beginning of heatmap cleanup {{{
