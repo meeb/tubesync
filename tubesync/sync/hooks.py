@@ -29,58 +29,71 @@ class PPHookStatus:
 
 
 def yt_dlp_progress_hook(event):
-    hook = progress_hook.get('status', None)
-    filename = os.path.basename(event['filename'])
-    if hook is None:
-        log.error('yt_dlp_progress_hook: failed to get hook status object')
-        return None
-
     if event['status'] not in ProgressHookStatus.valid:
-        log.warn(f'[youtube-dl] unknown event: {str(event)}')
+        log.warn(f'[youtube-dl] unknown progress event: {str(event)}')
         return None
-
-    if event.get('downloaded_bytes') is None or event.get('total_bytes') is None:
-        return None
-
-    if event['status'] == 'error':
-        log.error(f'[youtube-dl] error occured downloading: {filename}')
-    elif event['status'] == 'downloading':
-        downloaded_bytes = event.get('downloaded_bytes', 0)
-        total_bytes = event.get('total_bytes', 0)
-        eta = event.get('_eta_str', '?').strip()
-        percent_done = event.get('_percent_str', '?').strip()
-        speed = event.get('_speed_str', '?').strip()
-        total = event.get('_total_bytes_str', '?').strip()
-        if downloaded_bytes > 0 and total_bytes > 0:
-            p = round((event['downloaded_bytes'] / event['total_bytes']) * 100)
-            if (p % 5 == 0) and p > hook.download_progress:
-                hook.download_progress = p
-                log.info(f'[youtube-dl] downloading: {filename} - {percent_done} '
-                         f'of {total} at {speed}, {eta} remaining')
-        else:
-            # No progress to monitor, just spam every 10 download messages instead
-            hook.download_progress += 1
-            if hook.download_progress % 10 == 0:
-                log.info(f'[youtube-dl] downloading: {filename} - {percent_done} '
-                         f'of {total} at {speed}, {eta} remaining')
-    elif event['status'] == 'finished':
-        total_size_str = event.get('_total_bytes_str', '?').strip()
-        elapsed_str = event.get('_elapsed_str', '?').strip()
-        log.info(f'[youtube-dl] finished downloading: {filename} - '
-                 f'{total_size_str} in {elapsed_str}')
-
-def yt_dlp_postprocessor_hook(event):
-    if event['status'] not in PPHookStatus.valid:
-        log.warn(f'[youtube-dl] unknown event: {str(event)}')
-        return None
-
-    postprocessor_hook['status'] = PPHookStatus(*event)
 
     name = key = 'Unknown'
     if 'display_id' in event['info_dict']:
         key = event['info_dict']['display_id']
     elif 'id' in event['info_dict']:
         key = event['info_dict']['id']
+
+    filename = os.path.basename(event.get('filename', '???'))
+    if 'error' == event['status']:
+        log.error(f'[youtube-dl] error occured downloading: {filename}')
+    elif 'downloading' == event['status']:
+        # get or create the status for key
+        status = progress_hook['status'].get(key, None)
+        if status is None:
+            progress_hook['status'].update({key: ProgressHookStatus()})
+
+        downloaded_bytes = event.get('downloaded_bytes', 0) or 0
+        total_bytes_estimate = event.get('total_bytes_estimate', 0) or 0
+        total_bytes = event.get('total_bytes', 0) or total_bytes_estimate
+        eta = event.get('_eta_str', '?').strip()
+        percent_str = event.get('_percent_str', '?').strip()
+        speed = event.get('_speed_str', '?').strip()
+        total = event.get('_total_bytes_str', '?').strip()
+        percent = None
+        try:
+            percent = int(float(percent_str.rstrip('%')))
+        except:
+            pass
+        if downloaded_bytes > 0 and total_bytes > 0:
+            percent = round(100 * downloaded_bytes / total_bytes)
+        if percent and (0 < percent) and (0 == percent % 5):
+            log.info(f'[youtube-dl] downloading: {filename} - {percent_str} '
+                     f'of {total} at {speed}, {eta} remaining')
+        status.download_progress = percent or 0
+    elif 'finished' == event['status']:
+        # update the status for key to the finished value
+        status = progress_hook['status'].get(key, None)
+        if status is None:
+            progress_hook['status'].update({key: ProgressHookStatus()})
+        status.download_progress = 100
+
+        total_size_str = event.get('_total_bytes_str', '?').strip()
+        elapsed_str = event.get('_elapsed_str', '?').strip()
+        log.info(f'[youtube-dl] finished downloading: {filename} - '
+                 f'{total_size_str} in {elapsed_str}')
+
+        # clean up the status for key
+        if key in progress_hook['status']:
+            del progress_hook['status'][key]
+
+def yt_dlp_postprocessor_hook(event):
+    if event['status'] not in PPHookStatus.valid:
+        log.warn(f'[youtube-dl] unknown postprocessor event: {str(event)}')
+        return None
+
+    name = key = 'Unknown'
+    if 'display_id' in event['info_dict']:
+        key = event['info_dict']['display_id']
+    elif 'id' in event['info_dict']:
+        key = event['info_dict']['id']
+
+    postprocessor_hook['status'].update({key: PPHookStatus(*event)})
 
     title = None
     if 'fulltitle' in event['info_dict']:
@@ -99,15 +112,19 @@ def yt_dlp_postprocessor_hook(event):
         log.debug(repr(event['info_dict']))
 
     log.info(f'[{event["postprocessor"]}] {event["status"]} for: {name}')
+    if 'finished' == event['status'] and key in postprocessor_hook['status']:
+        del postprocessor_hook['status'][key]
 
 
 progress_hook = {
-    'status': ProgressHookStatus(),
+    'class': ProgressHookStatus(),
     'function': yt_dlp_progress_hook,
+    'status': dict(),
 }
 
 postprocessor_hook = {
-    'status': PPHookStatus(),
+    'class': PPHookStatus(),
     'function': yt_dlp_postprocessor_hook,
+    'status': dict(),
 }
 
