@@ -360,7 +360,7 @@ RUN set -x && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video && \
   # Link to the current python3 version
-  ln -v -s -f -T "$(find /usr/local/lib -name 'python3.*' -type d -printf '%P\n' | sort -g -r | head -n 1)" /usr/local/lib/python3 && \
+  ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
   # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
