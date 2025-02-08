@@ -5,7 +5,12 @@ import os
 from .common import PostProcessor
 from .ffmpeg import FFmpegPostProcessor, FFmpegSubtitlesConvertorPP
 from .sponsorblock import SponsorBlockPP
-from ..utils import PostProcessingError, orderedSet, prepend_extension
+from ..utils import (
+    PostProcessingError,
+    orderedSet,
+    prepend_extension,
+    encodeArgument,
+)
 
 _TINY_CHAPTER_DURATION = 1
 DEFAULT_SPONSORBLOCK_CHAPTER_TITLE = '[SponsorBlock]: %(category_names)l'
