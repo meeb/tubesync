@@ -828,6 +828,8 @@ class TasksView(ListView):
             # Without this, the queue never resumes properly.
             if task.locked_by and not task.locked_by_pid_running():
                 task.locked_by = None
+                # do not wait for the task to expire
+                task.locked_at = None
                 task.save()
             obj, url = map_task_to_instance(task)
             if not obj:
