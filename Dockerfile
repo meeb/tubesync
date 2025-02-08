@@ -371,7 +371,7 @@ COPY config/root /
 
 # patch background_task
 COPY patches/background_task/ \
-    /usr/local/lib/python3.*/dist-packages/background_task/
+    /usr/local/lib/python3/dist-packages/background_task/
 
 # patch yt_dlp
 COPY patches/yt_dlp/ \
