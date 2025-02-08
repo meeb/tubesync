@@ -44,10 +44,10 @@ def yt_dlp_progress_hook(event):
         log.error(f'[youtube-dl] error occured downloading: {filename}')
     elif 'downloading' == event['status']:
         # get or create the status for key
-        status = progress_hook['status'].get(key, None)
+        status = progress_hook['status'].get(filename, None)
         if status is None:
             status = ProgressHookStatus()
-            progress_hook['status'].update({key: status})
+            progress_hook['status'].update({filename: status})
 
         downloaded_bytes = event.get('downloaded_bytes', 0) or 0
         total_bytes_estimate = event.get('total_bytes_estimate', 0) or 0
@@ -69,10 +69,10 @@ def yt_dlp_progress_hook(event):
         status.download_progress = percent or 0
     elif 'finished' == event['status']:
         # update the status for key to the finished value
-        status = progress_hook['status'].get(key, None)
+        status = progress_hook['status'].get(filename, None)
         if status is None:
             status = ProgressHookStatus()
-            progress_hook['status'].update({key: status})
+            progress_hook['status'].update({filename: status})
         status.download_progress = 100
 
         total_size_str = event.get('_total_bytes_str', '?').strip()
