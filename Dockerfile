@@ -367,6 +367,14 @@ RUN set -x && \
 # Copy root
 COPY config/root /
 
+# patch background_task
+COPY patches/background_task/ \
+    /usr/local/lib/python3.*/dist-packages/background_task/
+
+# patch yt_dlp
+COPY patches/yt_dlp/ \
+    /usr/local/lib/python3.*/dist-packages/yt_dlp/
+
 # Create a healthcheck
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
 
