@@ -1,15 +1,24 @@
 import copy
 import heapq
+import itertools
 import os
+import subprocess
 
 from .common import PostProcessor
-from .ffmpeg import FFmpegPostProcessor, FFmpegSubtitlesConvertorPP
+from .ffmpeg import (
+    FFmpegPostProcessor,
+    FFmpegPostProcessorError,
+    FFmpegSubtitlesConvertorPP,
+)
 from .sponsorblock import SponsorBlockPP
 from ..utils import (
+    Popen,
     PostProcessingError,
+    encodeArgument,
     orderedSet,
     prepend_extension,
-    encodeArgument,
+    shell_quote,
+    variadic,
 )
 
 _TINY_CHAPTER_DURATION = 1
