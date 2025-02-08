@@ -294,7 +294,6 @@ def filter_response(arg_dict, copy_arg=False):
     for key in ('subtitles', 'requested_subtitles', 'automatic_captions',):
         if key in response_dict.keys():
             lang_codes = response_dict[key]
-            assert isinstance(lang_codes, dict)
             if isinstance(lang_codes, dict):
                 for lang_code in lang_codes.keys():
                     _drop_url_keys(lang_codes, lang_code, drop_subtitles_url)
