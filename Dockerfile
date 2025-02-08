@@ -359,6 +359,8 @@ RUN set -x && \
   mkdir -v -p /config/cache/pycache && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video && \
+  # Link to the current python3 version
+  ln -v -s -f -T "$(find /usr/local/lib -name 'python3.*' -type d -printf '%P\n' | sort -g -r | head -n 1)" /usr/local/lib/python3 && \
   # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
@@ -369,7 +371,7 @@ COPY config/root /
 
 # patch yt_dlp
 COPY patches/yt_dlp/ \
-    /usr/local/lib/python3.*/dist-packages/yt_dlp/
+    /usr/local/lib/python3/dist-packages/yt_dlp/
 
 # Create a healthcheck
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
