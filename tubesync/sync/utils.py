@@ -203,6 +203,17 @@ def normalize_codec(codec_str):
     return result
 
 
+def list_of_dictionaries(arg_list, arg_function=lambda x: x):
+    assert callable(arg_function)
+    if isinstance(arg_list, list):
+        def _assert_and_call(arg_dict):
+            assert isinstance(arg_dict, dict)
+            if isinstance(arg_dict, dict):
+                return arg_function(arg_dict)
+        return (True, list(map(_assert_and_call, arg_list)),)
+    return (False, arg_list,)
+
+
 def _url_keys(arg_dict, filter_func):
     result = {}
     if isinstance(arg_dict, dict):
@@ -214,17 +225,17 @@ def _url_keys(arg_dict, filter_func):
     return result
 
 
+# expects a dictionary where the value at key is a:
+# list of dictionaries 
 def _drop_url_keys(arg_dict, key, filter_func):
+    def _del_url_keys(_arg_dict):
+        for url_key, remove in _url_keys(_arg_dict, filter_func).items():
+            if remove is True:
+                del _arg_dict[url_key]
+
     assert isinstance(arg_dict, dict)
     if key in arg_dict.keys():
-        key_list = arg_dict[key]
-        assert isinstance(key_list, list)
-        if isinstance(key_list, list):
-            for val_dict in key_list:
-                assert isinstance(val_dict, dict)
-                for url_key, remove in _url_keys(val_dict, filter_func).items():
-                    if remove is True:
-                        del val_dict[url_key]
+        list_of_dictionaries(arg_dict[key], _del_url_keys)
 
 
 def filter_response(arg_dict, copy_arg=False):
@@ -266,16 +277,15 @@ def filter_response(arg_dict, copy_arg=False):
         '__needs_testing',
         '__working',
     ))
+    def del_drop_keys(arg_dict):
+        for drop_key in drop_keys:
+            if drop_key in arg_dict.keys():
+                del arg_dict[drop_key]
+
     for key in ('formats', 'requested_formats',):
         if key in response_dict.keys():
             _drop_url_keys(response_dict, key, drop_format_url)
-            formats = response_dict[key]
-            assert isinstance(formats, list)
-            if isinstance(formats, list):
-                for format in formats:
-                    for drop_key in drop_keys:
-                        if drop_key in format.keys():
-                            del format[drop_key]
+            list_of_dictionaries(response_dict[key], del_drop_keys)
     # end of formats cleanup }}}
 
     # beginning of subtitles cleanup {{{
