@@ -143,6 +143,7 @@ def get_media_info(url):
         'simulate': True,
         'logger': log,
         'extract_flat': True,
+        'extractor_args': {'youtubetab': {'approximate_date': ['true']}},
     })
     response = {}
     with yt_dlp.YoutubeDL(opts) as y:
