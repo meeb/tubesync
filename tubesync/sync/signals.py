@@ -221,7 +221,7 @@ def media_post_delete(sender, instance, **kwargs):
         video_path = Path(str(instance.media_file.path)).resolve()
         instance.media_file.delete(save=False)
         # the other files we created have these known suffixes
-        for suffix in frozenset(('nfo', 'jpg', 'webp', 'info.json',)):
+        for suffix in frozenset(('nfo', 'jpg', 'webp', 'vtt', 'info.json',)):
             other_path = video_path.with_suffix(f'.{suffix}').resolve()
             log.info(f'Deleting file for: {instance} path: {other_path!s}')
             delete_file(other_path)
