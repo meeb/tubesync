@@ -86,7 +86,7 @@ def source_post_save(sender, instance, created, **kwargs):
             queue=str(instance.pk),
             priority=1,
             verbose_name=verbose_name.format(instance.name),
-            remove_existing_tasks=False
+            remove_existing_tasks=True
         )
     verbose_name = _('Checking all media for source "{}"')
     save_all_media_for_source(
