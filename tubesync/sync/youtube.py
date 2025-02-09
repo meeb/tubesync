@@ -224,6 +224,10 @@ def download_media(
         'sponskrub': False,
     })
 
+    pp_opts.exec_cmd.update(
+        opts.get('exec_cmd', default_opts.exec_cmd)
+    )
+
     if skip_sponsors:
         # Let yt_dlp convert from human for us.
         pp_opts.sponsorblock_mark = yt_dlp.parse_options(
