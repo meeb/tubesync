@@ -203,22 +203,39 @@ def normalize_codec(codec_str):
     return result
 
 
+def list_of_dictionaries(arg_list, arg_function=lambda x: x):
+    assert callable(arg_function)
+    if isinstance(arg_list, list):
+        def _assert_and_call(arg_dict):
+            if isinstance(arg_dict, dict):
+                return arg_function(arg_dict)
+            return arg_dict
+        return (True, list(map(_assert_and_call, arg_list)),)
+    return (False, arg_list,)
+
+
 def _url_keys(arg_dict, filter_func):
     result = {}
-    for key in arg_dict.keys():
-        if 'url' in key:
-            result.update(
-                {key: filter_func(key=key, url=arg_dict[key])}
-            )
+    if isinstance(arg_dict, dict):
+        for key, value in arg_dict.items():
+            if 'url' in key:
+                result.update(
+                    {key: filter_func(key=key, url=value)}
+                )
     return result
 
 
+# expects a dictionary where the value at key is a:
+# list of dictionaries 
 def _drop_url_keys(arg_dict, key, filter_func):
+    def _del_url_keys(_arg_dict):
+        for url_key, remove in _url_keys(_arg_dict, filter_func).items():
+            if remove is True:
+                del _arg_dict[url_key]
+
+    assert isinstance(arg_dict, dict)
     if key in arg_dict.keys():
-        for val_dict in arg_dict[key]:
-            for url_key, remove in _url_keys(val_dict, filter_func).items():
-                if remove is True:
-                    del val_dict[url_key]
+        list_of_dictionaries(arg_dict[key], _del_url_keys)
 
 
 def filter_response(arg_dict, copy_arg=False):
@@ -260,13 +277,15 @@ def filter_response(arg_dict, copy_arg=False):
         '__needs_testing',
         '__working',
     ))
-    for key in frozenset(('formats', 'requested_formats',)):
-        _drop_url_keys(response_dict, key, drop_format_url)
+    def del_drop_keys(arg_dict):
+        for drop_key in drop_keys:
+            if drop_key in arg_dict.keys():
+                del arg_dict[drop_key]
+
+    for key in ('formats', 'requested_formats',):
         if key in response_dict.keys():
-            for format in response_dict[key]:
-                for drop_key in drop_keys:
-                    if drop_key in format.keys():
-                        del format[drop_key]
+            _drop_url_keys(response_dict, key, drop_format_url)
+            list_of_dictionaries(response_dict[key], del_drop_keys)
     # end of formats cleanup }}}
 
     # beginning of subtitles cleanup {{{
@@ -282,12 +301,19 @@ def filter_response(arg_dict, copy_arg=False):
             )
         )
 
-    for key in frozenset(('subtitles', 'automatic_captions',)):
+    for key in ('subtitles', 'requested_subtitles', 'automatic_captions',):
         if key in response_dict.keys():
-            key_dict = response_dict[key]
-            for lang_code in key_dict:
-                _drop_url_keys(key_dict, lang_code, drop_subtitles_url)
+            lang_codes = response_dict[key]
+            if isinstance(lang_codes, dict):
+                for lang_code in lang_codes.keys():
+                    _drop_url_keys(lang_codes, lang_code, drop_subtitles_url)
     # end of subtitles cleanup }}}
+ 
+    # beginning of heatmap cleanup {{{
+    for key in ('heatmap',):
+        if key in response_dict.keys():
+            del response_dict[key]
+    # end of heatmap cleanup }}}
 
     return response_dict
 
