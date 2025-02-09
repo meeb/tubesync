@@ -207,9 +207,9 @@ def list_of_dictionaries(arg_list, arg_function=lambda x: x):
     assert callable(arg_function)
     if isinstance(arg_list, list):
         def _assert_and_call(arg_dict):
-            assert isinstance(arg_dict, dict)
             if isinstance(arg_dict, dict):
                 return arg_function(arg_dict)
+            return arg_dict
         return (True, list(map(_assert_and_call, arg_list)),)
     return (False, arg_list,)
 
