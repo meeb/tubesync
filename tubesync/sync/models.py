@@ -935,7 +935,7 @@ class Media(models.Model):
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         # Trigger an update of derived fields from metadata
         if self.metadata:
-            self.title = self.metadata_title
+            self.title = self.metadata_title[:200]
             self.duration = self.metadata_duration
         if update_fields is not None and "metadata" in update_fields:
             # If only some fields are being updated, make sure we update title and duration if metadata changes
