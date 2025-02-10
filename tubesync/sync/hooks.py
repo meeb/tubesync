@@ -56,8 +56,12 @@ class BaseStatus:
         task = get_media_download_task(str(media.pk))
         if task:
             if self.task_verbose_name is None:
-                self.task_verbose_name = task.verbose_name
-            task.verbose_name = f'{self.task_status} ' + self.task_verbose_name
+                # clean up any previously prepended task_status
+                # this happened because of duplicated tasks on my test system
+                s = task.verbose_name
+                cleaned = s[1+s.find(' Downloading '):]
+                self.task_verbose_name = cleaned
+            task.verbose_name = f'{self.task_status} {self.task_verbose_name}'
             task.save()
 
 class ProgressHookStatus(BaseStatus):
