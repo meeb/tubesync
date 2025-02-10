@@ -215,7 +215,7 @@ def index_source_task(source_id):
             media = Media(key=key)
         media.source = source
         media.duration = float(video.get(fields('duration', media), 0)) or None
-        media.title = str(video.get(fields('title', media), ''))
+        media.title = str(video.get(fields('title', media), ''))[:200]
         timestamp = video.get(fields('timestamp', media), None)
         if timestamp is not None:
             try:
