@@ -151,11 +151,6 @@ def media_post_save(sender, instance, created, **kwargs):
             if instance.can_download:
                 instance.can_download = False
                 can_download_changed = True
-    # Save the instance if any changes were required
-    if skip_changed or can_download_changed:
-        post_save.disconnect(media_post_save, sender=Media)
-        instance.save()
-        post_save.connect(media_post_save, sender=Media)
     # If the media is missing metadata schedule it to be downloaded
     if not instance.metadata and not instance.skip and not get_media_metadata_task(instance.pk):
         log.info(f'Scheduling task to download metadata for: {instance.url}')
@@ -186,6 +181,10 @@ def media_post_save(sender, instance, created, **kwargs):
     existing_media_download_task = get_media_download_task(str(instance.pk))
     # If the media has not yet been downloaded schedule it to be downloaded
     if not (instance.media_file_exists or existing_media_download_task):
+        # The file was deleted after it was downloaded, skip this media.
+        if instance.can_download and instance.downloaded:
+            skip_changed = True != instance.skip
+            instance.skip = True
         instance.downloaded = False
         instance.media_file = None
     if (instance.source.download_media and instance.can_download) and not (
@@ -198,6 +197,11 @@ def media_post_save(sender, instance, created, **kwargs):
             verbose_name=verbose_name.format(instance.name),
             remove_existing_tasks=True
         )
+    # Save the instance if any changes were required
+    if skip_changed or can_download_changed:
+        post_save.disconnect(media_post_save, sender=Media)
+        instance.save()
+        post_save.connect(media_post_save, sender=Media)
 
 
 @receiver(pre_delete, sender=Media)
@@ -225,6 +229,11 @@ def media_post_delete(sender, instance, **kwargs):
             other_path = video_path.with_suffix(f'.{suffix}').resolve()
             log.info(f'Deleting file for: {instance} path: {other_path!s}')
             delete_file(other_path)
+        # subtitles include language code
+        subtitle_files = video_path.parent.glob(f'{glob_quote(video_path.with_suffix("").name)}*.vtt')
+        for file in subtitle_files:
+            log.info(f'Deleting file for: {instance} path: {file}')
+            delete_file(file)
         # Jellyfin creates .trickplay directories and posters
         for suffix in frozenset(('.trickplay', '-poster.jpg', '-poster.webp',)):
             # with_suffix insists on suffix beginning with '.' for no good reason

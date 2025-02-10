@@ -143,6 +143,7 @@ def get_media_info(url):
         'simulate': True,
         'logger': log,
         'extract_flat': True,
+        'extractor_args': {'youtubetab': {'approximate_date': ['true']}},
     })
     response = {}
     with yt_dlp.YoutubeDL(opts) as y:
@@ -223,6 +224,10 @@ def download_media(
         'force_keyframes_at_cuts': True,
         'sponskrub': False,
     })
+
+    pp_opts.exec_cmd.update(
+        opts.get('exec_cmd', default_opts.exec_cmd)
+    )
 
     if skip_sponsors:
         # Let yt_dlp convert from human for us.
