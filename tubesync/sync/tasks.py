@@ -27,7 +27,6 @@ from common.utils import json_serial
 from .models import Source, Media, MediaServer
 from .utils import (get_remote_image, resize_image_to_height, delete_file,
                     write_text_file, filter_response)
-from .filtering import filter_media
 from .youtube import YouTubeError
 
 
