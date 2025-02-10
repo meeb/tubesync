@@ -229,6 +229,11 @@ def media_post_delete(sender, instance, **kwargs):
             other_path = video_path.with_suffix(f'.{suffix}').resolve()
             log.info(f'Deleting file for: {instance} path: {other_path!s}')
             delete_file(other_path)
+        # subtitles include language code
+        subtitle_files = video_path.parent.glob(f'{glob_quote(video_path.with_suffix("").name)}*.vtt')
+        for file in subtitle_files:
+            log.info(f'Deleting file for: {instance} path: {file}')
+            delete_file(file)
         # Jellyfin creates .trickplay directories and posters
         for suffix in frozenset(('.trickplay', '-poster.jpg', '-poster.webp',)):
             # with_suffix insists on suffix beginning with '.' for no good reason
