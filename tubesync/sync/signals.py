@@ -14,7 +14,7 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     map_task_to_instance, check_source_directory_exists,
                     download_media, rescan_media_server, download_source_images,
                     save_all_media_for_source, rename_all_media_for_source,
-                    get_media_metadata_task)
+                    get_media_metadata_task, get_media_download_task)
 from .utils import delete_file, glob_quote
 from .filtering import filter_media
 
@@ -183,13 +183,13 @@ def media_post_save(sender, instance, created, **kwargs):
                 verbose_name=verbose_name.format(instance.name),
                 remove_existing_tasks=True
             )
+    existing_media_download_task = get_media_download_task(str(instance.pk))
     # If the media has not yet been downloaded schedule it to be downloaded
-    if not instance.media_file_exists:
+    if not (instance.media_file_exists or existing_media_download_task):
         instance.downloaded = False
         instance.media_file = None
-    if (not instance.downloaded and instance.can_download and not instance.skip
-        and instance.source.download_media):
-        delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
+    if (instance.source.download_media and instance.can_download) and not (
+        instance.skip or instance.downloaded or existing_media_download_task):
         verbose_name = _('Downloading media for "{}"')
         download_media(
             str(instance.pk),
