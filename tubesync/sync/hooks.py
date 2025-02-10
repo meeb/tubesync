@@ -15,9 +15,6 @@ postprocessor_hook = {
 
 
 class BaseStatus:
-    from .models import Media
-    from .tasks import get_media_download_task
-    
     status_dict = dict()
     valid = set()
 
@@ -52,6 +49,9 @@ class BaseStatus:
     def update_task(self):
         if self.media_key is None:
             return
+        from .models import Media
+        from .tasks import get_media_download_task
+
         media = Media.objects.get(key=self.media_key)
         task = get_media_download_task(str(media.pk))
         if task:
