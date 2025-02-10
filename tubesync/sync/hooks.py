@@ -4,6 +4,9 @@ import yt_dlp
 from common.logger import log
 from django.conf import settings
 
+from .models import Media
+from .tasks import get_media_download_task
+
 
 progress_hook = {
     'status': dict(),
@@ -27,6 +30,9 @@ class BaseStatus:
         return status in cls.valid
 
     def __init__(self, hook_status_dict=None):
+        self.media_key = None
+        self.task_status = '[Started: 0%]'
+        self.task_verbose_name = None
         self._status_dict = hook_status_dict or self.status_dict
         self._registered_keys = set()
 
@@ -42,6 +48,17 @@ class BaseStatus:
         for key in self._registered_keys:
             if key in self._status_dict:
                 del self._status_dict[key]
+
+    def update_task(self):
+        if self.media_key is None:
+            return
+        media = Media.objects.get(key=self.media_key)
+        task = get_media_download_task(str(media.pk))
+        if task:
+            if self.task_verbose_name is None:
+                self.task_verbose_name = task.verbose_name
+            task.verbose_name = f'{self.task_status} ' + self.task_verbose_name
+            task.save()
 
 class ProgressHookStatus(BaseStatus):
     status_dict = progress_hook['status']
@@ -121,6 +138,10 @@ def yt_dlp_progress_hook(event):
             percent = round(100 * downloaded_bytes / total_bytes)
         if percent and (status.next_progress() < percent) and (0 == percent % 5):
             status.download_progress = percent
+            if key:
+                status.media_key = key
+            status.task_status = f'[downloading: {percent_str}]'
+            status.update_task()
             log.info(f'[youtube-dl] downloading: {filename} - {percent_str} '
                      f'of {total} at {speed}, {eta} remaining')
     elif 'finished' == event['status']:
@@ -170,6 +191,11 @@ def yt_dlp_postprocessor_hook(event):
         if 'automatic_captions' in event['info_dict']:
             del event['info_dict']['automatic_captions']
         log.debug(repr(event['info_dict']))
+
+    if 'Unknown' != key:
+        status.media_key = key
+    status.task_status = f'[{event["postprocessor"]}: {event["status"]}]'
+    status.update_task()
 
     log.info(f'[{event["postprocessor"]}] {event["status"]} for: {name}')
     if 'finished' == event['status']:
