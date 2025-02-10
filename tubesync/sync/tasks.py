@@ -201,7 +201,7 @@ def index_source_task(source_id):
     source.last_crawl = timezone.now()
     source.save()
     log.info(f'Found {len(videos)} media items for source: {source}')
-    fields = lambda x, t=source.source_type: Media.METADATA_FIELDS.get(x, dict()).get(t, x)
+    fields = lambda f, m: m.get_metadata_field(f)
     for video in videos:
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
@@ -213,9 +213,9 @@ def index_source_task(source_id):
         except Media.DoesNotExist:
             media = Media(key=key)
         media.source = source
-        media.duration = float(video.get(fields('duration'), 0)) or None
-        media.title = str(video.get(fields('title'), ''))
-        timestamp = video.get(fields('timestamp'), None)
+        media.duration = float(video.get(fields('duration', media), 0)) or None
+        media.title = str(video.get(fields('title', media), ''))[:200]
+        timestamp = video.get(fields('timestamp', media), None)
         if timestamp is not None:
             try:
                 timestamp_float = float(timestamp)
