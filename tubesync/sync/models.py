@@ -664,6 +664,11 @@ class Media(models.Model):
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'upload_date',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'upload_date',
         },
+        'timestamp': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'timestamp',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'timestamp',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'timestamp',
+        },
         'title': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'title',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'title',
@@ -944,7 +949,7 @@ class Media(models.Model):
 
     def get_metadata_field(self, field):
         fields = self.METADATA_FIELDS.get(field, {})
-        return fields.get(self.source.source_type, '')
+        return fields.get(self.source.source_type, field)
 
     def iter_formats(self):
         for fmt in self.formats:
