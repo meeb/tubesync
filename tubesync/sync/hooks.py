@@ -4,9 +4,6 @@ import yt_dlp
 from common.logger import log
 from django.conf import settings
 
-from .models import Media
-from .tasks import get_media_download_task
-
 
 progress_hook = {
     'status': dict(),
@@ -18,6 +15,9 @@ postprocessor_hook = {
 
 
 class BaseStatus:
+    from .models import Media
+    from .tasks import get_media_download_task
+    
     status_dict = dict()
     valid = set()
 
