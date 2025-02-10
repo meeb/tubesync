@@ -151,11 +151,6 @@ def media_post_save(sender, instance, created, **kwargs):
             if instance.can_download:
                 instance.can_download = False
                 can_download_changed = True
-    # Save the instance if any changes were required
-    if skip_changed or can_download_changed:
-        post_save.disconnect(media_post_save, sender=Media)
-        instance.save()
-        post_save.connect(media_post_save, sender=Media)
     # If the media is missing metadata schedule it to be downloaded
     if not instance.metadata and not instance.skip and not get_media_metadata_task(instance.pk):
         log.info(f'Scheduling task to download metadata for: {instance.url}')
@@ -185,6 +180,10 @@ def media_post_save(sender, instance, created, **kwargs):
             )
     # If the media has not yet been downloaded schedule it to be downloaded
     if not instance.media_file_exists:
+        # The file was deleted after it was downloaded, skip this media.
+        if instance.can_download and instance.downloaded:
+            skip_changed = True != instance.skip
+            instance.skip = True
         instance.downloaded = False
         instance.media_file = None
     if (not instance.downloaded and instance.can_download and not instance.skip
@@ -198,6 +197,11 @@ def media_post_save(sender, instance, created, **kwargs):
             verbose_name=verbose_name.format(instance.name),
             remove_existing_tasks=True
         )
+    # Save the instance if any changes were required
+    if skip_changed or can_download_changed:
+        post_save.disconnect(media_post_save, sender=Media)
+        instance.save()
+        post_save.connect(media_post_save, sender=Media)
 
 
 @receiver(pre_delete, sender=Media)
