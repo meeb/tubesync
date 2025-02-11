@@ -242,7 +242,7 @@ def download_media(
         'writesubtitles': write_subtitles,
         'writeautomaticsub': auto_subtitles,
         'subtitleslangs': sub_langs.split(','),
-        'writethumbnail': True,
+        'writethumbnail': embed_thumbnail,
         'check_formats': False,
         'overwrites': None,
         'sleep_interval': 10 + int(settings.DOWNLOAD_MEDIA_DELAY / 20),
