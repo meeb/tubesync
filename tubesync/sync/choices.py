@@ -36,35 +36,35 @@ class YouTube_SourceType(models.TextChoices):
 
 
 youtube_long_source_types = {
-    'youtube-channel': YouTube_SourceType.CHANNEL,
-    'youtube-channel-id': YouTube_SourceType.CHANNEL_ID,
-    'youtube-playlist': YouTube_SourceType.PLAYLIST,
+    'youtube-channel': YouTube_SourceType.CHANNEL.value,
+    'youtube-channel-id': YouTube_SourceType.CHANNEL_ID.value,
+    'youtube-playlist': YouTube_SourceType.PLAYLIST.value,
 }
 
 
 youtube_help = {
     'examples': {
-        YouTube_SourceType.CHANNEL: 'https://www.youtube.com/google',
-        YouTube_SourceType.CHANNEL_ID: ('https://www.youtube.com/channel/'
+        YouTube_SourceType.CHANNEL.value: 'https://www.youtube.com/google',
+        YouTube_SourceType.CHANNEL_ID.value: ('https://www.youtube.com/channel/'
                                         'UCK8sQmJBp8GCxrOtXWBpyEA'),
-        YouTube_SourceType.PLAYLIST: ('https://www.youtube.com/playlist?list='
+        YouTube_SourceType.PLAYLIST.value: ('https://www.youtube.com/playlist?list='
                                       'PL590L5WQmH8dpP0RyH5pCfIaDEdt9nk7r'),
     },
     'texts': {
-        YouTube_SourceType.CHANNEL: _(
+        YouTube_SourceType.CHANNEL.value: _(
             'Enter a YouTube channel URL into the box below. A channel URL will be in '
             'the format of <strong>https://www.youtube.com/CHANNELNAME</strong> '
             'where <strong>CHANNELNAME</strong> is the name of the channel you want '
             'to add.'
         ),
-        YouTube_SourceType.CHANNEL_ID: _(
+        YouTube_SourceType.CHANNEL_ID.value: _(
             'Enter a YouTube channel URL by channel ID into the box below. A channel '
             'URL by channel ID will be in the format of <strong>'
             'https://www.youtube.com/channel/BiGLoNgUnIqUeId</strong> '
             'where <strong>BiGLoNgUnIqUeId</strong> is the ID of the channel you want '
             'to add.'
         ),
-        YouTube_SourceType.PLAYLIST: _(
+        YouTube_SourceType.PLAYLIST.value: _(
             'Enter a YouTube playlist URL into the box below. A playlist URL will be '
             'in the format of <strong>https://www.youtube.com/playlist?list='
             'BiGLoNgUnIqUeId</strong> where <strong>BiGLoNgUnIqUeId</strong> is the '
@@ -75,7 +75,7 @@ youtube_help = {
 
 
 youtube_validation_urls = {
-    YouTube_SourceType.CHANNEL: {
+    YouTube_SourceType.CHANNEL.value: {
         'scheme': 'https',
         'domains': DOMAINS['youtube'],
         'path_regex': '^\/(c\/)?([^\/]+)(\/videos)?$',
@@ -84,7 +84,7 @@ youtube_validation_urls = {
         'extract_key': ('path_regex', 1),
         'example': 'https://www.youtube.com/SOMECHANNEL'
     },
-    YouTube_SourceType.CHANNEL_ID: {
+    YouTube_SourceType.CHANNEL_ID.value: {
         'scheme': 'https',
         'domains': DOMAINS['youtube'],
         'path_regex': '^\/channel\/([^\/]+)(\/videos)?$',
@@ -93,7 +93,7 @@ youtube_validation_urls = {
         'extract_key': ('path_regex', 0),
         'example': 'https://www.youtube.com/channel/CHANNELID'
     },
-    YouTube_SourceType.PLAYLIST: {
+    YouTube_SourceType.PLAYLIST.value: {
         'scheme': 'https',
         'domains': DOMAINS['youtube'],
         'path_regex': '^\/(playlist|watch)$',
