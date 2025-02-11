@@ -143,6 +143,7 @@ def get_media_info(url):
         'simulate': True,
         'logger': log,
         'extract_flat': True,
+        'extractor_args': {'youtubetab': {'approximate_date': ['true']}},
     })
     response = {}
     with yt_dlp.YoutubeDL(opts) as y:
@@ -224,6 +225,10 @@ def download_media(
         'sponskrub': False,
     })
 
+    pp_opts.exec_cmd.update(
+        opts.get('exec_cmd', default_opts.exec_cmd)
+    )
+
     if skip_sponsors:
         # Let yt_dlp convert from human for us.
         pp_opts.sponsorblock_mark = yt_dlp.parse_options(
@@ -242,7 +247,7 @@ def download_media(
         'writesubtitles': write_subtitles,
         'writeautomaticsub': auto_subtitles,
         'subtitleslangs': sub_langs.split(','),
-        'writethumbnail': True,
+        'writethumbnail': embed_thumbnail,
         'check_formats': False,
         'overwrites': None,
         'sleep_interval': 10 + int(settings.DOWNLOAD_MEDIA_DELAY / 20),
@@ -279,9 +284,11 @@ def download_media(
     codec_options = list()
     ofn = ytopts['outtmpl']
     if 'av1-' in ofn:
-        codec_options = ['-c:v', 'libsvtav1', '-preset', '8', '-crf', '35']
+        codec_options.extend(['-c:v', 'libsvtav1', '-preset', '8', '-crf', '35'])
     elif 'vp9-' in ofn:
-        codec_options = ['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '31']
+        codec_options.extend(['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '31', '-row-mt', '1', '-tile-columns', '2'])
+    if '-opus' in ofn:
+        codec_options.extend(['-c:a', 'libopus'])
     set_ffmpeg_codec = not (
         ytopts['postprocessor_args'] and
         ytopts['postprocessor_args']['modifychapters+ffmpeg']
