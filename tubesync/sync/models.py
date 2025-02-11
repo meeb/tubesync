@@ -664,6 +664,11 @@ class Media(models.Model):
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'upload_date',
             Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'upload_date',
         },
+        'timestamp': {
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'timestamp',
+            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'timestamp',
+            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'timestamp',
+        },
         'title': {
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'title',
             Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'title',
@@ -930,7 +935,7 @@ class Media(models.Model):
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         # Trigger an update of derived fields from metadata
         if self.metadata:
-            self.title = self.metadata_title
+            self.title = self.metadata_title[:200]
             self.duration = self.metadata_duration
         if update_fields is not None and "metadata" in update_fields:
             # If only some fields are being updated, make sure we update title and duration if metadata changes
@@ -944,7 +949,7 @@ class Media(models.Model):
 
     def get_metadata_field(self, field):
         fields = self.METADATA_FIELDS.get(field, {})
-        return fields.get(self.source.source_type, '')
+        return fields.get(self.source.source_type, field)
 
     def iter_formats(self):
         for fmt in self.formats:
@@ -1561,6 +1566,8 @@ class Media(models.Model):
         if self.downloaded and self.media_file:
             old_video_path = Path(self.media_file.path)
             new_video_path = Path(get_media_file_path(self, None))
+            if old_video_path == new_video_path:
+                return
             if old_video_path.exists() and not new_video_path.exists():
                 old_video_path = old_video_path.resolve(strict=True)
 

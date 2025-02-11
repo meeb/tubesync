@@ -10,7 +10,7 @@ import math
 import uuid
 from io import BytesIO
 from hashlib import sha1
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta, timezone as tz
 from shutil import copyfile
 from PIL import Image
 from django.conf import settings
@@ -27,7 +27,6 @@ from common.utils import json_serial
 from .models import Source, Media, MediaServer
 from .utils import (get_remote_image, resize_image_to_height, delete_file,
                     write_text_file, filter_response)
-from .filtering import filter_media
 from .youtube import YouTubeError
 
 
@@ -202,6 +201,7 @@ def index_source_task(source_id):
     source.last_crawl = timezone.now()
     source.save()
     log.info(f'Found {len(videos)} media items for source: {source}')
+    fields = lambda f, m: m.get_metadata_field(f)
     for video in videos:
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
@@ -213,6 +213,18 @@ def index_source_task(source_id):
         except Media.DoesNotExist:
             media = Media(key=key)
         media.source = source
+        media.duration = float(video.get(fields('duration', media), 0)) or None
+        media.title = str(video.get(fields('title', media), ''))[:200]
+        timestamp = video.get(fields('timestamp', media), None)
+        if timestamp is not None:
+            try:
+                timestamp_float = float(timestamp)
+                posix_epoch = datetime(1970, 1, 1, tzinfo=tz.utc)
+                published_dt = posix_epoch + timedelta(seconds=timestamp_float)
+            except Exception as e:
+                log.warn(f'Could not set published for: {source} / {media} with "{e}"')
+            else:
+                media.published = published_dt
         try:
             media.save()
             log.debug(f'Indexed media: {source} / {media}')
