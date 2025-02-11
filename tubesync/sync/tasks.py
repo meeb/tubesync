@@ -603,7 +603,7 @@ def rename_all_media_for_source(source_id):
     for media in Media.objects.filter(source=source):
         media.rename_files()
 
-@background(schedule=0)
+@background(schedule=0, remove_existing_tasks=True)
 def wait_for_media_premiere(media_id):
     hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
 
