@@ -1566,6 +1566,8 @@ class Media(models.Model):
         if self.downloaded and self.media_file:
             old_video_path = Path(self.media_file.path)
             new_video_path = Path(get_media_file_path(self, None))
+            if old_video_path == new_video_path:
+                return
             if old_video_path.exists() and not new_video_path.exists():
                 old_video_path = old_video_path.resolve(strict=True)
 
