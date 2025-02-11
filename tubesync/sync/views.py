@@ -332,18 +332,6 @@ class ValidateSourceView(FormView):
 
 class EditSourceMixin:
     model = Source
-    # ordered by the model
-    fields = [
-        k for k in dict.fromkeys(map(
-            lambda f: str(f).rsplit('.', 1)[-1],
-            Source._meta.fields
-        )).keys() if k not in frozenset((
-            'created',
-            'has_failed',
-            'last_crawl',
-            'uuid'
-        ))
-    ]
     # manual ordering
     fields = ('source_type', 'key', 'name', 'directory', 'filter_text', 'filter_text_invert', 'filter_seconds', 'filter_seconds_min',
               'media_format', 'index_schedule', 'index_videos', 'index_streams', 'download_media', 'download_cap', 'delete_old_media',
