@@ -332,12 +332,24 @@ class ValidateSourceView(FormView):
 
 class EditSourceMixin:
     model = Source
+    # ordered by the model
+    fields = [
+        k for k in dict.fromkeys(map(
+            lambda f: str(f).rsplit('.', 1)[-1],
+            Source._meta.fields
+        )).keys() if k not in frozenset((
+            'has_failed',
+            'created',
+            'last_crawl',
+            'uuid'
+        ))
+    ]
+    # manual ordering
     fields = ('source_type', 'key', 'name', 'directory', 'filter_text', 'filter_text_invert', 'filter_seconds', 'filter_seconds_min',
               'media_format', 'index_schedule', 'index_videos', 'index_streams', 'download_media', 'download_cap', 'delete_old_media',
-              'delete_removed_media', 'days_to_keep', 'source_resolution', 'source_vcodec',
-              'source_acodec', 'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_channel_images',
-              'delete_removed_media', 'delete_files_on_disk', 'days_to_keep', 'source_resolution',
-              'source_vcodec', 'source_acodec', 'prefer_60fps', 'prefer_hdr', 'fallback', 'copy_channel_images',
+              'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
+              'prefer_60fps', 'prefer_hdr', 'fallback',
+              'delete_removed_media', 'delete_files_on_disk', 'copy_channel_images',
               'copy_thumbnails', 'write_nfo', 'write_json', 'embed_metadata', 'embed_thumbnail',
               'enable_sponsorblock', 'sponsorblock_categories', 'write_subtitles',
               'auto_subtitles', 'sub_langs')
