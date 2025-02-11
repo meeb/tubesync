@@ -338,8 +338,8 @@ class EditSourceMixin:
             lambda f: str(f).rsplit('.', 1)[-1],
             Source._meta.fields
         )).keys() if k not in frozenset((
-            'has_failed',
             'created',
+            'has_failed',
             'last_crawl',
             'uuid'
         ))
