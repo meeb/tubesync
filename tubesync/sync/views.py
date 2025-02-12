@@ -31,7 +31,8 @@ from .utils import validate_url, delete_file
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
                     delete_task_by_media, index_source_task)
-from .choices import (MediaServerType, YouTube_SourceType, youtube_long_source_types,
+from .choices import (MediaServerType, SourceResolution,
+                        YouTube_SourceType, youtube_long_source_types,
                         youtube_help, youtube_validation_urls)
 from . import signals
 from . import youtube
@@ -50,7 +51,7 @@ class DashboardView(TemplateView):
         # Sources
         data['num_sources'] = Source.objects.all().count()
         data['num_video_sources'] = Source.objects.filter(
-            ~Q(source_resolution=Source.SOURCE_RESOLUTION_AUDIO)
+            ~Q(source_resolution=SourceResolution.AUDIO.value)
         ).count()
         data['num_audio_sources'] = data['num_sources'] - data['num_video_sources']
         data['num_failed_sources'] = Source.objects.filter(has_failed=True).count()
