@@ -123,22 +123,23 @@ class YouTube_SourceType(models.TextChoices):
             'domains': DOMAINS['youtube'],
             'qs_args': [],
         }
+        update_and_return = lambda c, d: c.update(d) or c
         return dict(zip(
             cls.values,
             (
-                deepcopy(defaults).update({
+                update_and_return(deepcopy(defaults), {
                     'path_regex': r'^\/(c\/)?([^\/]+)(\/videos)?$',
                     'path_must_not_match': ('/playlist', '/c/playlist'),
                     'extract_key': ('path_regex', 1),
                     'example': 'https://www.youtube.com/SOMECHANNEL',
                 }),
-                deepcopy(defaults).update({
+                update_and_return(deepcopy(defaults), {
                     'path_regex': r'^\/channel\/([^\/]+)(\/videos)?$',
                     'path_must_not_match': ('/playlist', '/c/playlist'),
                     'extract_key': ('path_regex', 0),
                     'example': 'https://www.youtube.com/channel/CHANNELID',
                 }),
-                deepcopy(defaults).update({
+                update_and_return(deepcopy(defaults), {
                     'path_regex': r'^\/(playlist|watch)$',
                     'path_must_not_match': (),
                     'qs_args': ('list',),
