@@ -112,7 +112,7 @@ class SponsorBlock_Category(models.TextChoices):
 
 class YouTube_SourceType(models.TextChoices):
     CHANNEL = 'c', _('YouTube channel')
-    CHANNEL_ID = 'i', _('YouTube channel ID')
+    CHANNEL_ID = 'i', _('YouTube channel by ID')
     PLAYLIST = 'p', _('YouTube playlist')
 
 
