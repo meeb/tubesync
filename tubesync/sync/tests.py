@@ -19,7 +19,7 @@ from .models import Source, Media
 from .tasks import cleanup_old_media
 from .filtering import filter_media
 from .utils import filter_response
-from .choices import IndexSchedule
+from .choices import IndexSchedule, youtube_long_source_types
 
 
 class FrontEndTestCase(TestCase):
@@ -34,11 +34,7 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_validate_source(self):
-        test_source_types = {
-            'youtube-channel': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
-            'youtube-channel-id': Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID,
-            'youtube-playlist': Source.SOURCE_TYPE_YOUTUBE_PLAYLIST,
-        }
+        test_source_types = youtube_long_source_types
         test_sources = {
             'youtube-channel': {
                 'valid': (
