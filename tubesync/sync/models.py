@@ -26,7 +26,8 @@ from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
 from .fields import CommaSepChoiceField
-from .choices import CapChoices, IndexSchedule, SponsorBlock_Category, YouTube_SourceType
+from .choices import (CapChoices, IndexSchedule, MediaServerType,
+                        SponsorBlock_Category, YouTube_SourceType)
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 
@@ -1612,11 +1613,7 @@ class MediaServer(models.Model):
         A remote media server, such as a Plex server.
     '''
 
-    SERVER_TYPE_PLEX = 'p'
-    SERVER_TYPES = (SERVER_TYPE_PLEX,)
-    SERVER_TYPE_CHOICES = (
-        (SERVER_TYPE_PLEX, _('Plex')),
-    )
+    SERVER_TYPE_PLEX = MediaServerType.PLEX.value
     ICONS = {
         SERVER_TYPE_PLEX: '<i class="fas fa-server"></i>',
     }
@@ -1628,8 +1625,8 @@ class MediaServer(models.Model):
         _('server type'),
         max_length=1,
         db_index=True,
-        choices=SERVER_TYPE_CHOICES,
-        default=SERVER_TYPE_PLEX,
+        choices=MediaServerType.choices,
+        default=MediaServerType.PLEX,
         help_text=_('Server type')
     )
     host = models.CharField(
