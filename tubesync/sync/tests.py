@@ -34,7 +34,6 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_validate_source(self):
-        test_source_types = youtube_long_source_types
         test_sources = {
             'youtube-channel': {
                 'valid': (
@@ -126,7 +125,7 @@ class FrontEndTestCase(TestCase):
         for (source_type, tests) in test_sources.items():
             for test, urls in tests.items():
                 for url in urls:
-                    source_type_char = test_source_types.get(source_type)
+                    source_type_char = youtube_long_source_types.get(source_type)
                     data = {'source_url': url, 'source_type': source_type_char}
                     response = c.post(f'/source-validate/{source_type}', data)
                     if test == 'valid':
