@@ -1,3 +1,5 @@
+from enum import Enum
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -83,13 +85,10 @@ class SourceResolution(models.TextChoices):
 SourceResolutionInteger = dict()
 for name in SourceResolution.names:
     if name.endswith('0P'):
-        value = None
-        try:
-            value = SourceResolution.__getattr__(name).value[: -1]
-        except AttributeError:
-            value = name[6:-1]
-        if value is not None:
-            SourceResolutionInteger.update({name: int(value)})
+        value = SourceResolution.__dict__.get(name, None)
+        if isinstance(value, Enum):
+            value = int(value.value)
+            SourceResolutionInteger.update({name: value})
 
 
 # as stolen from:
