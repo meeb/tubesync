@@ -824,9 +824,14 @@ class TasksView(ListView):
         queryset = self.get_queryset()
         now = timezone.now()
         for task in queryset:
-            # There is broken logic in Task.objects.locked(), work around it.
-            # Without this, the queue never resumes properly.
-            if task.locked_by and not task.locked_by_pid_running():
+            # There was broken logic in `Task.objects.locked()`, work around it.
+            # With that broken logic, the tasks never resume properly.
+            # This check unlocks the tasks without a running process.
+            # `task.locked_by_pid_running()` returns:
+            # - `True`: locked and PID exists
+            # - `False`: locked and PID does not exist
+            # - `None`: not `locked_by`, so there was no PID to check
+            if task.locked_by_pid_running() is False:
                 task.locked_by = None
                 # do not wait for the task to expire
                 task.locked_at = None
