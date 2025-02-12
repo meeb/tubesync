@@ -26,6 +26,7 @@ from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
 from .fields import CommaSepChoiceField, SponsorBlock_Category
+from .choices import YouTube_SourceType
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 
@@ -35,16 +36,10 @@ class Source(models.Model):
         or a YouTube playlist.
     '''
 
-    SOURCE_TYPE_YOUTUBE_CHANNEL = 'c'
-    SOURCE_TYPE_YOUTUBE_CHANNEL_ID = 'i'
-    SOURCE_TYPE_YOUTUBE_PLAYLIST = 'p'
-    SOURCE_TYPES = (SOURCE_TYPE_YOUTUBE_CHANNEL, SOURCE_TYPE_YOUTUBE_CHANNEL_ID,
-                    SOURCE_TYPE_YOUTUBE_PLAYLIST)
-    SOURCE_TYPE_CHOICES = (
-        (SOURCE_TYPE_YOUTUBE_CHANNEL, _('YouTube channel')),
-        (SOURCE_TYPE_YOUTUBE_CHANNEL_ID, _('YouTube channel by ID')),
-        (SOURCE_TYPE_YOUTUBE_PLAYLIST, _('YouTube playlist')),
-    )
+    SOURCE_TYPE_YOUTUBE_CHANNEL = YouTube_SourceType.CHANNEL.value
+    SOURCE_TYPE_YOUTUBE_CHANNEL_ID = YouTube_SourceType.CHANNEL_ID.value
+    SOURCE_TYPE_YOUTUBE_PLAYLIST = YouTube_SourceType.PLAYLIST.value
+    SOURCE_TYPES = YouTube_SourceType.values
 
     SOURCE_RESOLUTION_360P = '360p'
     SOURCE_RESOLUTION_480P = '480p'
@@ -222,8 +217,8 @@ class Source(models.Model):
         _('source type'),
         max_length=1,
         db_index=True,
-        choices=SOURCE_TYPE_CHOICES,
-        default=SOURCE_TYPE_YOUTUBE_CHANNEL,
+        choices=YouTube_SourceType.choices,
+        default=YouTube_SourceType.CHANNEL,
         help_text=_('Source type')
     )
     key = models.CharField(
