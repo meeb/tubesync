@@ -19,7 +19,8 @@ from .models import Source, Media
 from .tasks import cleanup_old_media
 from .filtering import filter_media
 from .utils import filter_response
-from .choices import IndexSchedule, youtube_long_source_types
+from .choices import (Fallback, IndexSchedule,
+                        youtube_long_source_types)
 
 
 class FrontEndTestCase(TestCase):
@@ -243,7 +244,7 @@ class FrontEndTestCase(TestCase):
             'source_acodec': Source.SOURCE_ACODEC_OPUS,
             'prefer_60fps': False,
             'prefer_hdr': False,
-            'fallback': Source.FALLBACK_FAIL,
+            'fallback': Fallback.FAIL.value,
             'sponsorblock_categories': data_categories,
             'sub_langs': 'en',
         }
@@ -280,7 +281,7 @@ class FrontEndTestCase(TestCase):
             'source_acodec': Source.SOURCE_ACODEC_OPUS,
             'prefer_60fps': False,
             'prefer_hdr': False,
-            'fallback': Source.FALLBACK_FAIL,
+            'fallback': Fallback.FAIL.value,
             'sponsorblock_categories': data_categories,
             'sub_langs': 'en',
         }
@@ -346,7 +347,7 @@ class FrontEndTestCase(TestCase):
             source_acodec=Source.SOURCE_ACODEC_OPUS,
             prefer_60fps=False,
             prefer_hdr=False,
-            fallback=Source.FALLBACK_FAIL
+            fallback=Fallback.FAIL.value
         )
         # Add some media
         test_minimal_metadata = '''
@@ -528,7 +529,7 @@ class FilepathTestCase(TestCase):
             source_acodec=Source.SOURCE_ACODEC_OPUS,
             prefer_60fps=False,
             prefer_hdr=False,
-            fallback=Source.FALLBACK_FAIL
+            fallback=Fallback.FAIL.value
         )
         # Add some test media
         self.media = Media.objects.create(
@@ -688,7 +689,7 @@ class MediaTestCase(TestCase):
             source_acodec=Source.SOURCE_ACODEC_OPUS,
             prefer_60fps=False,
             prefer_hdr=False,
-            fallback=Source.FALLBACK_FAIL
+            fallback=Fallback.FAIL.value
         )
         # Add some test media
         self.media = Media.objects.create(
@@ -761,7 +762,7 @@ class MediaFilterTestCase(TestCase):
             source_acodec=Source.SOURCE_ACODEC_OPUS,
             prefer_60fps=False,
             prefer_hdr=False,
-            fallback=Source.FALLBACK_FAIL,
+            fallback=Fallback.FAIL.value,
         )
         # Add some test media
         self.media = Media.objects.create(
@@ -930,7 +931,7 @@ class FormatMatchingTestCase(TestCase):
             source_acodec=Source.SOURCE_ACODEC_OPUS,
             prefer_60fps=False,
             prefer_hdr=False,
-            fallback=Source.FALLBACK_FAIL
+            fallback=Fallback.FAIL.value
         )
         # Add some media
         self.media = Media.objects.create(
@@ -940,7 +941,7 @@ class FormatMatchingTestCase(TestCase):
         )
 
     def test_combined_exact_format_matching(self):
-        self.source.fallback = Source.FALLBACK_FAIL
+        self.source.fallback = Fallback.FAIL.value
         self.media.metadata = all_test_metadata['boring']
         self.media.save()
         expected_matches = {
@@ -1070,7 +1071,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expected_match_type)
 
     def test_audio_exact_format_matching(self):
-        self.source.fallback = Source.FALLBACK_FAIL
+        self.source.fallback = Fallback.FAIL.value
         self.media.metadata = all_test_metadata['boring']
         self.media.save()
         expected_matches = {
@@ -1216,7 +1217,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
 
     def test_video_exact_format_matching(self):
-        self.source.fallback = Source.FALLBACK_FAIL
+        self.source.fallback = Fallback.FAIL.value
         # Test no 60fps, no HDR metadata
         self.media.metadata = all_test_metadata['boring']
         self.media.save()
@@ -1426,7 +1427,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
 
     def test_video_next_best_format_matching(self):
-        self.source.fallback = Source.FALLBACK_NEXT_BEST
+        self.source.fallback = Fallback.NEXT_BEST.value
         # Test no 60fps, no HDR metadata
         self.media.metadata = all_test_metadata['boring']
         self.media.save()
@@ -1748,7 +1749,7 @@ class ResponseFilteringTestCase(TestCase):
             source_acodec=Source.SOURCE_ACODEC_OPUS,
             prefer_60fps=False,
             prefer_hdr=False,
-            fallback=Source.FALLBACK_FAIL
+            fallback=Fallback.FAIL.value
         )
         # Add some media
         self.media = Media.objects.create(
