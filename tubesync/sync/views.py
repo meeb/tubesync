@@ -31,7 +31,7 @@ from .utils import validate_url, delete_file
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
                     delete_task_by_media, index_source_task)
-from .choices import YouTube_SourceType, youtube_long_source_types
+from .choices import (YouTube_SourceType, youtube_long_source_types, youtube_validation_urls)
 from . import signals
 from . import youtube
 
@@ -196,40 +196,7 @@ class ValidateSourceView(FormView):
         Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: ('https://www.youtube.com/playlist?list='
                                               'PL590L5WQmH8dpP0RyH5pCfIaDEdt9nk7r')
     }
-    _youtube_domains = frozenset({
-        'youtube.com',
-        'm.youtube.com',
-        'www.youtube.com',
-    })
-    validation_urls = {
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL: {
-            'scheme': 'https',
-            'domains': _youtube_domains,
-            'path_regex': '^\/(c\/)?([^\/]+)(\/videos)?$',
-            'path_must_not_match': ('/playlist', '/c/playlist'),
-            'qs_args': [],
-            'extract_key': ('path_regex', 1),
-            'example': 'https://www.youtube.com/SOMECHANNEL'
-        },
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: {
-            'scheme': 'https',
-            'domains': _youtube_domains,
-            'path_regex': '^\/channel\/([^\/]+)(\/videos)?$',
-            'path_must_not_match': ('/playlist', '/c/playlist'),
-            'qs_args': [],
-            'extract_key': ('path_regex', 0),
-            'example': 'https://www.youtube.com/channel/CHANNELID'
-        },
-        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: {
-            'scheme': 'https',
-            'domains': _youtube_domains,
-            'path_regex': '^\/(playlist|watch)$',
-            'path_must_not_match': (),
-            'qs_args': ('list',),
-            'extract_key': ('qs_args', 'list'),
-            'example': 'https://www.youtube.com/playlist?list=PLAYLISTID'
-        },
-    }
+    validation_urls = youtube_validation_urls
     prepopulate_fields = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: ('source_type', 'key', 'name', 'directory'),
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: ('source_type', 'key'),
