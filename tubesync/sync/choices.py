@@ -87,7 +87,7 @@ for name in SourceResolution.names:
     if name.endswith('0P'):
         value = SourceResolution.__dict__.get(name, None)
         if isinstance(value, Enum):
-            value = int(value.value)
+            value = int(value.value[: -1])
             SourceResolutionInteger.update({name: value})
 
 
