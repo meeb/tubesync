@@ -26,7 +26,7 @@ from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
 from .fields import CommaSepChoiceField
-from .choices import (CapChoices, IndexSchedule, MediaServerType,
+from .choices import (CapChoices, Fallback, IndexSchedule, MediaServerType,
                         SponsorBlock_Category, YouTube_SourceType)
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
@@ -91,15 +91,9 @@ class Source(models.Model):
         (SOURCE_ACODEC_OPUS, _('OPUS')),
     )
 
-    FALLBACK_FAIL = 'f'
-    FALLBACK_NEXT_BEST = 'n'
-    FALLBACK_NEXT_BEST_HD = 'h'
-    FALLBACKS = (FALLBACK_FAIL, FALLBACK_NEXT_BEST, FALLBACK_NEXT_BEST_HD)
-    FALLBACK_CHOICES = (
-        (FALLBACK_FAIL, _('Fail, do not download any media')),
-        (FALLBACK_NEXT_BEST, _('Get next best resolution or codec instead')),
-        (FALLBACK_NEXT_BEST_HD, _('Get next best resolution but at least HD'))
-    )
+    FALLBACK_FAIL = Fallback.FAIL.value
+    FALLBACK_NEXT_BEST = Fallback.NEXT_BEST.value
+    FALLBACK_NEXT_BEST_HD = Fallback.NEXT_BEST_HD.value
 
     FILTER_SECONDS_CHOICES = (
         (True, _('Minimum Length')),
@@ -335,8 +329,8 @@ class Source(models.Model):
         _('fallback'),
         max_length=1,
         db_index=True,
-        choices=FALLBACK_CHOICES,
-        default=FALLBACK_NEXT_BEST_HD,
+        choices=Fallback.choices,
+        default=Fallback.NEXT_BEST_HD,
         help_text=_('What do do when media in your source resolution and codecs is not available')
     )
     copy_channel_images = models.BooleanField(
