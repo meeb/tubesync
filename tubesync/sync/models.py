@@ -39,7 +39,6 @@ class Source(models.Model):
     SOURCE_TYPE_YOUTUBE_CHANNEL = YouTube_SourceType.CHANNEL.value
     SOURCE_TYPE_YOUTUBE_CHANNEL_ID = YouTube_SourceType.CHANNEL_ID.value
     SOURCE_TYPE_YOUTUBE_PLAYLIST = YouTube_SourceType.PLAYLIST.value
-    SOURCE_TYPES = YouTube_SourceType.values
 
     SOURCE_RESOLUTION_360P = '360p'
     SOURCE_RESOLUTION_480P = '480p'
