@@ -27,6 +27,7 @@ from .matching import (get_best_combined_format, get_best_audio_format,
 from .mediaservers import PlexMediaServer
 from .fields import CommaSepChoiceField
 from .choices import (CapChoices, Fallback, IndexSchedule, MediaServerType,
+                        SourceResolution, SourceResolutionInteger,
                         SponsorBlock_Category, YouTube_SourceType)
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
@@ -41,37 +42,10 @@ class Source(models.Model):
     SOURCE_TYPE_YOUTUBE_CHANNEL_ID = YouTube_SourceType.CHANNEL_ID.value
     SOURCE_TYPE_YOUTUBE_PLAYLIST = YouTube_SourceType.PLAYLIST.value
 
-    SOURCE_RESOLUTION_360P = '360p'
-    SOURCE_RESOLUTION_480P = '480p'
-    SOURCE_RESOLUTION_720P = '720p'
-    SOURCE_RESOLUTION_1080P = '1080p'
-    SOURCE_RESOLUTION_1440P = '1440p'
-    SOURCE_RESOLUTION_2160P = '2160p'
-    SOURCE_RESOLUTION_4320P = '4320p'
-    SOURCE_RESOLUTION_AUDIO = 'audio'
-    SOURCE_RESOLUTIONS = (SOURCE_RESOLUTION_360P, SOURCE_RESOLUTION_480P,
-                          SOURCE_RESOLUTION_720P, SOURCE_RESOLUTION_1080P,
-                          SOURCE_RESOLUTION_1440P, SOURCE_RESOLUTION_2160P,
-                          SOURCE_RESOLUTION_4320P, SOURCE_RESOLUTION_AUDIO)
-    SOURCE_RESOLUTION_CHOICES = (
-        (SOURCE_RESOLUTION_360P, _('360p (SD)')),
-        (SOURCE_RESOLUTION_480P, _('480p (SD)')),
-        (SOURCE_RESOLUTION_720P, _('720p (HD)')),
-        (SOURCE_RESOLUTION_1080P, _('1080p (Full HD)')),
-        (SOURCE_RESOLUTION_1440P, _('1440p (2K)')),
-        (SOURCE_RESOLUTION_2160P, _('2160p (4K)')),
-        (SOURCE_RESOLUTION_4320P, _('4320p (8K)')),
-        (SOURCE_RESOLUTION_AUDIO, _('Audio only')),
-    )
-    RESOLUTION_MAP = {
-        SOURCE_RESOLUTION_360P: 360,
-        SOURCE_RESOLUTION_480P: 480,
-        SOURCE_RESOLUTION_720P: 720,
-        SOURCE_RESOLUTION_1080P: 1080,
-        SOURCE_RESOLUTION_1440P: 1440,
-        SOURCE_RESOLUTION_2160P: 2160,
-        SOURCE_RESOLUTION_4320P: 4320,
-    }
+    SOURCE_RESOLUTION_1080P = SourceResolution.VIDEO_1080P.value
+    SOURCE_RESOLUTION_AUDIO = SourceResolution.AUDIO.value
+    SOURCE_RESOLUTIONS = SourceResolution.values
+    RESOLUTION_MAP = SourceResolutionInteger
 
     SOURCE_VCODEC_AVC1 = 'AVC1'
     SOURCE_VCODEC_VP9 = 'VP9'
@@ -295,8 +269,8 @@ class Source(models.Model):
         _('source resolution'),
         max_length=8,
         db_index=True,
-        choices=SOURCE_RESOLUTION_CHOICES,
-        default=SOURCE_RESOLUTION_1080P,
+        choices=SourceResolution.choices,
+        default=SourceResolution.VIDEO_1080P,
         help_text=_('Source resolution, desired video resolution to download')
     )
     source_vcodec = models.CharField(
@@ -401,7 +375,7 @@ class Source(models.Model):
 
     @property
     def is_audio(self):
-        return self.source_resolution == self.SOURCE_RESOLUTION_AUDIO
+        return self.source_resolution == SourceResolution.AUDIO.value
 
     @property
     def is_video(self):
@@ -461,7 +435,7 @@ class Source(models.Model):
 
     @property
     def format_summary(self):
-        if self.source_resolution == Source.SOURCE_RESOLUTION_AUDIO:
+        if self.source_resolution == SourceResolution.AUDIO.value:
             vc = 'none'
         else:
             vc = self.source_vcodec
@@ -478,7 +452,7 @@ class Source(models.Model):
     @property
     def type_directory_path(self):
         if settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX:
-            if self.source_resolution == self.SOURCE_RESOLUTION_AUDIO:
+            if self.source_resolution == SourceResolution.AUDIO.value:
                 return Path(settings.DOWNLOAD_AUDIO_DIR) / self.directory
             else:
                 return Path(settings.DOWNLOAD_VIDEO_DIR) / self.directory
