@@ -83,8 +83,13 @@ class SourceResolution(models.TextChoices):
 SourceResolutionInteger = dict()
 for name in SourceResolution.names:
     if name.endswith('0P'):
-        value = SourceResolution.__getattr__(name).value[: -1]
-        SourceResolutionInteger.update({name: int(value)})
+        value = None
+        try:
+            value = SourceResolution.__getattr__(name).value[: -1]
+        except AttributeError:
+            value = name[6:-1]
+        if value is not None:
+            SourceResolutionInteger.update({name: int(value)})
 
 
 # as stolen from:
@@ -165,7 +170,7 @@ youtube_validation_urls = {
     YouTube_SourceType.CHANNEL.value: {
         'scheme': 'https',
         'domains': DOMAINS['youtube'],
-        'path_regex': '^\/(c\/)?([^\/]+)(\/videos)?$',
+        'path_regex': r'^\/(c\/)?([^\/]+)(\/videos)?$',
         'path_must_not_match': ('/playlist', '/c/playlist'),
         'qs_args': [],
         'extract_key': ('path_regex', 1),
@@ -174,7 +179,7 @@ youtube_validation_urls = {
     YouTube_SourceType.CHANNEL_ID.value: {
         'scheme': 'https',
         'domains': DOMAINS['youtube'],
-        'path_regex': '^\/channel\/([^\/]+)(\/videos)?$',
+        'path_regex': r'^\/channel\/([^\/]+)(\/videos)?$',
         'path_must_not_match': ('/playlist', '/c/playlist'),
         'qs_args': [],
         'extract_key': ('path_regex', 0),
@@ -183,7 +188,7 @@ youtube_validation_urls = {
     YouTube_SourceType.PLAYLIST.value: {
         'scheme': 'https',
         'domains': DOMAINS['youtube'],
-        'path_regex': '^\/(playlist|watch)$',
+        'path_regex': r'^\/(playlist|watch)$',
         'path_must_not_match': (),
         'qs_args': ('list',),
         'extract_key': ('qs_args', 'list'),
