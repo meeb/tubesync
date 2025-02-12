@@ -13,6 +13,13 @@ DOMAINS = dict({
 })
 
 
+def V(*args):
+    results = list(
+        a.value if isinstance(a, models.enums.Choices) else a for a in args
+    )
+    return results.pop(0) if 1 == len(results) else (*results,)
+
+
 class CapChoices(models.IntegerChoices):
     CAP_NOCAP = 0, _('No cap')
     CAP_7DAYS = 604800, _('1 week (7 days)')
