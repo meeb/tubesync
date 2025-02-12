@@ -19,6 +19,7 @@ from .models import Source, Media
 from .tasks import cleanup_old_media
 from .filtering import filter_media
 from .utils import filter_response
+from .choices import IndexSchedule
 
 
 class FrontEndTestCase(TestCase):
@@ -239,7 +240,7 @@ class FrontEndTestCase(TestCase):
             'download_cap': 0,
             'filter_text': '.*',
             'filter_seconds_min': True,
-            'index_schedule': Source.IndexSchedule.EVERY_HOUR,
+            'index_schedule': IndexSchedule.EVERY_HOUR,
             'delete_old_media': False,
             'days_to_keep': 14,
             'source_resolution': Source.SOURCE_RESOLUTION_1080P,
@@ -276,7 +277,7 @@ class FrontEndTestCase(TestCase):
             'download_cap': 0,
             'filter_text': '.*',
             'filter_seconds_min': True,
-            'index_schedule': Source.IndexSchedule.EVERY_2_HOURS,  # changed
+            'index_schedule': IndexSchedule.EVERY_2_HOURS,  # changed
             'delete_old_media': False,
             'days_to_keep': 14,
             'source_resolution': Source.SOURCE_RESOLUTION_1080P,
@@ -342,7 +343,7 @@ class FrontEndTestCase(TestCase):
             key='testkey',
             name='testname',
             directory='testdirectory',
-            index_schedule=Source.IndexSchedule.EVERY_HOUR,
+            index_schedule=IndexSchedule.EVERY_HOUR,
             delete_old_media=False,
             days_to_keep=14,
             source_resolution=Source.SOURCE_RESOLUTION_1080P,
