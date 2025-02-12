@@ -206,11 +206,11 @@ def normalize_codec(codec_str):
 def list_of_dictionaries(arg_list, arg_function=lambda x: x):
     assert callable(arg_function)
     if isinstance(arg_list, list):
-        def _assert_and_call(arg_dict):
+        def _call_func_with_dict(arg_dict):
             if isinstance(arg_dict, dict):
                 return arg_function(arg_dict)
             return arg_dict
-        return (True, list(map(_assert_and_call, arg_list)),)
+        return (True, list(map(_call_func_with_dict, arg_list)),)
     return (False, arg_list,)
 
 

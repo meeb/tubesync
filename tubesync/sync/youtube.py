@@ -143,6 +143,7 @@ def get_media_info(url):
         'simulate': True,
         'logger': log,
         'extract_flat': True,
+        'extractor_args': {'youtubetab': {'approximate_date': ['true']}},
     })
     response = {}
     with yt_dlp.YoutubeDL(opts) as y:
@@ -224,6 +225,10 @@ def download_media(
         'sponskrub': False,
     })
 
+    pp_opts.exec_cmd.update(
+        opts.get('exec_cmd', default_opts.exec_cmd)
+    )
+
     if skip_sponsors:
         # Let yt_dlp convert from human for us.
         pp_opts.sponsorblock_mark = yt_dlp.parse_options(
@@ -242,7 +247,7 @@ def download_media(
         'writesubtitles': write_subtitles,
         'writeautomaticsub': auto_subtitles,
         'subtitleslangs': sub_langs.split(','),
-        'writethumbnail': True,
+        'writethumbnail': embed_thumbnail,
         'check_formats': False,
         'overwrites': None,
         'sleep_interval': 10 + int(settings.DOWNLOAD_MEDIA_DELAY / 20),

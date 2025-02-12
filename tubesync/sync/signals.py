@@ -14,7 +14,7 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     map_task_to_instance, check_source_directory_exists,
                     download_media, rescan_media_server, download_source_images,
                     save_all_media_for_source, rename_all_media_for_source,
-                    get_media_metadata_task)
+                    get_media_metadata_task, get_media_download_task)
 from .utils import delete_file, glob_quote
 from .filtering import filter_media
 
@@ -156,8 +156,9 @@ def media_post_save(sender, instance, created, **kwargs):
         post_save.disconnect(media_post_save, sender=Media)
         instance.save()
         post_save.connect(media_post_save, sender=Media)
+    existing_media_metadata_task = get_media_metadata_task(str(instance.pk))
     # If the media is missing metadata schedule it to be downloaded
-    if not instance.metadata and not instance.skip and not get_media_metadata_task(instance.pk):
+    if not (instance.skip or instance.metadata or existing_media_metadata_task):
         log.info(f'Scheduling task to download metadata for: {instance.url}')
         verbose_name = _('Downloading metadata for "{}"')
         download_media_metadata(
@@ -183,13 +184,13 @@ def media_post_save(sender, instance, created, **kwargs):
                 verbose_name=verbose_name.format(instance.name),
                 remove_existing_tasks=True
             )
+    existing_media_download_task = get_media_download_task(str(instance.pk))
     # If the media has not yet been downloaded schedule it to be downloaded
-    if not instance.media_file_exists:
+    if not (instance.media_file_exists or existing_media_download_task):
         instance.downloaded = False
         instance.media_file = None
-    if (not instance.downloaded and instance.can_download and not instance.skip
-        and instance.source.download_media):
-        delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
+    if (instance.source.download_media and instance.can_download) and not (
+        instance.skip or instance.downloaded or existing_media_download_task):
         verbose_name = _('Downloading media for "{}"')
         download_media(
             str(instance.pk),
@@ -225,6 +226,11 @@ def media_post_delete(sender, instance, **kwargs):
             other_path = video_path.with_suffix(f'.{suffix}').resolve()
             log.info(f'Deleting file for: {instance} path: {other_path!s}')
             delete_file(other_path)
+        # subtitles include language code
+        subtitle_files = video_path.parent.glob(f'{glob_quote(video_path.with_suffix("").name)}*.vtt')
+        for file in subtitle_files:
+            log.info(f'Deleting file for: {instance} path: {file}')
+            delete_file(file)
         # Jellyfin creates .trickplay directories and posters
         for suffix in frozenset(('.trickplay', '-poster.jpg', '-poster.webp',)):
             # with_suffix insists on suffix beginning with '.' for no good reason
