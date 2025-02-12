@@ -45,7 +45,6 @@ class Source(models.Model):
     SOURCE_RESOLUTION_1080P = SourceResolution.VIDEO_1080P.value
     SOURCE_RESOLUTION_AUDIO = SourceResolution.AUDIO.value
     SOURCE_RESOLUTIONS = SourceResolution.values
-    RESOLUTION_MAP = SourceResolutionInteger
 
     SOURCE_VCODEC_AVC1 = 'AVC1'
     SOURCE_VCODEC_VP9 = 'VP9'
@@ -480,7 +479,7 @@ class Source(models.Model):
 
     @property
     def source_resolution_height(self):
-        return self.RESOLUTION_MAP.get(self.source_resolution, 0)
+        return SourceResolutionInteger.get(self.source_resolution, 0)
 
     @property
     def can_fallback(self):
