@@ -5,6 +5,7 @@
 '''
 
 
+from .choices import Fallback
 from .utils import multi_key_sort
 from django.conf import settings
 
@@ -389,10 +390,10 @@ def get_best_video_format(media):
             return True, best_match['id']
         elif media.source.can_fallback:
             # Allow the fallback if it meets requirements
-            if (media.source.fallback == media.source.FALLBACK_NEXT_BEST_HD and
+            if (media.source.fallback == Fallback.NEXT_BEST_HD.value and
                 best_match['height'] >= fallback_hd_cutoff):
                 return False, best_match['id']
-            elif media.source.fallback == media.source.FALLBACK_NEXT_BEST:
+            elif media.source.fallback == Fallback.NEXT_BEST.value:
                 return False, best_match['id']
     # Nope, failed to find match
     return False, False
