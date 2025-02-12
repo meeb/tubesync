@@ -19,7 +19,7 @@ from .models import Source, Media
 from .tasks import cleanup_old_media
 from .filtering import filter_media
 from .utils import filter_response
-from .choices import (Fallback, IndexSchedule,
+from .choices import (Fallback, IndexSchedule, SourceResolution,
                         youtube_long_source_types)
 
 
@@ -239,7 +239,7 @@ class FrontEndTestCase(TestCase):
             'index_schedule': IndexSchedule.EVERY_HOUR,
             'delete_old_media': False,
             'days_to_keep': 14,
-            'source_resolution': Source.SOURCE_RESOLUTION_1080P,
+            'source_resolution': SourceResolution.VIDEO_1080P.value,
             'source_vcodec': Source.SOURCE_VCODEC_VP9,
             'source_acodec': Source.SOURCE_ACODEC_OPUS,
             'prefer_60fps': False,
@@ -276,7 +276,7 @@ class FrontEndTestCase(TestCase):
             'index_schedule': IndexSchedule.EVERY_2_HOURS,  # changed
             'delete_old_media': False,
             'days_to_keep': 14,
-            'source_resolution': Source.SOURCE_RESOLUTION_1080P,
+            'source_resolution': SourceResolution.VIDEO_1080P.value,
             'source_vcodec': Source.SOURCE_VCODEC_VP9,
             'source_acodec': Source.SOURCE_ACODEC_OPUS,
             'prefer_60fps': False,
@@ -342,7 +342,7 @@ class FrontEndTestCase(TestCase):
             index_schedule=IndexSchedule.EVERY_HOUR,
             delete_old_media=False,
             days_to_keep=14,
-            source_resolution=Source.SOURCE_RESOLUTION_1080P,
+            source_resolution=SourceResolution.VIDEO_1080P.value,
             source_vcodec=Source.SOURCE_VCODEC_VP9,
             source_acodec=Source.SOURCE_ACODEC_OPUS,
             prefer_60fps=False,
@@ -524,7 +524,7 @@ class FilepathTestCase(TestCase):
             index_schedule=3600,
             delete_old_media=False,
             days_to_keep=14,
-            source_resolution=Source.SOURCE_RESOLUTION_1080P,
+            source_resolution=SourceResolution.VIDEO_1080P.value,
             source_vcodec=Source.SOURCE_VCODEC_VP9,
             source_acodec=Source.SOURCE_ACODEC_OPUS,
             prefer_60fps=False,
@@ -655,11 +655,11 @@ class FilepathTestCase(TestCase):
         self.assertTrue(isinstance(settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX, bool))
         # Test the default behavior for "True", forced "audio" or "video" parent directories for sources
         settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX = True
-        self.source.source_resolution = Source.SOURCE_RESOLUTION_AUDIO
+        self.source.source_resolution = SourceResolution.AUDIO.value
         test_audio_prefix_path = Path(self.source.directory_path)
         self.assertEqual(test_audio_prefix_path.parts[-2], 'audio')
         self.assertEqual(test_audio_prefix_path.parts[-1], 'testdirectory')
-        self.source.source_resolution = Source.SOURCE_RESOLUTION_1080P
+        self.source.source_resolution = SourceResolution.VIDEO_1080P.value
         test_video_prefix_path = Path(self.source.directory_path)
         self.assertEqual(test_video_prefix_path.parts[-2], 'video')
         self.assertEqual(test_video_prefix_path.parts[-1], 'testdirectory')
@@ -684,7 +684,7 @@ class MediaTestCase(TestCase):
             index_schedule=3600,
             delete_old_media=False,
             days_to_keep=14,
-            source_resolution=Source.SOURCE_RESOLUTION_1080P,
+            source_resolution=SourceResolution.VIDEO_1080P.value,
             source_vcodec=Source.SOURCE_VCODEC_VP9,
             source_acodec=Source.SOURCE_ACODEC_OPUS,
             prefer_60fps=False,
@@ -757,7 +757,7 @@ class MediaFilterTestCase(TestCase):
             index_schedule=3600,
             delete_old_media=False,
             days_to_keep=14,
-            source_resolution=Source.SOURCE_RESOLUTION_1080P,
+            source_resolution=SourceResolution.VIDEO_1080P.value,
             source_vcodec=Source.SOURCE_VCODEC_VP9,
             source_acodec=Source.SOURCE_ACODEC_OPUS,
             prefer_60fps=False,
@@ -926,7 +926,7 @@ class FormatMatchingTestCase(TestCase):
             index_schedule=3600,
             delete_old_media=False,
             days_to_keep=14,
-            source_resolution=Source.SOURCE_RESOLUTION_1080P,
+            source_resolution=SourceResolution.VIDEO_1080P.value,
             source_vcodec=Source.SOURCE_VCODEC_VP9,
             source_acodec=Source.SOURCE_ACODEC_OPUS,
             prefer_60fps=False,
@@ -1744,7 +1744,7 @@ class ResponseFilteringTestCase(TestCase):
             index_schedule=3600,
             delete_old_media=False,
             days_to_keep=14,
-            source_resolution=Source.SOURCE_RESOLUTION_1080P,
+            source_resolution=SourceResolution.VIDEO_1080P.value,
             source_vcodec=Source.SOURCE_VCODEC_VP9,
             source_acodec=Source.SOURCE_ACODEC_OPUS,
             prefer_60fps=False,
