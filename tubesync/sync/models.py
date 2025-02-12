@@ -25,7 +25,10 @@ from .utils import (seconds_to_timestr, parse_media_format, filter_response,
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
-from .fields import CommaSepChoiceField, SponsorBlock_Category
+from .fields import CommaSepChoiceField
+from .choices import (CapChoices, Fallback, IndexSchedule, MediaServerType,
+                        SourceResolution, SourceResolutionInteger,
+                        SponsorBlock_Category, YouTube_SourceType)
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 
@@ -35,48 +38,13 @@ class Source(models.Model):
         or a YouTube playlist.
     '''
 
-    SOURCE_TYPE_YOUTUBE_CHANNEL = 'c'
-    SOURCE_TYPE_YOUTUBE_CHANNEL_ID = 'i'
-    SOURCE_TYPE_YOUTUBE_PLAYLIST = 'p'
-    SOURCE_TYPES = (SOURCE_TYPE_YOUTUBE_CHANNEL, SOURCE_TYPE_YOUTUBE_CHANNEL_ID,
-                    SOURCE_TYPE_YOUTUBE_PLAYLIST)
-    SOURCE_TYPE_CHOICES = (
-        (SOURCE_TYPE_YOUTUBE_CHANNEL, _('YouTube channel')),
-        (SOURCE_TYPE_YOUTUBE_CHANNEL_ID, _('YouTube channel by ID')),
-        (SOURCE_TYPE_YOUTUBE_PLAYLIST, _('YouTube playlist')),
-    )
+    SOURCE_TYPE_YOUTUBE_CHANNEL = YouTube_SourceType.CHANNEL.value
+    SOURCE_TYPE_YOUTUBE_CHANNEL_ID = YouTube_SourceType.CHANNEL_ID.value
+    SOURCE_TYPE_YOUTUBE_PLAYLIST = YouTube_SourceType.PLAYLIST.value
 
-    SOURCE_RESOLUTION_360P = '360p'
-    SOURCE_RESOLUTION_480P = '480p'
-    SOURCE_RESOLUTION_720P = '720p'
-    SOURCE_RESOLUTION_1080P = '1080p'
-    SOURCE_RESOLUTION_1440P = '1440p'
-    SOURCE_RESOLUTION_2160P = '2160p'
-    SOURCE_RESOLUTION_4320P = '4320p'
-    SOURCE_RESOLUTION_AUDIO = 'audio'
-    SOURCE_RESOLUTIONS = (SOURCE_RESOLUTION_360P, SOURCE_RESOLUTION_480P,
-                          SOURCE_RESOLUTION_720P, SOURCE_RESOLUTION_1080P,
-                          SOURCE_RESOLUTION_1440P, SOURCE_RESOLUTION_2160P,
-                          SOURCE_RESOLUTION_4320P, SOURCE_RESOLUTION_AUDIO)
-    SOURCE_RESOLUTION_CHOICES = (
-        (SOURCE_RESOLUTION_360P, _('360p (SD)')),
-        (SOURCE_RESOLUTION_480P, _('480p (SD)')),
-        (SOURCE_RESOLUTION_720P, _('720p (HD)')),
-        (SOURCE_RESOLUTION_1080P, _('1080p (Full HD)')),
-        (SOURCE_RESOLUTION_1440P, _('1440p (2K)')),
-        (SOURCE_RESOLUTION_2160P, _('2160p (4K)')),
-        (SOURCE_RESOLUTION_4320P, _('4320p (8K)')),
-        (SOURCE_RESOLUTION_AUDIO, _('Audio only')),
-    )
-    RESOLUTION_MAP = {
-        SOURCE_RESOLUTION_360P: 360,
-        SOURCE_RESOLUTION_480P: 480,
-        SOURCE_RESOLUTION_720P: 720,
-        SOURCE_RESOLUTION_1080P: 1080,
-        SOURCE_RESOLUTION_1440P: 1440,
-        SOURCE_RESOLUTION_2160P: 2160,
-        SOURCE_RESOLUTION_4320P: 4320,
-    }
+    SOURCE_RESOLUTION_1080P = SourceResolution.VIDEO_1080P.value
+    SOURCE_RESOLUTION_AUDIO = SourceResolution.AUDIO.value
+    SOURCE_RESOLUTIONS = SourceResolution.values
 
     SOURCE_VCODEC_AVC1 = 'AVC1'
     SOURCE_VCODEC_VP9 = 'VP9'
@@ -96,15 +64,9 @@ class Source(models.Model):
         (SOURCE_ACODEC_OPUS, _('OPUS')),
     )
 
-    FALLBACK_FAIL = 'f'
-    FALLBACK_NEXT_BEST = 'n'
-    FALLBACK_NEXT_BEST_HD = 'h'
-    FALLBACKS = (FALLBACK_FAIL, FALLBACK_NEXT_BEST, FALLBACK_NEXT_BEST_HD)
-    FALLBACK_CHOICES = (
-        (FALLBACK_FAIL, _('Fail, do not download any media')),
-        (FALLBACK_NEXT_BEST, _('Get next best resolution or codec instead')),
-        (FALLBACK_NEXT_BEST_HD, _('Get next best resolution but at least HD'))
-    )
+    FALLBACK_FAIL = Fallback.FAIL.value
+    FALLBACK_NEXT_BEST = Fallback.NEXT_BEST.value
+    FALLBACK_NEXT_BEST_HD = Fallback.NEXT_BEST_HD.value
 
     FILTER_SECONDS_CHOICES = (
         (True, _('Minimum Length')),
@@ -173,31 +135,6 @@ class Source(models.Model):
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'id',
     }
 
-    class CapChoices(models.IntegerChoices):
-        CAP_NOCAP = 0, _('No cap')
-        CAP_7DAYS = 604800, _('1 week (7 days)')
-        CAP_30DAYS = 2592000, _('1 month (30 days)')
-        CAP_90DAYS = 7776000, _('3 months (90 days)')
-        CAP_6MONTHS = 15552000, _('6 months (180 days)')
-        CAP_1YEAR = 31536000, _('1 year (365 days)')
-        CAP_2YEARs = 63072000, _('2 years (730 days)')
-        CAP_3YEARs = 94608000, _('3 years (1095 days)')
-        CAP_5YEARs = 157680000, _('5 years (1825 days)')
-        CAP_10YEARS = 315360000, _('10 years (3650 days)')
-
-    class IndexSchedule(models.IntegerChoices):
-        EVERY_HOUR = 3600, _('Every hour')
-        EVERY_2_HOURS = 7200, _('Every 2 hours')
-        EVERY_3_HOURS = 10800, _('Every 3 hours')
-        EVERY_4_HOURS = 14400, _('Every 4 hours')
-        EVERY_5_HOURS = 18000, _('Every 5 hours')
-        EVERY_6_HOURS = 21600, _('Every 6 hours')
-        EVERY_12_HOURS = 43200, _('Every 12 hours')
-        EVERY_24_HOURS = 86400, _('Every 24 hours')
-        EVERY_3_DAYS = 259200, _('Every 3 days')
-        EVERY_7_DAYS = 604800, _('Every 7 days')
-        NEVER = 0, _('Never')
-
     uuid = models.UUIDField(
         _('uuid'),
         primary_key=True,
@@ -222,8 +159,8 @@ class Source(models.Model):
         _('source type'),
         max_length=1,
         db_index=True,
-        choices=SOURCE_TYPE_CHOICES,
-        default=SOURCE_TYPE_YOUTUBE_CHANNEL,
+        choices=YouTube_SourceType.choices,
+        default=YouTube_SourceType.CHANNEL,
         help_text=_('Source type')
     )
     key = models.CharField(
@@ -331,8 +268,8 @@ class Source(models.Model):
         _('source resolution'),
         max_length=8,
         db_index=True,
-        choices=SOURCE_RESOLUTION_CHOICES,
-        default=SOURCE_RESOLUTION_1080P,
+        choices=SourceResolution.choices,
+        default=SourceResolution.VIDEO_1080P,
         help_text=_('Source resolution, desired video resolution to download')
     )
     source_vcodec = models.CharField(
@@ -365,8 +302,8 @@ class Source(models.Model):
         _('fallback'),
         max_length=1,
         db_index=True,
-        choices=FALLBACK_CHOICES,
-        default=FALLBACK_NEXT_BEST_HD,
+        choices=Fallback.choices,
+        default=Fallback.NEXT_BEST_HD,
         help_text=_('What do do when media in your source resolution and codecs is not available')
     )
     copy_channel_images = models.BooleanField(
@@ -437,7 +374,7 @@ class Source(models.Model):
 
     @property
     def is_audio(self):
-        return self.source_resolution == self.SOURCE_RESOLUTION_AUDIO
+        return self.source_resolution == SourceResolution.AUDIO.value
 
     @property
     def is_video(self):
@@ -497,7 +434,7 @@ class Source(models.Model):
 
     @property
     def format_summary(self):
-        if self.source_resolution == Source.SOURCE_RESOLUTION_AUDIO:
+        if self.source_resolution == SourceResolution.AUDIO.value:
             vc = 'none'
         else:
             vc = self.source_vcodec
@@ -514,7 +451,7 @@ class Source(models.Model):
     @property
     def type_directory_path(self):
         if settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX:
-            if self.source_resolution == self.SOURCE_RESOLUTION_AUDIO:
+            if self.source_resolution == SourceResolution.AUDIO.value:
                 return Path(settings.DOWNLOAD_AUDIO_DIR) / self.directory
             else:
                 return Path(settings.DOWNLOAD_VIDEO_DIR) / self.directory
@@ -542,7 +479,7 @@ class Source(models.Model):
 
     @property
     def source_resolution_height(self):
-        return self.RESOLUTION_MAP.get(self.source_resolution, 0)
+        return SourceResolutionInteger.get(self.source_resolution, 0)
 
     @property
     def can_fallback(self):
@@ -1643,11 +1580,7 @@ class MediaServer(models.Model):
         A remote media server, such as a Plex server.
     '''
 
-    SERVER_TYPE_PLEX = 'p'
-    SERVER_TYPES = (SERVER_TYPE_PLEX,)
-    SERVER_TYPE_CHOICES = (
-        (SERVER_TYPE_PLEX, _('Plex')),
-    )
+    SERVER_TYPE_PLEX = MediaServerType.PLEX.value
     ICONS = {
         SERVER_TYPE_PLEX: '<i class="fas fa-server"></i>',
     }
@@ -1659,8 +1592,8 @@ class MediaServer(models.Model):
         _('server type'),
         max_length=1,
         db_index=True,
-        choices=SERVER_TYPE_CHOICES,
-        default=SERVER_TYPE_PLEX,
+        choices=MediaServerType.choices,
+        default=MediaServerType.PLEX,
         help_text=_('Server type')
     )
     host = models.CharField(
