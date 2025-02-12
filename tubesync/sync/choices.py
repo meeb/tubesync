@@ -83,14 +83,9 @@ class SourceResolution(models.TextChoices):
 
     @classmethod
     def _integer_mapping(cls):
-        filter_func = lambda s: s.lower().endswith('0p')
-        return dict(zip(
-            filter(filter_func, cls.names),
-            map(
-                lambda s: int(s[:-1], base=10),
-                filter(filter_func, cls.values)
-            )
-        ))
+        int_height = lambda s: int(s[:-1], base=10)
+        video = filter(lambda s: s.endswith('0p'), cls.values)
+        return dict(zip( video, map(int_height, video) ))
 
 
 # as stolen from:
