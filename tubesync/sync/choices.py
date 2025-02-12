@@ -1,5 +1,3 @@
-from enum import Enum
-
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -81,14 +79,19 @@ class SourceResolution(models.TextChoices):
     VIDEO_2160P = '2160p', _('4320p (8K)')
     VIDEO_4320P = '4320p', _('4320p (8K)')
 
+    @classmethod
+    def _integer_mapping(cls):
+        filter_func = lambda s: s.lower().endswith('0p')
+        return dict(zip(
+            filter(filter_func, cls.names),
+            map(
+                lambda s: int(s[:-1], base=10),
+                filter(filter_func, cls.values)
+            )
+        ))
 
-SourceResolutionInteger = dict()
-for name in SourceResolution.names:
-    if name.endswith('0P'):
-        value = SourceResolution.__dict__.get(name, None)
-        if isinstance(value, Enum):
-            value = int(value.value[: -1])
-            SourceResolutionInteger.update({name: value})
+
+SourceResolutionInteger = SourceResolution._integer_mapping()
 
 
 # as stolen from:
