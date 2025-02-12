@@ -26,6 +26,7 @@ from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
 from .fields import CommaSepChoiceField, SponsorBlock_Category
+from .choices import CapChoices, IndexSchedule, YouTube_SourceType
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 
@@ -35,16 +36,9 @@ class Source(models.Model):
         or a YouTube playlist.
     '''
 
-    SOURCE_TYPE_YOUTUBE_CHANNEL = 'c'
-    SOURCE_TYPE_YOUTUBE_CHANNEL_ID = 'i'
-    SOURCE_TYPE_YOUTUBE_PLAYLIST = 'p'
-    SOURCE_TYPES = (SOURCE_TYPE_YOUTUBE_CHANNEL, SOURCE_TYPE_YOUTUBE_CHANNEL_ID,
-                    SOURCE_TYPE_YOUTUBE_PLAYLIST)
-    SOURCE_TYPE_CHOICES = (
-        (SOURCE_TYPE_YOUTUBE_CHANNEL, _('YouTube channel')),
-        (SOURCE_TYPE_YOUTUBE_CHANNEL_ID, _('YouTube channel by ID')),
-        (SOURCE_TYPE_YOUTUBE_PLAYLIST, _('YouTube playlist')),
-    )
+    SOURCE_TYPE_YOUTUBE_CHANNEL = YouTube_SourceType.CHANNEL.value
+    SOURCE_TYPE_YOUTUBE_CHANNEL_ID = YouTube_SourceType.CHANNEL_ID.value
+    SOURCE_TYPE_YOUTUBE_PLAYLIST = YouTube_SourceType.PLAYLIST.value
 
     SOURCE_RESOLUTION_360P = '360p'
     SOURCE_RESOLUTION_480P = '480p'
@@ -173,31 +167,6 @@ class Source(models.Model):
         SOURCE_TYPE_YOUTUBE_PLAYLIST: 'id',
     }
 
-    class CapChoices(models.IntegerChoices):
-        CAP_NOCAP = 0, _('No cap')
-        CAP_7DAYS = 604800, _('1 week (7 days)')
-        CAP_30DAYS = 2592000, _('1 month (30 days)')
-        CAP_90DAYS = 7776000, _('3 months (90 days)')
-        CAP_6MONTHS = 15552000, _('6 months (180 days)')
-        CAP_1YEAR = 31536000, _('1 year (365 days)')
-        CAP_2YEARs = 63072000, _('2 years (730 days)')
-        CAP_3YEARs = 94608000, _('3 years (1095 days)')
-        CAP_5YEARs = 157680000, _('5 years (1825 days)')
-        CAP_10YEARS = 315360000, _('10 years (3650 days)')
-
-    class IndexSchedule(models.IntegerChoices):
-        EVERY_HOUR = 3600, _('Every hour')
-        EVERY_2_HOURS = 7200, _('Every 2 hours')
-        EVERY_3_HOURS = 10800, _('Every 3 hours')
-        EVERY_4_HOURS = 14400, _('Every 4 hours')
-        EVERY_5_HOURS = 18000, _('Every 5 hours')
-        EVERY_6_HOURS = 21600, _('Every 6 hours')
-        EVERY_12_HOURS = 43200, _('Every 12 hours')
-        EVERY_24_HOURS = 86400, _('Every 24 hours')
-        EVERY_3_DAYS = 259200, _('Every 3 days')
-        EVERY_7_DAYS = 604800, _('Every 7 days')
-        NEVER = 0, _('Never')
-
     uuid = models.UUIDField(
         _('uuid'),
         primary_key=True,
@@ -222,8 +191,8 @@ class Source(models.Model):
         _('source type'),
         max_length=1,
         db_index=True,
-        choices=SOURCE_TYPE_CHOICES,
-        default=SOURCE_TYPE_YOUTUBE_CHANNEL,
+        choices=YouTube_SourceType.choices,
+        default=YouTube_SourceType.CHANNEL,
         help_text=_('Source type')
     )
     key = models.CharField(

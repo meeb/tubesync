@@ -31,6 +31,7 @@ from .utils import validate_url, delete_file
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
                     delete_task_by_media, index_source_task)
+from .choices import YouTube_SourceType, youtube_long_source_types
 from . import signals
 from . import youtube
 
@@ -161,11 +162,7 @@ class ValidateSourceView(FormView):
         'invalid_url': _('Invalid URL, the URL must for a "{item}" must be in '
                          'the format of "{example}". The error was: {error}.'),
     }
-    source_types = {
-        'youtube-channel': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
-        'youtube-channel-id': Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID,
-        'youtube-playlist': Source.SOURCE_TYPE_YOUTUBE_PLAYLIST,
-    }
+    source_types = youtube_long_source_types
     help_item = {
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL: _('YouTube channel'),
         Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: _('YouTube channel ID'),
@@ -391,7 +388,7 @@ class AddSourceView(EditSourceMixin, CreateView):
 
     def dispatch(self, request, *args, **kwargs):
         source_type = request.GET.get('source_type', '')
-        if source_type and source_type in Source.SOURCE_TYPES:
+        if source_type and source_type in YouTube_SourceType.values:
             self.prepopulated_data['source_type'] = source_type
         key = request.GET.get('key', '')
         if key:
