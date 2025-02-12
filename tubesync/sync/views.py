@@ -31,6 +31,7 @@ from .utils import validate_url, delete_file
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
                     delete_task_by_media, index_source_task)
+from .choices import YouTube_SourceType
 from . import signals
 from . import youtube
 
@@ -391,7 +392,7 @@ class AddSourceView(EditSourceMixin, CreateView):
 
     def dispatch(self, request, *args, **kwargs):
         source_type = request.GET.get('source_type', '')
-        if source_type and source_type in Source.SOURCE_TYPES:
+        if source_type and source_type in YouTube_SourceType.values:
             self.prepopulated_data['source_type'] = source_type
         key = request.GET.get('key', '')
         if key:
