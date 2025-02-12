@@ -5,24 +5,6 @@ from django.db import connection, models
 from django.utils.translation import gettext_lazy as _
 
 
-# as stolen from:
-# - https://wiki.sponsor.ajay.app/w/Types
-# - https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/postprocessor/sponsorblock.py
-#
-# The spacing is a little odd, it is for easy copy/paste selection.
-# Please don't change it.
-# Every possible category fits in a string < 128 characters
-class SponsorBlock_Category(models.TextChoices):
-    SPONSOR = 'sponsor', _( 'Sponsor' )
-    INTRO = 'intro', _( 'Intermission/Intro Animation' )
-    OUTRO = 'outro', _( 'Endcards/Credits' )
-    SELFPROMO = 'selfpromo', _( 'Unpaid/Self Promotion' )
-    PREVIEW = 'preview', _( 'Preview/Recap' )
-    FILLER = 'filler', _( 'Filler Tangent' )
-    INTERACTION = 'interaction', _( 'Interaction Reminder' )
-    MUSIC_OFFTOPIC = 'music_offtopic', _( 'Non-Music Section' )
-
-
 CommaSepChoice = namedtuple(
     'CommaSepChoice', [
         'allow_all',
