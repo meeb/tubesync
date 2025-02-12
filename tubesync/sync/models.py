@@ -25,8 +25,8 @@ from .utils import (seconds_to_timestr, parse_media_format, filter_response,
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
-from .fields import CommaSepChoiceField, SponsorBlock_Category
-from .choices import CapChoices, IndexSchedule, YouTube_SourceType
+from .fields import CommaSepChoiceField
+from .choices import CapChoices, IndexSchedule, SponsorBlock_Category, YouTube_SourceType
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 
