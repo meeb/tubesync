@@ -41,14 +41,6 @@ class Source(models.Model):
         or a YouTube playlist.
     '''
 
-    SOURCE_TYPE_YOUTUBE_CHANNEL = V(YouTube_SourceType.CHANNEL)
-    SOURCE_TYPE_YOUTUBE_CHANNEL_ID = V(YouTube_SourceType.CHANNEL_ID)
-    SOURCE_TYPE_YOUTUBE_PLAYLIST = V(YouTube_SourceType.PLAYLIST)
-
-    SOURCE_RESOLUTION_1080P = V(SourceResolution.VIDEO_1080P)
-    SOURCE_RESOLUTION_AUDIO = V(SourceResolution.AUDIO)
-    SOURCE_RESOLUTIONS = SourceResolution.values
-
     SOURCE_VCODEC_VP9 = V(YouTube_VideoCodec.VP9)
     SOURCE_VCODEC_CHOICES = list(reversed(YouTube_VideoCodec.choices[1:]))
 
@@ -353,7 +345,11 @@ class Source(models.Model):
 
     @property
     def is_audio(self):
-        return self.source_resolution == V(SourceResolution.AUDIO)
+        return self.source_resolution == SourceResolution.AUDIO.value
+
+    @property
+    def is_playlist(self):
+        return self.source_type == YouTube_SourceType.PLAYLIST.value
 
     @property
     def is_video(self):
@@ -442,7 +438,7 @@ class Source(models.Model):
 
     @property
     def get_image_url(self):
-        if self.source_type == self.SOURCE_TYPE_YOUTUBE_PLAYLIST:
+        if self.is_playlist:
             raise SuspiciousOperation('This source is a playlist so it doesn\'t have thumbnail.')
 
         return get_youtube_channel_image_info(self.url)
@@ -536,7 +532,7 @@ class Source(models.Model):
         if self.index_videos:
             entries += self.get_index('videos')
         # Playlists do something different that I have yet to figure out
-        if self.source_type != Source.SOURCE_TYPE_YOUTUBE_PLAYLIST:
+        if not self.is_playlist:
             if self.index_streams:
                 entries += self.get_index('streams')
 
@@ -1239,7 +1235,7 @@ class Media(models.Model):
         nfo.append(showtitle)
         # season = upload date year
         season = nfo.makeelement('season', {})
-        if self.source.source_type == Source.SOURCE_TYPE_YOUTUBE_PLAYLIST:
+        if self.source.is_playlist:
             # If it's a playlist, set season to 1
             season.text = '1'
         else:
@@ -1388,7 +1384,7 @@ class Media(models.Model):
         return response
 
     def calculate_episode_number(self):
-        if self.source.source_type == Source.SOURCE_TYPE_YOUTUBE_PLAYLIST:
+        if self.source.is_playlist:
             sorted_media = Media.objects.filter(source=self.source)
         else:
             self_year = self.upload_date.year if self.upload_date else self.created.year
