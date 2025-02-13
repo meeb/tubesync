@@ -40,8 +40,6 @@ class Source(models.Model):
         or a YouTube playlist.
     '''
 
-    EXTENSIONS = FileExtension.values
-
     SOURCE_TYPE_YOUTUBE_CHANNEL = V(YouTube_SourceType.CHANNEL)
     SOURCE_TYPE_YOUTUBE_CHANNEL_ID = V(YouTube_SourceType.CHANNEL_ID)
     SOURCE_TYPE_YOUTUBE_PLAYLIST = V(YouTube_SourceType.PLAYLIST)
@@ -1567,7 +1565,6 @@ class MediaServer(models.Model):
         A remote media server, such as a Plex server.
     '''
 
-    SERVER_TYPE_PLEX = V(MediaServerType.PLEX)
     ICONS = {
         V(MediaServerType.PLEX): '<i class="fas fa-server"></i>',
     }
