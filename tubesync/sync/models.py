@@ -26,9 +26,11 @@ from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .mediaservers import PlexMediaServer
 from .fields import CommaSepChoiceField
-from .choices import (CapChoices, Fallback, IndexSchedule, MediaServerType,
+from .choices import (V, CapChoices, Fallback, FileExtension,
+                        IndexSchedule, MediaServerType,
                         SourceResolution, SourceResolutionInteger,
-                        SponsorBlock_Category, YouTube_SourceType)
+                        SponsorBlock_Category, YouTube_AudioCodec,
+                        YouTube_SourceType, YouTube_VideoCodec)
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 
@@ -38,45 +40,30 @@ class Source(models.Model):
         or a YouTube playlist.
     '''
 
-    SOURCE_TYPE_YOUTUBE_CHANNEL = YouTube_SourceType.CHANNEL.value
-    SOURCE_TYPE_YOUTUBE_CHANNEL_ID = YouTube_SourceType.CHANNEL_ID.value
-    SOURCE_TYPE_YOUTUBE_PLAYLIST = YouTube_SourceType.PLAYLIST.value
+    EXTENSIONS = FileExtension.values
 
-    SOURCE_RESOLUTION_1080P = SourceResolution.VIDEO_1080P.value
-    SOURCE_RESOLUTION_AUDIO = SourceResolution.AUDIO.value
+    SOURCE_TYPE_YOUTUBE_CHANNEL = V(YouTube_SourceType.CHANNEL)
+    SOURCE_TYPE_YOUTUBE_CHANNEL_ID = V(YouTube_SourceType.CHANNEL_ID)
+    SOURCE_TYPE_YOUTUBE_PLAYLIST = V(YouTube_SourceType.PLAYLIST)
+
+    SOURCE_RESOLUTION_1080P = V(SourceResolution.VIDEO_1080P)
+    SOURCE_RESOLUTION_AUDIO = V(SourceResolution.AUDIO)
     SOURCE_RESOLUTIONS = SourceResolution.values
 
-    SOURCE_VCODEC_AVC1 = 'AVC1'
-    SOURCE_VCODEC_VP9 = 'VP9'
-    SOURCE_VCODECS = (SOURCE_VCODEC_AVC1, SOURCE_VCODEC_VP9)
-    SOURCE_VCODECS_PRIORITY = (SOURCE_VCODEC_VP9, SOURCE_VCODEC_AVC1)
-    SOURCE_VCODEC_CHOICES = (
-        (SOURCE_VCODEC_AVC1, _('AVC1 (H.264)')),
-        (SOURCE_VCODEC_VP9, _('VP9')),
-    )
+    SOURCE_VCODEC_VP9 = V(YouTube_VideoCodec.VP9)
+    SOURCE_VCODEC_CHOICES = list(reversed(YouTube_VideoCodec.choices[1:]))
 
-    SOURCE_ACODEC_MP4A = 'MP4A'
-    SOURCE_ACODEC_OPUS = 'OPUS'
-    SOURCE_ACODECS = (SOURCE_ACODEC_MP4A, SOURCE_ACODEC_OPUS)
-    SOURCE_ACODEC_PRIORITY = (SOURCE_ACODEC_OPUS, SOURCE_ACODEC_MP4A)
-    SOURCE_ACODEC_CHOICES = (
-        (SOURCE_ACODEC_MP4A, _('MP4A')),
-        (SOURCE_ACODEC_OPUS, _('OPUS')),
-    )
+    SOURCE_ACODEC_OPUS = V(YouTube_AudioCodec.OPUS)
+    SOURCE_ACODEC_CHOICES = list(reversed(YouTube_AudioCodec.choices))
 
-    FALLBACK_FAIL = Fallback.FAIL.value
-    FALLBACK_NEXT_BEST = Fallback.NEXT_BEST.value
-    FALLBACK_NEXT_BEST_HD = Fallback.NEXT_BEST_HD.value
+    FALLBACK_FAIL = V(Fallback.FAIL)
+    FALLBACK_NEXT_BEST = V(Fallback.NEXT_BEST)
+    FALLBACK_NEXT_BEST_HD = V(Fallback.NEXT_BEST_HD)
 
     FILTER_SECONDS_CHOICES = (
         (True, _('Minimum Length')),
         (False, _('Maximum Length')),
     )
-
-    EXTENSION_M4A = 'm4a'
-    EXTENSION_OGG = 'ogg'
-    EXTENSION_MKV = 'mkv'
-    EXTENSIONS = (EXTENSION_M4A, EXTENSION_OGG, EXTENSION_MKV)
 
     sponsorblock_categories = CommaSepChoiceField(
         _(''),
@@ -277,7 +264,7 @@ class Source(models.Model):
         max_length=8,
         db_index=True,
         choices=SOURCE_VCODEC_CHOICES,
-        default=SOURCE_VCODEC_VP9,
+        default=YouTube_VideoCodec.VP9,
         help_text=_('Source video codec, desired video encoding format to download (ignored if "resolution" is audio only)')
     )
     source_acodec = models.CharField(
@@ -285,7 +272,7 @@ class Source(models.Model):
         max_length=8,
         db_index=True,
         choices=SOURCE_ACODEC_CHOICES,
-        default=SOURCE_ACODEC_OPUS,
+        default=YouTube_AudioCodec.OPUS,
         help_text=_('Source audio codec, desired audio encoding format to download')
     )
     prefer_60fps = models.BooleanField(
@@ -374,7 +361,7 @@ class Source(models.Model):
 
     @property
     def is_audio(self):
-        return self.source_resolution == SourceResolution.AUDIO.value
+        return self.source_resolution == V(SourceResolution.AUDIO)
 
     @property
     def is_video(self):
@@ -406,14 +393,14 @@ class Source(models.Model):
             depending on audio codec.
         '''
         if self.is_audio:
-            if self.source_acodec == self.SOURCE_ACODEC_MP4A:
-                return self.EXTENSION_M4A
-            elif self.source_acodec == self.SOURCE_ACODEC_OPUS:
-                return self.EXTENSION_OGG
+            if self.source_acodec == V(YouTube_AudioCodec.MP4A):
+                return V(FileExtension.M4A)
+            elif self.source_acodec == V(YouTube_AudioCodec.OPUS):
+                return V(FileExtension.OGG)
             else:
                 raise ValueError('Unable to choose audio extension, uknown acodec')
         else:
-            return self.EXTENSION_MKV
+            return V(FileExtension.MKV)
 
     @classmethod
     def create_url(obj, source_type, key):
@@ -434,7 +421,7 @@ class Source(models.Model):
 
     @property
     def format_summary(self):
-        if self.source_resolution == SourceResolution.AUDIO.value:
+        if self.is_audio:
             vc = 'none'
         else:
             vc = self.source_vcodec
@@ -451,7 +438,7 @@ class Source(models.Model):
     @property
     def type_directory_path(self):
         if settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX:
-            if self.source_resolution == SourceResolution.AUDIO.value:
+            if self.is_audio:
                 return Path(settings.DOWNLOAD_AUDIO_DIR) / self.directory
             else:
                 return Path(settings.DOWNLOAD_VIDEO_DIR) / self.directory
@@ -965,12 +952,12 @@ class Media(models.Model):
                 resolution = self.downloaded_format.lower()
             elif self.downloaded_height:
                 resolution = f'{self.downloaded_height}p'
-            if self.downloaded_format != 'audio':
+            if self.downloaded_format != V(SourceResolution.AUDIO):
                 vcodec = self.downloaded_video_codec.lower()
                 fmt.append(vcodec)
             acodec = self.downloaded_audio_codec.lower()
             fmt.append(acodec)
-            if self.downloaded_format != 'audio':
+            if self.downloaded_format != V(SourceResolution.AUDIO):
                 fps = str(self.downloaded_fps)
                 fmt.append(f'{fps}fps')
                 if self.downloaded_hdr:
@@ -1294,19 +1281,19 @@ class Media(models.Model):
             acodec = self.downloaded_audio_codec
             if acodec is None:
                 raise TypeError() # nothing here.
-            acodec = acodec.lower()
-            if acodec == "mp4a":
+            acodec = acodec.upper()
+            if acodec == V(YouTube_AudioCodec.MP4A):
                 return "audio/mp4"
-            elif acodec == "opus":
+            elif acodec == V(YouTube_AudioCodec.OPUS):
                 return "audio/opus"
             else:
                 # fall-fall-back.
                 return 'audio/ogg'
-        vcodec = vcodec.lower()
-        if vcodec == 'vp9':
-            return 'video/webm'
-        else:
+        vcodec = vcodec.upper()
+        if vcodec == V(YouTube_VideoCodec.AVC1):
             return 'video/mp4'
+        else:
+            return 'video/matroska'
 
     @property
     def nfoxml(self):
@@ -1580,12 +1567,12 @@ class MediaServer(models.Model):
         A remote media server, such as a Plex server.
     '''
 
-    SERVER_TYPE_PLEX = MediaServerType.PLEX.value
+    SERVER_TYPE_PLEX = V(MediaServerType.PLEX)
     ICONS = {
-        SERVER_TYPE_PLEX: '<i class="fas fa-server"></i>',
+        V(MediaServerType.PLEX): '<i class="fas fa-server"></i>',
     }
     HANDLERS = {
-        SERVER_TYPE_PLEX: PlexMediaServer,
+        V(MediaServerType.PLEX): PlexMediaServer,
     }
 
     server_type = models.CharField(
