@@ -17,6 +17,7 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     get_media_metadata_task, get_media_download_task)
 from .utils import delete_file, glob_quote
 from .filtering import filter_media
+from .choices import V, YouTube_SourceType
 
 
 @receiver(pre_save, sender=Source)
@@ -52,7 +53,7 @@ def source_post_save(sender, instance, created, **kwargs):
             priority=0,
             verbose_name=verbose_name.format(instance.name)
         )
-        if instance.source_type != Source.SOURCE_TYPE_YOUTUBE_PLAYLIST and instance.copy_channel_images:
+        if instance.source_type != V(YouTube_SourceType.PLAYLIST) and instance.copy_channel_images:
             download_source_images(
                 str(instance.pk),
                 priority=2,
