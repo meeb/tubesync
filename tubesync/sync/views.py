@@ -31,7 +31,7 @@ from .utils import validate_url, delete_file
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
                     delete_task_by_media, index_source_task)
-from .choices import (MediaServerType, SourceResolution,
+from .choices import (V, MediaServerType, SourceResolution,
                         YouTube_SourceType, youtube_long_source_types,
                         youtube_help, youtube_validation_urls)
 from . import signals
@@ -51,7 +51,7 @@ class DashboardView(TemplateView):
         # Sources
         data['num_sources'] = Source.objects.all().count()
         data['num_video_sources'] = Source.objects.filter(
-            ~Q(source_resolution=SourceResolution.AUDIO.value)
+            ~Q(source_resolution=V(SourceResolution.AUDIO))
         ).count()
         data['num_audio_sources'] = data['num_sources'] - data['num_video_sources']
         data['num_failed_sources'] = Source.objects.filter(has_failed=True).count()
@@ -170,9 +170,9 @@ class ValidateSourceView(FormView):
     help_examples = youtube_help.get('examples')
     validation_urls = youtube_validation_urls
     prepopulate_fields = {
-        YouTube_SourceType.CHANNEL.value: ('source_type', 'key', 'name', 'directory'),
-        YouTube_SourceType.CHANNEL_ID.value: ('source_type', 'key'),
-        YouTube_SourceType.PLAYLIST.value: ('source_type', 'key'),
+        V(YouTube_SourceType.CHANNEL): ('source_type', 'key', 'name', 'directory'),
+        V(YouTube_SourceType.CHANNEL_ID): ('source_type', 'key'),
+        V(YouTube_SourceType.PLAYLIST): ('source_type', 'key'),
     }
 
     def __init__(self, *args, **kwargs):
@@ -910,11 +910,11 @@ class AddMediaServerView(FormView):
 
     template_name = 'sync/mediaserver-add.html'
     server_types = {
-        'plex': MediaServerType.PLEX.value,
+        'plex': V(MediaServerType.PLEX),
     }
     server_type_names = dict(MediaServerType.choices)
     forms = {
-        MediaServerType.PLEX.value: PlexMediaServerForm,
+        V(MediaServerType.PLEX): PlexMediaServerForm,
     }
 
     def __init__(self, *args, **kwargs):
@@ -1031,7 +1031,7 @@ class UpdateMediaServerView(FormView, SingleObjectMixin):
     template_name = 'sync/mediaserver-update.html'
     model = MediaServer
     forms = {
-        MediaServerType.PLEX.value: PlexMediaServerForm,
+        V(MediaServerType.PLEX): PlexMediaServerForm,
     }
 
     def __init__(self, *args, **kwargs):
