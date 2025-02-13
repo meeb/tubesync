@@ -27,7 +27,7 @@ from .matching import (get_best_combined_format, get_best_audio_format,
 from .mediaservers import PlexMediaServer
 from .fields import CommaSepChoiceField
 from .choices import (V, CapChoices, Fallback, FileExtension,
-                        IndexSchedule, MediaServerType,
+                        FilterSeconds, IndexSchedule, MediaServerType,
                         SourceResolution, SourceResolutionInteger,
                         SponsorBlock_Category, YouTube_AudioCodec,
                         YouTube_SourceType, YouTube_VideoCodec)
@@ -57,11 +57,6 @@ class Source(models.Model):
     FALLBACK_FAIL = V(Fallback.FAIL)
     FALLBACK_NEXT_BEST = V(Fallback.NEXT_BEST)
     FALLBACK_NEXT_BEST_HD = V(Fallback.NEXT_BEST_HD)
-
-    FILTER_SECONDS_CHOICES = (
-        (True, _('Minimum Length')),
-        (False, _('Maximum Length')),
-    )
 
     sponsorblock_categories = CommaSepChoiceField(
         _(''),
@@ -234,8 +229,8 @@ class Source(models.Model):
     )
     filter_seconds_min = models.BooleanField(
         _('filter seconds min/max'),
-        choices=FILTER_SECONDS_CHOICES,
-        default=True,
+        choices=FilterSeconds.choices,
+        default=V(FilterSeconds.MIN),
         help_text=_('When Filter Seconds is > 0, do we skip on minimum (video shorter than limit) or maximum (video '
                     'greater than maximum) video duration')
     )
