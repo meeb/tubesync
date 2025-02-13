@@ -137,7 +137,7 @@ def media_post_save(sender, instance, created, **kwargs):
     can_download_changed = False
     # Reset the skip flag if the download cap has changed if the media has not
     # already been downloaded
-    if not instance.downloaded and instance.metadata:
+    if not instance.downloaded:
         skip_changed = filter_media(instance)
 
     # Recalculate the "can_download" flag, this may

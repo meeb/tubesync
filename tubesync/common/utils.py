@@ -112,8 +112,8 @@ def append_uri_params(uri, params):
 def clean_filename(filename):
     if not isinstance(filename, str):
         raise ValueError(f'filename must be a str, got {type(filename)}')
-    to_scrub = '<>\/:*?"|%'
-    for char in to_scrub:
+    to_scrub = r'<>\/:*?"|%'
+    for char in list(to_scrub):
         filename = filename.replace(char, '')
     clean_filename = ''
     for c in filename:
