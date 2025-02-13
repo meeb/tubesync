@@ -28,11 +28,12 @@ from .mediaservers import PlexMediaServer
 from .fields import CommaSepChoiceField
 from .choices import (V, CapChoices, Fallback, FileExtension,
                         FilterSeconds, IndexSchedule, MediaServerType,
-                        SourceResolution, SourceResolutionInteger,
+                        MediaState, SourceResolution, SourceResolutionInteger,
                         SponsorBlock_Category, YouTube_AudioCodec,
                         YouTube_SourceType, YouTube_VideoCodec)
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
+_srctype_dict = lambda n: dict(zip( YouTube_SourceType.values, (n,) * len(YouTube_SourceType.values) ))
 
 class Source(models.Model):
     '''
@@ -85,35 +86,33 @@ class Source(models.Model):
     )
 
     # Fontawesome icons used for the source on the front end
-    ICONS = {
-        SOURCE_TYPE_YOUTUBE_CHANNEL: '<i class="fab fa-youtube"></i>',
-        SOURCE_TYPE_YOUTUBE_CHANNEL_ID: '<i class="fab fa-youtube"></i>',
-        SOURCE_TYPE_YOUTUBE_PLAYLIST: '<i class="fab fa-youtube"></i>',
-    }
+    ICONS = _srctype_dict('<i class="fab fa-youtube"></i>')
+
     # Format to use to display a URL for the source
-    URLS = {
-        SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/c/{key}',
-        SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/channel/{key}',
-        SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/playlist?list={key}',
-    }
+    URLS = dict(zip(
+        YouTube_SourceType.values,
+        (
+            'https://www.youtube.com/c/{key}',
+            'https://www.youtube.com/channel/{key}',
+            'https://www.youtube.com/playlist?list={key}',
+        ),
+    ))
+
     # Format used to create indexable URLs
-    INDEX_URLS = {
-        SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/c/{key}/{type}',
-        SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/channel/{key}/{type}',
-        SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/playlist?list={key}',
-    }
+    INDEX_URLS = dict(zip(
+        YouTube_SourceType.values,
+        (
+            'https://www.youtube.com/c/{key}/{type}',
+            'https://www.youtube.com/channel/{key}/{type}',
+            'https://www.youtube.com/playlist?list={key}',
+        ),
+    ))
+
     # Callback functions to get a list of media from the source
-    INDEXERS = {
-        SOURCE_TYPE_YOUTUBE_CHANNEL: get_youtube_media_info,
-        SOURCE_TYPE_YOUTUBE_CHANNEL_ID: get_youtube_media_info,
-        SOURCE_TYPE_YOUTUBE_PLAYLIST: get_youtube_media_info,
-    }
+    INDEXERS = _srctype_dict(get_youtube_media_info)
+
     # Field names to find the media ID used as the key when storing media
-    KEY_FIELD = {
-        SOURCE_TYPE_YOUTUBE_CHANNEL: 'id',
-        SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'id',
-        SOURCE_TYPE_YOUTUBE_PLAYLIST: 'id',
-    }
+    KEY_FIELD = _srctype_dict('id')
 
     uuid = models.UUIDField(
         _('uuid'),
@@ -563,108 +562,41 @@ class Media(models.Model):
     '''
 
     # Format to use to display a URL for the media
-    URLS = {
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/watch?v={key}',
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'https://www.youtube.com/watch?v={key}',
-        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'https://www.youtube.com/watch?v={key}',
-    }
+    URLS = _srctype_dict('https://www.youtube.com/watch?v={key}')
+
     # Callback functions to get a list of media from the source
-    INDEXERS = {
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL: get_youtube_media_info,
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: get_youtube_media_info,
-        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: get_youtube_media_info,
-    }
+    INDEXERS = _srctype_dict(get_youtube_media_info)
+
     # Maps standardised names to names used in source metdata
+    _same_name = lambda n, k=None: {k or n: _srctype_dict(n) }
     METADATA_FIELDS = {
-        'upload_date': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'upload_date',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'upload_date',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'upload_date',
-        },
-        'timestamp': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'timestamp',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'timestamp',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'timestamp',
-        },
-        'title': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'title',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'title',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'title',
-        },
-        'thumbnail': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'thumbnail',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'thumbnail',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'thumbnail',
-        },
-        'description': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'description',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'description',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'description',
-        },
-        'duration': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'duration',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'duration',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'duration',
-        },
-        'formats': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'formats',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'formats',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'formats',
-        },
-        'categories': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'categories',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'categories',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'categories',
-        },
-        'rating': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'average_rating',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'average_rating',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'average_rating',
-        },
-        'age_limit': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'age_limit',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'age_limit',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'age_limit',
-        },
-        'uploader': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'uploader',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'uploader',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'uploader',
-        },
-        'upvotes': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'like_count',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'like_count',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'like_count',
-        },
-        'downvotes': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'dislike_count',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'dislike_count',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'dislike_count',
-        },
-        'playlist_title': {
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'playlist_title',
-            Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: 'playlist_title',
-            Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: 'playlist_title',
-        },
+        **(_same_name('upload_date')),
+        **(_same_name('timestamp')),
+        **(_same_name('title')),
+        **(_same_name('description')),
+        **(_same_name('duration')),
+        **(_same_name('formats')),
+        **(_same_name('categories')),
+        **(_same_name('average_rating', 'rating')),
+        **(_same_name('age_limit')),
+        **(_same_name('uploader')),
+        **(_same_name('like_count', 'upvotes')),
+        **(_same_name('dislike_count', 'downvotes')),
+        **(_same_name('playlist_title')),
     }
-    STATE_UNKNOWN = 'unknown'
-    STATE_SCHEDULED = 'scheduled'
-    STATE_DOWNLOADING = 'downloading'
-    STATE_DOWNLOADED = 'downloaded'
-    STATE_SKIPPED = 'skipped'
-    STATE_DISABLED_AT_SOURCE = 'source-disabled'
-    STATE_ERROR = 'error'
-    STATES = (STATE_UNKNOWN, STATE_SCHEDULED, STATE_DOWNLOADING, STATE_DOWNLOADED,
-              STATE_SKIPPED, STATE_DISABLED_AT_SOURCE, STATE_ERROR)
-    STATE_ICONS = {
-        STATE_UNKNOWN: '<i class="far fa-question-circle" title="Unknown download state"></i>',
-        STATE_SCHEDULED: '<i class="far fa-clock" title="Scheduled to download"></i>',
-        STATE_DOWNLOADING: '<i class="fas fa-download" title="Downloading now"></i>',
-        STATE_DOWNLOADED: '<i class="far fa-check-circle" title="Downloaded"></i>',
-        STATE_SKIPPED: '<i class="fas fa-exclamation-circle" title="Skipped"></i>',
-        STATE_DISABLED_AT_SOURCE: '<i class="fas fa-stop-circle" title="Media downloading disabled at source"></i>',
-        STATE_ERROR: '<i class="fas fa-exclamation-triangle" title="Error downloading"></i>',
-    }
+
+    STATE_ICONS = dict(zip(
+        MediaState.values,
+        (
+            '<i class="far fa-question-circle" title="Unknown download state"></i>',
+            '<i class="far fa-clock" title="Scheduled to download"></i>',
+            '<i class="fas fa-download" title="Downloading now"></i>',
+            '<i class="far fa-check-circle" title="Downloaded"></i>',
+            '<i class="fas fa-exclamation-circle" title="Skipped"></i>',
+            '<i class="fas fa-stop-circle" title="Media downloading disabled at source"></i>',
+            '<i class="fas fa-exclamation-triangle" title="Error downloading"></i>',
+        )
+    ))
 
     uuid = models.UUIDField(
         _('uuid'),
@@ -1404,19 +1336,19 @@ class Media(models.Model):
 
     def get_download_state(self, task=None):
         if self.downloaded:
-            return self.STATE_DOWNLOADED
+            return V(MediaState.DOWNLOADED)
         if task:
             if task.locked_by_pid_running():
-                return self.STATE_DOWNLOADING
+                return V(MediaState.DOWNLOADING)
             elif task.has_error():
-                return self.STATE_ERROR
+                return V(MediaState.ERROR)
             else:
-                return self.STATE_SCHEDULED
+                return V(MediaState.SCHEDULED)
         if self.skip:
-            return self.STATE_SKIPPED
+            return V(MediaState.SKIPPED)
         if not self.source.download_media:
-            return self.STATE_DISABLED_AT_SOURCE
-        return self.STATE_UNKNOWN
+            return V(MediaState.DISABLED_AT_SOURCE)
+        return V(MediaState.UNKNOWN)
 
     def get_download_state_icon(self, task=None):
         state = self.get_download_state(task)
