@@ -41,10 +41,6 @@ class Source(models.Model):
         or a YouTube playlist.
     '''
 
-    SOURCE_RESOLUTION_1080P = V(SourceResolution.VIDEO_1080P)
-    SOURCE_RESOLUTION_AUDIO = V(SourceResolution.AUDIO)
-    SOURCE_RESOLUTIONS = SourceResolution.values
-
     SOURCE_VCODEC_VP9 = V(YouTube_VideoCodec.VP9)
     SOURCE_VCODEC_CHOICES = list(reversed(YouTube_VideoCodec.choices[1:]))
 
