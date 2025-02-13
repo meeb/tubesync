@@ -1352,7 +1352,7 @@ class Media(models.Model):
 
     def get_download_state_icon(self, task=None):
         state = self.get_download_state(task)
-        return self.STATE_ICONS.get(state, self.STATE_ICONS[self.STATE_UNKNOWN])
+        return self.STATE_ICONS.get(state, self.STATE_ICONS[V(MediaState.UNKNOWN)])
 
     def download_media(self):
         format_str = self.get_format_str()
