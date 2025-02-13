@@ -28,6 +28,7 @@ class BaseStatus:
 
     def __init__(self, hook_status_dict=None):
         self.media_key = None
+        self.media_uuid = None
         self.task_status = '[Started: 0%]'
         self.task_verbose_name = None
         self._status_dict = hook_status_dict or self.status_dict
@@ -52,9 +53,33 @@ class BaseStatus:
         from .models import Media
         from .tasks import get_media_download_task
 
-        media = Media.objects.get(key=self.media_key)
-        task = get_media_download_task(str(media.pk))
-        if task:
+        media = task = None
+        mqs = Media.objects.all()
+        if self.media_uuid:
+            media = mqs.get(uuid=self.media_uuid)
+            task = get_media_download_task(str(media.pk))
+        else:
+            mqs = mqs.exclude(
+                skip=True,
+                manual_skip=True
+            ).filter(
+                source__download_media=True,
+                can_download=True,
+                downloaded=False,
+                key=self.media_key
+            )
+            for m in mqs:
+                if not m.source.download_media:
+                    continue
+                t = get_media_download_task(str(m.pk))
+                if t:
+                    media = m
+                    task = t
+                    break
+
+        if media and task:
+            if self.media_uuid is None:
+                self.media_uuid = media.uuid
             if self.task_verbose_name is None:
                 # clean up any previously prepended task_status
                 # this happened because of duplicated tasks on my test system
