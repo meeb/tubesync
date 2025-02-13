@@ -138,7 +138,7 @@ def media_post_save(sender, instance, created, **kwargs):
     can_download_changed = False
     # Reset the skip flag if the download cap has changed if the media has not
     # already been downloaded
-    if not instance.downloaded and instance.metadata:
+    if not instance.downloaded:
         skip_changed = filter_media(instance)
 
     # Recalculate the "can_download" flag, this may
@@ -152,11 +152,6 @@ def media_post_save(sender, instance, created, **kwargs):
             if instance.can_download:
                 instance.can_download = False
                 can_download_changed = True
-    # Save the instance if any changes were required
-    if skip_changed or can_download_changed:
-        post_save.disconnect(media_post_save, sender=Media)
-        instance.save()
-        post_save.connect(media_post_save, sender=Media)
     existing_media_metadata_task = get_media_metadata_task(str(instance.pk))
     # If the media is missing metadata schedule it to be downloaded
     if not (instance.skip or instance.metadata or existing_media_metadata_task):
@@ -188,6 +183,10 @@ def media_post_save(sender, instance, created, **kwargs):
     existing_media_download_task = get_media_download_task(str(instance.pk))
     # If the media has not yet been downloaded schedule it to be downloaded
     if not (instance.media_file_exists or existing_media_download_task):
+        # The file was deleted after it was downloaded, skip this media.
+        if instance.can_download and instance.downloaded:
+            skip_changed = True != instance.skip
+            instance.skip = True
         instance.downloaded = False
         instance.media_file = None
     if (instance.source.download_media and instance.can_download) and not (
@@ -200,6 +199,11 @@ def media_post_save(sender, instance, created, **kwargs):
             verbose_name=verbose_name.format(instance.name),
             remove_existing_tasks=True
         )
+    # Save the instance if any changes were required
+    if skip_changed or can_download_changed:
+        post_save.disconnect(media_post_save, sender=Media)
+        instance.save()
+        post_save.connect(media_post_save, sender=Media)
 
 
 @receiver(pre_delete, sender=Media)
