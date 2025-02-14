@@ -42,10 +42,7 @@ class Source(models.Model):
     '''
 
     SOURCE_VCODEC_VP9 = Val(YouTube_VideoCodec.VP9)
-    SOURCE_VCODEC_CHOICES = list(reversed(YouTube_VideoCodec.choices[1:]))
-
     SOURCE_ACODEC_OPUS = Val(YouTube_AudioCodec.OPUS)
-    SOURCE_ACODEC_CHOICES = list(reversed(YouTube_AudioCodec.choices))
 
     FALLBACK_FAIL = Val(Fallback.FAIL)
     FALLBACK_NEXT_BEST = Val(Fallback.NEXT_BEST)
@@ -247,7 +244,7 @@ class Source(models.Model):
         _('source video codec'),
         max_length=8,
         db_index=True,
-        choices=SOURCE_VCODEC_CHOICES,
+        choices=list(reversed(YouTube_VideoCodec.choices[1:])),
         default=YouTube_VideoCodec.VP9,
         help_text=_('Source video codec, desired video encoding format to download (ignored if "resolution" is audio only)')
     )
@@ -255,7 +252,7 @@ class Source(models.Model):
         _('source audio codec'),
         max_length=8,
         db_index=True,
-        choices=SOURCE_ACODEC_CHOICES,
+        choices=list(reversed(YouTube_AudioCodec.choices)),
         default=YouTube_AudioCodec.OPUS,
         help_text=_('Source audio codec, desired audio encoding format to download')
     )
