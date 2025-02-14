@@ -70,6 +70,10 @@
         <td class="hide-on-small-only">Duration</td>
         <td><span class="hide-on-med-and-up">Duration<br></span><strong>{{ media.duration_formatted }}</strong></td>
       </tr>
+      <tr title="The media publication date">
+        <td class="hide-on-small-only">Published</td>
+        <td><span class="hide-on-med-and-up">Published<br></span><strong>{{ media.published |date:'Y-m-d H:i' }}</strong></td>
+      </tr>
       <tr title="The desired format">
         <td class="hide-on-small-only">Desired format</td>
         <td><span class="hide-on-med-and-up">Desired format<br></span><strong>{{ media.source.format_summary }}</strong></td>
@@ -77,6 +81,10 @@
       <tr title="Fallback setting on the source">
         <td class="hide-on-small-only">Fallback</td>
         <td><span class="hide-on-med-and-up">Fallback<br></span><strong>{{ media.source.get_fallback_display }}</strong></td>
+      </tr>
+      <tr title="The media title">
+        <td class="hide-on-small-only">Title</td>
+        <td><span class="hide-on-med-and-up">Title<br></span><strong>{{ media.title }}</strong></td>
       </tr>
       {% if not media.source.download_media %}
       <tr title="Is media marked to be downloaded at the source?">
@@ -92,7 +100,7 @@
       {% else %}
       <tr title="Has the media been downloaded?">
         <td class="hide-on-small-only">Downloaded?</td>
-        <td><span class="hide-on-med-and-up">Downloaded?<br></span><strong>{% if media.downloaded %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+        <td><span class="hide-on-med-and-up">Downloaded?<br></span><strong>{% if media.downloaded %}<i class="fas fa-check"></i>&nbsp;{{ media.download_date |date:'Y-m-d H:i:s' }}{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
       </tr>
       {% endif %}
       {% if media.downloaded %}
