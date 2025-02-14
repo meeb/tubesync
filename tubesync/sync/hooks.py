@@ -61,11 +61,11 @@ class BaseStatus:
         else:
             mqs = mqs.exclude(
                 skip=True,
-                manual_skip=True
+                manual_skip=True,
+                downloaded=True,
             ).filter(
                 source__download_media=True,
                 can_download=True,
-                downloaded=False,
                 key=self.media_key
             )
             for m in mqs:
