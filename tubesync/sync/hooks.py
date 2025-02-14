@@ -68,7 +68,6 @@ class BaseStatus:
                 downloaded=False,
                 key=self.media_key
             )
-            log.debug(mqs.query)
             for m in mqs:
                 t = get_media_download_task(str(m.pk))
                 if t:
