@@ -186,7 +186,6 @@ def media_post_save(sender, instance, created, **kwargs):
         if instance.can_download and instance.downloaded:
             skip_changed = True != instance.skip
             instance.skip = True
-        instance.downloaded = False
         instance.media_file = None
     if (instance.source.download_media and instance.can_download) and not (
         instance.skip or instance.downloaded or existing_media_download_task):
