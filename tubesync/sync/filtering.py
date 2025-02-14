@@ -41,6 +41,7 @@ def filter_media(instance: Media):
 
     # Check if skipping
     if instance.skip != skip:
+        # only allow; False => True changes
         instance.skip = instance.skip or skip
         log.info(
             f"Media: {instance.source} / {instance} has changed skip setting to {instance.skip}"
