@@ -41,8 +41,6 @@ class Source(models.Model):
         or a YouTube playlist.
     '''
 
-    SOURCE_VCODEC_VP9 = Val(YouTube_VideoCodec.VP9)
-
     FALLBACK_FAIL = Val(Fallback.FAIL)
     FALLBACK_NEXT_BEST = Val(Fallback.NEXT_BEST)
     FALLBACK_NEXT_BEST_HD = Val(Fallback.NEXT_BEST_HD)
