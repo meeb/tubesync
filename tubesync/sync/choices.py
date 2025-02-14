@@ -13,7 +13,7 @@ DOMAINS = dict({
 })
 
 
-def V(*args):
+def Val(*args):
     results = list(
         a.value if isinstance(a, models.enums.Choices) else a for a in args
     )
