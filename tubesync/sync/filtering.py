@@ -12,7 +12,7 @@ from .overrides.custom_filter import filter_custom
 # Check the filter conditions for instance, return is if the Skip property has changed so we can do other things
 def filter_media(instance: Media):
     # Assume we aren't skipping it, if any of these conditions are true, we skip it
-    skip = False
+    skip = instance.skip
 
     # Check if it's published
     if not skip and filter_published(instance):
