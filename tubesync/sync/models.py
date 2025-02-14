@@ -42,7 +42,6 @@ class Source(models.Model):
     '''
 
     SOURCE_VCODEC_VP9 = Val(YouTube_VideoCodec.VP9)
-    SOURCE_ACODEC_OPUS = Val(YouTube_AudioCodec.OPUS)
 
     FALLBACK_FAIL = Val(Fallback.FAIL)
     FALLBACK_NEXT_BEST = Val(Fallback.NEXT_BEST)

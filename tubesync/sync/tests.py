@@ -20,6 +20,7 @@ from .tasks import cleanup_old_media
 from .filtering import filter_media
 from .utils import filter_response
 from .choices import (Val, Fallback, IndexSchedule, SourceResolution,
+                        YouTube_AudioCodec,
                         YouTube_SourceType, youtube_long_source_types)
 
 
@@ -241,7 +242,7 @@ class FrontEndTestCase(TestCase):
             'days_to_keep': 14,
             'source_resolution': Val(SourceResolution.VIDEO_1080P),
             'source_vcodec': Source.SOURCE_VCODEC_VP9,
-            'source_acodec': Source.SOURCE_ACODEC_OPUS,
+            'source_acodec': Val(YouTube_AudioCodec.OPUS),
             'prefer_60fps': False,
             'prefer_hdr': False,
             'fallback': Val(Fallback.FAIL),
@@ -278,7 +279,7 @@ class FrontEndTestCase(TestCase):
             'days_to_keep': 14,
             'source_resolution': Val(SourceResolution.VIDEO_1080P),
             'source_vcodec': Source.SOURCE_VCODEC_VP9,
-            'source_acodec': Source.SOURCE_ACODEC_OPUS,
+            'source_acodec': Val(YouTube_AudioCodec.OPUS),
             'prefer_60fps': False,
             'prefer_hdr': False,
             'fallback': Val(Fallback.FAIL),
@@ -344,7 +345,7 @@ class FrontEndTestCase(TestCase):
             days_to_keep=14,
             source_resolution=Val(SourceResolution.VIDEO_1080P),
             source_vcodec=Source.SOURCE_VCODEC_VP9,
-            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
             prefer_60fps=False,
             prefer_hdr=False,
             fallback=Val(Fallback.FAIL)
@@ -526,7 +527,7 @@ class FilepathTestCase(TestCase):
             days_to_keep=14,
             source_resolution=Val(SourceResolution.VIDEO_1080P),
             source_vcodec=Source.SOURCE_VCODEC_VP9,
-            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
             prefer_60fps=False,
             prefer_hdr=False,
             fallback=Val(Fallback.FAIL)
@@ -686,7 +687,7 @@ class MediaTestCase(TestCase):
             days_to_keep=14,
             source_resolution=Val(SourceResolution.VIDEO_1080P),
             source_vcodec=Source.SOURCE_VCODEC_VP9,
-            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
             prefer_60fps=False,
             prefer_hdr=False,
             fallback=Val(Fallback.FAIL)
@@ -759,7 +760,7 @@ class MediaFilterTestCase(TestCase):
             days_to_keep=14,
             source_resolution=Val(SourceResolution.VIDEO_1080P),
             source_vcodec=Source.SOURCE_VCODEC_VP9,
-            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
             prefer_60fps=False,
             prefer_hdr=False,
             fallback=Val(Fallback.FAIL),
@@ -928,7 +929,7 @@ class FormatMatchingTestCase(TestCase):
             days_to_keep=14,
             source_resolution=Val(SourceResolution.VIDEO_1080P),
             source_vcodec=Source.SOURCE_VCODEC_VP9,
-            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
             prefer_60fps=False,
             prefer_hdr=False,
             fallback=Val(Fallback.FAIL)
@@ -1746,7 +1747,7 @@ class ResponseFilteringTestCase(TestCase):
             days_to_keep=14,
             source_resolution=Val(SourceResolution.VIDEO_1080P),
             source_vcodec=Source.SOURCE_VCODEC_VP9,
-            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
             prefer_60fps=False,
             prefer_hdr=False,
             fallback=Val(Fallback.FAIL)
