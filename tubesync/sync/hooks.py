@@ -62,7 +62,7 @@ class BaseStatus:
             mqs = mqs.exclude(
                 skip=True,
                 manual_skip=True,
-                downloaded=True,
+                downloaded=True
             ).filter(
                 source__download_media=True,
                 can_download=True,
