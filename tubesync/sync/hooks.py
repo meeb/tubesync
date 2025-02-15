@@ -61,14 +61,13 @@ class BaseStatus:
         else:
             mqs = mqs.exclude(
                 skip=True,
-                manual_skip=True
+                manual_skip=True,
+                downloaded=True
             ).filter(
                 source__download_media=True,
                 can_download=True,
-                downloaded=False,
                 key=self.media_key
             )
-            log.debug(mqs.query)
             for m in mqs:
                 t = get_media_download_task(str(m.pk))
                 if t:
