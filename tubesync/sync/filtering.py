@@ -11,7 +11,7 @@ from .overrides.custom_filter import filter_custom
 
 # Check the filter conditions for instance, return is if the Skip property has changed so we can do other things
 def filter_media(instance: Media):
-    unskip = False
+    unskip = True
     # Assume we aren't skipping it, if any of these conditions are true, we skip it
     skip = False
 
@@ -30,41 +30,42 @@ def filter_media(instance: Media):
     if not skip and not download_kept:
         skip = True
 
-    keep_newly_published_video = (
-        is_published and download_kept and
-        not (instance.downloaded or video_too_old)
-    )
-
     # Check if we have filter_text and filter text matches
     if not skip and filter_filter_text(instance):
         skip = True
+        unskip = False
 
     # Check if the video is longer than the max, or shorter than the min
     if not skip and filter_duration(instance):
         skip = True
+        unskip = False
 
     # If we aren't already skipping the file, call our custom function that can be overridden
     if not skip and filter_custom(instance):
         log.info(f"Media: {instance.source} / {instance} has been skipped by Custom Filter")
         skip = True
+        unskip = False
+
+    keep_newly_published_video = (
+        is_published and download_kept and
+        not (instance.downloaded or video_too_old)
+    )
 
     # Check if skipping
-    if keep_newly_published_video:
-        unskip = True
+    if not keep_newly_published_video:
+        unskip = False
     if instance.skip != skip:
         was_skipped = instance.skip
         instance.skip = skip
 
-        if was_skipped and unskip:
-            instance.skip = False
-        elif was_skipped and not unskip and not skip:
+        if was_skipped and not (unskip or skip):
             instance.skip = True
 
         if instance.skip != was_skipped:
             log.info(
                 f"Media: {instance.source} / {instance} has changed skip setting to {instance.skip}"
             )
-        return True
+            return True
 
     return False
 
