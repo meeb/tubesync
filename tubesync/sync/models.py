@@ -41,10 +41,6 @@ class Source(models.Model):
         or a YouTube playlist.
     '''
 
-    FALLBACK_FAIL = Val(Fallback.FAIL)
-    FALLBACK_NEXT_BEST = Val(Fallback.NEXT_BEST)
-    FALLBACK_NEXT_BEST_HD = Val(Fallback.NEXT_BEST_HD)
-
     sponsorblock_categories = CommaSepChoiceField(
         _(''),
         max_length=128,
@@ -452,7 +448,7 @@ class Source(models.Model):
 
     @property
     def can_fallback(self):
-        return self.fallback != self.FALLBACK_FAIL
+        return self.fallback != Val(Fallback.FAIL)
 
     @property
     def example_media_format_dict(self):
