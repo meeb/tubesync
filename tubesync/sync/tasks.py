@@ -454,9 +454,7 @@ def download_media(media_id):
                  f'it is now marked to be skipped, not downloading')
         return
     downloaded_file_exists = (
-        media.media_file and
-        media.media_file.path and
-        media.filepath.samefile(media.media_file.path) and
+        media.media_file_exists or
         media.filepath.exists()
     )
     if media.downloaded and downloaded_file_exists:
