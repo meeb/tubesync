@@ -11,20 +11,29 @@ from .overrides.custom_filter import filter_custom
 
 # Check the filter conditions for instance, return is if the Skip property has changed so we can do other things
 def filter_media(instance: Media):
+    unskip = False
     # Assume we aren't skipping it, if any of these conditions are true, we skip it
     skip = False
 
     # Check if it's published
-    if not skip and filter_published(instance):
+    is_published = not filter_published(instance)
+    if not skip and not is_published:
         skip = True
 
     # Check if older than max_cap_age, skip
-    if not skip and filter_max_cap(instance):
+    video_too_old = is_published and filter_max_cap(instance)
+    if not skip and video_too_old:
         skip = True
 
     # Check if older than source_cutoff
-    if not skip and filter_source_cutoff(instance):
+    download_kept = not filter_source_cutoff(instance)
+    if not skip and not download_kept:
         skip = True
+
+    keep_newly_published_video = (
+        is_published and download_kept and
+        not (instance.downloaded or video_too_old)
+    )
 
     # Check if we have filter_text and filter text matches
     if not skip and filter_filter_text(instance):
@@ -40,12 +49,21 @@ def filter_media(instance: Media):
         skip = True
 
     # Check if skipping
-    # only allow; False => True changes
-    if not instance.skip and skip:
+    if keep_newly_published_video:
+        unskip = True
+    if instance.skip != skip:
+        was_skipped = instance.skip
         instance.skip = skip
-        log.info(
-            f"Media: {instance.source} / {instance} has changed skip setting to {skip}"
-        )
+
+        if was_skipped and unskip:
+            instance.skip = False
+        elif was_skipped and not unskip and not skip:
+            instance.skip = True
+
+        if instance.skip != was_skipped:
+            log.info(
+                f"Media: {instance.source} / {instance} has changed skip setting to {instance.skip}"
+            )
         return True
 
     return False
