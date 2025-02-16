@@ -51,6 +51,7 @@ def map_task_to_instance(task):
         'sync.tasks.download_media': Media,
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
+        'sync.tasks.rename_media': Media,
         'sync.tasks.rename_all_media_for_source': Source,
         'sync.tasks.wait_for_media_premiere': Media,
     }
@@ -574,7 +575,7 @@ def rescan_media_server(mediaserver_id):
     mediaserver.update()
 
 
-@background(schedule=0)
+@background(schedule=0, remove_existing_tasks=True)
 def save_all_media_for_source(source_id):
     '''
         Iterates all media items linked to a source and saves them to
@@ -595,7 +596,16 @@ def save_all_media_for_source(source_id):
         media.save()
 
 
-@background(schedule=0)
+@background(schedule=0, remove_existing_tasks=True)
+def rename_media(media_id):
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist:
+        return
+    media.rename_files()
+
+
+@background(schedule=0, remove_existing_tasks=True)
 def rename_all_media_for_source(source_id):
     try:
         source = Source.objects.get(pk=source_id)
@@ -606,6 +616,7 @@ def rename_all_media_for_source(source_id):
         return
     for media in Media.objects.filter(source=source):
         media.rename_files()
+
 
 @background(schedule=0, remove_existing_tasks=True)
 def wait_for_media_premiere(media_id):
