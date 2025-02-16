@@ -73,22 +73,23 @@ def source_post_save(sender, instance, created, **kwargs):
             )
     # Check settings before any rename tasks are scheduled
     rename_sources_setting = settings.RENAME_SOURCES or list()
-    create_rename_task = (
+    create_rename_tasks = (
         (
             instance.directory and
             instance.directory in rename_sources_setting
         ) or
         settings.RENAME_ALL_SOURCES
     )
-    if create_rename_task:
-        verbose_name = _('Renaming all media for source "{}"')
-        rename_all_media_for_source(
-            str(instance.pk),
-            queue=str(instance.pk),
-            priority=1,
-            verbose_name=verbose_name.format(instance.name),
-            remove_existing_tasks=True
-        )
+    if create_rename_tasks:
+        for media in Media.objects.filter(source=instance.pk, downloaded=True):
+            verbose_name = _('Renaming media for: {}: "{}"')
+            rename_media(
+                str(media.pk),
+                queue=str(media.pk),
+                priority=1,
+                verbose_name=verbose_name.format(media.key, media.name),
+                remove_existing_tasks=True
+            )
     verbose_name = _('Checking all media for source "{}"')
     save_all_media_for_source(
         str(instance.pk),
