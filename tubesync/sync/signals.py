@@ -13,7 +13,7 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     download_media_thumbnail, download_media_metadata,
                     map_task_to_instance, check_source_directory_exists,
                     download_media, rescan_media_server, download_source_images,
-                    save_all_media_for_source, rename_all_media_for_source,
+                    save_all_media_for_source, rename_media,
                     get_media_metadata_task, get_media_download_task)
 from .utils import delete_file, glob_quote
 from .filtering import filter_media
