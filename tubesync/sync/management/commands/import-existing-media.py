@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from common.logger import log
+from sync.choices import FileExtension
 from sync.models import Source, Media
 
 
@@ -17,7 +18,7 @@ class Command(BaseCommand):
         for s in Source.objects.all():
             dirmap[s.directory_path] = s
         log.info(f'Scanning sources...')
-        file_extensions = list(Source.EXTENSIONS) + self.extra_extensions
+        file_extensions = list(FileExtension.values) + self.extra_extensions
         for sourceroot, source in dirmap.items():
             media = list(Media.objects.filter(source=source, downloaded=False,
                                               skip=False))

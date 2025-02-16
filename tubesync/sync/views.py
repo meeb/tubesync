@@ -31,6 +31,9 @@ from .utils import validate_url, delete_file
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
                     delete_task_by_media, index_source_task)
+from .choices import (Val, MediaServerType, SourceResolution,
+                        YouTube_SourceType, youtube_long_source_types,
+                        youtube_help, youtube_validation_urls)
 from . import signals
 from . import youtube
 
@@ -48,7 +51,7 @@ class DashboardView(TemplateView):
         # Sources
         data['num_sources'] = Source.objects.all().count()
         data['num_video_sources'] = Source.objects.filter(
-            ~Q(source_resolution=Source.SOURCE_RESOLUTION_AUDIO)
+            ~Q(source_resolution=Val(SourceResolution.AUDIO))
         ).count()
         data['num_audio_sources'] = data['num_sources'] - data['num_video_sources']
         data['num_failed_sources'] = Source.objects.filter(has_failed=True).count()
@@ -161,82 +164,15 @@ class ValidateSourceView(FormView):
         'invalid_url': _('Invalid URL, the URL must for a "{item}" must be in '
                          'the format of "{example}". The error was: {error}.'),
     }
-    source_types = {
-        'youtube-channel': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
-        'youtube-channel-id': Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID,
-        'youtube-playlist': Source.SOURCE_TYPE_YOUTUBE_PLAYLIST,
-    }
-    help_item = {
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL: _('YouTube channel'),
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: _('YouTube channel ID'),
-        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: _('YouTube playlist'),
-    }
-    help_texts = {
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL: _(
-            'Enter a YouTube channel URL into the box below. A channel URL will be in '
-            'the format of <strong>https://www.youtube.com/CHANNELNAME</strong> '
-            'where <strong>CHANNELNAME</strong> is the name of the channel you want '
-            'to add.'
-        ),
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: _(
-            'Enter a YouTube channel URL by channel ID into the box below. A channel '
-            'URL by channel ID will be in the format of <strong>'
-            'https://www.youtube.com/channel/BiGLoNgUnIqUeId</strong> '
-            'where <strong>BiGLoNgUnIqUeId</strong> is the ID of the channel you want '
-            'to add.'
-        ),
-        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: _(
-            'Enter a YouTube playlist URL into the box below. A playlist URL will be '
-            'in the format of <strong>https://www.youtube.com/playlist?list='
-            'BiGLoNgUnIqUeId</strong> where <strong>BiGLoNgUnIqUeId</strong> is the '
-            'unique ID of the playlist you want to add.'
-        ),
-    }
-    help_examples = {
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL: 'https://www.youtube.com/google',
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: ('https://www.youtube.com/channel/'
-                                                'UCK8sQmJBp8GCxrOtXWBpyEA'),
-        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: ('https://www.youtube.com/playlist?list='
-                                              'PL590L5WQmH8dpP0RyH5pCfIaDEdt9nk7r')
-    }
-    _youtube_domains = frozenset({
-        'youtube.com',
-        'm.youtube.com',
-        'www.youtube.com',
-    })
-    validation_urls = {
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL: {
-            'scheme': 'https',
-            'domains': _youtube_domains,
-            'path_regex': '^\/(c\/)?([^\/]+)(\/videos)?$',
-            'path_must_not_match': ('/playlist', '/c/playlist'),
-            'qs_args': [],
-            'extract_key': ('path_regex', 1),
-            'example': 'https://www.youtube.com/SOMECHANNEL'
-        },
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: {
-            'scheme': 'https',
-            'domains': _youtube_domains,
-            'path_regex': '^\/channel\/([^\/]+)(\/videos)?$',
-            'path_must_not_match': ('/playlist', '/c/playlist'),
-            'qs_args': [],
-            'extract_key': ('path_regex', 0),
-            'example': 'https://www.youtube.com/channel/CHANNELID'
-        },
-        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: {
-            'scheme': 'https',
-            'domains': _youtube_domains,
-            'path_regex': '^\/(playlist|watch)$',
-            'path_must_not_match': (),
-            'qs_args': ('list',),
-            'extract_key': ('qs_args', 'list'),
-            'example': 'https://www.youtube.com/playlist?list=PLAYLISTID'
-        },
-    }
+    source_types = youtube_long_source_types
+    help_item = dict(YouTube_SourceType.choices)
+    help_texts = youtube_help.get('texts')
+    help_examples = youtube_help.get('examples')
+    validation_urls = youtube_validation_urls
     prepopulate_fields = {
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL: ('source_type', 'key', 'name', 'directory'),
-        Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID: ('source_type', 'key'),
-        Source.SOURCE_TYPE_YOUTUBE_PLAYLIST: ('source_type', 'key'),
+        Val(YouTube_SourceType.CHANNEL): ('source_type', 'key', 'name', 'directory'),
+        Val(YouTube_SourceType.CHANNEL_ID): ('source_type', 'key'),
+        Val(YouTube_SourceType.PLAYLIST): ('source_type', 'key'),
     }
 
     def __init__(self, *args, **kwargs):
@@ -269,7 +205,7 @@ class ValidateSourceView(FormView):
         # Perform extra validation on the URL, we need to extract the channel name or
         # playlist ID and check they are valid
         source_type = form.cleaned_data['source_type']
-        if source_type not in self.source_types.values():
+        if source_type not in YouTube_SourceType.values:
             form.add_error(
                 'source_type',
                 ValidationError(self.errors['invalid_source'])
@@ -391,7 +327,7 @@ class AddSourceView(EditSourceMixin, CreateView):
 
     def dispatch(self, request, *args, **kwargs):
         source_type = request.GET.get('source_type', '')
-        if source_type and source_type in Source.SOURCE_TYPES:
+        if source_type and source_type in YouTube_SourceType.values:
             self.prepopulated_data['source_type'] = source_type
         key = request.GET.get('key', '')
         if key:
@@ -962,13 +898,11 @@ class AddMediaServerView(FormView):
 
     template_name = 'sync/mediaserver-add.html'
     server_types = {
-        'plex': MediaServer.SERVER_TYPE_PLEX,
+        'plex': Val(MediaServerType.PLEX),
     }
-    server_type_names = {
-        MediaServer.SERVER_TYPE_PLEX: _('Plex'),
-    }
+    server_type_names = dict(MediaServerType.choices)
     forms = {
-        MediaServer.SERVER_TYPE_PLEX: PlexMediaServerForm,
+        Val(MediaServerType.PLEX): PlexMediaServerForm,
     }
 
     def __init__(self, *args, **kwargs):
@@ -1085,7 +1019,7 @@ class UpdateMediaServerView(FormView, SingleObjectMixin):
     template_name = 'sync/mediaserver-update.html'
     model = MediaServer
     forms = {
-        MediaServer.SERVER_TYPE_PLEX: PlexMediaServerForm,
+        Val(MediaServerType.PLEX): PlexMediaServerForm,
     }
 
     def __init__(self, *args, **kwargs):

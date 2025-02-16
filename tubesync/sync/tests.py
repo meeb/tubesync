@@ -19,6 +19,9 @@ from .models import Source, Media
 from .tasks import cleanup_old_media
 from .filtering import filter_media
 from .utils import filter_response
+from .choices import (Val, Fallback, IndexSchedule, SourceResolution,
+                        YouTube_AudioCodec, YouTube_VideoCodec,
+                        YouTube_SourceType, youtube_long_source_types)
 
 
 class FrontEndTestCase(TestCase):
@@ -33,11 +36,6 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_validate_source(self):
-        test_source_types = {
-            'youtube-channel': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
-            'youtube-channel-id': Source.SOURCE_TYPE_YOUTUBE_CHANNEL_ID,
-            'youtube-playlist': Source.SOURCE_TYPE_YOUTUBE_PLAYLIST,
-        }
         test_sources = {
             'youtube-channel': {
                 'valid': (
@@ -121,7 +119,7 @@ class FrontEndTestCase(TestCase):
             }
         }
         c = Client()
-        for source_type in test_sources.keys():
+        for source_type in youtube_long_source_types.keys():
             response = c.get(f'/source-validate/{source_type}')
             self.assertEqual(response.status_code, 200)
         response = c.get('/source-validate/invalid')
@@ -129,7 +127,7 @@ class FrontEndTestCase(TestCase):
         for (source_type, tests) in test_sources.items():
             for test, urls in tests.items():
                 for url in urls:
-                    source_type_char = test_source_types.get(source_type)
+                    source_type_char = youtube_long_source_types.get(source_type)
                     data = {'source_url': url, 'source_type': source_type_char}
                     response = c.post(f'/source-validate/{source_type}', data)
                     if test == 'valid':
@@ -182,7 +180,7 @@ class FrontEndTestCase(TestCase):
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
             'filter_text': '.*',
-            'filter_seconds_min': True,
+            'filter_seconds_min': int(True),
             'index_schedule': 3600,
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -231,23 +229,23 @@ class FrontEndTestCase(TestCase):
                          expected_categories)
         # Update the source key
         data = {
-            'source_type': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            'source_type': Val(YouTube_SourceType.CHANNEL),
             'key': 'updatedkey',  # changed
             'name': 'testname',
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
             'filter_text': '.*',
-            'filter_seconds_min': True,
-            'index_schedule': Source.IndexSchedule.EVERY_HOUR,
+            'filter_seconds_min': int(True),
+            'index_schedule': Val(IndexSchedule.EVERY_HOUR),
             'delete_old_media': False,
             'days_to_keep': 14,
-            'source_resolution': Source.SOURCE_RESOLUTION_1080P,
-            'source_vcodec': Source.SOURCE_VCODEC_VP9,
-            'source_acodec': Source.SOURCE_ACODEC_OPUS,
+            'source_resolution': Val(SourceResolution.VIDEO_1080P),
+            'source_vcodec': Val(YouTube_VideoCodec.VP9),
+            'source_acodec': Val(YouTube_AudioCodec.OPUS),
             'prefer_60fps': False,
             'prefer_hdr': False,
-            'fallback': Source.FALLBACK_FAIL,
+            'fallback': Val(Fallback.FAIL),
             'sponsorblock_categories': data_categories,
             'sub_langs': 'en',
         }
@@ -268,23 +266,23 @@ class FrontEndTestCase(TestCase):
                          expected_categories)
         # Update the source index schedule which should recreate the scheduled task
         data = {
-            'source_type': Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            'source_type': Val(YouTube_SourceType.CHANNEL),
             'key': 'updatedkey',
             'name': 'testname',
             'directory': 'testdirectory',
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
             'filter_text': '.*',
-            'filter_seconds_min': True,
-            'index_schedule': Source.IndexSchedule.EVERY_2_HOURS,  # changed
+            'filter_seconds_min': int(True),
+            'index_schedule': Val(IndexSchedule.EVERY_2_HOURS),  # changed
             'delete_old_media': False,
             'days_to_keep': 14,
-            'source_resolution': Source.SOURCE_RESOLUTION_1080P,
-            'source_vcodec': Source.SOURCE_VCODEC_VP9,
-            'source_acodec': Source.SOURCE_ACODEC_OPUS,
+            'source_resolution': Val(SourceResolution.VIDEO_1080P),
+            'source_vcodec': Val(YouTube_VideoCodec.VP9),
+            'source_acodec': Val(YouTube_AudioCodec.OPUS),
             'prefer_60fps': False,
             'prefer_hdr': False,
-            'fallback': Source.FALLBACK_FAIL,
+            'fallback': Val(Fallback.FAIL),
             'sponsorblock_categories': data_categories,
             'sub_langs': 'en',
         }
@@ -338,19 +336,19 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         # Add a test source
         test_source = Source.objects.create(
-            source_type=Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            source_type=Val(YouTube_SourceType.CHANNEL),
             key='testkey',
             name='testname',
             directory='testdirectory',
-            index_schedule=Source.IndexSchedule.EVERY_HOUR,
+            index_schedule=Val(IndexSchedule.EVERY_HOUR),
             delete_old_media=False,
             days_to_keep=14,
-            source_resolution=Source.SOURCE_RESOLUTION_1080P,
-            source_vcodec=Source.SOURCE_VCODEC_VP9,
-            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            source_resolution=Val(SourceResolution.VIDEO_1080P),
+            source_vcodec=Val(YouTube_VideoCodec.VP9),
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
             prefer_60fps=False,
             prefer_hdr=False,
-            fallback=Source.FALLBACK_FAIL
+            fallback=Val(Fallback.FAIL)
         )
         # Add some media
         test_minimal_metadata = '''
@@ -519,7 +517,7 @@ class FilepathTestCase(TestCase):
         logging.disable(logging.CRITICAL)
         # Add a test source
         self.source = Source.objects.create(
-            source_type=Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            source_type=Val(YouTube_SourceType.CHANNEL),
             key='testkey',
             name='testname',
             directory='testdirectory',
@@ -527,12 +525,12 @@ class FilepathTestCase(TestCase):
             index_schedule=3600,
             delete_old_media=False,
             days_to_keep=14,
-            source_resolution=Source.SOURCE_RESOLUTION_1080P,
-            source_vcodec=Source.SOURCE_VCODEC_VP9,
-            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            source_resolution=Val(SourceResolution.VIDEO_1080P),
+            source_vcodec=Val(YouTube_VideoCodec.VP9),
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
             prefer_60fps=False,
             prefer_hdr=False,
-            fallback=Source.FALLBACK_FAIL
+            fallback=Val(Fallback.FAIL)
         )
         # Add some test media
         self.media = Media.objects.create(
@@ -658,11 +656,11 @@ class FilepathTestCase(TestCase):
         self.assertTrue(isinstance(settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX, bool))
         # Test the default behavior for "True", forced "audio" or "video" parent directories for sources
         settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX = True
-        self.source.source_resolution = Source.SOURCE_RESOLUTION_AUDIO
+        self.source.source_resolution = Val(SourceResolution.AUDIO)
         test_audio_prefix_path = Path(self.source.directory_path)
         self.assertEqual(test_audio_prefix_path.parts[-2], 'audio')
         self.assertEqual(test_audio_prefix_path.parts[-1], 'testdirectory')
-        self.source.source_resolution = Source.SOURCE_RESOLUTION_1080P
+        self.source.source_resolution = Val(SourceResolution.VIDEO_1080P)
         test_video_prefix_path = Path(self.source.directory_path)
         self.assertEqual(test_video_prefix_path.parts[-2], 'video')
         self.assertEqual(test_video_prefix_path.parts[-1], 'testdirectory')
@@ -679,7 +677,7 @@ class MediaTestCase(TestCase):
         logging.disable(logging.CRITICAL)
         # Add a test source
         self.source = Source.objects.create(
-            source_type=Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            source_type=Val(YouTube_SourceType.CHANNEL),
             key='testkey',
             name='testname',
             directory='testdirectory',
@@ -687,12 +685,12 @@ class MediaTestCase(TestCase):
             index_schedule=3600,
             delete_old_media=False,
             days_to_keep=14,
-            source_resolution=Source.SOURCE_RESOLUTION_1080P,
-            source_vcodec=Source.SOURCE_VCODEC_VP9,
-            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            source_resolution=Val(SourceResolution.VIDEO_1080P),
+            source_vcodec=Val(YouTube_VideoCodec.VP9),
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
             prefer_60fps=False,
             prefer_hdr=False,
-            fallback=Source.FALLBACK_FAIL
+            fallback=Val(Fallback.FAIL)
         )
         # Add some test media
         self.media = Media.objects.create(
@@ -752,7 +750,7 @@ class MediaFilterTestCase(TestCase):
         # logging.disable(logging.CRITICAL)
         # Add a test source
         self.source = Source.objects.create(
-            source_type=Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            source_type=Val(YouTube_SourceType.CHANNEL),
             key="testkey",
             name="testname",
             directory="testdirectory",
@@ -760,12 +758,12 @@ class MediaFilterTestCase(TestCase):
             index_schedule=3600,
             delete_old_media=False,
             days_to_keep=14,
-            source_resolution=Source.SOURCE_RESOLUTION_1080P,
-            source_vcodec=Source.SOURCE_VCODEC_VP9,
-            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            source_resolution=Val(SourceResolution.VIDEO_1080P),
+            source_vcodec=Val(YouTube_VideoCodec.VP9),
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
             prefer_60fps=False,
             prefer_hdr=False,
-            fallback=Source.FALLBACK_FAIL,
+            fallback=Val(Fallback.FAIL),
         )
         # Add some test media
         self.media = Media.objects.create(
@@ -922,19 +920,19 @@ class FormatMatchingTestCase(TestCase):
         logging.disable(logging.CRITICAL)
         # Add a test source
         self.source = Source.objects.create(
-            source_type=Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            source_type=Val(YouTube_SourceType.CHANNEL),
             key='testkey',
             name='testname',
             directory='testdirectory',
             index_schedule=3600,
             delete_old_media=False,
             days_to_keep=14,
-            source_resolution=Source.SOURCE_RESOLUTION_1080P,
-            source_vcodec=Source.SOURCE_VCODEC_VP9,
-            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            source_resolution=Val(SourceResolution.VIDEO_1080P),
+            source_vcodec=Val(YouTube_VideoCodec.VP9),
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
             prefer_60fps=False,
             prefer_hdr=False,
-            fallback=Source.FALLBACK_FAIL
+            fallback=Val(Fallback.FAIL)
         )
         # Add some media
         self.media = Media.objects.create(
@@ -944,7 +942,7 @@ class FormatMatchingTestCase(TestCase):
         )
 
     def test_combined_exact_format_matching(self):
-        self.source.fallback = Source.FALLBACK_FAIL
+        self.source.fallback = Val(Fallback.FAIL)
         self.media.metadata = all_test_metadata['boring']
         self.media.save()
         expected_matches = {
@@ -1074,7 +1072,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expected_match_type)
 
     def test_audio_exact_format_matching(self):
-        self.source.fallback = Source.FALLBACK_FAIL
+        self.source.fallback = Val(Fallback.FAIL)
         self.media.metadata = all_test_metadata['boring']
         self.media.save()
         expected_matches = {
@@ -1220,7 +1218,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
 
     def test_video_exact_format_matching(self):
-        self.source.fallback = Source.FALLBACK_FAIL
+        self.source.fallback = Val(Fallback.FAIL)
         # Test no 60fps, no HDR metadata
         self.media.metadata = all_test_metadata['boring']
         self.media.save()
@@ -1430,7 +1428,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
 
     def test_video_next_best_format_matching(self):
-        self.source.fallback = Source.FALLBACK_NEXT_BEST
+        self.source.fallback = Val(Fallback.NEXT_BEST)
         # Test no 60fps, no HDR metadata
         self.media.metadata = all_test_metadata['boring']
         self.media.save()
@@ -1740,19 +1738,19 @@ class ResponseFilteringTestCase(TestCase):
         logging.disable(logging.CRITICAL)
         # Add a test source
         self.source = Source.objects.create(
-            source_type=Source.SOURCE_TYPE_YOUTUBE_CHANNEL,
+            source_type=Val(YouTube_SourceType.CHANNEL),
             key='testkey',
             name='testname',
             directory='testdirectory',
             index_schedule=3600,
             delete_old_media=False,
             days_to_keep=14,
-            source_resolution=Source.SOURCE_RESOLUTION_1080P,
-            source_vcodec=Source.SOURCE_VCODEC_VP9,
-            source_acodec=Source.SOURCE_ACODEC_OPUS,
+            source_resolution=Val(SourceResolution.VIDEO_1080P),
+            source_vcodec=Val(YouTube_VideoCodec.VP9),
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
             prefer_60fps=False,
             prefer_hdr=False,
-            fallback=Source.FALLBACK_FAIL
+            fallback=Val(Fallback.FAIL)
         )
         # Add some media
         self.media = Media.objects.create(
