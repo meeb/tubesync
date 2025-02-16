@@ -453,7 +453,11 @@ def download_media(media_id):
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
                  f'it is now marked to be skipped, not downloading')
         return
-    if media.downloaded and media.media_file and media.media_file.name:
+    downloaded_file_exists = (
+        media.media_file_exists or
+        media.filepath.exists()
+    )
+    if media.downloaded and downloaded_file_exists:
         # Media has been marked as downloaded before the download_media task was fired,
         # skip it
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
