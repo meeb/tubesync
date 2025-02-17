@@ -164,3 +164,91 @@ class PlexMediaServer(MediaServer):
                                        f'{response.status_code}. Check your media '
                                        f'server details.')
         return True
+
+
+class JellyfinMediaServer(MediaServer):
+    TIMEOUT = 5
+
+    HELP = _('<p>To connect your TubeSync server to your Jellyfin Media Server, please enter the details below.</p>'
+             '<p>The <strong>host</strong> can be either an IP address or a valid hostname.</p>'
+             '<p>The <strong>port</strong> should be between 1 and 65536.</p>'
+             '<p>The <strong>token</strong> is required for API access. You can generate a token in your Jellyfin user profile settings.</p>'
+             '<p>The <strong>libraries</strong> is a comma-separated list of library IDs in Jellyfin.</p>')
+
+    def make_request(self, uri='/', params={}):
+        headers = {
+            'User-Agent': 'TubeSync',
+            'X-Emby-Token': self.object.loaded_options['token']  # Jellyfin uses the same `X-Emby-Token` header as Emby
+        }
+        base_url = f"{self.object.url}:{self.object.port}" if self.object.port else self.object.url
+        url = f"{base_url}{uri}"
+        
+        log.debug(f'[jellyfin media server] Making HTTP GET request to: {url}')
+        
+        return requests.get(url, headers=headers, verify=self.object.verify_https, timeout=self.TIMEOUT)
+
+    def validate(self):
+        if not self.object.host:
+            raise ValidationError('Jellyfin Media Server requires a "host"')
+        if not self.object.port:
+            raise ValidationError('Jellyfin Media Server requires a "port"')
+        
+        try:
+            port = int(self.object.port)
+            if port < 1 or port > 65535:
+                raise ValidationError('Jellyfin Media Server "port" must be between 1 and 65535')
+        except (TypeError, ValueError):
+            raise ValidationError('Jellyfin Media Server "port" must be an integer')
+        
+        options = self.object.loaded_options
+        if 'token' not in options:
+            raise ValidationError('Jellyfin Media Server requires a "token"')
+        if 'libraries' not in options:
+            raise ValidationError('Jellyfin Media Server requires a "libraries"')
+        
+        # Test connection and fetch libraries
+        try:
+            response = self.make_request('/Library/MediaFolders', params={'Recursive': 'true', 'IncludeItemTypes': 'CollectionFolder'})
+            if response.status_code != 200:
+                raise ValidationError(f'Failed to connect to Jellyfin server: {response.status_code}')
+            data = response.json()
+            if 'Items' not in data:
+                raise ValidationError('Jellyfin Media Server returned unexpected data.')
+        except Exception as e:
+            raise ValidationError(f'Connection error: {e}')
+
+        # Seems we have a valid library sections page, get the library IDs
+        remote_libraries = {}
+        try:
+            for d in data['Items']:
+                library_id = d['Id']
+                library_name = d['Name']
+                remote_libraries[library_id] = library_name
+        except Exception as e:
+            raise ValidationError(f'Jellyfin Media Server returned unexpected data, '
+                                  f'the JSON it returned could not be parsed and the '
+                                  f'error was "{e}"')
+        # Validate the library IDs
+        remote_libraries_desc = []
+        for remote_library_id, remote_library_name in remote_libraries.items():
+            remote_libraries_desc.append(f'"{remote_library_name}" with ID '
+                                         f'"{remote_library_id}"')
+        remote_libraries_str = ', '.join(remote_libraries_desc)
+        for library_id in libraries:
+            library_id = library_id.strip()
+            if library_id not in remote_libraries:
+                raise ValidationError(f'One or more of your specified library IDs do '
+                                      f'not exist on your Plex Media Server. Your '
+                                      f'valid libraries are: {remote_libraries_str}')
+        
+        return True
+
+    def update(self):
+        libraries = self.object.loaded_options.get('libraries', '').split(',')
+        for library_id in libraries:
+            library_id = library_id.strip()
+            uri = f'/Library/{library_id}/Refresh'
+            response = self.make_request(uri)
+            if response.status_code != 204:  # 204 No Content is expected for successful refresh
+                raise MediaServerError(f'Failed to refresh Jellyfin library "{library_id}", status code: {response.status_code}')
+        return True
