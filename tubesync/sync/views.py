@@ -594,6 +594,9 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
         self.object.downloaded_fps = None
         self.object.downloaded_hdr = False
         self.object.downloaded_filesize = None
+        # Mark it as not skipped
+        self.object.skip = False
+        self.object.manual_skip = False
         # Saving here will trigger the post_create signals to schedule new tasks
         self.object.save()
         return super().form_valid(form)
