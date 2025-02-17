@@ -217,15 +217,9 @@ def index_source_task(source_id):
         media.duration = float(video.get(fields('duration', media), None) or 0) or None
         media.title = str(video.get(fields('title', media), ''))[:200]
         timestamp = video.get(fields('timestamp', media), None)
-        if timestamp is not None:
-            try:
-                timestamp_float = float(timestamp)
-                posix_epoch = datetime(1970, 1, 1, tzinfo=tz.utc)
-                published_dt = posix_epoch + timedelta(seconds=timestamp_float)
-            except Exception as e:
-                log.warn(f'Could not set published for: {source} / {media} with "{e}"')
-            else:
-                media.published = published_dt
+        published_dt = media.metadata_published(timestamp)
+        if published_dt is not None:
+            media.published = published_dt
         try:
             media.save()
             log.debug(f'Indexed media: {source} / {media}')
