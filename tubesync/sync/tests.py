@@ -16,7 +16,7 @@ from django.test import TestCase, Client, override_settings
 from django.utils import timezone
 from background_task.models import Task
 from .models import Source, Media
-from .tasks import cleanup_old_media
+from .tasks import cleanup_old_media, check_source_directory_exists
 from .filtering import filter_media
 from .utils import filter_response
 from .choices import (Val, Fallback, IndexSchedule, SourceResolution,
