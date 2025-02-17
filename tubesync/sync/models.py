@@ -1033,10 +1033,11 @@ class Media(models.Model):
         return self.loaded_metadata.get(field, '').strip()
 
     @property
-    def metadata_published(self):
+    def metadata_published(self, timestamp=None):
         published_dt = None
-        field = self.get_metadata_field('timestamp')
-        timestamp = self.loaded_metadata.get(field, None)
+        if timestamp is None:
+            field = self.get_metadata_field('timestamp')
+            timestamp = self.loaded_metadata.get(field, None)
         if timestamp is not None:
             try:
                 timestamp_float = float(timestamp)
