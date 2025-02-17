@@ -558,7 +558,7 @@ class Media(models.Model):
     METADATA_FIELDS = {
         **(_same_name('upload_date')),
         **(_same_name('timestamp')),
-        **(_same_name('title')),
+        **(_same_name('fulltitle', 'title')),
         **(_same_name('description')),
         **(_same_name('duration')),
         **(_same_name('formats')),
