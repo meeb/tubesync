@@ -1033,6 +1033,20 @@ class Media(models.Model):
         return self.loaded_metadata.get(field, '').strip()
 
     @property
+    def metadata_published(self):
+        published_dt = None
+        field = self.get_metadata_field('timestamp')
+        timestamp = self.loaded_metadata.get(field, None)
+        if timestamp is not None:
+            try:
+                timestamp_float = float(timestamp)
+                posix_epoch = datetime(1970, 1, 1, tzinfo=tz.utc)
+                published_dt = posix_epoch + timedelta(seconds=timestamp_float)
+            except Exception as e:
+                log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
+        return published_dt
+
+    @property
     def slugtitle(self):
         replaced = self.title.replace('_', '-').replace('&', 'and').replace('+', 'and')
         return slugify(replaced)[:80]
