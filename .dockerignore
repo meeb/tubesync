@@ -4,5 +4,5 @@
 .gitattributes
 README.md
 tubesync/media
-tubesync/downloads
+tubesync/tubesync/downloads
 db.sqlite3

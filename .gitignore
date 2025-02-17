@@ -63,7 +63,7 @@ db.sqlite3
 db.sqlite3-journal
 /tubesync/static/
 /tubesync/media/
-/tubesync/downloads/
+/tubesync/tubesync/downloads/
 
 # Flask stuff:
 instance/
