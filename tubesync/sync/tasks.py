@@ -380,7 +380,7 @@ def download_media_metadata(media_id):
     # Media must have a valid upload date
     if upload_date:
         media.published = timezone.make_aware(upload_date)
-    published = media.metadata_published
+    published = media.metadata_published()
     if published:
         media.published = published
 
