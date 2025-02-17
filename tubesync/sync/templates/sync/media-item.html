@@ -9,7 +9,7 @@
     {% if media.title %}<h2 class="truncate"><strong>{{ media.title }}</strong></h2>{% endif %}
     <p class="truncate"><strong><a href="{{ media.url }}" target="_blank"><i class="fas fa-link"></i> {{ media.url }}</a></strong></p>
     <p class="truncate">Downloading to: <strong>{{ media.source.directory_path }}</strong></p>
-    {% if download_state == 'downloaded' %}
+    {% if not media.skip and download_state == 'downloaded' %}
     {% if media.source.is_audio %}
     <audio controls src="{% url 'sync:media-content' pk=media.pk %}"></audio>
     {% else %}
