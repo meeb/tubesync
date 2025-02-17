@@ -16,7 +16,7 @@ from django.test import TestCase, Client, override_settings
 from django.utils import timezone
 from background_task.models import Task
 from .models import Source, Media
-from .tasks import cleanup_old_media
+from .tasks import cleanup_old_media, check_source_directory_exists
 from .filtering import filter_media
 from .utils import filter_response
 from .choices import (Val, Fallback, IndexSchedule, SourceResolution,
@@ -212,6 +212,8 @@ class FrontEndTestCase(TestCase):
         task = Task.objects.get_task('sync.tasks.index_source_task',
                                      args=(source_uuid,))[0]
         self.assertEqual(task.queue, source_uuid)
+        # Run the check_source_directory_exists task
+        check_source_directory_exists.now(source_uuid)
         # Check the source is now on the source overview page
         response = c.get('/sources')
         self.assertEqual(response.status_code, 200)
