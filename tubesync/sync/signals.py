@@ -1,5 +1,3 @@
-import os
-import glob
 from pathlib import Path
 from django.conf import settings
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
@@ -15,7 +13,7 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     download_media, rescan_media_server, download_source_images,
                     save_all_media_for_source, rename_media,
                     get_media_metadata_task, get_media_download_task)
-from .utils import delete_file, glob_quote
+from .utils import delete_file, glob_quote, mkdir_p
 from .filtering import filter_media
 from .choices import Val, YouTube_SourceType
 
@@ -29,15 +27,29 @@ def source_pre_save(sender, instance, **kwargs):
     except Source.DoesNotExist:
         # Probably not possible?
         return
-    if existing_source.index_schedule != instance.index_schedule:
+    existing_dirpath = existing_source.directory_path.resolve(strict=True)
+    new_dirpath = instance.directory_path.resolve(strict=False)
+    rename_source_directory = (
+        existing_dirpath != new_dirpath and
+        not new_dirpath.exists()
+    )
+    if rename_source_directory:
+        mkdir_p(new_dirpath.parent)
+        existing_dirpath.rename(new_dirpath)
+    recreate_index_source_task = (
+        existing_source.name != instance.name or
+        existing_source.index_schedule != instance.index_schedule
+    )
+    if recreate_index_source_task:
         # Indexing schedule has changed, recreate the indexing task
         delete_task_by_source('sync.tasks.index_source_task', instance.pk)
         verbose_name = _('Index media from source "{}"')
         index_source_task(
             str(instance.pk),
+            schedule=instance.index_schedule,
             repeat=instance.index_schedule,
             queue=str(instance.pk),
-            priority=5,
+            priority=10,
             verbose_name=verbose_name.format(instance.name),
             remove_existing_tasks=True
         )
@@ -56,18 +68,19 @@ def source_post_save(sender, instance, created, **kwargs):
         if instance.source_type != Val(YouTube_SourceType.PLAYLIST) and instance.copy_channel_images:
             download_source_images(
                 str(instance.pk),
-                priority=2,
+                priority=5,
                 verbose_name=verbose_name.format(instance.name)
             )
         if instance.index_schedule > 0:
             delete_task_by_source('sync.tasks.index_source_task', instance.pk)
-            log.info(f'Scheduling media indexing for source: {instance.name}')
+            log.info(f'Scheduling first media indexing for source: {instance.name}')
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(instance.pk),
+                schedule=600,
                 repeat=instance.index_schedule,
                 queue=str(instance.pk),
-                priority=5,
+                priority=10,
                 verbose_name=verbose_name.format(instance.name),
                 remove_existing_tasks=True
             )
@@ -86,14 +99,14 @@ def source_post_save(sender, instance, created, **kwargs):
             rename_media(
                 str(media.pk),
                 queue=str(media.pk),
-                priority=1,
+                priority=5,
                 verbose_name=verbose_name.format(media.key, media.name),
                 remove_existing_tasks=True
             )
     verbose_name = _('Checking all media for source "{}"')
     save_all_media_for_source(
         str(instance.pk),
-        priority=2,
+        priority=9,
         verbose_name=verbose_name.format(instance.name),
         remove_existing_tasks=True
     )
@@ -160,7 +173,7 @@ def media_post_save(sender, instance, created, **kwargs):
         verbose_name = _('Downloading metadata for "{}"')
         download_media_metadata(
             str(instance.pk),
-            priority=5,
+            priority=10,
             verbose_name=verbose_name.format(instance.pk),
             remove_existing_tasks=True
         )
@@ -177,7 +190,7 @@ def media_post_save(sender, instance, created, **kwargs):
                 str(instance.pk),
                 thumbnail_url,
                 queue=str(instance.source.pk),
-                priority=10,
+                priority=15,
                 verbose_name=verbose_name.format(instance.name),
                 remove_existing_tasks=True
             )
@@ -196,7 +209,7 @@ def media_post_save(sender, instance, created, **kwargs):
         download_media(
             str(instance.pk),
             queue=str(instance.source.pk),
-            priority=10,
+            priority=15,
             verbose_name=verbose_name.format(instance.name),
             remove_existing_tasks=True
         )
@@ -209,29 +222,33 @@ def media_post_save(sender, instance, created, **kwargs):
 
 @receiver(pre_delete, sender=Media)
 def media_pre_delete(sender, instance, **kwargs):
-    # Triggered before media is deleted, delete any scheduled tasks
+    # Triggered before media is deleted, delete any unlocked scheduled tasks
     log.info(f'Deleting tasks for media: {instance.name}')
     delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
+    delete_task_by_media('sync.tasks.download_media_metadata', (str(instance.pk),))
+    delete_task_by_media('sync.tasks.rename_media', (str(instance.pk),))
+    delete_task_by_media('sync.tasks.wait_for_media_premiere', (str(instance.pk),))
     thumbnail_url = instance.thumbnail
     if thumbnail_url:
         delete_task_by_media('sync.tasks.download_media_thumbnail',
                              (str(instance.pk), thumbnail_url))
+    # Remove thumbnail file for deleted media
+    if instance.thumb:
+        instance.thumb.delete(save=False)
 
 
 @receiver(post_delete, sender=Media)
 def media_post_delete(sender, instance, **kwargs):
-    # Remove thumbnail file for deleted media
-    if instance.thumb:
-        instance.thumb.delete(save=False)
     # Remove the video file, when configured to do so
     if instance.source.delete_files_on_disk and instance.media_file:
-        video_path = Path(str(instance.media_file.path)).resolve()
+        video_path = Path(str(instance.media_file.path)).resolve(strict=False)
         instance.media_file.delete(save=False)
         # the other files we created have these known suffixes
         for suffix in frozenset(('nfo', 'jpg', 'webp', 'info.json',)):
-            other_path = video_path.with_suffix(f'.{suffix}').resolve()
-            log.info(f'Deleting file for: {instance} path: {other_path!s}')
-            delete_file(other_path)
+            other_path = video_path.with_suffix(f'.{suffix}').resolve(strict=False)
+            if other_path.is_file():
+                log.info(f'Deleting file for: {instance} path: {other_path!s}')
+                delete_file(other_path)
         # subtitles include language code
         subtitle_files = video_path.parent.glob(f'{glob_quote(video_path.with_suffix("").name)}*.vtt')
         for file in subtitle_files:
@@ -240,7 +257,7 @@ def media_post_delete(sender, instance, **kwargs):
         # Jellyfin creates .trickplay directories and posters
         for suffix in frozenset(('.trickplay', '-poster.jpg', '-poster.webp',)):
             # with_suffix insists on suffix beginning with '.' for no good reason
-            other_path = Path(str(video_path.with_suffix('')) + suffix).resolve()
+            other_path = Path(str(video_path.with_suffix('')) + suffix).resolve(strict=False)
             if other_path.is_file():
                 log.info(f'Deleting file for: {instance} path: {other_path!s}')
                 delete_file(other_path)
@@ -284,6 +301,7 @@ def media_post_delete(sender, instance, **kwargs):
         verbose_name = _('Request media server rescan for "{}"')
         rescan_media_server(
             str(mediaserver.pk),
+            schedule=5,
             priority=0,
             verbose_name=verbose_name.format(mediaserver),
             remove_existing_tasks=True
