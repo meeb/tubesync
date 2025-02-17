@@ -1032,7 +1032,6 @@ class Media(models.Model):
         field = self.get_metadata_field('title')
         return self.loaded_metadata.get(field, '').strip()
 
-    @property
     def metadata_published(self, timestamp=None):
         published_dt = None
         if timestamp is None:
