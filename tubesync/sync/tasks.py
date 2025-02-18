@@ -10,7 +10,7 @@ import math
 import uuid
 from io import BytesIO
 from hashlib import sha1
-from datetime import datetime, timedelta, timezone as tz
+from datetime import datetime, timedelta
 from shutil import copyfile
 from PIL import Image
 from django.conf import settings
