@@ -382,7 +382,8 @@ HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck
 
 # ENVS and ports
 ENV PYTHONPATH="/app" \
-    PYTHONPYCACHEPREFIX="/config/cache/pycache"
+    PYTHONPYCACHEPREFIX="/config/cache/pycache" \
+    XDG_CACHE_HOME="/config/cache"
 EXPOSE 4848
 
 # Volumes
