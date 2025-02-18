@@ -4,7 +4,7 @@ import json
 import re
 from xml.etree import ElementTree
 from collections import OrderedDict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as tz
 from pathlib import Path
 from django.conf import settings
 from django.db import models
