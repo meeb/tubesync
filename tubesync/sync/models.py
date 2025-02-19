@@ -4,7 +4,7 @@ import json
 import re
 from xml.etree import ElementTree
 from collections import OrderedDict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as tz
 from pathlib import Path
 from django.conf import settings
 from django.db import models
@@ -559,6 +559,7 @@ class Media(models.Model):
         **(_same_name('upload_date')),
         **(_same_name('timestamp')),
         **(_same_name('title')),
+        **(_same_name('fulltitle')),
         **(_same_name('description')),
         **(_same_name('duration')),
         **(_same_name('formats')),
@@ -1029,8 +1030,28 @@ class Media(models.Model):
 
     @property
     def metadata_title(self):
-        field = self.get_metadata_field('title')
-        return self.loaded_metadata.get(field, '').strip()
+        result = ''
+        for key in ('fulltitle', 'title'):
+            field = self.get_metadata_field(key)
+            value = self.loaded_metadata.get(field, '').strip()
+            if value:
+                result = value
+                break
+        return result
+
+    def metadata_published(self, timestamp=None):
+        published_dt = None
+        if timestamp is None:
+            field = self.get_metadata_field('timestamp')
+            timestamp = self.loaded_metadata.get(field, None)
+        if timestamp is not None:
+            try:
+                timestamp_float = float(timestamp)
+                posix_epoch = datetime(1970, 1, 1, tzinfo=tz.utc)
+                published_dt = posix_epoch + timedelta(seconds=timestamp_float)
+            except Exception as e:
+                log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
+        return published_dt
 
     @property
     def slugtitle(self):
