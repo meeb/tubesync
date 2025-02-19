@@ -553,6 +553,8 @@ def download_media(media_id):
         err = (f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
                f'expected outfile does not exist: {filepath}')
         log.error(err)
+        # Try refreshing formats
+        media.refresh_formats
         # Raising an error here triggers the task to be re-attempted (or fail)
         raise DownloadFailedException(err)
 
