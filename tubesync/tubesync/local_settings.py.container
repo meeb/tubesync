@@ -65,7 +65,7 @@ BACKGROUND_TASK_ASYNC_THREADS = int(os.getenv('TUBESYNC_WORKERS', DEFAULT_THREAD
 
 MEDIA_ROOT = CONFIG_BASE_DIR / 'media'
 DOWNLOAD_ROOT = DOWNLOADS_BASE_DIR
-YOUTUBE_DL_CACHEDIR = CONFIG_BASE_DIR / 'cache/youtube'
+YOUTUBE_DL_CACHEDIR = CONFIG_BASE_DIR / 'cache/yt-dlp'
 YOUTUBE_DL_TEMPDIR = DOWNLOAD_ROOT / 'cache'
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 
@@ -114,6 +114,7 @@ if not YOUTUBE_DL_CACHEDIR.is_dir():
     YOUTUBE_DL_CACHEDIR.mkdir(parents=True)
 # rename any old yt_dlp cache directories to the current directory
 old_youtube_cache_dirs = list(YOUTUBE_DL_CACHEDIR.parent.glob('youtube-*'))
+old_youtube_cache_dirs.extend(list(YOUTUBE_DL_CACHEDIR.parent.glob('youtube/youtube-*')))
 for cache_dir in old_youtube_cache_dirs:
     cache_dir.rename(YOUTUBE_DL_CACHEDIR / cache_dir.name)
 
