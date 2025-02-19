@@ -596,7 +596,7 @@ def save_all_media_for_source(source_id):
 @background(schedule=0, remove_existing_tasks=True)
 def rename_media(media_id):
     try:
-        media = Media.objects.get(pk=media_id)
+        media = Media.objects.defer('metadata', 'thumb').get(pk=media_id)
     except Media.DoesNotExist:
         return
     media.rename_files()
