@@ -1048,7 +1048,7 @@ class Media(models.Model):
         now = timezone.now()
         formats_seconds = data.get('formats_epoch', metadata_seconds)
         metadata_dt = self.metadata_published(formats_seconds)
-        if (now - metadata_dt) < self.source.index_schedule:
+        if (now - metadata_dt) < timedelta(seconds=self.source.index_schedule):
             return False
 
         self.skip = False
