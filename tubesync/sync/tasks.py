@@ -587,10 +587,25 @@ def save_all_media_for_source(source_id):
         log.error(f'Task save_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         return
+
+    already_saved = set()
+    mqs = Media.objects.filter(source=source)
+    refresh_qs = mqs.filter(
+        can_download=False,
+        skip=False,
+        manual_skip=False,
+        downloaded=False,
+    )
+    for media in refresh_qs:
+        media.refresh_formats
+        media.save()
+        already_saved.add(media.uuid)
+
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
-    for media in Media.objects.filter(source=source):
-        media.save()
+    for media in mqs:
+        if media.uuid not in already_saved:
+            media.save()
 
 
 @background(schedule=0, remove_existing_tasks=True)
