@@ -94,12 +94,20 @@ def source_post_save(sender, instance, created, **kwargs):
         settings.RENAME_ALL_SOURCES
     )
     if create_rename_tasks:
-        for media in Media.objects.filter(source=instance.pk, downloaded=True):
+        mqs = Media.objects.filter(
+            source=instance.pk,
+            downloaded=True,
+        ).defer(
+            'media_file',
+            'metadata',
+            'thumb',
+        )
+        for media in mqs:
             verbose_name = _('Renaming media for: {}: "{}"')
             rename_media(
                 str(media.pk),
                 queue=str(media.pk),
-                priority=5,
+                priority=15,
                 verbose_name=verbose_name.format(media.key, media.name),
                 remove_existing_tasks=True
             )
