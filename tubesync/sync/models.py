@@ -822,6 +822,25 @@ class Media(models.Model):
                 if audio_format and video_format:
                     return f'{video_format}+{audio_format}'
                 else:
+                    # last resort: any combined format
+                    fallback_hd_cutoff = getattr(settings, 'VIDEO_HEIGHT_IS_HD', 500)
+
+                    for fmt in reversed(list(self.iter_formats())):
+                        select_fmt = (
+                            fmt.get('id') and
+                            fmt.get('acodec') and
+                            fmt.get('vcodec') and
+                            self.source.can_fallback and
+                            (
+                                (self.source.fallback == Val(Fallback.NEXT_BEST)) or
+                                (
+                                    self.source.fallback == Val(Fallback.NEXT_BEST_HD) and
+                                    (fmt.get('height') or 0) >= fallback_hd_cutoff
+                                )
+                            )
+                        )
+                        if select_fmt:
+                            return str(fmt.get('id'))
                     return False
         return False
  
