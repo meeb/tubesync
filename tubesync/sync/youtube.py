@@ -85,6 +85,7 @@ def get_channel_image_info(url):
         'simulate': True,
         'logger': log,
         'extract_flat': True,  # Change to False to get detailed info
+        'check_formats': False,
     })
 
     with yt_dlp.YoutubeDL(opts) as y:
@@ -143,7 +144,11 @@ def get_media_info(url):
         'simulate': True,
         'logger': log,
         'extract_flat': True,
-        'extractor_args': {'youtubetab': {'approximate_date': ['true']}},
+        'check_formats': True,
+        'extractor_args': {
+            'youtube': {'formats': ['missing_pot']},
+            'youtubetab': {'approximate_date': ['true']},
+        },
     })
     response = {}
     with yt_dlp.YoutubeDL(opts) as y:
@@ -248,7 +253,7 @@ def download_media(
         'writeautomaticsub': auto_subtitles,
         'subtitleslangs': sub_langs.split(','),
         'writethumbnail': embed_thumbnail,
-        'check_formats': False,
+        'check_formats': None,
         'overwrites': None,
         'sleep_interval': 10 + int(settings.DOWNLOAD_MEDIA_DELAY / 20),
         'max_sleep_interval': settings.DOWNLOAD_MEDIA_DELAY,
