@@ -819,13 +819,9 @@ class CompletedTasksView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        return CompletedTask.objects.all().order_by('-run_at')
-
-    def get_queryset(self):
+        q = CompletedTask.objects.all()
         if self.filter_source:
-            q = CompletedTask.objects.filter(queue=str(self.filter_source.pk))
-        else:
-            q = CompletedTask.objects.all()
+            q = q.filter(queue=str(self.filter_source.pk))
         return q.order_by('-run_at')
 
     def get_context_data(self, *args, **kwargs):
