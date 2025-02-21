@@ -819,9 +819,6 @@ class CompletedTasksView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        return CompletedTask.objects.all().order_by('-run_at')
-
-    def get_queryset(self):
         if self.filter_source:
             q = CompletedTask.objects.filter(queue=str(self.filter_source.pk))
         else:
