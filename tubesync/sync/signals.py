@@ -107,7 +107,7 @@ def source_post_save(sender, instance, created, **kwargs):
             rename_media(
                 str(media.pk),
                 queue=str(media.pk),
-                priority=15,
+                priority=16,
                 verbose_name=verbose_name.format(media.key, media.name),
                 remove_existing_tasks=True
             )
