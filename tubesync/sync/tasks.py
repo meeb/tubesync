@@ -601,10 +601,12 @@ def save_all_media_for_source(source_id):
     for media in refresh_qs:
         try:
             media.refresh_formats
+        except YouTubeError as e:
+            log.debug(f'Failed to refresh formats for: {source} / {media.key}: {e!s}')
+            pass
+        else:
             media.save()
             already_saved.add(media.uuid)
-        except YouTubeError:
-            pass
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
