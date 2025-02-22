@@ -84,33 +84,7 @@ def source_post_save(sender, instance, created, **kwargs):
                 verbose_name=verbose_name.format(instance.name),
                 remove_existing_tasks=True
             )
-    # Check settings before any rename tasks are scheduled
-    rename_sources_setting = settings.RENAME_SOURCES or list()
-    create_rename_tasks = (
-        (
-            instance.directory and
-            instance.directory in rename_sources_setting
-        ) or
-        settings.RENAME_ALL_SOURCES
-    )
-    if create_rename_tasks:
-        mqs = Media.objects.filter(
-            source=instance.pk,
-            downloaded=True,
-        ).defer(
-            'media_file',
-            'metadata',
-            'thumb',
-        )
-        for media in mqs:
-            verbose_name = _('Renaming media for: {}: "{}"')
-            rename_media(
-                str(media.pk),
-                queue=str(media.pk),
-                priority=16,
-                verbose_name=verbose_name.format(media.key, media.name),
-                remove_existing_tasks=True
-            )
+
     verbose_name = _('Checking all media for source "{}"')
     save_all_media_for_source(
         str(instance.pk),
@@ -160,8 +134,30 @@ def media_post_save(sender, instance, created, **kwargs):
     can_download_changed = False
     # Reset the skip flag if the download cap has changed if the media has not
     # already been downloaded
-    if not instance.downloaded:
+    downloaded = instance.downloaded
+    if not downloaded:
         skip_changed = filter_media(instance)
+    else:
+        # Downloaded media might need to be renamed
+        # Check settings before any rename tasks are scheduled
+        media = instance
+        rename_sources_setting = settings.RENAME_SOURCES or list()
+        create_rename_task = (
+            (
+                media.source.directory and
+                media.source.directory in rename_sources_setting
+            ) or
+            settings.RENAME_ALL_SOURCES
+        )
+        if create_rename_task:
+            verbose_name = _('Renaming media for: {}: "{}"')
+            rename_media(
+                str(media.pk),
+                queue=str(media.pk),
+                priority=16,
+                verbose_name=verbose_name.format(media.key, media.name),
+                remove_existing_tasks=True
+            )
 
     # Recalculate the "can_download" flag, this may
     # need to change if the source specifications have been changed
@@ -204,7 +200,6 @@ def media_post_save(sender, instance, created, **kwargs):
             )
     existing_media_download_task = get_media_download_task(str(instance.pk))
     # If the media has not yet been downloaded schedule it to be downloaded
-    downloaded = instance.downloaded
     if not (instance.media_file_exists or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
         if instance.can_download and instance.downloaded:
