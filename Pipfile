@@ -7,7 +7,7 @@ verify_ssl = true
 autopep8 = "*"
 
 [packages]
-django = "*"
+django = "~=3.2"
 django-sass-processor = "*"
 libsass = "*"
 pillow = "*"
