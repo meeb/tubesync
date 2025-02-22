@@ -633,7 +633,25 @@ def rename_all_media_for_source(source_id):
         log.error(f'Task rename_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         return
-    for media in Media.objects.filter(source=source):
+    # Check that the settings allow renaming
+    rename_sources_setting = settings.RENAME_SOURCES or list()
+    create_rename_tasks = (
+        (
+            source.directory and
+            source.directory in rename_sources_setting
+        ) or
+        settings.RENAME_ALL_SOURCES
+    )
+    if not create_rename_tasks:
+        return
+    mqs = Media.objects.all().defer(
+        'metadata',
+        'thumb',
+    ).filter(
+        source=source,
+        downloaded=True,
+    )
+    for media in mqs:
         media.rename_files()
 
 
