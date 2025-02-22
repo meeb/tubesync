@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-ARG FFMPEG_DATE="2025-02-04-17-39"
-ARG FFMPEG_VERSION="N-118421-ga8595dae0f"
+ARG FFMPEG_DATE="2025-02-18-14-16"
+ARG FFMPEG_VERSION="N-118500-g08e37fa082"
 
 ARG S6_VERSION="3.2.0.2"
 
@@ -382,7 +382,8 @@ HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck
 
 # ENVS and ports
 ENV PYTHONPATH="/app" \
-    PYTHONPYCACHEPREFIX="/config/cache/pycache"
+    PYTHONPYCACHEPREFIX="/config/cache/pycache" \
+    XDG_CACHE_HOME="/config/cache"
 EXPOSE 4848
 
 # Volumes

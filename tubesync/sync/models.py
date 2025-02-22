@@ -822,6 +822,25 @@ class Media(models.Model):
                 if audio_format and video_format:
                     return f'{video_format}+{audio_format}'
                 else:
+                    # last resort: any combined format
+                    fallback_hd_cutoff = getattr(settings, 'VIDEO_HEIGHT_IS_HD', 500)
+
+                    for fmt in reversed(list(self.iter_formats())):
+                        select_fmt = (
+                            fmt.get('id') and
+                            fmt.get('acodec') and
+                            fmt.get('vcodec') and
+                            self.source.can_fallback and
+                            (
+                                (self.source.fallback == Val(Fallback.NEXT_BEST)) or
+                                (
+                                    self.source.fallback == Val(Fallback.NEXT_BEST_HD) and
+                                    (fmt.get('height') or 0) >= fallback_hd_cutoff
+                                )
+                            )
+                        )
+                        if select_fmt:
+                            return str(fmt.get('id'))
                     return False
         return False
  
@@ -1017,6 +1036,40 @@ class Media(models.Model):
             return data
         except Exception as e:
             return {}
+
+    @property
+    def refresh_formats(self):
+        data = self.loaded_metadata
+        metadata_seconds = data.get('epoch', None)
+        if not metadata_seconds:
+            self.metadata = None
+            return False
+
+        now = timezone.now()
+        formats_seconds = data.get('formats_epoch', metadata_seconds)
+        metadata_dt = self.metadata_published(formats_seconds)
+        if (now - metadata_dt) < timedelta(seconds=self.source.index_schedule):
+            return False
+
+        self.skip = False
+        metadata = self.index_metadata()
+        if self.skip:
+            return False
+ 
+        response = metadata
+        if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
+            response = filter_response(metadata, True)
+
+        field = self.get_metadata_field('formats')
+        data[field] = response.get(field, [])
+        if data.get('availability', 'public') != response.get('availability', 'public'):
+            data['availability'] = response.get('availability', 'public')
+        data['formats_epoch'] = response.get('epoch', formats_seconds)
+
+        from common.utils import json_serial
+        compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
+        self.metadata = compact_json
+        return True
 
     @property
     def url(self):
