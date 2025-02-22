@@ -121,6 +121,7 @@ class SourcesView(ListView):
                 str(sobj.pk),
                 queue=str(sobj.pk),
                 repeat=0,
+                schedule=30,
                 verbose_name=verbose_name.format(sobj.name))
             url = reverse_lazy('sync:sources')
             url = append_uri_params(url, {'message': 'source-refreshed'})
