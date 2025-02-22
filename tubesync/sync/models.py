@@ -1514,6 +1514,8 @@ class Media(models.Model):
                         old_file_str = other_path.name
                         new_file_str = new_stem + old_file_str[len(old_stem):]
                         new_file_path = Path(new_prefix_path / new_file_str)
+                        if new_file_path == other_path:
+                            continue
                         log.debug(f'Considering replace for: {self!s}\n\t{other_path!s}\n\t{new_file_path!s}')
                         # it should exist, but check anyway 
                         if other_path.exists():
@@ -1525,6 +1527,8 @@ class Media(models.Model):
                         old_file_str = fuzzy_path.name
                         new_file_str = new_stem + old_file_str[len(fuzzy_stem):]
                         new_file_path = Path(new_prefix_path / new_file_str)
+                        if new_file_path == fuzzy_path:
+                            continue
                         log.debug(f'Considering rename for: {self!s}\n\t{fuzzy_path!s}\n\t{new_file_path!s}')
                         # it quite possibly was renamed already
                         if fuzzy_path.exists() and not new_file_path.exists():
@@ -1538,8 +1542,9 @@ class Media(models.Model):
 
                     # try to remove empty dirs
                     parent_dir = old_video_path.parent
+                    stop_dir = self.source.directory_path
                     try:
-                        while parent_dir.is_dir():
+                        while parent_dir.is_relative_to(stop_dir):
                             parent_dir.rmdir()
                             log.info(f'Removed empty directory: {parent_dir!s}')
                             parent_dir = parent_dir.parent
