@@ -930,7 +930,7 @@ class Media(models.Model):
             if vformat['format']:
                 resolution = vformat['format'].lower()
             else:
-                resolution = f'{vformat['height']}p'
+                resolution = f"{vformat['height']}p"
             if resolution:
                 fmt.append(resolution)
             vcodec = vformat['vcodec'].lower()
