@@ -25,7 +25,7 @@ class Command(BaseCommand):
                 str(source.pk),
                 repeat=source.index_schedule,
                 queue=str(source.pk),
-                priority=5,
+                priority=10,
                 verbose_name=verbose_name.format(source.name)
             )
             # This also chains down to call each Media objects .save() as well
