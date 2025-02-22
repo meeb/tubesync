@@ -122,6 +122,8 @@ class SourcesView(ListView):
                 str(sobj.pk),
                 queue=str(sobj.pk),
                 repeat=0,
+                priority=10,
+                schedule=30,
                 verbose_name=verbose_name.format(sobj.name))
             url = reverse_lazy('sync:sources')
             url = append_uri_params(url, {'message': 'source-refreshed'})
@@ -861,7 +863,7 @@ class ResetTasks(FormView):
                 str(source.pk),
                 repeat=source.index_schedule,
                 queue=str(source.pk),
-                priority=5,
+                priority=10,
                 verbose_name=verbose_name.format(source.name)
             )
             # This also chains down to call each Media objects .save() as well
