@@ -25,7 +25,7 @@ def source_pre_save(sender, instance, **kwargs):
     try:
         existing_source = Source.objects.get(pk=instance.pk)
     except Source.DoesNotExist:
-        # Probably not possible?
+        log.debug(f'source_pre_save signal: no existing source: {sender} - {instance}')
         return
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
     new_dirpath = instance.directory_path.resolve(strict=False)
