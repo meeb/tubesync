@@ -25,7 +25,7 @@ from common.utils import append_uri_params
 from background_task.models import Task, CompletedTask
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
-                    SkipMediaForm, EnableMediaForm, ResetTasksForm, PlexMediaServerForm,
+                    SkipMediaForm, EnableMediaForm, ResetTasksForm,
                     ConfirmDeleteMediaServerForm)
 from .utils import validate_url, delete_file
 from .tasks import (map_task_to_instance, get_error_message,
@@ -879,6 +879,7 @@ class MediaServersView(ListView):
 
     template_name = 'sync/mediaservers.html'
     context_object_name = 'mediaservers'
+    types_object = MediaServerType
     messages = {
         'deleted': _('Your selected media server has been deleted.'),
     }
@@ -893,11 +894,12 @@ class MediaServersView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        return MediaServer.objects.all().order_by('host')
+        return MediaServer.objects.all().order_by('host', 'port')
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
         data['message'] = self.message
+        data['media_server_types'] = self.types_object.members_list()
         return data
 
 
@@ -908,13 +910,9 @@ class AddMediaServerView(FormView):
     '''
 
     template_name = 'sync/mediaserver-add.html'
-    server_types = {
-        'plex': Val(MediaServerType.PLEX),
-    }
+    server_types = MediaServerType.long_types()
     server_type_names = dict(MediaServerType.choices)
-    forms = {
-        Val(MediaServerType.PLEX): PlexMediaServerForm,
-    }
+    forms = MediaServerType.forms_dict()
 
     def __init__(self, *args, **kwargs):
         self.server_type = None
@@ -928,6 +926,8 @@ class AddMediaServerView(FormView):
         if not self.server_type:
             raise Http404
         self.form_class = self.forms.get(self.server_type)
+        if not self.form_class:
+            raise Http404
         self.model_class = MediaServer(server_type=self.server_type)
         return super().dispatch(request, *args, **kwargs)
 
@@ -969,6 +969,7 @@ class AddMediaServerView(FormView):
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
         data['server_type'] = self.server_type
+        data['server_type_long'] = self.server_types.get(self.server_type)
         data['server_type_name'] = self.server_type_names.get(self.server_type)
         data['server_help'] = self.model_class.get_help_html()
         return data
@@ -1029,9 +1030,7 @@ class UpdateMediaServerView(FormView, SingleObjectMixin):
 
     template_name = 'sync/mediaserver-update.html'
     model = MediaServer
-    forms = {
-        Val(MediaServerType.PLEX): PlexMediaServerForm,
-    }
+    forms = MediaServerType.forms_dict()
 
     def __init__(self, *args, **kwargs):
         self.object = None

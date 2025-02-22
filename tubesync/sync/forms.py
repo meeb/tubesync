@@ -48,7 +48,39 @@ class ConfirmDeleteMediaServerForm(forms.Form):
 
     pass
 
+_media_server_type_label = 'Jellyfin'
+class JellyfinMediaServerForm(forms.Form):
 
+    host = forms.CharField(
+        label=_(f'Host name or IP address of the {_media_server_type_label} server'),
+        required=True,
+    )
+    port = forms.IntegerField(
+        label=_(f'Port number of the {_media_server_type_label} server'),
+        required=True,
+        initial=8096,
+    )
+    use_https = forms.BooleanField(
+        label=_('Connect over HTTPS'),
+        required=False,
+        initial=False,
+    )
+    verify_https = forms.BooleanField(
+        label=_('Verify the HTTPS certificate is valid if connecting over HTTPS'),
+        required=False,
+        initial=True,
+    )
+    token = forms.CharField(
+        label=_(f'{_media_server_type_label} token'),
+        required=True,
+    )
+    libraries = forms.CharField(
+        label=_(f'Comma-separated list of {_media_server_type_label} library IDs to update'),
+        required=False,
+    )
+
+
+_media_server_type_label = 'Plex'
 class PlexMediaServerForm(forms.Form):
 
     host = forms.CharField(
