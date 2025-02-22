@@ -123,6 +123,7 @@ class SourcesView(ListView):
                 repeat=0,
                 priority=10,
                 schedule=30,
+                remove_existing_tasks=False,
                 verbose_name=verbose_name.format(sobj.name))
             url = reverse_lazy('sync:sources')
             url = append_uri_params(url, {'message': 'source-refreshed'})
