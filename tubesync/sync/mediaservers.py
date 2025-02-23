@@ -18,14 +18,53 @@ class MediaServer:
 
     TIMEOUT = 0
     HELP = ''
+    default_headers = {'User-Agent': 'TubeSync'}
 
     def __init__(self, mediaserver_instance):
         self.object = mediaserver_instance
+        self.headers = dict(**self.default_headers)
+        self.token = None
+
+    def make_request_args(self, uri='/', token_header=None, headers={}, token_param=None, params={}):
+        base_parts = urlsplit(self.object.url)
+        if self.token is None:
+            self.token = self.object.loaded_options['token'] or None
+        if token_header and self.token:
+            headers.update({token_header: self.token})
+        self.headers.update(headers)
+        if token_param and self.token:
+            params.update({token_param: self.token})
+        qs = urlencode(params)
+        enable_verify = (
+            base_parts.scheme.endswith('s') and
+            self.object.verify_https
+        )
+        url = urlunsplit((base_parts.scheme, base_parts.netloc, uri, qs, ''))
+        return (url,
+            {
+                headers=self.headers,
+                verify=enable_verify,
+                timeout=self.TIMEOUT,
+            })
+
+    def make_request(self, uri='/', headers={}, params={}):
+        '''
+            A very simple implementation is:
+                url, kwargs = self.make_request_args(uri=uri, headers=headers, params=params)
+                return requests.get(url, **kwargs)
+        '''
+        raise NotImplementedError('MediaServer.make_request() must be implemented')
 
     def validate(self):
+        '''
+            Called to check that the configured media server values are correct.
+        '''
         raise NotImplementedError('MediaServer.validate() must be implemented')
 
     def update(self):
+        '''
+            Called after the `Media` instance has saved a downloaded file.
+        '''
         raise NotImplementedError('MediaServer.update() must be implemented')
 
 
@@ -48,30 +87,23 @@ class PlexMediaServer(MediaServer):
              '<a href="https://www.plexopedia.com/plex-media-server/api/server/libraries/" '
              'target="_blank">here</a></p>.')
 
-    def make_request(self, uri='/', params={}):
-        headers = {'User-Agent': 'TubeSync'}
-        token = self.object.loaded_options['token']
-        params['X-Plex-Token'] = token
-        base_parts = urlsplit(self.object.url)
-        qs = urlencode(params)
-        url = urlunsplit((base_parts.scheme, base_parts.netloc, uri, qs, ''))
-        if self.object.verify_https:
-            log.debug(f'[plex media server] Making HTTP GET request to: {url}')
-            return requests.get(url, headers=headers, verify=True,
-                                timeout=self.TIMEOUT)
+    def make_request(self, uri='/', headers={}, params={}):
+        url, kwargs = self.make_request_args(uri=uri, headers=headers, token_param='X-Plex-Token', params=params)
+        log.debug(f'[plex media server] Making HTTP GET request to: {url}')
+        if kwargs['verify']:
+            return requests.get(url, **kwargs)
         else:
             # If not validating SSL, given this is likely going to be for an internal
             # or private network, that Plex issues certs *.hash.plex.direct and that
             # the warning won't ever been sensibly seen in the HTTPS logs, hide it
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                return requests.get(url, headers=headers, verify=False,
-                                    timeout=self.TIMEOUT)
+                return requests.get(url, **kwargs)
 
     def validate(self):
         '''
             A Plex server requires a host, port, access token and a comma-separated
-            list if library IDs.
+            list of library IDs.
         '''
         # Check all the required values are present
         if not self.object.host:
@@ -175,16 +207,10 @@ class JellyfinMediaServer(MediaServer):
              '<p>The <strong>token</strong> is required for API access. You can generate a token in your Jellyfin user profile settings.</p>'
              '<p>The <strong>libraries</strong> is a comma-separated list of library IDs in Jellyfin.</p>')
 
-    def make_request(self, uri='/', params={}):
-        headers = {
-            'User-Agent': 'TubeSync',
-            'X-Emby-Token': self.object.loaded_options['token']  # Jellyfin uses the same `X-Emby-Token` header as Emby
-        }
-
-        url = f'{self.object.url}{uri}'
+    def make_request(self, uri='/', headers={}, params={}):
+        url, kwargs = self.make_request_args(uri=uri, token_header='X-Emby-Token', headers=headers, params=params)
         log.debug(f'[jellyfin media server] Making HTTP GET request to: {url}')
-
-        return requests.get(url, headers=headers, verify=self.object.verify_https, timeout=self.TIMEOUT)
+        return requests.get(url, **kwargs)
 
     def validate(self):
         if not self.object.host:
