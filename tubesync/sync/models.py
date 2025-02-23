@@ -1046,7 +1046,8 @@ class Media(models.Model):
                 log.info(f'{self.key}: metadata reduced by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
                 if getattr(settings, 'SHRINK_OLD_MEDIA_METADATA', False):
                     self.metadata = filtered_json
-            return filtered_data
+                    return filtered_data
+            return data
 
 
     @property
