@@ -40,12 +40,11 @@ class MediaServer:
             self.object.verify_https
         )
         url = urlunsplit((base_parts.scheme, base_parts.netloc, uri, qs, ''))
-        return (url,
-            {
+        return (url, dict(
                 headers=self.headers,
                 verify=enable_verify,
                 timeout=self.TIMEOUT,
-            })
+            ))
 
     def make_request(self, uri='/', headers={}, params={}):
         '''
