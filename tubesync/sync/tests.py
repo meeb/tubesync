@@ -1767,7 +1767,7 @@ class ResponseFilteringTestCase(TestCase):
         self.media.save()
 
         unfiltered = self.media.loaded_metadata
-        filtered = filter_response(self.media.loaded_metadata)
+        filtered = filter_response(self.media.loaded_metadata, True)
         self.assertIn('formats', unfiltered.keys())
         self.assertIn('formats', filtered.keys())
         # filtered 'downloader_options'
