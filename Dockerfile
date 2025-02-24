@@ -276,7 +276,6 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   pkgconf \
   python3 \
   python3-wheel \
-  redis-server \
   curl \
   less \
   && \
