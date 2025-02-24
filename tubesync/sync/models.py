@@ -883,14 +883,19 @@ class Media(models.Model):
                 resolution = self.downloaded_format.lower()
             elif self.downloaded_height:
                 resolution = f'{self.downloaded_height}p'
+            if resolution:
+                fmt.append(resolution)
             if self.downloaded_format != Val(SourceResolution.AUDIO):
                 vcodec = self.downloaded_video_codec.lower()
+            if vcodec:
                 fmt.append(vcodec)
             acodec = self.downloaded_audio_codec.lower()
-            fmt.append(acodec)
+            if acodec:
+                fmt.append(acodec)
             if self.downloaded_format != Val(SourceResolution.AUDIO):
                 fps = str(self.downloaded_fps)
-                fmt.append(f'{fps}fps')
+                if fps:
+                    fmt.append(f'{fps}fps')
                 if self.downloaded_hdr:
                     hdr = 'hdr'
                     fmt.append(hdr)
@@ -922,13 +927,19 @@ class Media(models.Model):
                 # Combined
                 vformat = cformat
         if vformat:
-            resolution = vformat['format'].lower()
-            fmt.append(resolution)
+            if vformat['format']:
+                resolution = vformat['format'].lower()
+            else:
+                resolution = f"{vformat['height']}p"
+            if resolution:
+                fmt.append(resolution)
             vcodec = vformat['vcodec'].lower()
-            fmt.append(vcodec)
+            if vcodec:
+                fmt.append(vcodec)
         if aformat:
             acodec = aformat['acodec'].lower()
-            fmt.append(acodec)
+            if acodec:
+                fmt.append(acodec)
         if vformat:
             if vformat['is_60fps']:
                 fps = '60fps'
