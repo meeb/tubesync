@@ -1014,26 +1014,26 @@ class Media(models.Model):
 
     @property
     def reduce_data(self):
+        now = timezone.now()
         try:
             data = json.loads(self.metadata or "{}")
             if '_reduce_data_ran_at' in data.keys():
                 total_seconds = data['_reduce_data_ran_at']
                 ran_at = self.posix_epoch + timedelta(seconds=total_seconds)
-                if (timezone.now() - ran_at) < timedelta(hours=1):
+                if (now - ran_at) < timedelta(hours=1):
                     return data
 
             from common.utils import json_serial
             compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
 
             filtered_data = filter_response(data, True)
-            filtered_data['_reduce_data_ran_at'] = round((timezone.now() - self.posix_epoch).total_seconds())
+            filtered_data['_reduce_data_ran_at'] = round((now - self.posix_epoch).total_seconds())
             filtered_json = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
         except Exception as e:
             from common.logger import log
             log.exception('reduce_data: %s', e)
         else:
             from common.logger import log
-            log.debug(f'reduce_data: running for: {self.source.name} / {self.key}')
             # log the results of filtering / compacting on metadata size
             new_mdl = len(compact_json)
             old_mdl = len(self.metadata or "")
@@ -1052,16 +1052,15 @@ class Media(models.Model):
 
     @property
     def loaded_metadata(self):
+        cached = getattr(self, '_cached_metadata_dict', None)
+        if cached:
+            return deepcopy(cached)
         data = None
         if getattr(settings, 'SHRINK_OLD_MEDIA_METADATA', False):
             data = self.reduce_data
         try:
             if not data:
-                cached = getattr(self, '_cached_metadata_dict', None)
-                if cached:
-                    return deepcopy(cached)
-                else:
-                    data = json.loads(self.metadata or "{}")
+                data = json.loads(self.metadata or "{}")
             if not isinstance(data, dict):
                 return {}
             setattr(self, '_cached_metadata_dict', data)
