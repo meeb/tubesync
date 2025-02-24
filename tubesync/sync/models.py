@@ -24,7 +24,6 @@ from .utils import (seconds_to_timestr, parse_media_format, filter_response,
                     write_text_file, mkdir_p, directory_and_stem, glob_quote)
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
-from .mediaservers import PlexMediaServer
 from .fields import CommaSepChoiceField
 from .choices import (Val, CapChoices, Fallback, FileExtension,
                         FilterSeconds, IndexSchedule, MediaServerType,
@@ -1589,11 +1588,10 @@ class MediaServer(models.Model):
     '''
 
     ICONS = {
+        Val(MediaServerType.JELLYFIN): '<i class="fas fa-server"></i>',
         Val(MediaServerType.PLEX): '<i class="fas fa-server"></i>',
     }
-    HANDLERS = {
-        Val(MediaServerType.PLEX): PlexMediaServer,
-    }
+    HANDLERS = MediaServerType.handlers_dict()
 
     server_type = models.CharField(
         _('server type'),
@@ -1616,17 +1614,17 @@ class MediaServer(models.Model):
     )
     use_https = models.BooleanField(
         _('use https'),
-        default=True,
+        default=False,
         help_text=_('Connect to the media server over HTTPS')
     )
     verify_https = models.BooleanField(
         _('verify https'),
-        default=False,
+        default=True,
         help_text=_('If connecting over HTTPS, verify the SSL certificate is valid')
     )
     options = models.TextField(
         _('options'),
-        blank=True,
+        blank=False, # valid JSON only
         null=True,
         help_text=_('JSON encoded options for the media server')
     )
