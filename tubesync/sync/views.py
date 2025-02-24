@@ -499,8 +499,9 @@ class MediaThumbView(DetailView):
 
     def get(self, request, *args, **kwargs):
         media = self.get_object()
-        if media.thumb:
-            thumb = open(media.thumb.path, 'rb').read()
+        if media.thumb_file_exists:
+            thumb_path = pathlib.Path(media.thumb.path)
+            thumb = thumb_path.read_bytes()
             content_type = 'image/jpeg' 
         else:
             # No thumbnail on disk, return a blank 1x1 gif
