@@ -1026,7 +1026,7 @@ class Media(models.Model):
             compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
 
             filtered_data = filter_response(data, True)
-            filtered_data['_reduce_data_ran_at'] = round((timezone.now() - posix_epoch).total_seconds())
+            filtered_data['_reduce_data_ran_at'] = round((timezone.now() - self.posix_epoch).total_seconds())
             filtered_json = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
         except Exception as e:
             from common.logger import log
