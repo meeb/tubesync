@@ -2,10 +2,11 @@ import os
 import uuid
 import json
 import re
-from xml.etree import ElementTree
 from collections import OrderedDict
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone as tz
 from pathlib import Path
+from xml.etree import ElementTree
 from django.conf import settings
 from django.db import models
 from django.core.exceptions import SuspiciousOperation
@@ -1058,7 +1059,7 @@ class Media(models.Model):
             if not data:
                 cached = getattr(self, '_cached_metadata_dict', None)
                 if cached:
-                    data = cached
+                    return deepcopy(cached)
                 else:
                     data = json.loads(self.metadata or "{}")
             if not isinstance(data, dict):
