@@ -237,7 +237,7 @@ class Source(models.Model):
         _('source video codec'),
         max_length=8,
         db_index=True,
-        choices=list(reversed(YouTube_VideoCodec.choices[1:])),
+        choices=list(reversed(YouTube_VideoCodec.choices)),
         default=YouTube_VideoCodec.VP9,
         help_text=_('Source video codec, desired video encoding format to download (ignored if "resolution" is audio only)')
     )
