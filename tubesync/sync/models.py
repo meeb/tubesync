@@ -2,10 +2,11 @@ import os
 import uuid
 import json
 import re
-from xml.etree import ElementTree
 from collections import OrderedDict
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone as tz
 from pathlib import Path
+from xml.etree import ElementTree
 from django.conf import settings
 from django.db import models
 from django.core.exceptions import SuspiciousOperation
@@ -1017,7 +1018,7 @@ class Media(models.Model):
             data = json.loads(self.metadata or "{}")
             if '_reduce_data_ran_at' in data.keys():
                 total_seconds = data['_reduce_data_ran_at']
-                ran_at = posix_epoch + timedelta(seconds=total_seconds)
+                ran_at = self.posix_epoch + timedelta(seconds=total_seconds)
                 if (timezone.now() - ran_at) < timedelta(hours=1):
                     return data
 
@@ -1058,7 +1059,7 @@ class Media(models.Model):
             if not data:
                 cached = getattr(self, '_cached_metadata_dict', None)
                 if cached:
-                    data = cached
+                    return deepcopy(cached)
                 else:
                     data = json.loads(self.metadata or "{}")
             if not isinstance(data, dict):
@@ -1131,7 +1132,7 @@ class Media(models.Model):
         if timestamp is not None:
             try:
                 timestamp_float = float(timestamp)
-                published_dt = posix_epoch + timedelta(seconds=timestamp_float)
+                published_dt = self.posix_epoch + timedelta(seconds=timestamp_float)
             except Exception as e:
                 log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
         return published_dt

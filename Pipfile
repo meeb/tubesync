@@ -20,7 +20,5 @@ django-basicauth = "*"
 psycopg2-binary = "*"
 mysqlclient = "*"
 yt-dlp = "*"
-redis = "*"
-hiredis = "*"
 requests = {extras = ["socks"], version = "*"}
 emoji = "*"
