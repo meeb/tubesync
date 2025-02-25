@@ -18,7 +18,6 @@ find /app -mindepth 2 -type f -execdir chmod 640 '{}' +
 chown -R app:app /app/common/static
 chown -R app:app /app/static
 
-
 # Optionally reset the download dir permissions
 if [ "${TUBESYNC_RESET_DOWNLOAD_DIR:=True}" == "True" ]
 then
