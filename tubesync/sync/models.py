@@ -1582,6 +1582,53 @@ class Media(models.Model):
                         pass
 
 
+class Metadata(models.Model):
+    '''
+        CREATE TABLE IF NOT EXISTS "sync_metadata" AS
+            SELECT
+                "uuid" AS "media_id",
+                "metadata" ->> '$.extractor_key' AS "site",
+                "metadata" ->> '$.id' AS "key",
+                datetime("metadata" ->> '$.timestamp', 'unixepoch') AS "uploaded",
+                datetime("metadata" ->> '$.epoch', 'unixepoch') AS "retrieved",
+                "metadata" AS "value"
+            FROM "sync_media" ;
+    '''
+    class Meta:
+        pass
+    pass
+    uuid = models.UUIDField(
+        _('uuid'),
+        primary_key=True,
+        editable=False,
+        default=uuid.uuid4,
+        help_text=_('UUID of the metadata')
+    )
+    media = models.ForeignKey(
+        Media,
+        # on_delete=models.DO_NOTHING,
+        related_name='metadata_media',
+        help_text=_('Media the metadata belongs to')
+    )
+
+
+class MetadataFormat(models.Model):
+    '''
+        CREATE TABLE IF NOT EXISTS "sync_metadata_formats" (
+            "metadata_id" REFERENCES "sync_metadata" ("rowid") ON DELETE CASCADE,
+            "key" char(12) NOT NULL,
+            "num" INTEGER NOT NULL,
+            "format_id" varchar(20) NOT NULL,
+            "value" json not null,
+            UNIQUE("key", "num"),
+            UNIQUE("key", "format_id")
+        ); 
+    '''
+    class Meta:
+        pass
+    pass
+
+
 class MediaServer(models.Model):
     '''
         A remote media server, such as a Plex server.
