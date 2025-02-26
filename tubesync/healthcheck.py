@@ -30,6 +30,9 @@ def do_heatlhcheck(url):
 
 
 if __name__ == '__main__':
+    # if it is marked as intentionally down, nothing else matters
+    if os.path.exists('/run/service/gunicorn/down'):
+        sys.exit(0)
     try:
         url = sys.argv[1]
     except IndexError:
