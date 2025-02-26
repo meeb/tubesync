@@ -13,12 +13,10 @@ chown -R app:app /config
 chmod -R 0755 /config
 chown -R root:app /app
 chmod -R 0750 /app
+chmod 0755 /app/*.py /app/*.sh
+find /app -mindepth 2 -type f -execdir chmod 640 '{}' +
 chown -R app:app /app/common/static
-chmod -R 0750 /app/common/static
 chown -R app:app /app/static
-chmod -R 0750 /app/static
-find /app -type f ! -iname healthcheck.py -exec chmod 640 {} \;
-chmod 0755 /app/healthcheck.py
 
 # Optionally reset the download dir permissions
 if [ "${TUBESYNC_RESET_DOWNLOAD_DIR:=True}" == "True" ]
