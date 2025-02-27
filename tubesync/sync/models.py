@@ -508,7 +508,10 @@ class Source(models.Model):
         indexer = self.INDEXERS.get(self.source_type, None)
         if not callable(indexer):
             raise Exception(f'Source type f"{self.source_type}" has no indexer')
-        response = indexer(self.get_index_url(type=type))
+        days = None
+        if self.download_cap_date:
+            days = timedelta(seconds=self.download_cap).days
+        response = indexer(self.get_index_url(type=type), days=days)
         if not isinstance(response, dict):
             return []
         entries = response.get('entries', []) 

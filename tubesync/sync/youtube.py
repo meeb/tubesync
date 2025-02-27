@@ -130,12 +130,21 @@ def _subscriber_only(msg='', response=None):
     return False
 
 
-def get_media_info(url):
+def get_media_info(url, days=None):
     '''
         Extracts information from a YouTube URL and returns it as a dict. For a channel
         or playlist this returns a dict of all the videos on the channel or playlist
         as well as associated metadata.
     '''
+    start = None
+    if days is not None:
+        try:
+            days = int(str(days), 10)
+        except Exception as e:
+            days = None
+        start = (
+            f'yesterday-{days!s}days' if days else None
+        )
     opts = get_yt_opts()
     opts.update({
         'ignoreerrors': False, # explicitly set this to catch exceptions
@@ -145,6 +154,7 @@ def get_media_info(url):
         'logger': log,
         'extract_flat': True,
         'check_formats': True,
+        'daterange': yt_dlp.utils.DateRange(start=start),
         'extractor_args': {
             'youtube': {'formats': ['missing_pot']},
             'youtubetab': {'approximate_date': ['true']},
