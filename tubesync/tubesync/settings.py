@@ -119,6 +119,8 @@ Disallow: /
 '''.strip()
 
 
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 
