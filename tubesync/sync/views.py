@@ -774,6 +774,7 @@ class TasksView(ListView):
         data['running'] = []
         data['errors'] = []
         data['scheduled'] = []
+        data['scheduled_total'] = queryset.filter(locked_at__isnull=True).count()
         now = timezone.now()
         for task in queryset.filter(locked_at__isnull=False):
             # There was broken logic in `Task.objects.locked()`, work around it.
