@@ -758,12 +758,14 @@ class TasksView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        _ordering = getattr(settings,
+        order = getattr(settings,
             'BACKGROUND_TASK_PRIORITY_ORDERING',
             'DESC'
         )
+        prefix = '-' if 'ASC' != order else ''
+        _priority = f'{prefix}priority'
         return Task.objects.all().order_by(
-            f"{'-' if 'ASC' != _ordering else ''}priority",
+            _priority,
             'run_at'
         )
 
