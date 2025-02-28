@@ -297,6 +297,9 @@ RUN --mount=type=tmpfs,target=/cache \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
+  # Remove __pycache__ directories from the image
+  PYTHONPYCACHEPREFIX=/cache/pycache && \
+  export PYTHONPYCACHEPREFIX && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
