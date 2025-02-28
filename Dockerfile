@@ -297,6 +297,9 @@ RUN --mount=type=tmpfs,target=/cache \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
+  # Remove __pycache__ directories from image
+  PYTHONPYCACHEPREFIX=/tmp/pycache && \
+  export PYTHONPYCACHEPREFIX && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
@@ -349,9 +352,14 @@ COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.
 RUN set -x && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   rm -rf /app/db.sqlite3 && \
+  # Remove __pycache__ directories from image
+  PYTHONPYCACHEPREFIX=/tmp/pycache && \
+  export PYTHONPYCACHEPREFIX && \
   # Run any required app commands
   /usr/bin/python3 -B /app/manage.py compilescss && \
   /usr/bin/python3 -B /app/manage.py collectstatic --no-input --link && \
+  # Clean up
+  rm -v -rf /tmp/* && \
   # Create config, downloads and run dirs
   mkdir -v -p /run/app && \
   mkdir -v -p /config/media && \
