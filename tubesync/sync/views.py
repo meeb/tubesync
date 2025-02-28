@@ -745,40 +745,61 @@ class TasksView(ListView):
     context_object_name = 'tasks'
     paginate_by = settings.TASKS_PER_PAGE
     messages = {
+        'filter': _('Viewing tasks filtered for source: <strong>{name}</strong>'),
         'reset': _('All tasks have been reset'),
     }
 
     def __init__(self, *args, **kwargs):
+        self.filter_source = None
         self.message = None
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
         message_key = request.GET.get('message', '')
         self.message = self.messages.get(message_key, '')
+        filter_by = request.GET.get('filter', '')
+        if filter_by:
+            try:
+                self.filter_source = Source.objects.get(pk=filter_by)
+            except Source.DoesNotExist:
+                self.filter_source = None
+            if not message_key or 'filter' == message_key:
+                message = self.messages.get('filter', '')
+                self.message = message.format(
+                    name=self.filter_source.name
+                )
+
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
+        qs = Task.objects.all()
+        if self.filter_source:
+            qs = qs.filter(queue=str(self.filter_source.pk))
         order = getattr(settings,
             'BACKGROUND_TASK_PRIORITY_ORDERING',
             'DESC'
         )
         prefix = '-' if 'ASC' != order else ''
         _priority = f'{prefix}priority'
-        return Task.objects.all().order_by(
+        return qs.order_by(
             _priority,
             'run_at'
         )
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
+        now = timezone.now()
+        qs = Task.objects.all()
+
+        # Add to context data from ListView
         data['message'] = self.message
-        queryset = self.get_queryset()
+        data['source'] = self.filter_source
         data['running'] = []
         data['errors'] = []
         data['scheduled'] = []
-        data['total_scheduled'] = queryset.filter(locked_at__isnull=True).count()
-        now = timezone.now()
-        for task in queryset.filter(locked_at__isnull=False):
+        data['total_scheduled'] = qs.filter(locked_at__isnull=True).count()
+
+        for task in qs.filter(locked_at__isnull=False):
             # There was broken logic in `Task.objects.locked()`, work around it.
             # With that broken logic, the tasks never resume properly.
             # This check unlocks the tasks without a running process.
@@ -806,6 +827,7 @@ class TasksView(ListView):
                 data['errors'].append(task)
             else:
                 data['scheduled'].append(task)
+
         for task in data['tasks']:
             obj, url = map_task_to_instance(task)
             if not obj:
@@ -821,6 +843,7 @@ class TasksView(ListView):
             setattr(task, 'url', url)
             setattr(task, 'run_now', task.run_at < now)
             data['scheduled'].append(task)
+
         return data
 
 
@@ -850,10 +873,10 @@ class CompletedTasksView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        q = CompletedTask.objects.all()
+        qs = CompletedTask.objects.all()
         if self.filter_source:
-            q = q.filter(queue=str(self.filter_source.pk))
-        return q.order_by('-run_at')
+            qs = qs.filter(queue=str(self.filter_source.pk))
+        return qs.order_by('-run_at')
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
@@ -862,11 +885,10 @@ class CompletedTasksView(ListView):
                 error_message = get_error_message(task)
                 setattr(task, 'error_message', error_message)
         data['message'] = ''
-        data['source'] = None
+        data['source'] = self.filter_source
         if self.filter_source:
             message = str(self.messages.get('filter', ''))
             data['message'] = message.format(name=self.filter_source.name)
-            data['source'] = self.filter_source
         return data
 
 
