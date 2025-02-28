@@ -45,6 +45,11 @@ jobs:
         uses: ASzc/change-string-case-action@v6
         with:
           string: ${{ github.actor }}
+      - name: Cache from tubesync stage
+        uses: actions/cache@v4
+        with:
+          path: /cache/*
+          key: docker-cache-tubesync
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
