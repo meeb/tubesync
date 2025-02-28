@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'base.html' %}{% load humanize %}
 
 {% block headtitle %}Tasks{% endblock %}
 
@@ -17,7 +17,7 @@
 {% include 'infobox.html' with message=message %}
 <div class="row">
   <div class="col s12">
-    <h2>{{ running|length }} Running</h2>
+    <h2>{{ running|length|intcomma }} Running</h2>
     <p>
       Running tasks are tasks which currently being worked on right now.
     </p>
@@ -35,7 +35,7 @@
 </div>
 <div class="row">
   <div class="col s12">
-    <h2>{{ errors|length }} Error{{ errors|length|pluralize }}</h2>
+    <h2>{{ errors|length|intcomma }} Error{{ errors|length|pluralize }}</h2>
     <p>
       Tasks which generated an error are shown here. Tasks are retried a couple of
       times, so if there was an intermittent error such as a download got interrupted
@@ -56,7 +56,7 @@
 </div>
 <div class="row">
   <div class="col s12">
-    <h2>{{ scheduled|length }} Scheduled</h2>
+    <h2>{{ total_scheduled|intcomma }} Scheduled</h2>
     <p>
       Tasks which are scheduled to run in the future or are waiting in a queue to be
       processed. They can be waiting for an available worker to run immediately, or
@@ -75,6 +75,7 @@
     </div>
   </div>
 </div>
+{% include 'pagination.html' with pagination=sources.paginator filter=source.pk %}
 <div class="row">
   <div class="col s12">
     <h2>Completed</h2>
