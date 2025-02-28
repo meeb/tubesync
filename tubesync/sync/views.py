@@ -743,6 +743,7 @@ class TasksView(ListView):
 
     template_name = 'sync/tasks.html'
     context_object_name = 'tasks'
+    paginate_by = settings.TASKS_PER_PAGE
     messages = {
         'reset': _('All tasks have been reset'),
     }
@@ -757,17 +758,24 @@ class TasksView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        return Task.objects.all().order_by('run_at')
+        _ordering = getattr(settings,
+            'BACKGROUND_TASK_PRIORITY_ORDERING',
+            'DESC'
+        )
+        return Task.objects.all().order_by(
+            f"{'-' if 'ASC' != _ordering else ''}priority",
+            'run_at'
+        )
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
         data['message'] = self.message
+        queryset = self.get_queryset()
         data['running'] = []
         data['errors'] = []
         data['scheduled'] = []
-        queryset = self.get_queryset()
         now = timezone.now()
-        for task in queryset:
+        for task in queryset.filter(locked_at__isnull=False):
             # There was broken logic in `Task.objects.locked()`, work around it.
             # With that broken logic, the tasks never resume properly.
             # This check unlocks the tasks without a running process.
@@ -795,6 +803,21 @@ class TasksView(ListView):
                 data['errors'].append(task)
             else:
                 data['scheduled'].append(task)
+        for task in data['tasks']:
+            obj, url = map_task_to_instance(task)
+            if not obj:
+                continue
+            already_added = (
+                task in data['running'] or
+                task in data['errors'] or
+                task in data['scheduled']
+            )
+            if already_added:
+                continue
+            setattr(task, 'instance', obj)
+            setattr(task, 'url', url)
+            setattr(task, 'run_now', task.run_at < now)
+            data['scheduled'].append(task)
         return data
 
 
