@@ -782,8 +782,8 @@ class TasksView(ListView):
         prefix = '-' if 'ASC' != order else ''
         _priority = f'{prefix}priority'
         return qs.order_by(
+            'run_at',
             _priority,
-            'run_at'
         )
 
     def get_context_data(self, *args, **kwargs):
