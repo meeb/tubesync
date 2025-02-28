@@ -1544,14 +1544,19 @@ class Media(models.Model):
 
                     # move and change names to match stem
                     for other_path in other_paths:
+                        # it should exist, but check anyway
+                        if not other_path.exists():
+                            continue
+
                         old_file_str = other_path.name
                         new_file_str = new_stem + old_file_str[len(old_stem):]
                         new_file_path = Path(new_prefix_path / new_file_str)
                         if new_file_path == other_path:
                             continue
                         log.debug(f'Considering replace for: {self!s}\n\t{other_path!s}\n\t{new_file_path!s}')
-                        # it should exist, but check anyway 
-                        if other_path.exists():
+                        # do not move the file we just updated in the database
+                        # doing that loses track of the `Media.media_file` entirely
+                        if not new_video_path.samefile(other_path):
                             log.debug(f'{self!s}: {other_path!s} => {new_file_path!s}')
                             other_path.replace(new_file_path)
 
