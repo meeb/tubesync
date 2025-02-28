@@ -74,6 +74,7 @@
       {% endfor %}
     </div>
   </div>
+{% include 'pagination.html' with pagination=sources.paginator filter=source.pk %}
 </div>
 <div class="row">
   <div class="col s12">
