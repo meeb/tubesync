@@ -775,6 +775,11 @@ class Media(models.Model):
         )
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        # Correct the path after a source is renamed
+        if not self.media_file_exists and self.filepath.exists():
+            self.media_file.name = str(self.filepath.relative_to(self.media_file.storage.location))
+            if update_fields is not None:
+                update_fields = {'media_file',}.union(update_fields)
         # Trigger an update of derived fields from metadata
         if self.metadata:
             setattr(self, '_cached_metadata_dict', None)
