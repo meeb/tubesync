@@ -776,8 +776,8 @@ class Media(models.Model):
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         # Correct the path after a source is renamed
-        if self.downloaded and not self.media_file_exists:
-            fp_list = list(self.filepath)
+        if self.created and self.downloaded and not self.media_file_exists:
+            fp_list = list((self.filepath,))
             if self.media_file:
                 fp_list.append(self.filepath.parent / Path(self.media_file.path).name)
             for filepath in fp_list:
