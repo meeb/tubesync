@@ -28,6 +28,7 @@ def source_pre_save(sender, instance, **kwargs):
     except Source.DoesNotExist:
         log.debug(f'source_pre_save signal: no existing source: {sender} - {instance}')
         return
+
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
     new_dirpath = instance.directory_path.resolve(strict=False)
     if existing_dirpath != new_dirpath:
@@ -42,22 +43,34 @@ def source_pre_save(sender, instance, **kwargs):
         work_directory = existing_dirpath
         for _ in range(parents_count, 0, -1):
             work_directory = work_directory.parent
-        with TemporaryDirectory(suffix='.'+new_dirpath.name, prefix='.tmp.', dir=work_directory) as tmp_dir:
+        with TemporaryDirectory(suffix=('.'+new_dirpath.name), prefix='.tmp.', dir=work_directory) as tmp_dir:
             tmp_dirpath = Path(tmp_dir)
             existed = None
             if new_dirpath.exists():
-                existed = tmp_dirpath / 'existed'
-                new_dirpath.rename(existed)
-            previous = tmp_dirpath / 'previous'
-            existing_dirpath.rename(previous)
+                existed = new_dirpath.rename(tmp_dirpath / 'existed')
+            previous = existing_dirpath.rename(tmp_dirpath / 'previous')
             mkdir_p(new_dirpath.parent)
             previous.rename(new_dirpath)
+            existing_dirpath = previous = None
             if existed and existed.is_dir():
-                existed.rename(new_dirpath / '.existed')
-                # TODO: merge the contents of the directories
-                pass
+                existed = existed.rename(new_dirpath / '.existed')
+                for entry_path in existed.iterdir():
+                    try:
+                        target = new_dirpath / entry_path.name
+                        if not target.exists():
+                            entry_path = entry_path.rename(target)
+                    except Exception as e:
+                        log.exception(e)
+                try:
+                    existed.rmdir()
+                except Exception as e:
+                    log.exception(e)
             elif existed:
-                existed.rename(new_dirpath / '.existed')
+                try:
+                    existed = existed.rename(new_dirpath / ('.existed-' + new_dirpath.name))
+                except Exception as e:
+                    log.exception(e)
+
     recreate_index_source_task = (
         existing_source.name != instance.name or
         existing_source.index_schedule != instance.index_schedule
