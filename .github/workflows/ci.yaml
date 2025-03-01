@@ -77,7 +77,8 @@ jobs:
         run: echo '${{ secrets.GITHUB_TOKEN }}' | docker login --password-stdin --username '${{ github.actor }}' 'https://ghcr.io'
       - name: Create /cache on the runner
         run: |
-          mkdir -v -p /cache
+          sudo mkdir -v -p /cache
+          id
       - name: Cache from tubesync stage
         uses: actions/cache@v4
         with:
