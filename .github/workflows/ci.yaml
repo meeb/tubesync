@@ -78,6 +78,7 @@ jobs:
       - name: Create cache directory on the runner
         run: |
           mkdir -v -p .cache
+          ls -al
       - name: Cache from tubesync stage
         uses: actions/cache@v4
         with:
@@ -86,6 +87,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
+          context: .
           platforms: linux/amd64,linux/arm64
           push: true
           provenance: false
