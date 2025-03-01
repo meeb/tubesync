@@ -241,7 +241,7 @@ def media_post_save(sender, instance, created, **kwargs):
             )
     existing_media_download_task = get_media_download_task(str(instance.pk))
     # If the media has not yet been downloaded schedule it to be downloaded
-    if not (instance.media_file_exists or existing_media_download_task):
+    if not (instance.media_file_exists or instance.filepath.exists() or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
         if instance.can_download and instance.downloaded:
             skip_changed = True != instance.skip
