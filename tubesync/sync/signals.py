@@ -34,8 +34,10 @@ def source_pre_save(sender, instance, **kwargs):
         not new_dirpath.exists()
     )
     if rename_source_directory:
+        tmp_dirpath = existing_dirpath.parent / ('.tmp.' + existing_dirpath.name)
+        existing_dirpath.rename(tmp_dirpath)
         mkdir_p(new_dirpath.parent)
-        existing_dirpath.rename(new_dirpath)
+        tmp_dirpath.rename(new_dirpath)
     recreate_index_source_task = (
         existing_source.name != instance.name or
         existing_source.index_schedule != instance.index_schedule
