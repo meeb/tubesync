@@ -1537,7 +1537,8 @@ class Media(models.Model):
 
                     # update the media_file in the db
                     self.media_file.name = str(new_video_path.relative_to(self.media_file.storage.location))
-                    self.save()
+                    self.skip = False
+                    self.save(update_fields=('media_file', 'skip'))
                     log.info(f'Updated "media_file" in the database for: {self!s}')
 
                     (new_prefix_path, new_stem) = directory_and_stem(new_video_path)
