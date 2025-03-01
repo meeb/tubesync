@@ -46,12 +46,18 @@ def source_pre_save(sender, instance, **kwargs):
         with TemporaryDirectory(suffix=('.'+new_dirpath.name), prefix='.tmp.', dir=work_directory) as tmp_dir:
             tmp_dirpath = Path(tmp_dir)
             existed = None
-            if new_dirpath.exists():
-                existed = new_dirpath.rename(tmp_dirpath / 'existed')
             previous = existing_dirpath.rename(tmp_dirpath / 'previous')
-            mkdir_p(new_dirpath.parent)
-            previous.rename(new_dirpath)
-            existing_dirpath = previous = None
+            try:
+                if new_dirpath.exists():
+                    existed = new_dirpath.rename(tmp_dirpath / 'existed')
+                mkdir_p(new_dirpath.parent)
+                previous.rename(new_dirpath)
+            except Exception:
+                # try to preserve the directory, if anything went wrong
+                previous.rename(existing_dirpath)
+                raise
+            else:
+                existing_dirpath = previous = None
             if existed and existed.is_dir():
                 existed = existed.rename(new_dirpath / '.existed')
                 for entry_path in existed.iterdir():
