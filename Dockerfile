@@ -297,7 +297,7 @@ RUN --mount=type=tmpfs,target=/cache \
     --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
-  set -x && \
+  ls -alR /cache ; set -x && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
