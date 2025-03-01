@@ -292,7 +292,7 @@ WORKDIR /app
 
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
-    --mount=type=bind,source=/cache,target=/cache/.host \
+    --mount=type=bind,source=.cache,target=/cache/.host \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
