@@ -40,9 +40,8 @@ def source_pre_save(sender, instance, **kwargs):
         # the names in the relative path are also in the absolute path
         parents_count = len(ad_parents_set.intersection(rd_parents_set))
         work_directory = existing_dirpath
-        while parents_count > 0:
+        for _ in range(parents_count, 0, -1):
             work_directory = work_directory.parent
-            parents_count -= 1
         with TemporaryDirectory(suffix='.'+new_dirpath.name, prefix='.tmp.', dir=work_directory) as tmp_dir:
             tmp_dirpath = Path(tmp_dir)
             existed = None
