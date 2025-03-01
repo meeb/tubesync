@@ -47,7 +47,8 @@ jobs:
           string: ${{ github.actor }}
       - name: Create /cache on the runner
         run: |
-          mkdir -v -p /cache
+          sudo mkdir -v -p /cache
+          id
       - name: Cache from tubesync stage
         uses: actions/cache@v4
         with:
