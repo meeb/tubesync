@@ -35,7 +35,7 @@
 </div>
 <div class="row">
   <div class="col s12">
-    <h2>{{ errors|length|intcomma }} Error{{ errors|length|pluralize }}</h2>
+    <h2>{{ total_errors|intcomma }} Total Error{{ total_errors|pluralize }} ({{ errors|length|intcomma }} on this page)</h2>
     <p>
       Tasks which generated an error are shown here. Tasks are retried a couple of
       times, so if there was an intermittent error such as a download got interrupted
