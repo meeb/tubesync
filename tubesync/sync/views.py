@@ -796,6 +796,7 @@ class TasksView(ListView):
         data['source'] = self.filter_source
         data['running'] = []
         data['errors'] = []
+        data['total_errors'] = qs.exclude(last_error='').count()
         data['scheduled'] = []
         data['total_scheduled'] = qs.filter(locked_at__isnull=True).count()
 
@@ -842,7 +843,12 @@ class TasksView(ListView):
             setattr(task, 'instance', obj)
             setattr(task, 'url', url)
             setattr(task, 'run_now', task.run_at < now)
-            data['scheduled'].append(task)
+            if task.has_error():
+                error_message = get_error_message(task)
+                setattr(task, 'error_message', error_message)
+                data['errors'].append(task)
+            else:
+                data['scheduled'].append(task)
 
         return data
 
