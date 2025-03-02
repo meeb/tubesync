@@ -796,11 +796,11 @@ class TasksView(ListView):
         data['source'] = self.filter_source
         data['running'] = []
         data['errors'] = []
-        data['total_errors'] = qs.exclude(last_error='').count()
+        data['total_errors'] = qs.filter(attempts__gt=0, locked_by__isnull=True).count()
         data['scheduled'] = []
-        data['total_scheduled'] = qs.filter(locked_at__isnull=True).count()
+        data['total_scheduled'] = qs.filter(locked_by__isnull=True).count()
 
-        for task in qs.filter(locked_at__isnull=False):
+        for task in qs.filter(locked_by__isnull=False):
             # There was broken logic in `Task.objects.locked()`, work around it.
             # With that broken logic, the tasks never resume properly.
             # This check unlocks the tasks without a running process.
@@ -808,11 +808,15 @@ class TasksView(ListView):
             # - `True`: locked and PID exists
             # - `False`: locked and PID does not exist
             # - `None`: not `locked_by`, so there was no PID to check
-            if task.locked_by_pid_running() is False:
+            locked_by_pid_running = task.locked_by_pid_running()
+            if locked_by_pid_running is False:
                 task.locked_by = None
                 # do not wait for the task to expire
                 task.locked_at = None
                 task.save()
+                continue
+            elif not locked_by_pid_running:
+                continue
             obj, url = map_task_to_instance(task)
             if not obj:
                 # Orphaned task, ignore it (it will be deleted when it fires)
@@ -820,25 +824,13 @@ class TasksView(ListView):
             setattr(task, 'instance', obj)
             setattr(task, 'url', url)
             setattr(task, 'run_now', task.run_at < now)
-            if task.locked_by_pid_running():
-                data['running'].append(task)
-            elif task.has_error():
-                error_message = get_error_message(task)
-                setattr(task, 'error_message', error_message)
-                data['errors'].append(task)
-            else:
-                data['scheduled'].append(task)
+            data['running'].append(task)
 
         for task in data['tasks']:
+            if task in data['running']:
+                continue
             obj, url = map_task_to_instance(task)
             if not obj:
-                continue
-            already_added = (
-                task in data['running'] or
-                task in data['errors'] or
-                task in data['scheduled']
-            )
-            if already_added:
                 continue
             setattr(task, 'instance', obj)
             setattr(task, 'url', url)
