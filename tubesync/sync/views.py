@@ -27,7 +27,7 @@ from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm,
                     ConfirmDeleteMediaServerForm)
-from .utils import validate_url, delete_file
+from .utils import validate_url, delete_file, multi_key_sort
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
                     delete_task_by_media, index_source_task)
@@ -782,8 +782,8 @@ class TasksView(ListView):
         prefix = '-' if 'ASC' != order else ''
         _priority = f'{prefix}priority'
         return qs.order_by(
-            'run_at',
             _priority,
+            'run_at',
         )
 
     def get_context_data(self, *args, **kwargs):
@@ -857,6 +857,19 @@ class TasksView(ListView):
                 data['errors'].append(task)
             elif mapped:
                 data['scheduled'].append(task)
+
+        order = getattr(settings,
+            'BACKGROUND_TASK_PRIORITY_ORDERING',
+            'DESC'
+        )
+        sort_keys = (
+            # key, reverse
+            ('run_now', False),
+            ('priority', 'ASC' != order),
+            ('run_at', False),
+        )
+        data['errors'] = multi_key_sort(data['errors'], sort_keys, attr=True)
+        data['scheduled'] = multi_key_sort(data['scheduled'], sort_keys, attr=True)
 
         return data
 
