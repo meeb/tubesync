@@ -864,7 +864,7 @@ class TasksView(ListView):
         )
         sort_keys = (
             # key, reverse
-            ('run_now', False),
+            ('run_now', True),
             ('priority', 'ASC' != order),
             ('run_at', False),
         )
