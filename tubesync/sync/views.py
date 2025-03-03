@@ -790,17 +790,33 @@ class TasksView(ListView):
         data = super().get_context_data(*args, **kwargs)
         now = timezone.now()
         qs = Task.objects.all()
+        errors_qs = qs.filter(attempts__gt=0, locked_by__isnull=True)
+        running_qs = qs.filter(locked_by__isnull=False)
+        scheduled_qs = qs.filter(locked_by__isnull=True)
 
         # Add to context data from ListView
         data['message'] = self.message
         data['source'] = self.filter_source
-        data['running'] = []
-        data['errors'] = []
-        data['total_errors'] = qs.filter(attempts__gt=0, locked_by__isnull=True).count()
-        data['scheduled'] = []
-        data['total_scheduled'] = qs.filter(locked_by__isnull=True).count()
+        data['running'] = list()
+        data['errors'] = list()
+        data['total_errors'] = errors_qs.count()
+        data['scheduled'] = list()
+        data['total_scheduled'] = scheduled_qs.count()
 
-        for task in qs.filter(locked_by__isnull=False):
+        def add_to_task(task):
+            obj, url = map_task_to_instance(task)
+            if not obj:
+                return False
+            setattr(task, 'instance', obj)
+            setattr(task, 'url', url)
+            setattr(task, 'run_now', task.run_at < now)
+            if task.has_error():
+                error_message = get_error_message(task)
+                setattr(task, 'error_message', error_message)
+                return 'error'
+            return True
+                    
+        for task in running_qs:
             # There was broken logic in `Task.objects.locked()`, work around it.
             # With that broken logic, the tasks never resume properly.
             # This check unlocks the tasks without a running process.
@@ -814,32 +830,32 @@ class TasksView(ListView):
                 # do not wait for the task to expire
                 task.locked_at = None
                 task.save()
-                continue
-            elif not locked_by_pid_running:
-                continue
-            obj, url = map_task_to_instance(task)
-            if not obj:
-                # Orphaned task, ignore it (it will be deleted when it fires)
-                continue
-            setattr(task, 'instance', obj)
-            setattr(task, 'url', url)
-            setattr(task, 'run_now', task.run_at < now)
-            data['running'].append(task)
+            if locked_by_pid_running and add_to_task(task):
+                data['running'].append(task)
+
+        # show all the errors when they fit on one page
+        if (data['total_errors'] + len(data['running'])) < self.paginate_by:
+            for task in errors_qs:
+                if task in data['running']:
+                    continue
+                mapped = add_to_task(task)
+                if 'error' == mapped:
+                    data['errors'].append(task)
+                elif mapped:
+                    data['scheduled'].append(task)
 
         for task in data['tasks']:
-            if task in data['running']:
+            already_added = (
+                task in data['running'] or
+                task in data['errors'] or
+                task in data['scheduled']
+            )
+            if already_added:
                 continue
-            obj, url = map_task_to_instance(task)
-            if not obj:
-                continue
-            setattr(task, 'instance', obj)
-            setattr(task, 'url', url)
-            setattr(task, 'run_now', task.run_at < now)
-            if task.has_error():
-                error_message = get_error_message(task)
-                setattr(task, 'error_message', error_message)
+            mapped = add_to_task(task)
+            if 'error' == mapped:
                 data['errors'].append(task)
-            else:
+            elif mapped:
                 data['scheduled'].append(task)
 
         return data
