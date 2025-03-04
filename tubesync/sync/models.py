@@ -775,6 +775,22 @@ class Media(models.Model):
         )
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        # Correct the path after a source is renamed
+        if self.created and self.downloaded and not self.media_file_exists:
+            fp_list = list((self.filepath,))
+            if self.media_file:
+                fp_list.append(self.filepath.parent / Path(self.media_file.path).name)
+            for filepath in fp_list:
+                if filepath.exists():
+                    self.media_file.name = str(
+                        filepath.relative_to(
+                            self.media_file.storage.location
+                        )
+                    )
+                    self.skip = False
+                    if update_fields is not None:
+                        update_fields = {'media_file', 'skip'}.union(update_fields)
+
         # Trigger an update of derived fields from metadata
         if self.metadata:
             setattr(self, '_cached_metadata_dict', None)
@@ -1537,7 +1553,8 @@ class Media(models.Model):
 
                     # update the media_file in the db
                     self.media_file.name = str(new_video_path.relative_to(self.media_file.storage.location))
-                    self.save()
+                    self.skip = False
+                    self.save(update_fields=('media_file', 'skip'))
                     log.info(f'Updated "media_file" in the database for: {self!s}')
 
                     (new_prefix_path, new_stem) = directory_and_stem(new_video_path)

@@ -1,4 +1,5 @@
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from django.conf import settings
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
 from django.dispatch import receiver
@@ -27,15 +28,55 @@ def source_pre_save(sender, instance, **kwargs):
     except Source.DoesNotExist:
         log.debug(f'source_pre_save signal: no existing source: {sender} - {instance}')
         return
+
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
     new_dirpath = instance.directory_path.resolve(strict=False)
-    rename_source_directory = (
-        existing_dirpath != new_dirpath and
-        not new_dirpath.exists()
-    )
-    if rename_source_directory:
-        mkdir_p(new_dirpath.parent)
-        existing_dirpath.rename(new_dirpath)
+    if existing_dirpath != new_dirpath:
+        path_name = lambda p: p.name
+        relative_dir = existing_source.directory
+        rd_parents = Path(relative_dir).parents
+        rd_parents_set = set(map(path_name, rd_parents))
+        ad_parents = existing_dirpath.parents
+        ad_parents_set = set(map(path_name, ad_parents))
+        # the names in the relative path are also in the absolute path
+        parents_count = len(ad_parents_set.intersection(rd_parents_set))
+        work_directory = existing_dirpath
+        for _count in range(parents_count, 0, -1):
+            work_directory = work_directory.parent
+        with TemporaryDirectory(suffix=('.'+new_dirpath.name), prefix='.tmp.', dir=work_directory) as tmp_dir:
+            tmp_dirpath = Path(tmp_dir)
+            existed = None
+            previous = existing_dirpath.rename(tmp_dirpath / 'previous')
+            try:
+                if new_dirpath.exists():
+                    existed = new_dirpath.rename(tmp_dirpath / 'existed')
+                mkdir_p(new_dirpath.parent)
+                previous.rename(new_dirpath)
+            except Exception:
+                # try to preserve the directory, if anything went wrong
+                previous.rename(existing_dirpath)
+                raise
+            else:
+                existing_dirpath = previous = None
+            if existed and existed.is_dir():
+                existed = existed.rename(new_dirpath / '.existed')
+                for entry_path in existed.iterdir():
+                    try:
+                        target = new_dirpath / entry_path.name
+                        if not target.exists():
+                            entry_path = entry_path.rename(target)
+                    except Exception as e:
+                        log.exception(e)
+                try:
+                    existed.rmdir()
+                except Exception as e:
+                    log.exception(e)
+            elif existed:
+                try:
+                    existed = existed.rename(new_dirpath / ('.existed-' + new_dirpath.name))
+                except Exception as e:
+                    log.exception(e)
+
     recreate_index_source_task = (
         existing_source.name != instance.name or
         existing_source.index_schedule != instance.index_schedule
@@ -200,7 +241,7 @@ def media_post_save(sender, instance, created, **kwargs):
             )
     existing_media_download_task = get_media_download_task(str(instance.pk))
     # If the media has not yet been downloaded schedule it to be downloaded
-    if not (instance.media_file_exists or existing_media_download_task):
+    if not (instance.media_file_exists or instance.filepath.exists() or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
         if instance.can_download and instance.downloaded:
             skip_changed = True != instance.skip
