@@ -1190,11 +1190,13 @@ class Media(models.Model):
 
     @property
     def upload_date(self):
-        upload_date_str = self.get_metadata_first_value('upload_date', '')
+        upload_date_str = self.get_metadata_first_value('upload_date')
+        if not upload_date_str:
+            return None
         try:
             return datetime.strptime(upload_date_str, '%Y%m%d')
         except (AttributeError, ValueError) as e:
-            log.debug(f'Media.upload_date: {self.source} / {self}: strptime: {upload_date_str=}: {e}')
+            log.debug(f'Media.upload_date: {self.source} / {self}: strptime: {e}')
             pass
         return None
 
