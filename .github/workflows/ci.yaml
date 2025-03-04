@@ -34,6 +34,8 @@ jobs:
   containerise:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -45,9 +47,36 @@ jobs:
         uses: ASzc/change-string-case-action@v6
         with:
           string: ${{ github.actor }}
+      - name: Create cache directory on the runner
+        run: |
+          mkdir -v .cache
+      - name: Start magic-wormhole services on the runner
+        run: |
+          sudo apt-get install python3-virtualenv
+          TMPDIR="${XDG_RUNTIME_DIR:-/tmp}/temp"
+          mkdir -v "${TMPDIR}" && export TMPDIR
+          venv_dir="$(mktemp -d)" &&
+              virtualenv "${venv_dir}" &&
+              . "${venv_dir}"/bin/activate || exit
+          pip install --upgrade pip
+          pip install magic-wormhole magic-wormhole-mailbox-server magic-wormhole-transit-relay twisted
+          # port 4000
+          (mkdir -v "${TMPDIR}"/magic-wormhole-mailbox-server &&
+              cd "${TMPDIR}"/magic-wormhole-mailbox-server &&
+              exec twistd wormhole-mailbox --channel-db=channel.sqlite --usage-db=usage.sqlite --motd=TubeSync)
+          # port 4001
+          (mkdir -v "${TMPDIR}"/magic-wormhole-transit-relay &&
+              cd "${TMPDIR}"/magic-wormhole-transit-relay &&
+              exec twistd transitrelay)
+      - name: Cache from tubesync stage
+        uses: actions/cache@v4
+        with:
+          path: .cache/*
+          key: docker-cache-tubesync
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
+          context: .
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
