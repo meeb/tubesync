@@ -350,6 +350,8 @@ COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.
 RUN set -x && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   rm -rf /app/db.sqlite3 && \
+  # Check nginx configuration
+  nginx -t && \
   # Run any required app commands
   /usr/bin/python3 -B /app/manage.py compilescss && \
   /usr/bin/python3 -B /app/manage.py collectstatic --no-input --link && \
