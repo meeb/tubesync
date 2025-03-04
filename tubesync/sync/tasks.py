@@ -15,7 +15,6 @@ from shutil import copyfile
 from PIL import Image
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from django.db.utils import IntegrityError
 from django.utils.translation import gettext_lazy as _
@@ -25,7 +24,7 @@ from common.logger import log
 from common.errors import NoMediaException, DownloadFailedException
 from common.utils import json_serial
 from .models import Source, Media, MediaServer
-from .utils import (get_remote_image, resize_image_to_height, delete_file,
+from .utils import (get_remote_image, delete_file,
                     write_text_file, filter_response)
 from .youtube import YouTubeError
 
@@ -414,26 +413,7 @@ def download_media_thumbnail(media_id, url):
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
                  f'it is now marked to be skipped, not downloading thumbnail')
         return
-    width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
-    height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
-    i = get_remote_image(url)
-    log.info(f'Resizing {i.width}x{i.height} thumbnail to '
-             f'{width}x{height}: {url}')
-    i = resize_image_to_height(i, width, height)
-    image_file = BytesIO()
-    i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
-    image_file.seek(0)
-    media.thumb.save(
-        'thumb',
-        SimpleUploadedFile(
-            'thumb',
-            image_file.read(),
-            'image/jpeg',
-        ),
-        save=True
-    )
-    log.info(f'Saved thumbnail for: {media} from: {url}')
-    return True
+    return media.save_thumbnail(url)
 
 
 @background(schedule=60, remove_existing_tasks=True)
@@ -481,40 +461,7 @@ def download_media(media_id):
         # Media has been downloaded successfully
         log.info(f'Successfully downloaded media: {media} (UUID: {media.pk}) to: '
                  f'"{filepath}"')
-        # Link the media file to the object and update info about the download
-        media.media_file.name = str(media.source.type_directory_path / media.filename)
-        media.downloaded = True
-        media.download_date = timezone.now()
-        media.downloaded_filesize = os.path.getsize(filepath)
-        media.downloaded_container = container
-        if '+' in format_str:
-            # Seperate audio and video streams
-            vformat_code, aformat_code = format_str.split('+')
-            aformat = media.get_format_by_code(aformat_code)
-            vformat = media.get_format_by_code(vformat_code)
-            media.downloaded_format = vformat['format']
-            media.downloaded_height = vformat['height']
-            media.downloaded_width = vformat['width']
-            media.downloaded_audio_codec = aformat['acodec']
-            media.downloaded_video_codec = vformat['vcodec']
-            media.downloaded_container = container
-            media.downloaded_fps = vformat['fps']
-            media.downloaded_hdr = vformat['is_hdr']
-        else:
-            # Combined stream or audio-only stream
-            cformat_code = format_str
-            cformat = media.get_format_by_code(cformat_code)
-            media.downloaded_audio_codec = cformat['acodec']
-            if cformat['vcodec']:
-                # Combined
-                media.downloaded_format = cformat['format']
-                media.downloaded_height = cformat['height']
-                media.downloaded_width = cformat['width']
-                media.downloaded_video_codec = cformat['vcodec']
-                media.downloaded_fps = cformat['fps']
-                media.downloaded_hdr = cformat['is_hdr']
-            else:
-                media.downloaded_format = 'audio'
+        media.finish_download(format_str, container, filepath)
         media.save()
         # If selected, copy the thumbnail over as well
         if media.source.copy_thumbnails:
@@ -657,22 +604,11 @@ def rename_all_media_for_source(source_id):
 
 @background(schedule=60, remove_existing_tasks=True)
 def wait_for_media_premiere(media_id):
-    hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
-
     try:
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist:
         return
-    if media.metadata:
+    if not media.wait_for_premiere():
         return
-    now = timezone.now()
-    if media.published < now:
-        media.manual_skip = False
-        media.skip = False
-        # start the download tasks
-        media.save()
-    else:
-        media.manual_skip = True
-        media.title = _(f'Premieres in {hours(media.published - now)} hours')
-        media.save()
+    media.save()
 
