@@ -331,7 +331,7 @@ def download_media_metadata(media_id):
         metadata = media.index_metadata()
     except YouTubeError as e:
         e_str = str(e)
-        log_exception = True
+        raise_exception = True
         if ': Premieres in ' in e_str:
             now = timezone.now()
             published_datetime = None
@@ -367,9 +367,9 @@ def download_media_metadata(media_id):
                     verbose_name=verbose_name.format(media.key, published_datetime.isoformat(' ', 'seconds')),
                     remove_existing_tasks=True,
                 )
-                log_exception = False
-        if log_exception:
-            log.exception(e)
+                raise_exception = False
+        if raise_exception:
+            raise
         log.debug(str(e))
         return
     response = metadata
