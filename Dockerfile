@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-ARG FFMPEG_DATE="2025-02-18-14-16"
-ARG FFMPEG_VERSION="N-118500-g08e37fa082"
+ARG FFMPEG_DATE="2025-03-04-15-43"
+ARG FFMPEG_VERSION="N-118645-gf76195ff65"
 
 ARG S6_VERSION="3.2.0.2"
 
@@ -292,11 +292,12 @@ WORKDIR /app
 
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=bind,source=.cache,target=/cache/.host \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
-  set -x && \
+  ls -alR /cache ; set -x && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
@@ -317,13 +318,28 @@ RUN --mount=type=tmpfs,target=/cache \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
+  # Restore cached wheels
+  { \
+    cache_path='/cache' ; \
+    saved="${cache_path}/.host" ; \
+    pycache="${cache_path}/pycache" ; \
+    test -d "${cache_path}/pipenv" || \
+         { rm -rf "${cache_path}/pipenv" ; mkdir -p "${cache_path}/pipenv" ; } ; \
+    cp -v -a "${saved}/wheels" "${cache_path}/pipenv/" || : ; \
+  } && \
   # Install non-distro packages
   cp -at /tmp/ "${HOME}" && \
   HOME="/tmp/${HOME#/}" \
-  XDG_CACHE_HOME='/cache' \
+  XDG_CACHE_HOME="${cache_path}" \
   PIPENV_VERBOSITY=64 \
-  PYTHONPYCACHEPREFIX=/cache/pycache \
+  PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
+  # Save wheels to cache, with rotation
+  { \
+    test '!' -e "${saved}/wheels.0" || rm -rf "${saved}/wheels.0" ; \
+    test '!' -e "${saved}/wheels" || mv "${saved}/wheels" "${saved}/wheels.0" ; \
+    cp -v -a "${cache_path}/pipenv/wheels" "${saved}/" || : ; \
+  } && \
   # Clean up
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
