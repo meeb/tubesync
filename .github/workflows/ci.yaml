@@ -50,7 +50,22 @@ jobs:
       - name: Create cache directory on the runner
         run: |
           mkdir -v -p .cache
-          ls -al
+          df -h
+      - name: Start magic-wormhole services on the runner
+        run: |
+          sudo apt-get install pipx python3-pip python3-virtualenv
+          sudo pipx ensurepath --global
+          venv_dir="$(mktemp -d)" &&
+              virtualenv "${venv_dir}" &&
+              . "${venv_dir}"/bin/activate || exit
+          pip install --upgrade pip
+          pip install magic-wormhole magic-wormhole-mailbox-server magic-wormhole-transit-relay
+          mkdir -v -p /run/magic-wormhole-transit-relay &&
+              cd /run/magic-wormhole-transit-relay &&
+              twistd3 transitrelay # 4001
+          mkdir -v -p /run/magic-wormhole-mailbox-server &&
+              cd /run/magic-wormhole-mailbox-server &&
+              twist3 wormhole-mailbox --usage-db=usage.sqlite --help
       - name: Cache from tubesync stage
         uses: actions/cache@v4
         with:
