@@ -60,14 +60,14 @@ jobs:
               . "${venv_dir}"/bin/activate || exit
           pip install --upgrade pip
           pip install magic-wormhole magic-wormhole-mailbox-server magic-wormhole-transit-relay twisted
+          # port 4000
+          (mkdir -v "${TMPDIR}"/magic-wormhole-mailbox-server &&
+              cd "${TMPDIR}"/magic-wormhole-mailbox-server &&
+              exec twistd wormhole-mailbox --channel-db=channel.sqlite --usage-db=usage.sqlite --motd=TubeSync)
           # port 4001
           (mkdir -v "${TMPDIR}"/magic-wormhole-transit-relay &&
               cd "${TMPDIR}"/magic-wormhole-transit-relay &&
               exec twistd transitrelay)
-          # port 4000
-          (mkdir -v "${TMPDIR}"/magic-wormhole-mailbox-server &&
-              cd "${TMPDIR}"/magic-wormhole-mailbox-server &&
-              exec twist wormhole-mailbox --channel-db=channel.sqlite --usage-db=usage.sqlite --motd=TubeSync &)
       - name: Cache from tubesync stage
         uses: actions/cache@v4
         with:
