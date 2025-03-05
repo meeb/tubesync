@@ -313,7 +313,6 @@ RUN --mount=type=tmpfs,target=/cache \
   postgresql-common \
   python3-dev \
   python3-pip \
-  python3-virtualenv \
   zlib1g-dev \
   && \
   # Create a 'app' user which the application will run as
@@ -360,7 +359,6 @@ RUN --mount=type=tmpfs,target=/cache \
   postgresql-common \
   python3-dev \
   python3-pip \
-  python3-virtualenv \
   zlib1g-dev \
   && \
   apt-get -y autopurge && \
