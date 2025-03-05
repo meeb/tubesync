@@ -275,6 +275,7 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   pipenv \
   pkgconf \
   python3 \
+  python3-idna \
   python3-six \
   python3-wheel \
   curl \
@@ -323,11 +324,10 @@ RUN --mount=type=tmpfs,target=/cache \
   # Restore cached wheels
   { \
     cache_path='/cache' ; \
-    saved="${cache_path}/.host" ; \
+    saved="${cache_path}/.host/saved" ; \
     pycache="${cache_path}/pycache" ; \
     test -d "${cache_path}/pipenv" || \
          { rm -rf "${cache_path}/pipenv" ; mkdir -p "${cache_path}/pipenv" ; } ; \
-    more "${saved}"/.??* | cat -v ; \
     cp -v -a "${saved}/wheels" "${cache_path}/pipenv/" || : ; \
   } && \
   # Install non-distro packages
@@ -338,16 +338,14 @@ RUN --mount=type=tmpfs,target=/cache \
   PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
   # Save wheels to cache
-  ( set -x ; cd "${cache_path}" ; \
-    more "${saved}"/.??* | cat -v ; \
-    wormhole \
+  { wormhole \
         --appid TubeSync \
-        --relay-url "$(cat ${saved}/.wormhole-relay)" \
-        --transit-helper "$(cat ${saved}/.wormhole-transit)" \
+        --relay-url "$(cat ${cache_path}/.host/.wormhole-relay)" \
+        --transit-helper "$(cat ${cache_path}/.host/.wormhole-transit)" \
         send \
-        --code "$(cat ${saved}/.wormhole-code)" \
+        --code "$(cat ${cache_path}/.host/.wormhole-code)" \
         "${cache_path}/pipenv/wheels" || : ; \
-  ) && \
+  } && \
   # Clean up
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
