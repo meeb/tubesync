@@ -78,6 +78,11 @@ jobs:
       - name: Create cache directory on the runner
         run: |
           mkdir -v .cache .cache/saved
+      - name: Cache from tubesync stage
+        uses: actions/cache@v4
+        with:
+          path: .cache/saved/*
+          key: docker-cache-tubesync
       - name: Start magic-wormhole services on the runner
         run: |
           sudo apt-get install python3-virtualenv
@@ -113,11 +118,6 @@ jobs:
                   wormhole --appid TubeSync --relay-url "$(< .wormhole-relay)" --transit-helper "$(< .wormhole-transit)" receive --accept-file -o saved/wheels "${code}" &
                   _pid=$!;
               done; } &)
-      - name: Cache from tubesync stage
-        uses: actions/cache@v4
-        with:
-          path: .cache/saved/*
-          key: docker-cache-tubesync
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
