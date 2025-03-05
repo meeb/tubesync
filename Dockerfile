@@ -307,6 +307,7 @@ RUN --mount=type=tmpfs,target=/cache \
   # set up cache
   { \
     cache_path='/cache' ; \
+    restored="${cache_path}/.host/saved/${TARGETARCH}" ; \
     saved="${cache_path}/saved/${TARGETARCH}" ; \
     pipenv_cache="${cache_path}/pipenv" ; \
     pycache="${cache_path}/pycache" ; \
@@ -314,6 +315,10 @@ RUN --mount=type=tmpfs,target=/cache \
     mkdir -p "${saved}" ; \
     test -d "${pipenv_cache}" || \
          { rm -rf "${pipenv_cache}" ; mkdir -p "${pipenv_cache}" ; } ; \
+    cp -at "${pipenv_cache}/" "${restored}/wheels" || : ; \
+    cp -at "${cache_path}/" "${restored}/wormhole" || : ; \
+    cp -at /tmp/ "${HOME}" && \
+    HOME="/tmp/${HOME#/}" ; \
   } && \
   # install magic-wormhole
   ( virtualenv "${wormhole_venv}" && \
@@ -341,24 +346,18 @@ RUN --mount=type=tmpfs,target=/cache \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
-  # Restore cached wheels
-  ( \
-      cp -v -a "${cache_path}/.host/saved/${TARGETARCH}/wheels" "${pipenv_cache}/" || \
-      cp -v -a "${cache_path}/.host/saved/wheels" "${pipenv_cache}/" || : ; \
-  ) && \
   # Install non-distro packages
-  cp -at /tmp/ "${HOME}" && \
-  HOME="/tmp/${HOME#/}" \
   XDG_CACHE_HOME="${cache_path}" \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
-  # Save wheels to cache
+  # Save wheels and wormhole to cache
   test -z "${WORMHOLE_CODE}" || \
   ( set +x ; \
     . "${wormhole_venv}/bin/activate" && \
     set -x && \
     cp -a "${pipenv_cache}/wheels" "${saved}/" && \
+    cp -a "${wormhole_venv}" "${saved}/" && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
       wormhole \
         --appid TubeSync \
