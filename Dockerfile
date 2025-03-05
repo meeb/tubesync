@@ -225,6 +225,12 @@ ARG S6_VERSION
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 
+ARG TARGETARCH
+
+ARG WORMHOLE_CODE
+ARG WORMHOLE_RELAY
+ARG WORMHOLE_TRANSIT
+
 ENV DEBIAN_FRONTEND="noninteractive" \
     HOME="/root" \
     LANGUAGE="en_US.UTF-8" \
@@ -298,6 +304,23 @@ RUN --mount=type=tmpfs,target=/cache \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
+  # set up cache
+  { \
+    cache_path='/cache' ; \
+    saved="${cache_path}/saved/${TARGETARCH}" ; \
+    pipenv_cache="${cache_path}/pipenv" ; \
+    pycache="${cache_path}/pycache" ; \
+    wormhole_venv="${cache_path}/wormhole" ; \
+    mkdir -p "${saved}" ; \
+    test -d "${pipenv_cache}" || \
+         { rm -rf "${pipenv_cache}" ; mkdir -p "${pipenv_cache}" ; } ; \
+  } && \
+  # install magic-wormhole
+  ( virtualenv "${wormhole_venv}" && \
+    . "${wormhole_venv}/bin/activate" && \
+    pip install --upgrade pip && \
+    pip install magic-wormhole ; \
+  ) && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
@@ -319,14 +342,10 @@ RUN --mount=type=tmpfs,target=/cache \
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Restore cached wheels
-  { \
-    cache_path='/cache' ; \
-    saved="${cache_path}/.host/saved" ; \
-    pycache="${cache_path}/pycache" ; \
-    test -d "${cache_path}/pipenv" || \
-         { rm -rf "${cache_path}/pipenv" ; mkdir -p "${cache_path}/pipenv" ; } ; \
-    cp -v -a "${saved}/wheels" "${cache_path}/pipenv/" || : ; \
-  } && \
+  ( \
+      cp -v -a "${cache_path}/.host/saved/${TARGETARCH}/wheels" "${pipenv_cache}/" || \
+      cp -v -a "${cache_path}/.host/saved/wheels" "${pipenv_cache}/" || : ; \
+  ) && \
   # Install non-distro packages
   cp -at /tmp/ "${HOME}" && \
   HOME="/tmp/${HOME#/}" \
@@ -335,17 +354,15 @@ RUN --mount=type=tmpfs,target=/cache \
   PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
   # Save wheels to cache
-  ( virtualenv "${cache_path}/wormhole" && \
-    . "${cache_path}/wormhole/bin/activate" && \
-    pip install --upgrade pip && \
-    pip install magic-wormhole && \
-      wormhole \
+  ( . "${wormhole_venv}/bin/activate" && \
+    cp -a "${pipenv_cache}/wheels" "${saved}/" && \
+    wormhole \
         --appid TubeSync \
-        --relay-url "$(cat ${cache_path}/.host/.wormhole-relay)" \
-        --transit-helper "$(cat ${cache_path}/.host/.wormhole-transit)" \
+        --relay-url "${WORMHOLE_RELAY}" \
+        --transit-helper "${WORMHOLE_TRANSIT}" \
         send \
-        --code "$(cat ${cache_path}/.host/.wormhole-code)" \
-        "${cache_path}/pipenv/wheels" || : ; \
+        --code "${WORMHOLE_CODE}" \
+        "${cache_path}/saved" || : ; \
   ) && \
   # Clean up
   apt-get -y autoremove --purge \
