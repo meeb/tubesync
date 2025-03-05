@@ -275,6 +275,7 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   pipenv \
   pkgconf \
   python3 \
+  python3-six \
   python3-wheel \
   curl \
   less \
