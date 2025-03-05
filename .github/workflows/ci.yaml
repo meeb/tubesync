@@ -112,10 +112,12 @@ jobs:
           # set variables
           relay_arg="ws://${runner_ip}:4000/v1"
           transit_arg="tcp:[${runner_ip}]:4001"
-          # generate the code and receive the first transfer
+          # generate the code
           wormhole --appid TubeSync --relay-url "${relay_arg}" --transit-helper "${transit_arg}" receive -a -c 3 --accept-file -o .cache/incoming >| .cache/receive.out 2>&1 &
           _pid=$!; sleep 1 && grep -e '^Allocated code:' .cache/receive.out | cut -d ' ' -f 3- >| .cache/.wormhole-code
+          cat -v -n .cache/receive.out
           rm -v -f .cache/receive.out
+          ( kill "${_pid}" && sleep 10 && kill -9 "${_pid}" || : ; ) &
           code="$(< .cache/.wormhole-code)"
           rm -v -f .cache/.wormhole-code
           # create output variables
@@ -124,10 +126,8 @@ jobs:
               relay "${relay_arg}" \
               runner_ip "${runner_ip}" \
               transit "${transit_arg}" ;
-          # receive another saved directory
-          { wait -f $_pid || : ; } &&
+          # receive the saved directories
           ( cd .cache &&
-              mv -f incoming/* saved/ &&
               while { \
                 wormhole \
                   --appid TubeSync \
@@ -137,8 +137,8 @@ jobs:
                   --accept-file -o incoming "${code}" || : ; \
               }
               do
-                  mv -f incoming/* saved/ ;
-              done) &
+                  mv -f incoming/* saved/ || : ;
+              done &)
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
