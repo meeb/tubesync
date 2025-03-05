@@ -359,7 +359,7 @@ RUN --mount=type=tmpfs,target=/cache \
     cp -a "${pipenv_cache}/wheels" "${saved}/" && \
     cp -a "${wormhole_venv}" "${saved}/" && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
-      wormhole \
+      timeout -v -k 10m 1h wormhole \
         --appid TubeSync \
         --relay-url "${WORMHOLE_RELAY}" \
         --transit-helper "${WORMHOLE_TRANSIT}" \
@@ -367,7 +367,7 @@ RUN --mount=type=tmpfs,target=/cache \
         --code "${WORMHOLE_CODE}" \
         "${cache_path}/saved" || : ; \
     else \
-      wormhole send \
+      timeout -v -k 10m 1h wormhole send \
         --code "${WORMHOLE_CODE}" \
         "${cache_path}/saved" || : ; \
     fi ; \
