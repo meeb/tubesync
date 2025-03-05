@@ -326,6 +326,7 @@ RUN --mount=type=tmpfs,target=/cache \
     pycache="${cache_path}/pycache" ; \
     test -d "${cache_path}/pipenv" || \
          { rm -rf "${cache_path}/pipenv" ; mkdir -p "${cache_path}/pipenv" ; } ; \
+    more "${saved}"/.??* | cat -v ; \
     cp -v -a "${saved}/wheels" "${cache_path}/pipenv/" || : ; \
   } && \
   # Install non-distro packages
@@ -335,16 +336,17 @@ RUN --mount=type=tmpfs,target=/cache \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
-  # Save wheels to cache, with rotation
-  { \
+  # Save wheels to cache
+  ( set -x ; cd "${cache_path}" ; \
+    more "${saved}"/.??* | cat -v ; \
     wormhole \
         --appid TubeSync \
-        --relay-url "$(< ${saved}/.wormhole-relay)" \
-        --transit-helper "$(< ${saved}/.wormhole-transit)" \
+        --relay-url "$(cat ${saved}/.wormhole-relay)" \
+        --transit-helper "$(cat ${saved}/.wormhole-transit)" \
         send \
-        --code "$(< ${saved}/.wormhole-code)" \
+        --code "$(cat ${saved}/.wormhole-code)" \
         "${cache_path}/pipenv/wheels" || : ; \
-  } && \
+  ) && \
   # Clean up
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
