@@ -68,6 +68,20 @@ jobs:
           (mkdir -v "${TMPDIR}"/magic-wormhole-transit-relay &&
               cd "${TMPDIR}"/magic-wormhole-transit-relay &&
               exec twistd transitrelay)
+          # determine the runner IP address
+          _awk_prog='$0 !~ /scope host/ && "inet" == $1 {split($2, P, "/"); print P[1]; exit;}'
+          runner_ip="$( ip addr sh | awk "${_awk_prog}" )"
+          export runner_ip
+          # receive the wheel directory
+          (cd .cache && url="ws://${runner_ip}:4000/v1" &&
+              wormhole --appid TubeSync --relay-url "${url}" --transit-helper "tcp:[${runner_ip}]:4001" receive -a -c 3 --accept-file -o wheel > receive.out 2>&1 &
+              sleep 1 && grep -e '^Allocated code:' receive.out | cut -d ' ' -f 3- > .wormhole-code &&
+              rm -v receive.out && code="$(< .wormhole-code)" &&
+              { while sleep 1; do
+                  test -s .wormhole-code && continue ||
+                  { echo "${code}" >| .wormhole-code &&
+                  wormhole --appid TubeSync --relay-url "${url}" --transit-helper "tcp:[${runner_ip}]:4001" receive --accept-file -o wheel "${code}" ; };
+              done; } &)
       - name: Cache from tubesync stage
         uses: actions/cache@v4
         with:
