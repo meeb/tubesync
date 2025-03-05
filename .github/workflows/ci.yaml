@@ -101,17 +101,17 @@ jobs:
           runner_ip="$( ip addr sh | awk "${_awk_prog}" )"
           export runner_ip
           # receive the wheel directory
-          (set -x ; cd .cache ;
+          (cd .cache ;
               printf -- '%s\n' "${runner_ip}" >| .ip
               printf -- '%s\n' "ws://${runner_ip}:4000/v1" >| .wormhole-relay
               printf -- '%s\n' "tcp:[${runner_ip}]:4001" >| .wormhole-transit
               wormhole --appid TubeSync --relay-url "$(< .wormhole-relay)" --transit-helper "$(< .wormhole-transit)" receive -a -c 3 --accept-file -o wheels >| receive.out 2>&1 &
-              sleep 1 && grep -e '^Allocated code:' receive.out | cut -d ' ' -f 3- > .wormhole-code &&
-              rm -v receive.out && code="$(< .wormhole-code)" &&
+              _pid=$!; sleep 1 && grep -e '^Allocated code:' receive.out | cut -d ' ' -f 3- > .wormhole-code &&
+              rm -f receive.out && code="$(< .wormhole-code)" &&
               { while sleep 1; do
-                  test -s .wormhole-code && continue ||
-                  { echo "${code}" >| .wormhole-code &&
-                  wormhole --appid TubeSync --relay-url "$(< .wormhole-relay)" --transit-helper "$(< .wormhole-transit)" receive --accept-file -o wheels "${code}" ; };
+                  test -d /proc/${_pid} && continue ;
+                  wormhole --appid TubeSync --relay-url "$(< .wormhole-relay)" --transit-helper "$(< .wormhole-transit)" receive --accept-file -o wheels "${code}" &
+                  _pid=$!;
               done; } &)
       - name: Cache from tubesync stage
         uses: actions/cache@v4
