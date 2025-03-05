@@ -77,7 +77,7 @@ jobs:
         run: echo '${{ secrets.GITHUB_TOKEN }}' | docker login --password-stdin --username '${{ github.actor }}' 'https://ghcr.io'
       - name: Create cache directory on the runner
         run: |
-          mkdir -v .cache
+          mkdir -v .cache .cache/saved
       - name: Start magic-wormhole services on the runner
         run: |
           sudo apt-get install python3-virtualenv
@@ -105,18 +105,18 @@ jobs:
               printf -- '%s\n' "${runner_ip}" >| .ip
               printf -- '%s\n' "ws://${runner_ip}:4000/v1" >| .wormhole-relay
               printf -- '%s\n' "tcp:[${runner_ip}]:4001" >| .wormhole-transit
-              wormhole --appid TubeSync --relay-url "$(< .wormhole-relay)" --transit-helper "$(< .wormhole-transit)" receive -a -c 3 --accept-file -o wheels >| receive.out 2>&1 &
+              wormhole --appid TubeSync --relay-url "$(< .wormhole-relay)" --transit-helper "$(< .wormhole-transit)" receive -a -c 3 --accept-file -o saved/wheels >| receive.out 2>&1 &
               _pid=$!; sleep 1 && grep -e '^Allocated code:' receive.out | cut -d ' ' -f 3- > .wormhole-code &&
               rm -f receive.out && code="$(< .wormhole-code)" &&
               { while sleep 1; do
                   test -d /proc/${_pid} && continue ;
-                  wormhole --appid TubeSync --relay-url "$(< .wormhole-relay)" --transit-helper "$(< .wormhole-transit)" receive --accept-file -o wheels "${code}" &
+                  wormhole --appid TubeSync --relay-url "$(< .wormhole-relay)" --transit-helper "$(< .wormhole-transit)" receive --accept-file -o saved/wheels "${code}" &
                   _pid=$!;
               done; } &)
       - name: Cache from tubesync stage
         uses: actions/cache@v4
         with:
-          path: .cache/*
+          path: .cache/saved/*
           key: docker-cache-tubesync
       - name: Build and push
         uses: docker/build-push-action@v6
