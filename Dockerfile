@@ -354,15 +354,24 @@ RUN --mount=type=tmpfs,target=/cache \
   PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
   # Save wheels to cache
-  ( . "${wormhole_venv}/bin/activate" && \
+  test -z "${WORMHOLE_CODE}" || \
+  ( set +x ; \
+    . "${wormhole_venv}/bin/activate" && \
+    set -x && \
     cp -a "${pipenv_cache}/wheels" "${saved}/" && \
-    wormhole \
+    if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
+      wormhole \
         --appid TubeSync \
         --relay-url "${WORMHOLE_RELAY}" \
         --transit-helper "${WORMHOLE_TRANSIT}" \
         send \
         --code "${WORMHOLE_CODE}" \
         "${cache_path}/saved" || : ; \
+    else \
+      wormhole send \
+        --code "${WORMHOLE_CODE}" \
+        "${cache_path}/saved" || : ; \
+    fi ; \
   ) && \
   # Clean up
   apt-get -y autoremove --purge \
