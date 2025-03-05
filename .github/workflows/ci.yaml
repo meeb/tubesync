@@ -83,6 +83,9 @@ jobs:
         with:
           path: .cache/saved
           key: docker-cache-tubesync
+      - name: List cache directory on the runner
+        run: |
+          ls -alR .cache
       - name: Start magic-wormhole services on the runner
         id: wormhole
         run: |
