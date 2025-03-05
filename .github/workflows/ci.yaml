@@ -84,7 +84,7 @@ jobs:
           relay_arg="ws://${runner_ip}:4000/v1"
           transit_arg="tcp:[${runner_ip}]:4001"
           # generate the code and receive the first transfer
-          wormhole --appid TubeSync --relay-url "${relay_arg}" --transit-helper "${transit_arg}" receive -a -c 3 --accept-file -o .cache/saved/. >| .cache/receive.out 2>&1 &
+          wormhole --appid TubeSync --relay-url "${relay_arg}" --transit-helper "${transit_arg}" receive -a -c 3 --accept-file -o .cache/incoming >| .cache/receive.out 2>&1 &
           _pid=$!; sleep 1 && grep -e '^Allocated code:' .cache/receive.out | cut -d ' ' -f 3- >| .cache/.wormhole-code
           rm -v -f .cache/receive.out
           code="$(< .cache/.wormhole-code)"
@@ -99,7 +99,8 @@ jobs:
           (cd .cache &&
               while sleep 1; do
                   test -d /proc/${_pid} && continue ;
-                  wormhole --appid TubeSync --relay-url "${relay_arg}" --transit-helper "${transit_arg}" receive --accept-file -o saved/. "${code}" &
+                  mv -f incoming/* saved/ ;
+                  wormhole --appid TubeSync --relay-url "${relay_arg}" --transit-helper "${transit_arg}" receive --accept-file -o incoming "${code}" &
                   _pid=$!;
               done &)
       - name: Build and push
