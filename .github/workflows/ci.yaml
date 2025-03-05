@@ -53,9 +53,10 @@ jobs:
       - name: Cache from tubesync stage
         uses: actions/cache@v4
         with:
-          path: .cache/saved/*
+          path: .cache/saved
           key: docker-cache-tubesync
       - name: Start magic-wormhole services on the runner
+        id: wormhole
         run: |
           sudo apt-get install python3-virtualenv
           TMPDIR="${XDG_RUNTIME_DIR:-/tmp}/temp"
@@ -76,20 +77,28 @@ jobs:
           # determine the runner IP address
           _awk_prog='$0 !~ /scope host/ && "inet" == $1 {split($2, P, "/"); print P[1]; exit;}'
           runner_ip="$( ip addr sh | awk "${_awk_prog}" )"
-          export runner_ip
-          # receive the wheel directory
-          (cd .cache ;
-              printf -- '%s\n' "${runner_ip}" >| .ip
-              printf -- '%s\n' "ws://${runner_ip}:4000/v1" >| .wormhole-relay
-              printf -- '%s\n' "tcp:[${runner_ip}]:4001" >| .wormhole-transit
-              wormhole --appid TubeSync --relay-url "$(< .wormhole-relay)" --transit-helper "$(< .wormhole-transit)" receive -a -c 3 --accept-file -o saved/wheels >| receive.out 2>&1 &
-              _pid=$!; sleep 1 && grep -e '^Allocated code:' receive.out | cut -d ' ' -f 3- > .wormhole-code &&
-              rm -f receive.out && code="$(< .wormhole-code)" &&
-              { while sleep 1; do
+          # set variables
+          relay_arg="ws://${runner_ip}:4000/v1"
+          transit_arg="tcp:[${runner_ip}]:4001"
+          # generate the code and receive the first transfer
+          wormhole --appid TubeSync --relay-url "${relay_arg}" --transit-helper "${transit_arg}" receive -a -c 3 --accept-file -o .cache/saved/. >| .cache/receive.out 2>&1 &
+          _pid=$!; sleep 1 && grep -e '^Allocated code:' .cache/receive.out | cut -d ' ' -f 3- >| .cache/.wormhole-code
+          rm -v -f .cache/receive.out
+          code="$(< .cache/.wormhole-code)"
+          rm -v -f .cache/.wormhole-code
+          # create output variables
+          printf -- '%s=%s\n' >> "$GITHUB_OUTPUT" \
+              code "${code}" \
+              relay "${relay_arg}" \
+              runner_ip "${runner_ip}" \
+              transit "${transit_arg}" ;
+          # receive the saved directory
+          (cd .cache &&
+              while sleep 1; do
                   test -d /proc/${_pid} && continue ;
-                  wormhole --appid TubeSync --relay-url "$(< .wormhole-relay)" --transit-helper "$(< .wormhole-transit)" receive --accept-file -o saved/wheels "${code}" &
+                  wormhole --appid TubeSync --relay-url "${relay_arg}" --transit-helper "${transit_arg}" receive --accept-file -o saved/. "${code}" &
                   _pid=$!;
-              done; } &)
+              done &)
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -101,3 +110,6 @@ jobs:
           cache-to: type=inline
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
+            WORMHOLE_CODE=${{ steps.wormhole.outputs.code }}
+            WORMHOLE_RELAY=${{ steps.wormhole.outputs.relay }}
+            WORMHOLE_TRANSIT=${{ steps.wormhole.outputs.transit }}
