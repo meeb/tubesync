@@ -73,8 +73,8 @@ jobs:
           runner_ip="$( ip addr sh | awk "${_awk_prog}" )"
           export runner_ip
           # receive the wheel directory
-          (set -x && cd .cache && url="ws://${runner_ip}:4000/v1" &&
-              wormhole --appid TubeSync --relay-url "${url}" --transit-helper "tcp:[${runner_ip}]:4001" receive -a -c 3 --accept-file -o wheel > receive.out 2>&1 &
+          (set -x ; cd .cache ; url="ws://${runner_ip}:4000/v1" ;
+              wormhole --appid TubeSync --relay-url "${url}" --transit-helper "tcp:[${runner_ip}]:4001" receive -a -c 3 --accept-file -o wheel >| receive.out 2>&1 &
               sleep 1 && grep -e '^Allocated code:' receive.out | cut -d ' ' -f 3- > .wormhole-code &&
               rm -v receive.out && code="$(< .wormhole-code)" &&
               { while sleep 1; do
