@@ -124,14 +124,21 @@ jobs:
               relay "${relay_arg}" \
               runner_ip "${runner_ip}" \
               transit "${transit_arg}" ;
-          # receive the saved directory
-          (cd .cache &&
-              while sleep 1; do
-                  test -d /proc/${_pid} && continue ;
+          # receive another saved directory
+          { wait -f $_pid || : ; } &&
+          ( cd .cache &&
+              mv -f incoming/* saved/ &&
+              while { \
+                wormhole \
+                  --appid TubeSync \
+                  --relay-url "${relay_arg}" \
+                  --transit-helper "${transit_arg}" \
+                  receive \
+                  --accept-file -o incoming "${code}" || : ; \
+              }
+              do
                   mv -f incoming/* saved/ ;
-                  wormhole --appid TubeSync --relay-url "${relay_arg}" --transit-helper "${transit_arg}" receive --accept-file -o incoming "${code}" &
-                  _pid=$!;
-              done &)
+              done) &
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
