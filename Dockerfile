@@ -275,8 +275,6 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   pipenv \
   pkgconf \
   python3 \
-  python3-idna \
-  python3-six \
   python3-wheel \
   curl \
   less \
@@ -311,11 +309,11 @@ RUN --mount=type=tmpfs,target=/cache \
   libjpeg-dev \
   libpq-dev \
   libwebp-dev \
-  magic-wormhole \
   make \
   postgresql-common \
   python3-dev \
   python3-pip \
+  python3-virtualenv \
   zlib1g-dev \
   && \
   # Create a 'app' user which the application will run as
@@ -338,14 +336,18 @@ RUN --mount=type=tmpfs,target=/cache \
   PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
   # Save wheels to cache
-  { wormhole \
+  ( virtualenv "${cache_path}/wormhole" && \
+    . "${cache_path}/wormhole/bin/activate" && \
+    pip install --upgrade pip && \
+    pip install magic-wormhole && \
+      wormhole \
         --appid TubeSync \
         --relay-url "$(cat ${cache_path}/.host/.wormhole-relay)" \
         --transit-helper "$(cat ${cache_path}/.host/.wormhole-transit)" \
         send \
         --code "$(cat ${cache_path}/.host/.wormhole-code)" \
         "${cache_path}/pipenv/wheels" || : ; \
-  } && \
+  ) && \
   # Clean up
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
@@ -354,11 +356,11 @@ RUN --mount=type=tmpfs,target=/cache \
   libjpeg-dev \
   libpq-dev \
   libwebp-dev \
-  magic-wormhole \
   make \
   postgresql-common \
   python3-dev \
   python3-pip \
+  python3-virtualenv \
   zlib1g-dev \
   && \
   apt-get -y autopurge && \
