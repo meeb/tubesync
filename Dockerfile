@@ -309,6 +309,7 @@ RUN --mount=type=tmpfs,target=/cache \
   libjpeg-dev \
   libpq-dev \
   libwebp-dev \
+  magic-wormhole \
   make \
   postgresql-common \
   python3-dev \
@@ -336,9 +337,13 @@ RUN --mount=type=tmpfs,target=/cache \
     pipenv install --system --skip-lock && \
   # Save wheels to cache, with rotation
   { \
-    test '!' -e "${saved}/wheels.0" || rm -rf "${saved}/wheels.0" ; \
-    test '!' -e "${saved}/wheels" || mv "${saved}/wheels" "${saved}/wheels.0" ; \
-    cp -v -a "${cache_path}/pipenv/wheels" "${saved}/" || : ; \
+    wormhole \
+        --appid TubeSync \
+        --relay-url "$(< ${saved}/.wormhole-relay)" \
+        --transit-helper "$(< ${saved}/.wormhole-transit)" \
+        send \
+        --code "$(< ${saved}/.wormhole-code)" \
+        "${cache_path}/pipenv/wheels" || : ; \
   } && \
   # Clean up
   apt-get -y autoremove --purge \
@@ -348,6 +353,7 @@ RUN --mount=type=tmpfs,target=/cache \
   libjpeg-dev \
   libpq-dev \
   libwebp-dev \
+  magic-wormhole \
   make \
   postgresql-common \
   python3-dev \
