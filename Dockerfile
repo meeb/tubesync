@@ -368,6 +368,7 @@ RUN --mount=type=tmpfs,target=/cache \
     cp -a /var/lib/apt "${saved}/apt-lib-cache" && \
     cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
     cp -a "${wormhole_venv}" "${saved}/" && \
+    ls -alR "${cache_path}/saved" && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
       timeout -v -k 10m 1h wormhole \
         --appid TubeSync \
