@@ -325,7 +325,6 @@ RUN --mount=type=tmpfs,target=/cache \
          { rm -rf "${pipenv_cache}" ; mkdir -p "${pipenv_cache}" ; } ; \
     cp -at "${pipenv_cache}/" "${restored}/pipenv-cache"/* || : ; \
     cp -at "${cache_path}/" "${restored}/${TARGETARCH}/wormhole" || : ; \
-    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
     cp -at /tmp/ "${HOME}" && \
     HOME="/tmp/${HOME#/}" ; \
   } && \
