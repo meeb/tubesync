@@ -225,8 +225,6 @@ ARG S6_VERSION
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 
-ARG TARGETARCH
-
 ARG WORMHOLE_CODE
 ARG WORMHOLE_RELAY
 ARG WORMHOLE_TRANSIT
@@ -257,7 +255,7 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   # restore saved cache directories for apt
   { \
     cache_path='/cache' ; \
-    restored="${cache_path}/.host/saved/${TARGETARCH}" ; \
+    restored="${cache_path}/.host/saved" ; \
     cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
     cp -at /var/lib/apt/ "${restored}/apt-lib-cache"/* || : ; \
   } && \
@@ -314,8 +312,8 @@ RUN --mount=type=tmpfs,target=/cache \
   # set up cache
   { \
     cache_path='/cache' ; \
-    restored="${cache_path}/.host/saved/${TARGETARCH}" ; \
-    saved="${cache_path}/saved/${TARGETARCH}" ; \
+    restored="${cache_path}/.host/saved" ; \
+    saved="${cache_path}/saved" ; \
     pipenv_cache="${cache_path}/pipenv" ; \
     pycache="${cache_path}/pycache" ; \
     wormhole_venv="${cache_path}/wormhole" ; \
