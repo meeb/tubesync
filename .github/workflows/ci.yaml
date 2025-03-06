@@ -60,9 +60,10 @@ jobs:
           key: docker-cache-tubesync-${{ hashFiles('.cache/reset', '*file', '.github/workflows/ci.yaml') }}
           restore-keys: |
             docker-cache-tubesync-
-            docker-cache-
       - name: List cache directory on the runner
         run: |
+          # remove the outdated TARGETARCH directories from the new cache
+          mv -v --backup=numbered -f .cache/saved/a??64 .cache/removed/ || :
           ls -alR .cache
       - name: Start magic-wormhole services on the runner
         id: wormhole
