@@ -261,6 +261,7 @@ RUN --mount=type=tmpfs,target=/cache \
     cache_path='/cache' ; \
     restored="${cache_path}/.host" ; \
     cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
+    cp -at /var/lib/apt/ "${restored}/apt-lib-cache"/* || : ; \
   } && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean && \
@@ -322,12 +323,13 @@ RUN --mount=type=tmpfs,target=/cache \
     wormhole_venv="${cache_path}/wormhole" ; \
     mkdir -p "${saved}/${TARGETARCH}" ; \
     test -d "${pipenv_cache}" || \
-         { rm -rf "${pipenv_cache}" ; mkdir -p "${pipenv_cache}" ; } ; \
+         { rm -v -rf "${pipenv_cache}" ; mkdir -v -p "${pipenv_cache}" ; } ; \
     cp -at "${pipenv_cache}/" "${restored}/pipenv-cache"/* || : ; \
     cp -at "${cache_path}/" "${restored}/${TARGETARCH}/wormhole" || : ; \
-    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
-    cp -at /tmp/ "${HOME}" && \
-    HOME="/tmp/${HOME#/}" ; \
+    # keep the real HOME clean
+    mkdir -p "${cache_path}/.home-directories" ; \
+    cp -at "${cache_path}/.home-directories/" "${HOME}" && \
+    HOME="${cache_path}/.home-directories/${HOME#/}" ; \
   } && \
   # install magic-wormhole
   ( virtualenv --download --upgrade-embed-wheels "${wormhole_venv}" && \
@@ -359,29 +361,6 @@ RUN --mount=type=tmpfs,target=/cache \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
-  # Save wheels and wormhole to cache
-  test -z "${WORMHOLE_CODE}" || \
-  ( set +x ; \
-    . "${wormhole_venv}/bin/activate" && \
-    set -x && \
-    cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
-    cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
-    cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
-    ls -al "${saved}" && ls -alR "${saved}"/*-cache && \
-    if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
-      timeout -v -k 10m 1h wormhole \
-        --appid TubeSync \
-        --relay-url "${WORMHOLE_RELAY}" \
-        --transit-helper "${WORMHOLE_TRANSIT}" \
-        send \
-        --code "${WORMHOLE_CODE}" \
-        "${cache_path}/saved" || : ; \
-    else \
-      timeout -v -k 10m 1h wormhole send \
-        --code "${WORMHOLE_CODE}" \
-        "${cache_path}/saved" || : ; \
-    fi ; \
-  ) && \
   # Clean up
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
@@ -398,7 +377,31 @@ RUN --mount=type=tmpfs,target=/cache \
   && \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
-  rm -rf /tmp/*
+  # Save our saved directory to the cache directory on the runner
+  test -z "${WORMHOLE_CODE}" || \
+  ( set +x ; \
+    . "${wormhole_venv}/bin/activate" && \
+    set -x && \
+    cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
+    cp -a /var/lib/apt "${saved}/apt-lib-cache" && \
+    cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
+    cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
+    ls -al "${saved}" && ls -al "${saved}"/* && \
+    if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
+      timeout -v -k 10m 1h wormhole \
+        --appid TubeSync \
+        --relay-url "${WORMHOLE_RELAY}" \
+        --transit-helper "${WORMHOLE_TRANSIT}" \
+        send \
+        --code "${WORMHOLE_CODE}" \
+        "${cache_path}/saved" || : ; \
+    else \
+      timeout -v -k 10m 1h wormhole send \
+        --code "${WORMHOLE_CODE}" \
+        "${cache_path}/saved" || : ; \
+    fi ; \
+  ) && \
+  rm -v -rf /tmp/*
 
 # Copy app
 COPY tubesync /app
