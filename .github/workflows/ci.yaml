@@ -79,7 +79,7 @@ jobs:
         run: |
           mkdir -v -p .cache
           : >> .cache/reset
-          mkdir -v .cache/saved
+          mkdir -v .cache/saved .cached/removed
       - name: Cache from tubesync stage
         id: cache
         uses: actions/cache@v4
@@ -124,7 +124,8 @@ jobs:
               --transit-helper "${transit_arg}" \
               receive -a -c 3 \
               --accept-file -o .cache/incoming >| .cache/receive.out 2>&1 && \
-              mv --backup=numbered -f .cache/incoming/* .cache/saved/ || : ; ) &
+              mv --backup=numbered -f .cache/incoming/* .cache/saved/ || : ; \
+              mv --backup=numbered -f .cache/saved/*.~[0-9]~ .cache/removed/ || : ; ) &
           _pid=$!; sleep 1 && grep -e '^Allocated code:' .cache/receive.out | cut -d ' ' -f 3- >| .cache/.wormhole-code
           cat -v -n .cache/receive.out
           rm -v -f .cache/receive.out
@@ -149,7 +150,8 @@ jobs:
               }
               do
                   mv --backup=numbered -f incoming/* saved/ || : ;
-                  rm -rf saved/*.~[0-9]~ || : ;
+                  mv --backup=numbered -f saved/*.~[0-9]~ removed/ || : ;
+                  rm -rf removed/* || : ;
               done &)
       - name: Build and push
         uses: docker/build-push-action@v6
