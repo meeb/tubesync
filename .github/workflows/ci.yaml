@@ -84,12 +84,17 @@ jobs:
           # set variables
           relay_arg="ws://${runner_ip}:4000/v1"
           transit_arg="tcp:[${runner_ip}]:4001"
-          # generate the code
-          wormhole --appid TubeSync --relay-url "${relay_arg}" --transit-helper "${transit_arg}" receive -a -c 3 --accept-file -o .cache/incoming >| .cache/receive.out 2>&1 &
+          # generate the code and receive the first transfer
+          ( wormhole \
+              --appid TubeSync \
+              --relay-url "${relay_arg}" \
+              --transit-helper "${transit_arg}" \
+              receive -a -c 3 \
+              --accept-file -o .cache/incoming >| .cache/receive.out 2>&1 && \
+              mv -f .cache/incoming/* .cache/saved/ || : ; ) &
           _pid=$!; sleep 1 && grep -e '^Allocated code:' .cache/receive.out | cut -d ' ' -f 3- >| .cache/.wormhole-code
           cat -v -n .cache/receive.out
           rm -v -f .cache/receive.out
-          ( kill "${_pid}" && sleep 10 && kill -9 "${_pid}" || : ; ) &
           code="$(< .cache/.wormhole-code)"
           rm -v -f .cache/.wormhole-code
           # create output variables
@@ -100,6 +105,7 @@ jobs:
               transit "${transit_arg}" ;
           # receive the saved directories
           ( cd .cache &&
+              while test -d /proc/"${_pid}" ; do sleep 5 ; done &&
               while { \
                 wormhole \
                   --appid TubeSync \
