@@ -79,7 +79,7 @@ jobs:
         run: |
           mkdir -v -p .cache
           : >> .cache/reset
-          mkdir -v .cache/saved .cached/removed
+          mkdir -v .cache/saved .cache/removed
       - name: Cache from tubesync stage
         id: cache
         uses: actions/cache@v4
