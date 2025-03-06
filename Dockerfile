@@ -256,7 +256,7 @@ RUN --mount=type=tmpfs,target=/cache \
     --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
   set -x && \
-  # restore the saved cache directory for apt packages
+  # restore the saved cache directories for apt packages
   { \
     cache_path='/cache' ; \
     restored="${cache_path}/.host" ; \
