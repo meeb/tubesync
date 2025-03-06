@@ -49,13 +49,15 @@ jobs:
           string: ${{ github.actor }}
       - name: Create cache directory on the runner
         run: |
-          mkdir -v .cache .cache/saved
+          mkdir -v -p .cache
+          : >> .cache/reset
+          mkdir -v .cache/saved
       - name: Cache from tubesync stage
         id: cache
         uses: actions/cache@v4
         with:
           path: .cache/saved
-          key: docker-cache-tubesync
+          key: docker-cache-tubesync-${{ hashFiles('.cache/reset', '[CP]*file') }}
       - name: List cache directory on the runner
         run: |
           ls -alR .cache
