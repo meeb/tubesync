@@ -323,11 +323,13 @@ RUN --mount=type=tmpfs,target=/cache \
     wormhole_venv="${cache_path}/wormhole" ; \
     mkdir -p "${saved}/${TARGETARCH}" ; \
     test -d "${pipenv_cache}" || \
-         { rm -rf "${pipenv_cache}" ; mkdir -p "${pipenv_cache}" ; } ; \
+         { rm -v -rf "${pipenv_cache}" ; mkdir -v -p "${pipenv_cache}" ; } ; \
     cp -at "${pipenv_cache}/" "${restored}/pipenv-cache"/* || : ; \
     cp -at "${cache_path}/" "${restored}/${TARGETARCH}/wormhole" || : ; \
-    cp -at /tmp/ "${HOME}" && \
-    HOME="/tmp/${HOME#/}" ; \
+    # keep the real HOME clean
+    mkdir -p "${cache_path}/.home-directories" ; \
+    cp -at "${cache_path}/.home-directories/" "${HOME}" && \
+    HOME="${cache_path}/.home-directories/${HOME#/}" ; \
   } && \
   # install magic-wormhole
   ( virtualenv --download --upgrade-embed-wheels "${wormhole_venv}" && \
@@ -359,7 +361,23 @@ RUN --mount=type=tmpfs,target=/cache \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
-  # Save wheels and wormhole to cache
+  # Clean up
+  apt-get -y autoremove --purge \
+  default-libmysqlclient-dev \
+  g++ \
+  gcc \
+  libjpeg-dev \
+  libpq-dev \
+  libwebp-dev \
+  make \
+  postgresql-common \
+  python3-dev \
+  python3-pip \
+  zlib1g-dev \
+  && \
+  apt-get -y autopurge && \
+  apt-get -y autoclean && \
+  # Save our saved directory to the cache directory on the runner
   test -z "${WORMHOLE_CODE}" || \
   ( set +x ; \
     . "${wormhole_venv}/bin/activate" && \
@@ -383,23 +401,7 @@ RUN --mount=type=tmpfs,target=/cache \
         "${cache_path}/saved" || : ; \
     fi ; \
   ) && \
-  # Clean up
-  apt-get -y autoremove --purge \
-  default-libmysqlclient-dev \
-  g++ \
-  gcc \
-  libjpeg-dev \
-  libpq-dev \
-  libwebp-dev \
-  make \
-  postgresql-common \
-  python3-dev \
-  python3-pip \
-  zlib1g-dev \
-  && \
-  apt-get -y autopurge && \
-  apt-get -y autoclean && \
-  rm -rf /tmp/*
+  rm -v -rf /tmp/*
 
 # Copy app
 COPY tubesync /app
