@@ -87,7 +87,7 @@ jobs:
           path: .cache/saved
           key: docker-cache-tubesync-${{ hashFiles('.cache/reset') }}-${{ hashFiles('*file', '.github/workflows/ci.yaml') }}
           restore-keys: |
-            docker-cache-tubesync-
+            docker-cache-tubesync-${{ hashFiles('.cache/reset') }}-
       - name: List cache directory on the runner
         run: |
           ls -alR .cache
