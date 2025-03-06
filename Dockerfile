@@ -261,6 +261,7 @@ RUN --mount=type=tmpfs,target=/cache \
     cache_path='/cache' ; \
     restored="${cache_path}/.host" ; \
     cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
+    cp -at /var/lib/apt/ "${restored}/apt-lib-cache"/* || : ; \
   } && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean && \
@@ -364,9 +365,10 @@ RUN --mount=type=tmpfs,target=/cache \
     . "${wormhole_venv}/bin/activate" && \
     set -x && \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
+    cp -a /var/lib/apt "${saved}/apt-lib-cache" && \
     cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
     cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
-    ls -al "${saved}" && ls -alR "${saved}"/*-cache && \
+    ls -al "${saved}" && ls -al "${saved}"/* && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
       timeout -v -k 10m 1h wormhole \
         --appid TubeSync \
