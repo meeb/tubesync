@@ -55,13 +55,11 @@ class Command(BaseCommand):
                 item.downloaded = True
                 item.downloaded_filesize = Path(filepath).stat().st_size
                 # set a reasonable download date
-                date = item.metadata_published‎(Path(filepath).stat().st_mtime)
+                date = item.metadata_published(Path(filepath).stat().st_mtime)
                 if item.published and item.published > date:
                     date = item.published
                 if item.has_metadata:
-                    # TODO: switch to the newer function when it is merged from PR 807
-                    # item.get_metadata_first_value('epoch', 0)
-                    metadata_date = item.metadata_published‎(item.loaded_metadata.get('epoch', 0))
+                    metadata_date = item.metadata_published(item.get_metadata_first_value('epoch', 0))
                     if metadata_date and metadata_date > date:
                         date = metadata_date
                 if item.download_date and item.download_date > date:
