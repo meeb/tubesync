@@ -124,7 +124,7 @@ jobs:
               --transit-helper "${transit_arg}" \
               receive -a -c 3 \
               --accept-file -o .cache/incoming >| .cache/receive.out 2>&1 && \
-              mv -f .cache/incoming/* .cache/saved/ || : ; ) &
+              mv --backup=numbered -f .cache/incoming/* .cache/saved/ || : ; ) &
           _pid=$!; sleep 1 && grep -e '^Allocated code:' .cache/receive.out | cut -d ' ' -f 3- >| .cache/.wormhole-code
           cat -v -n .cache/receive.out
           rm -v -f .cache/receive.out
@@ -148,7 +148,8 @@ jobs:
                   --accept-file -o incoming "${code}" || : ; \
               }
               do
-                  mv -f incoming/* saved/ || : ;
+                  mv --backup=numbered -f incoming/* saved/ || : ;
+                  rm -rf saved/*.~[0-9]~ || : ;
               done &)
       - name: Build and push
         uses: docker/build-push-action@v6
