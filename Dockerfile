@@ -251,17 +251,19 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
+RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=bind,source=.cache/saved,target=/cache/.host \
+    --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
   set -x && \
   # restore the saved cache directory for apt packages
   { \
     cache_path='/cache' ; \
-    restored="${cache_path}/.host/saved" ; \
-    cp -v -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
+    restored="${cache_path}/.host" ; \
+    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
   } && \
   # Update from the network and keep cache
-  rm -v -f /etc/apt/apt.conf.d/docker-clean && \
+  rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
   # Install locales
   apt-get -y --no-install-recommends install locales && \
@@ -304,7 +306,7 @@ WORKDIR /app
 
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
-    --mount=type=bind,source=.cache,target=/cache/.host \
+    --mount=type=bind,source=.cache/saved,target=/cache/.host \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
@@ -313,7 +315,7 @@ RUN --mount=type=tmpfs,target=/cache \
   # set up cache
   { \
     cache_path='/cache' ; \
-    restored="${cache_path}/.host/saved" ; \
+    restored="${cache_path}/.host" ; \
     saved="${cache_path}/saved" ; \
     pipenv_cache="${cache_path}/pipenv" ; \
     pycache="${cache_path}/pycache" ; \
@@ -323,7 +325,7 @@ RUN --mount=type=tmpfs,target=/cache \
          { rm -rf "${pipenv_cache}" ; mkdir -p "${pipenv_cache}" ; } ; \
     cp -at "${pipenv_cache}/" "${restored}/pipenv-cache"/* || : ; \
     cp -at "${cache_path}/" "${restored}/${TARGETARCH}/wormhole" || : ; \
-    cp -v -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
+    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
     cp -at /tmp/ "${HOME}" && \
     HOME="/tmp/${HOME#/}" ; \
   } && \
@@ -333,7 +335,7 @@ RUN --mount=type=tmpfs,target=/cache \
     pip install magic-wormhole ; \
   ) && \
   # Update from the network and keep cache
-  rm -v -f /etc/apt/apt.conf.d/docker-clean && \
+  rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -362,7 +364,6 @@ RUN --mount=type=tmpfs,target=/cache \
   ( set +x ; \
     . "${wormhole_venv}/bin/activate" && \
     set -x && \
-    mkdir -p "${saved}/apt-lib-cache" && \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
     cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
     cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
