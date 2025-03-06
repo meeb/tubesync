@@ -58,6 +58,9 @@ jobs:
         with:
           path: .cache/saved
           key: docker-cache-tubesync-${{ hashFiles('.cache/reset', '[CP]*file') }}
+          restore-keys: |
+            docker-cache-tubesync-
+            docker-cache-
       - name: List cache directory on the runner
         run: |
           ls -alR .cache
