@@ -254,12 +254,12 @@ COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
   set -x && \
-  # restore saved cache directories for apt
+  # restore the saved cache directory for apt packages
   { \
     cache_path='/cache' ; \
     restored="${cache_path}/.host/saved" ; \
-    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
-    cp -at /var/lib/apt/ "${restored}/apt-lib-cache"/* || : ; \
+    cp -pt /var/cache/apt/ "${restored}/apt-cache-cache"/*cache.bin || : ; \
+    cp -pt /var/cache/apt/archives/ "${restored}/apt-cache-cache/archives"/*.deb || : ; \
   } && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean && \
@@ -319,19 +319,17 @@ RUN --mount=type=tmpfs,target=/cache \
     pipenv_cache="${cache_path}/pipenv" ; \
     pycache="${cache_path}/pycache" ; \
     wormhole_venv="${cache_path}/wormhole" ; \
-    mkdir -p "${saved}/${TARGETARCH}" "${saved}/wormhole" ; \
+    mkdir -p "${saved}/${TARGETARCH}" ; \
     test -d "${pipenv_cache}" || \
          { rm -rf "${pipenv_cache}" ; mkdir -p "${pipenv_cache}" ; } ; \
-    cp -at "${pipenv_cache}/" "${restored}/pipenv-cache"/* || \
-    cp -at "${pipenv_cache}/" "${restored}/wheels" || : ; \
+    cp -at "${pipenv_cache}/" "${restored}/pipenv-cache"/* || : ; \
     cp -at "${cache_path}/" "${restored}/${TARGETARCH}/wormhole" || : ; \
     cp -at /tmp/ "${HOME}" && \
     HOME="/tmp/${HOME#/}" ; \
   } && \
   # install magic-wormhole
-  ( virtualenv "${wormhole_venv}" && \
+  ( virtualenv --download --upgrade-embed-wheels "${wormhole_venv}" && \
     . "${wormhole_venv}/bin/activate" && \
-    pip install --upgrade pip && \
     pip install magic-wormhole ; \
   ) && \
   # Update from the network and keep cache
@@ -365,7 +363,6 @@ RUN --mount=type=tmpfs,target=/cache \
     . "${wormhole_venv}/bin/activate" && \
     set -x && \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
-    cp -a /var/lib/apt "${saved}/apt-lib-cache" && \
     cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
     cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
