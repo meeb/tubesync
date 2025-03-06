@@ -225,6 +225,8 @@ ARG S6_VERSION
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 
+ARG TARGETARCH
+
 ARG WORMHOLE_CODE
 ARG WORMHOLE_RELAY
 ARG WORMHOLE_TRANSIT
@@ -317,12 +319,12 @@ RUN --mount=type=tmpfs,target=/cache \
     pipenv_cache="${cache_path}/pipenv" ; \
     pycache="${cache_path}/pycache" ; \
     wormhole_venv="${cache_path}/wormhole" ; \
-    mkdir -p "${saved}" ; \
+    mkdir -p "${saved}/${TARGETARCH}" "${saved}/wormhole" ; \
     test -d "${pipenv_cache}" || \
          { rm -rf "${pipenv_cache}" ; mkdir -p "${pipenv_cache}" ; } ; \
     cp -at "${pipenv_cache}/" "${restored}/pipenv-cache"/* || \
     cp -at "${pipenv_cache}/" "${restored}/wheels" || : ; \
-    cp -at "${cache_path}/" "${restored}/wormhole" || : ; \
+    cp -at "${cache_path}/" "${restored}/${TARGETARCH}/wormhole" || : ; \
     cp -at /tmp/ "${HOME}" && \
     HOME="/tmp/${HOME#/}" ; \
   } && \
@@ -365,7 +367,7 @@ RUN --mount=type=tmpfs,target=/cache \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
     cp -a /var/lib/apt "${saved}/apt-lib-cache" && \
     cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
-    cp -a "${wormhole_venv}" "${saved}/" && \
+    cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
       timeout -v -k 10m 1h wormhole \
         --appid TubeSync \
