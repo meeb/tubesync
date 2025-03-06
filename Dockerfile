@@ -258,11 +258,10 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   { \
     cache_path='/cache' ; \
     restored="${cache_path}/.host/saved" ; \
-    cp -pt /var/cache/apt/ "${restored}/apt-cache-cache"/*cache.bin || : ; \
-    cp -pt /var/cache/apt/archives/ "${restored}/apt-cache-cache/archives"/*.deb || : ; \
+    cp -v -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
   } && \
   # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
+  rm -v -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
   # Install locales
   apt-get -y --no-install-recommends install locales && \
@@ -324,6 +323,7 @@ RUN --mount=type=tmpfs,target=/cache \
          { rm -rf "${pipenv_cache}" ; mkdir -p "${pipenv_cache}" ; } ; \
     cp -at "${pipenv_cache}/" "${restored}/pipenv-cache"/* || : ; \
     cp -at "${cache_path}/" "${restored}/${TARGETARCH}/wormhole" || : ; \
+    cp -v -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
     cp -at /tmp/ "${HOME}" && \
     HOME="/tmp/${HOME#/}" ; \
   } && \
@@ -333,7 +333,7 @@ RUN --mount=type=tmpfs,target=/cache \
     pip install magic-wormhole ; \
   ) && \
   # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
+  rm -v -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -362,9 +362,11 @@ RUN --mount=type=tmpfs,target=/cache \
   ( set +x ; \
     . "${wormhole_venv}/bin/activate" && \
     set -x && \
+    mkdir -p "${saved}/apt-lib-cache" && \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
     cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
     cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
+    ls -al "${saved}" && ls -alR "${saved}"/*-cache && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
       timeout -v -k 10m 1h wormhole \
         --appid TubeSync \
