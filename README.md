@@ -126,7 +126,7 @@ services:
   tubesync:
     image: ghcr.io/meeb/tubesync:latest
     container_name: tubesync
-    restart: unless-stopped
+    restart: on-failure:3
     ports:
       - 4848:4848
     volumes:

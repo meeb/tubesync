@@ -225,6 +225,12 @@ ARG S6_VERSION
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 
+ARG TARGETARCH
+
+ARG WORMHOLE_CODE
+ARG WORMHOLE_RELAY
+ARG WORMHOLE_TRANSIT
+
 ENV DEBIAN_FRONTEND="noninteractive" \
     HOME="/root" \
     LANGUAGE="en_US.UTF-8" \
@@ -245,9 +251,18 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
+RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=bind,source=.cache/saved,target=/cache/.host \
+    --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
   set -x && \
+  # restore the saved cache directories for apt packages
+  { \
+    cache_path='/cache' ; \
+    restored="${cache_path}/.host" ; \
+    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
+    cp -at /var/lib/apt/ "${restored}/apt-lib-cache"/* || : ; \
+  } && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
@@ -292,11 +307,35 @@ WORKDIR /app
 
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=bind,source=.cache/saved,target=/cache/.host \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
+  # set up cache
+  { \
+    cache_path='/cache' ; \
+    restored="${cache_path}/.host" ; \
+    saved="${cache_path}/saved" ; \
+    pipenv_cache="${cache_path}/pipenv" ; \
+    pycache="${cache_path}/pycache" ; \
+    wormhole_venv="${cache_path}/wormhole" ; \
+    mkdir -p "${saved}/${TARGETARCH}" ; \
+    test -d "${pipenv_cache}" || \
+         { rm -v -rf "${pipenv_cache}" ; mkdir -v -p "${pipenv_cache}" ; } ; \
+    cp -at "${pipenv_cache}/" "${restored}/pipenv-cache"/* || : ; \
+    cp -at "${cache_path}/" "${restored}/${TARGETARCH}/wormhole" || : ; \
+    # keep the real HOME clean
+    mkdir -p "${cache_path}/.home-directories" ; \
+    cp -at "${cache_path}/.home-directories/" "${HOME}" && \
+    HOME="${cache_path}/.home-directories/${HOME#/}" ; \
+  } && \
+  # install magic-wormhole
+  ( virtualenv --download --upgrade-embed-wheels "${wormhole_venv}" && \
+    . "${wormhole_venv}/bin/activate" && \
+    pip install magic-wormhole ; \
+  ) && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
@@ -318,11 +357,9 @@ RUN --mount=type=tmpfs,target=/cache \
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
-  cp -at /tmp/ "${HOME}" && \
-  HOME="/tmp/${HOME#/}" \
-  XDG_CACHE_HOME='/cache' \
+  XDG_CACHE_HOME="${cache_path}" \
   PIPENV_VERBOSITY=64 \
-  PYTHONPYCACHEPREFIX=/cache/pycache \
+  PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
   # Clean up
   apt-get -y autoremove --purge \
@@ -340,6 +377,30 @@ RUN --mount=type=tmpfs,target=/cache \
   && \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
+  # Save our saved directory to the cache directory on the runner
+  test -z "${WORMHOLE_CODE}" || \
+  ( set +x ; \
+    . "${wormhole_venv}/bin/activate" && \
+    set -x && \
+    cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
+    cp -a /var/lib/apt "${saved}/apt-lib-cache" && \
+    cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
+    cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
+    ls -al "${saved}" && ls -al "${saved}"/* && \
+    if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
+      timeout -v -k 10m 1h wormhole \
+        --appid TubeSync \
+        --relay-url "${WORMHOLE_RELAY}" \
+        --transit-helper "${WORMHOLE_TRANSIT}" \
+        send \
+        --code "${WORMHOLE_CODE}" \
+        "${cache_path}/saved" || : ; \
+    else \
+      timeout -v -k 10m 1h wormhole send \
+        --code "${WORMHOLE_CODE}" \
+        "${cache_path}/saved" || : ; \
+    fi ; \
+  ) && \
   rm -v -rf /tmp/*
 
 # Copy app
