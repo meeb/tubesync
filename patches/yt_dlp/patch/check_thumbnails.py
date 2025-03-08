@@ -1,4 +1,5 @@
 from yt_dlp import YoutubeDL
+from yt_dlp.utils import sanitize_url, LazyList
 
 class PatchedYoutubeDL(YoutubeDL):
 
@@ -14,7 +15,7 @@ class PatchedYoutubeDL(YoutubeDL):
 
         def check_thumbnails(thumbnails):
             for t in thumbnails:
-                self.to_screen(f'[info] Testing thumbnail {t["id"]}')
+                self.to_screen(f'[info] Testing thumbnail {t["id"]}: {t["url"]!r}')
                 try:
                     self.urlopen(HEADRequest(t['url']))
                 except network_exceptions as err:
