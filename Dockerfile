@@ -279,6 +279,8 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   curl \
   less \
   && \
+  # Link to the current python3 version
+  ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
   # Clean up
   apt-get -y autopurge && \
   apt-get -y autoclean && \
@@ -369,8 +371,6 @@ RUN set -x && \
   mkdir -v -p /config/cache/pycache && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video && \
-  # Link to the current python3 version
-  ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
   # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
