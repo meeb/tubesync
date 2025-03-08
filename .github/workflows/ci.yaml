@@ -28,7 +28,9 @@ jobs:
           pip install pipenv
           pipenv install --system --skip-lock
       - name: Set up Django environment
-        run: cp tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
+        run: |
+          cp -v -p tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
+          cp -v -a -t /usr/local/lib/python3.*/dist-packages/yt_dlp/ tubesync/patches/yt_dlp/*
       - name: Run Django tests
         run: cd tubesync && python3 manage.py test --verbosity=2
   containerise:
