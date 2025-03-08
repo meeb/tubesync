@@ -17,6 +17,7 @@ from django.conf import settings
 from .hooks import postprocessor_hook, progress_hook
 from .utils import mkdir_p
 import yt_dlp
+import yt_dlp.patches.check_thumbnails
 from yt_dlp.utils import remove_end
 
 
