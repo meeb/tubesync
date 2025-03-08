@@ -407,6 +407,14 @@ RUN --mount=type=tmpfs,target=/cache \
 COPY tubesync /app
 COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
 
+# patch background_task
+COPY patches/background_task/ \
+    /usr/local/lib/python3/dist-packages/background_task/
+
+# patch yt_dlp
+COPY patches/yt_dlp/ \
+    /usr/local/lib/python3/dist-packages/yt_dlp/
+
 # Build app
 RUN set -x && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
@@ -431,14 +439,6 @@ RUN set -x && \
 
 # Copy root
 COPY config/root /
-
-# patch background_task
-COPY patches/background_task/ \
-    /usr/local/lib/python3/dist-packages/background_task/
-
-# patch yt_dlp
-COPY patches/yt_dlp/ \
-    /usr/local/lib/python3/dist-packages/yt_dlp/
 
 # Create a healthcheck
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
