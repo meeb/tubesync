@@ -155,6 +155,7 @@ def get_media_info(url, days=None):
         'logger': log,
         'extract_flat': True,
         'check_formats': True,
+        'check_thumbnails': False,
         'daterange': yt_dlp.utils.DateRange(start=start),
         'extractor_args': {
             'youtube': {'formats': ['missing_pot']},
