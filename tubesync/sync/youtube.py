@@ -158,6 +158,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'logger': log,
         'extract_flat': True,
         'check_formats': True,
+        'check_thumbnails': False,
         'clean_infojson': False,
         'daterange': yt_dlp.utils.DateRange(start=start),
         'extractor_args': {
