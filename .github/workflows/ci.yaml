@@ -68,11 +68,10 @@ jobs:
       - name: Start magic-wormhole services on the runner
         id: wormhole
         run: |
-          sudo apt-get install python3-virtualenv
+          sudo apt-get install python3-venv python3-virtualenv
           venv_dir='.cache/runner/wormhole' &&
-              virtualenv "${venv_dir}" &&
+              virtualenv --download "${venv_dir}" &&
               . "${venv_dir}"/bin/activate || exit
-          pip install --upgrade pip
           pip install magic-wormhole
           # port 4000
           docker run --pull always --rm -dt -p 4000:4000 \
