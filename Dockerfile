@@ -332,7 +332,7 @@ RUN --mount=type=tmpfs,target=/cache \
     HOME="${cache_path}/.home-directories/${HOME#/}" ; \
   } && \
   # install magic-wormhole
-  ( virtualenv --download --upgrade-embed-wheels "${wormhole_venv}" && \
+  ( virtualenv --download "${wormhole_venv}" && \
     . "${wormhole_venv}/bin/activate" && \
     pip install magic-wormhole ; \
   ) && \
