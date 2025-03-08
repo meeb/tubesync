@@ -73,15 +73,14 @@ jobs:
               virtualenv "${venv_dir}" &&
               . "${venv_dir}"/bin/activate || exit
           pip install --upgrade pip
-          pip install magic-wormhole magic-wormhole-mailbox-server magic-wormhole-transit-relay twisted
+          pip install magic-wormhole
           # port 4000
-          (mkdir -v "${TMPDIR}"/magic-wormhole-mailbox-server &&
-              cd "${TMPDIR}"/magic-wormhole-mailbox-server &&
-              exec twistd wormhole-mailbox --channel-db=channel.sqlite --usage-db=usage.sqlite --motd=TubeSync)
+          docker run --pull always --rm -dt -p 4000:4000 \
+              ghcr.io/tcely/docker-magic-wormhole-mailbox-server:main \
+              --usage-db=/data/usage.sqlite --motd=TubeSync
           # port 4001
-          (mkdir -v "${TMPDIR}"/magic-wormhole-transit-relay &&
-              cd "${TMPDIR}"/magic-wormhole-transit-relay &&
-              exec twistd transitrelay)
+          docker run --pull always --rm -dt -p 4001:4001 \
+              ghcr.io/tcely/docker-magic-wormhole-transit-relay:main
           # determine the runner IP address
           _awk_prog='$0 !~ /scope host/ && "inet" == $1 {split($2, P, "/"); print P[1]; exit;}'
           runner_ip="$( ip addr sh | awk "${_awk_prog}" )"
