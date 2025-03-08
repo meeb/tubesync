@@ -597,6 +597,7 @@ def save_all_media_for_source(source_id):
         skip=False,
         manual_skip=False,
         downloaded=False,
+        metadata__isnull=False,
     )
     for media in refresh_qs:
         try:
