@@ -80,12 +80,14 @@ jobs:
         run: |
           mkdir -v -p .cache
           : >> .cache/reset
-          mkdir -v .cache/saved .cache/removed
+          mkdir -v .cache/saved .cache/removed .cache/runner
       - name: Cache from tubesync stage
         id: cache
         uses: actions/cache@v4
         with:
-          path: .cache/saved
+          path: |
+            .cache/saved
+            .cache/runner
           key: docker-cache-tubesync-${{ hashFiles('.cache/reset') }}-${{ hashFiles('*file', '.github/workflows/ci.yaml') }}
           restore-keys: |
             docker-cache-tubesync-${{ hashFiles('.cache/reset') }}-
@@ -96,9 +98,7 @@ jobs:
         id: wormhole
         run: |
           sudo apt-get install python3-virtualenv
-          TMPDIR="${XDG_RUNTIME_DIR:-/tmp}/temp"
-          mkdir -v "${TMPDIR}" && export TMPDIR
-          venv_dir="$(mktemp -d)" &&
+          venv_dir='.cache/runner/wormhole' &&
               virtualenv "${venv_dir}" &&
               . "${venv_dir}"/bin/activate || exit
           pip install --upgrade pip
