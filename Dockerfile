@@ -314,7 +314,7 @@ COPY pip.conf /etc/pip.conf
 WORKDIR /app
 
 # Set up the app
-RUN --mount=type=tmpfs,target=/cache \
+RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=bind,from=restored-cache,target=${CACHE_PATH}/.restored \
     --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
@@ -324,7 +324,7 @@ RUN --mount=type=tmpfs,target=/cache \
   { \
     cache_path="${CACHE_PATH}" ; \
     restored="${cache_path}/.restored" ; \
-    saved="${cache_path}/saved" ; \
+    saved="${cache_path}/.saved" ; \
     pipenv_cache="${cache_path}/pipenv" ; \
     pycache="${cache_path}/pycache" ; \
     wormhole_venv="${cache_path}/wormhole" ; \
@@ -407,14 +407,14 @@ RUN --mount=type=tmpfs,target=/cache \
         --transit-helper "${WORMHOLE_TRANSIT}" \
         send \
         --code "${WORMHOLE_CODE}" \
-        "${cache_path}/saved" || : ; \
+        "${saved}" || : ; \
     else \
       timeout -v -k 10m 1h wormhole send \
         --code "${WORMHOLE_CODE}" \
-        "${cache_path}/saved" || : ; \
+        "${saved}" || : ; \
     fi ; \
   ) && \
-  rm -rf "${cache_path}/.home-directories" "${cache_path}"/* && \
+  rm -rf "${cache_path}/.home-directories" "${saved}" "${cache_path}"/* && \
   rm -v -rf /tmp/*
 
 # Copy app
