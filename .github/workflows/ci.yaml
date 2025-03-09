@@ -34,6 +34,8 @@ jobs:
   containerise:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -46,9 +48,85 @@ jobs:
         uses: ASzc/change-string-case-action@v6
         with:
           string: ${{ github.actor }}
+      - name: Create cache directory on the runner
+        run: |
+          mkdir -v -p .cache
+          : >> .cache/reset
+          mkdir -v .cache/saved .cache/removed .cache/runner
+      - name: Cache from tubesync stage
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/saved
+            .cache/runner
+          key: docker-cache-tubesync-${{ hashFiles('.cache/reset') }}-${{ hashFiles('*file', '.github/workflows/ci.yaml') }}
+          restore-keys: |
+            docker-cache-tubesync-${{ hashFiles('.cache/reset') }}-
+      - name: List cache directory on the runner
+        run: |
+          ls -alR .cache
+      - name: Start magic-wormhole services on the runner
+        id: wormhole
+        run: |
+          sudo apt-get install python3-venv
+          venv_dir='.cache/runner/wormhole' &&
+              python3 -m venv --upgrade-deps "${venv_dir}" &&
+              . "${venv_dir}"/bin/activate || exit
+          pip install magic-wormhole
+          # port 4000
+          docker run --pull always --rm -dt -p 4000:4000 \
+              ghcr.io/tcely/docker-magic-wormhole-mailbox-server:main \
+              --usage-db=/data/usage.sqlite --motd=TubeSync
+          # port 4001
+          docker run --pull always --rm -dt -p 4001:4001 \
+              ghcr.io/tcely/docker-magic-wormhole-transit-relay:main
+          # determine the runner IP address
+          _awk_prog='$0 !~ /scope host/ && "inet" == $1 {split($2, P, "/"); print P[1]; exit;}'
+          runner_ip="$( ip addr sh | awk "${_awk_prog}" )"
+          # set variables
+          relay_arg="ws://${runner_ip}:4000/v1"
+          transit_arg="tcp:[${runner_ip}]:4001"
+          # generate the code and receive the first transfer
+          ( wormhole \
+              --appid TubeSync \
+              --relay-url "${relay_arg}" \
+              --transit-helper "${transit_arg}" \
+              receive -a -c 3 \
+              --accept-file -o .cache/incoming >| .cache/receive.out 2>&1 && \
+              mv --backup=numbered -f .cache/incoming/* .cache/saved/ || : ; \
+              mv --backup=numbered -f .cache/saved/*.~[0-9]~ .cache/removed/ || : ; ) &
+          _pid=$!; sleep 1 && grep -e '^Allocated code:' .cache/receive.out | cut -d ' ' -f 3- >| .cache/.wormhole-code
+          cat -v -n .cache/receive.out
+          rm -v -f .cache/receive.out
+          code="$(< .cache/.wormhole-code)"
+          rm -v -f .cache/.wormhole-code
+          # create output variables
+          printf -- '%s=%s\n' >> "$GITHUB_OUTPUT" \
+              code "${code}" \
+              relay "${relay_arg}" \
+              runner_ip "${runner_ip}" \
+              transit "${transit_arg}" ;
+          # receive the saved directories
+          ( cd .cache &&
+              while test -d /proc/"${_pid}" ; do sleep 5 ; done &&
+              while { \
+                wormhole \
+                  --appid TubeSync \
+                  --relay-url "${relay_arg}" \
+                  --transit-helper "${transit_arg}" \
+                  receive \
+                  --accept-file -o incoming "${code}" || : ; \
+              }
+              do
+                  mv --backup=numbered -f incoming/* saved/ || : ;
+                  mv --backup=numbered -f saved/*.~[0-9]~ removed/ || : ;
+                  rm -rf removed/* || : ;
+              done &)
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
+          context: .
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
@@ -56,3 +134,6 @@ jobs:
           cache-to: type=inline
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
+            WORMHOLE_CODE=${{ steps.wormhole.outputs.code }}
+            WORMHOLE_RELAY=${{ steps.wormhole.outputs.relay }}
+            WORMHOLE_TRANSIT=${{ steps.wormhole.outputs.transit }}
