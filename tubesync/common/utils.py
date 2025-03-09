@@ -33,9 +33,6 @@ def getenv(key, default=None, /, *, integer=False, string=True):
 
     d = str(default) if default is not None else None
 
-    # just in case `os` wasn't already imported
-    import os
-
     r = os.getenv(key, d)
     if r is None:
         if string: r = str()
