@@ -19,6 +19,8 @@ ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 
+ARG CACHE_PATH="/cache"
+
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -218,6 +220,19 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
+FROM alpine:${ALPINE_VERSION} AS restored-cache-copy
+
+ARG CACHE_PATH
+RUN --mount=type=bind,source=.cache/saved,target=/.host \
+    set -eux ; \
+    mkdir -v -p "${CACHE_PATH}" && \
+    cp -v -at "${CACHE_PATH}"/ /.host/*
+
+FROM scratch AS restored-cache
+
+ARG CACHE_PATH
+COPY --from=restored-cache-copy "${CACHE_PATH}" /
+
 FROM debian:${DEBIAN_VERSION} AS tubesync
 
 ARG S6_VERSION
@@ -225,6 +240,7 @@ ARG S6_VERSION
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 
+ARG CACHE_PATH
 ARG TARGETARCH
 
 ARG WORMHOLE_CODE
@@ -251,11 +267,12 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+##RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
+##    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+RUN \
   set -x && \
   # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
+  ##rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
   # Install locales
   apt-get -y --no-install-recommends install locales && \
@@ -300,15 +317,15 @@ WORKDIR /app
 
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
-    --mount=type=bind,source=.cache/saved,target=/cache/.host \
+    --mount=type=bind,from=restored-cache,target=${CACHE_PATH}/.restored \
     --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
   # set up cache
   { \
-    cache_path='/cache' ; \
-    restored="${cache_path}/.host" ; \
+    cache_path="${CACHE_PATH}" ; \
+    restored="${cache_path}/.restored" ; \
     saved="${cache_path}/saved" ; \
     pipenv_cache="${cache_path}/pipenv" ; \
     pycache="${cache_path}/pycache" ; \
