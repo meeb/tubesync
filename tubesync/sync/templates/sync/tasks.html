@@ -56,7 +56,9 @@
 </div>
 <div class="row">
   <div class="col s12">
-    <h2>{{ (total_scheduled -total_errors)|intcomma }} Scheduled ({{ scheduled|length|intcomma }} on this page)</h2>
+    {% with adjusted=(total_scheduled - total_errors) %}
+    <h2>{{ adjusted|intcomma }} Scheduled ({{ scheduled|length|intcomma }} on this page)</h2>
+    {% endwith %}
     <p>
       Tasks which are scheduled to run in the future or are waiting in a queue to be
       processed. They can be waiting for an available worker to run immediately, or
