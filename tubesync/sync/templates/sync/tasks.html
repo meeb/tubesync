@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% load humanize %}
+{% extends 'base.html' %}{% load humanize %}{% load filters %}
 
 {% block headtitle %}Tasks{% endblock %}
 
@@ -56,7 +56,7 @@
 </div>
 <div class="row">
   <div class="col s12">
-    {% with adjusted=(total_scheduled - total_errors) %}
+    {% with adjusted=total_scheduled|sub:total_errors ) %}
     <h2>{{ adjusted|intcomma }} Scheduled ({{ scheduled|length|intcomma }} on this page)</h2>
     {% endwith %}
     <p>
