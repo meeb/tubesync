@@ -226,7 +226,7 @@ ARG CACHE_PATH
 RUN --mount=type=bind,source=.cache/saved,target=/.host \
     set -eux ; \
     mkdir -v -p "${CACHE_PATH}" && \
-    cp -v -at "${CACHE_PATH}"/ /.host/*
+    cp -at "${CACHE_PATH}"/ /.host/*
 
 FROM scratch AS restored-cache
 
