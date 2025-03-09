@@ -251,18 +251,9 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
-RUN --mount=type=tmpfs,target=/cache \
-    --mount=type=bind,source=.cache/saved,target=/cache/.host \
-    --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
+RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
   set -x && \
-  # restore the saved cache directories for apt packages
-  { \
-    cache_path='/cache' ; \
-    restored="${cache_path}/.host" ; \
-    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
-    cp -at /var/lib/apt/ "${restored}/apt-lib-cache"/* || : ; \
-  } && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
@@ -308,7 +299,6 @@ WORKDIR /app
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
     --mount=type=bind,source=.cache/saved,target=/cache/.host \
-    --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
@@ -322,9 +312,12 @@ RUN --mount=type=tmpfs,target=/cache \
     pycache="${cache_path}/pycache" ; \
     wormhole_venv="${cache_path}/wormhole" ; \
     mkdir -p "${saved}/${TARGETARCH}" ; \
-    test -d "${pipenv_cache}" || \
-         { rm -v -rf "${pipenv_cache}" ; mkdir -v -p "${pipenv_cache}" ; } ; \
-    cp -at "${pipenv_cache}/" "${restored}/pipenv-cache"/* || : ; \
+    # restore `apt` files
+    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
+    cp -at /var/lib/apt/ "${restored}/apt-lib-cache"/* || : ; \
+    # restore pipenv cached files
+    cp -a "${restored}/pipenv-cache" "${pipenv_cache}" || : ; \
+    # restore `magic-wormhole` virtual env
     cp -at "${cache_path}/" "${restored}/${TARGETARCH}/wormhole" || : ; \
     # keep the real HOME clean
     mkdir -p "${cache_path}/.home-directories" ; \
@@ -332,7 +325,10 @@ RUN --mount=type=tmpfs,target=/cache \
     HOME="${cache_path}/.home-directories/${HOME#/}" ; \
   } && \
   # install magic-wormhole
-  ( virtualenv --download "${wormhole_venv}" && \
+  # I want to use venv here, but python3-venv is not installed
+  # pipenv installed python3-virtualenv
+  ( test -d "${wormhole_venv}/bin" || \
+    virtualenv --download "${wormhole_venv}" && \
     . "${wormhole_venv}/bin/activate" && \
     pip install magic-wormhole ; \
   ) && \
@@ -401,6 +397,7 @@ RUN --mount=type=tmpfs,target=/cache \
         "${cache_path}/saved" || : ; \
     fi ; \
   ) && \
+  rm -rf "${cache_path}/.home-directories" "${cache_path}"/* && \
   rm -v -rf /tmp/*
 
 # Copy app
