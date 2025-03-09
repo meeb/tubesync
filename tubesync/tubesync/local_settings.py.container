@@ -2,31 +2,7 @@ import os
 import sys
 from pathlib import Path
 from urllib.parse import urljoin
-from common.utils import parse_database_connection_string
-
-
-def getenv(key, default=None, /, *, string=True, integer=False):
-    '''
-        Calls `os.getenv` and guarantees that a string is returned
-    '''
-
-    unsupported_type_msg = 'Unsupported type for positional argument, "{}": {}'
-    assert isinstance(key, (str,)), unsupported_type_msg.format('key', type(key))
-    assert isinstance(default, (str, bool, float, int, None.__class__,)), unsupported_type_msg.format('default', type(default))
-
-    d = default
-    k = key
-    if default is not None:
-        d = str(default)
-    import os # just in case it wasn't already imported
-
-    r = os.getenv(k, d)
-    if r is None:
-        if string: r = str()
-        if integer: r = int()
-    elif integer:
-        r = int(float(r))
-    return r
+from common.utils import getenv, parse_database_connection_string
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
