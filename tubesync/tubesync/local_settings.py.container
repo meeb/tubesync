@@ -5,24 +5,49 @@ from urllib.parse import urljoin
 from common.utils import parse_database_connection_string
 
 
+def getenv(key, default=None, /, *, string=True, integer=False):
+    '''
+        Calls `os.getenv` and guarantees that a string is returned
+    '''
+
+    unsupported_type_msg = 'Unsupported type for positional argument, "{}": {}'
+    assert isinstance(key, (str,)), unsupported_type_msg.format('key', type(key))
+    assert isinstance(default, (str, bool, float, int, None.__class__,)), unsupported_type_msg.format('default', type(default))
+
+    d = default
+    k = key
+    if default is not None:
+        d = str(default)
+    import os # just in case it wasn't already imported
+
+    r = os.getenv(k, d)
+    if r is None:
+        if string: r = str()
+        if integer: r = int()
+    elif integer:
+        r = int(float(r))
+    return r
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = Path('/')
 CONFIG_BASE_DIR = ROOT_DIR / 'config'
 DOWNLOADS_BASE_DIR = ROOT_DIR / 'downloads'
-DJANGO_URL_PREFIX = os.getenv('DJANGO_URL_PREFIX', None)
-STATIC_URL = str(os.getenv('DJANGO_STATIC_URL', '/static/'))
+DJANGO_URL_PREFIX = getenv('DJANGO_URL_PREFIX', str()).strip()
+STATIC_URL = getenv('DJANGO_STATIC_URL', '/static/').strip()
 if DJANGO_URL_PREFIX and STATIC_URL:
     STATIC_URL = urljoin(DJANGO_URL_PREFIX, STATIC_URL[1:])
 
 
 # This is not ever meant to be a public web interface so this isn't too critical
-SECRET_KEY = str(os.getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret'))
+SECRET_KEY = getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret')
 
 
-ALLOWED_HOSTS_STR = str(os.getenv('TUBESYNC_HOSTS', '*'))
+ALLOWED_HOSTS_STR = getenv('TUBESYNC_HOSTS', '*')
 ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
-DEBUG = True if os.getenv('TUBESYNC_DEBUG', False) else False
-FORCE_SCRIPT_NAME = os.getenv('DJANGO_FORCE_SCRIPT_NAME', DJANGO_URL_PREFIX)
+DEBUG_STR = getenv('TUBESYNC_DEBUG', False)
+DEBUG = True if 'true' == DEBUG_STR.strip().lower() else False
+FORCE_SCRIPT_NAME = getenv('DJANGO_FORCE_SCRIPT_NAME', DJANGO_URL_PREFIX)
 
 
 database_dict = {}
@@ -34,7 +59,8 @@ if database_connection_env:
 if database_dict:
     print(f'Using database connection: {database_dict["ENGINE"]}://'
           f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
-          f'{database_dict["PORT"]}/{database_dict["NAME"]}', file=sys.stdout)
+          f'{database_dict["PORT"]}/{database_dict["NAME"]}',
+        file=sys.stdout, flush=True)
     DATABASES = {
         'default': database_dict,
     }
@@ -60,7 +86,7 @@ else:
 
 
 DEFAULT_THREADS = 1
-BACKGROUND_TASK_ASYNC_THREADS = int(os.getenv('TUBESYNC_WORKERS', DEFAULT_THREADS))
+BACKGROUND_TASK_ASYNC_THREADS = getenv('TUBESYNC_WORKERS', DEFAULT_THREADS, integer=True)
 
 
 MEDIA_ROOT = CONFIG_BASE_DIR / 'media'
