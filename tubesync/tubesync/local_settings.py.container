@@ -1,32 +1,32 @@
-import os
 import sys
 from pathlib import Path
 from urllib.parse import urljoin
-from common.utils import parse_database_connection_string
+from common.utils import getenv, parse_database_connection_string
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = Path('/')
 CONFIG_BASE_DIR = ROOT_DIR / 'config'
 DOWNLOADS_BASE_DIR = ROOT_DIR / 'downloads'
-DJANGO_URL_PREFIX = os.getenv('DJANGO_URL_PREFIX', None)
-STATIC_URL = str(os.getenv('DJANGO_STATIC_URL', '/static/'))
+DJANGO_URL_PREFIX = getenv('DJANGO_URL_PREFIX').strip()
+STATIC_URL = getenv('DJANGO_STATIC_URL', '/static/').strip()
 if DJANGO_URL_PREFIX and STATIC_URL:
     STATIC_URL = urljoin(DJANGO_URL_PREFIX, STATIC_URL[1:])
 
 
 # This is not ever meant to be a public web interface so this isn't too critical
-SECRET_KEY = str(os.getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret'))
+SECRET_KEY = getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret')
 
 
-ALLOWED_HOSTS_STR = str(os.getenv('TUBESYNC_HOSTS', '*'))
+ALLOWED_HOSTS_STR = getenv('TUBESYNC_HOSTS', '*')
 ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
-DEBUG = True if os.getenv('TUBESYNC_DEBUG', False) else False
-FORCE_SCRIPT_NAME = os.getenv('DJANGO_FORCE_SCRIPT_NAME', DJANGO_URL_PREFIX)
+DEBUG_STR = getenv('TUBESYNC_DEBUG', False)
+DEBUG = True if 'true' == DEBUG_STR.strip().lower() else False
+FORCE_SCRIPT_NAME = getenv('DJANGO_FORCE_SCRIPT_NAME', DJANGO_URL_PREFIX)
 
 
 database_dict = {}
-database_connection_env = os.getenv('DATABASE_CONNECTION', '')
+database_connection_env = getenv('DATABASE_CONNECTION')
 if database_connection_env:
     database_dict = parse_database_connection_string(database_connection_env)
 
@@ -34,7 +34,8 @@ if database_connection_env:
 if database_dict:
     print(f'Using database connection: {database_dict["ENGINE"]}://'
           f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
-          f'{database_dict["PORT"]}/{database_dict["NAME"]}', file=sys.stdout)
+          f'{database_dict["PORT"]}/{database_dict["NAME"]}',
+        file=sys.stdout, flush=True)
     DATABASES = {
         'default': database_dict,
     }
@@ -60,7 +61,7 @@ else:
 
 
 DEFAULT_THREADS = 1
-BACKGROUND_TASK_ASYNC_THREADS = int(os.getenv('TUBESYNC_WORKERS', DEFAULT_THREADS))
+BACKGROUND_TASK_ASYNC_THREADS = getenv('TUBESYNC_WORKERS', DEFAULT_THREADS, integer=True)
 
 
 MEDIA_ROOT = CONFIG_BASE_DIR / 'media'
@@ -70,14 +71,14 @@ YOUTUBE_DL_TEMPDIR = DOWNLOAD_ROOT / 'cache'
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 
 
-HEALTHCHECK_FIREWALL_STR = str(os.getenv('TUBESYNC_HEALTHCHECK_FIREWALL', 'True')).strip().lower()
-HEALTHCHECK_FIREWALL = True if HEALTHCHECK_FIREWALL_STR == 'true' else False
-HEALTHCHECK_ALLOWED_IPS_STR = str(os.getenv('TUBESYNC_HEALTHCHECK_ALLOWED_IPS', '127.0.0.1'))
+HEALTHCHECK_FIREWALL_STR = getenv('TUBESYNC_HEALTHCHECK_FIREWALL', True)
+HEALTHCHECK_FIREWALL = ( 'true' == HEALTHCHECK_FIREWALL_STR.strip().lower() )
+HEALTHCHECK_ALLOWED_IPS_STR = getenv('TUBESYNC_HEALTHCHECK_ALLOWED_IPS', '127.0.0.1')
 HEALTHCHECK_ALLOWED_IPS = HEALTHCHECK_ALLOWED_IPS_STR.split(',')
 
 
-BASICAUTH_USERNAME = os.getenv('HTTP_USER', '').strip()
-BASICAUTH_PASSWORD = os.getenv('HTTP_PASS', '').strip()
+BASICAUTH_USERNAME = getenv('HTTP_USER').strip()
+BASICAUTH_PASSWORD = getenv('HTTP_PASS').strip()
 if BASICAUTH_USERNAME and BASICAUTH_PASSWORD:
     BASICAUTH_DISABLE = False
     BASICAUTH_USERS = {
@@ -88,25 +89,25 @@ else:
     BASICAUTH_USERS = {}
 
 
-SOURCE_DOWNLOAD_DIRECTORY_PREFIX_STR = os.getenv('TUBESYNC_DIRECTORY_PREFIX', 'True').strip().lower()
-SOURCE_DOWNLOAD_DIRECTORY_PREFIX = True if SOURCE_DOWNLOAD_DIRECTORY_PREFIX_STR == 'true' else False
+SOURCE_DOWNLOAD_DIRECTORY_PREFIX_STR = getenv('TUBESYNC_DIRECTORY_PREFIX', True)
+SOURCE_DOWNLOAD_DIRECTORY_PREFIX = ( 'true' == SOURCE_DOWNLOAD_DIRECTORY_PREFIX_STR.strip().lower() )
 
 
-SHRINK_NEW_MEDIA_METADATA_STR = os.getenv('TUBESYNC_SHRINK_NEW', 'false').strip().lower()
-SHRINK_NEW_MEDIA_METADATA = ( 'true' == SHRINK_NEW_MEDIA_METADATA_STR )
-SHRINK_OLD_MEDIA_METADATA_STR = os.getenv('TUBESYNC_SHRINK_OLD', 'false').strip().lower()
-SHRINK_OLD_MEDIA_METADATA = ( 'true' == SHRINK_OLD_MEDIA_METADATA_STR )
+SHRINK_NEW_MEDIA_METADATA_STR = getenv('TUBESYNC_SHRINK_NEW', False)
+SHRINK_NEW_MEDIA_METADATA = ( 'true' == SHRINK_NEW_MEDIA_METADATA_STR.strip().lower() )
+SHRINK_OLD_MEDIA_METADATA_STR = getenv('TUBESYNC_SHRINK_OLD', False)
+SHRINK_OLD_MEDIA_METADATA = ( 'true' == SHRINK_OLD_MEDIA_METADATA_STR.strip().lower() )
 
 
 # TUBESYNC_RENAME_ALL_SOURCES: True or False
-RENAME_ALL_SOURCES_STR = os.getenv('TUBESYNC_RENAME_ALL_SOURCES', 'False').strip().lower()
-RENAME_ALL_SOURCES = ( 'true' == RENAME_ALL_SOURCES_STR )
+RENAME_ALL_SOURCES_STR = getenv('TUBESYNC_RENAME_ALL_SOURCES', False)
+RENAME_ALL_SOURCES = ( 'true' == RENAME_ALL_SOURCES_STR.strip().lower() )
 # TUBESYNC_RENAME_SOURCES: A comma-separated list of Source directories
-RENAME_SOURCES_STR = os.getenv('TUBESYNC_RENAME_SOURCES', '')
+RENAME_SOURCES_STR = getenv('TUBESYNC_RENAME_SOURCES')
 RENAME_SOURCES = RENAME_SOURCES_STR.split(',') if RENAME_SOURCES_STR else None
 
 
-VIDEO_HEIGHT_CUTOFF = int(os.getenv("TUBESYNC_VIDEO_HEIGHT_CUTOFF", "240"))
+VIDEO_HEIGHT_CUTOFF = getenv("TUBESYNC_VIDEO_HEIGHT_CUTOFF", 240, integer=True)
 
 
 # ensure that the current directory exists
@@ -117,4 +118,11 @@ old_youtube_cache_dirs = list(YOUTUBE_DL_CACHEDIR.parent.glob('youtube-*'))
 old_youtube_cache_dirs.extend(list(YOUTUBE_DL_CACHEDIR.parent.glob('youtube/youtube-*')))
 for cache_dir in old_youtube_cache_dirs:
     cache_dir.rename(YOUTUBE_DL_CACHEDIR / cache_dir.name)
+# try to remove the old, hopefully empty, directory
+empty_old_youtube_dir = YOUTUBE_DL_CACHEDIR.parent / 'youtube'
+if empty_old_youtube_dir.is_dir():
+    try:
+        empty_old_youtube_dir.rmdir()
+    except:
+        pass
 
