@@ -73,11 +73,9 @@ jobs:
       - name: Start magic-wormhole services on the runner
         id: wormhole
         run: |
+          rm -rf .cache/runner/wormhole
           sudo apt-get install python3-venv
           venv_dir=".cache/runner/${RUNNER_ARCH}/wormhole" &&
-              (   cd .cache/runner &&
-                  mkdir -v -p "${RUNNER_ARCH}" &&
-                  mv -v wormhole "${RUNNER_ARCH}"/ || : ) &&
               python3 -m venv --upgrade-deps "${venv_dir}" &&
               . "${venv_dir}"/bin/activate || exit
           pip install magic-wormhole
