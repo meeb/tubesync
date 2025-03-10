@@ -1,5 +1,4 @@
 import os
-from datetime import timedelta
 from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from common.logger import log
