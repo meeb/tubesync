@@ -19,6 +19,8 @@ ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 
+ARG CACHE_PATH="/cache"
+
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -218,12 +220,32 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
+FROM alpine:${ALPINE_VERSION} AS restored-cache-copy
+
+ARG CACHE_PATH
+RUN --mount=type=bind,source=.cache/saved,target=/.host \
+    set -eux ; \
+    mkdir -v -p "${CACHE_PATH}" && \
+    cp -at "${CACHE_PATH}"/ /.host/*
+
+FROM scratch AS restored-cache
+
+ARG CACHE_PATH
+COPY --from=restored-cache-copy "${CACHE_PATH}" /
+
 FROM debian:${DEBIAN_VERSION} AS tubesync
 
 ARG S6_VERSION
 
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
+
+ARG CACHE_PATH
+ARG TARGETARCH
+
+ARG WORMHOLE_CODE
+ARG WORMHOLE_RELAY
+ARG WORMHOLE_TRANSIT
 
 ENV DEBIAN_FRONTEND="noninteractive" \
     HOME="/root" \
@@ -245,11 +267,12 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+##RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
+##    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+RUN \
   set -x && \
   # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
+  ##rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
   # Install locales
   apt-get -y --no-install-recommends install locales && \
@@ -279,6 +302,8 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   curl \
   less \
   && \
+  # Link to the current python3 version
+  ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
   # Clean up
   apt-get -y autopurge && \
   apt-get -y autoclean && \
@@ -291,12 +316,41 @@ COPY pip.conf /etc/pip.conf
 WORKDIR /app
 
 # Set up the app
-RUN --mount=type=tmpfs,target=/cache \
-    --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
+RUN --mount=type=tmpfs,target=${CACHE_PATH} \
+    --mount=type=bind,from=restored-cache,target=${CACHE_PATH}/.restored \
     --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
+  # set up cache
+  { \
+    cache_path="${CACHE_PATH}" ; \
+    restored="${cache_path}/.restored" ; \
+    saved="${cache_path}/.saved" ; \
+    pipenv_cache="${cache_path}/pipenv" ; \
+    pycache="${cache_path}/pycache" ; \
+    wormhole_venv="${cache_path}/wormhole" ; \
+    mkdir -p "${saved}/${TARGETARCH}" ; \
+    # restore `apt` files
+    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
+    cp -at /var/lib/apt/ "${restored}/apt-lib-cache"/* || : ; \
+    # restore pipenv cached files
+    cp -a "${restored}/pipenv-cache" "${pipenv_cache}" || : ; \
+    # restore `magic-wormhole` virtual env
+    cp -at "${cache_path}/" "${restored}/${TARGETARCH}/wormhole" || : ; \
+    # keep the real HOME clean
+    mkdir -p "${cache_path}/.home-directories" ; \
+    cp -at "${cache_path}/.home-directories/" "${HOME}" && \
+    HOME="${cache_path}/.home-directories/${HOME#/}" ; \
+  } && \
+  # install magic-wormhole
+  # I want to use venv here, but python3-venv is not installed
+  # pipenv installed python3-virtualenv
+  ( test -d "${wormhole_venv}/bin" || \
+    virtualenv --download "${wormhole_venv}" && \
+    . "${wormhole_venv}/bin/activate" && \
+    pip install magic-wormhole ; \
+  ) && \
   # Update from the network and keep cache
   rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
@@ -318,11 +372,9 @@ RUN --mount=type=tmpfs,target=/cache \
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
-  cp -at /tmp/ "${HOME}" && \
-  HOME="/tmp/${HOME#/}" \
-  XDG_CACHE_HOME='/cache' \
+  XDG_CACHE_HOME="${cache_path}" \
   PIPENV_VERBOSITY=64 \
-  PYTHONPYCACHEPREFIX=/cache/pycache \
+  PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
   # Clean up
   apt-get -y autoremove --purge \
@@ -340,11 +392,44 @@ RUN --mount=type=tmpfs,target=/cache \
   && \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
+  # Save our saved directory to the cache directory on the runner
+  test -z "${WORMHOLE_CODE}" || \
+  ( set +x ; \
+    . "${wormhole_venv}/bin/activate" && \
+    set -x && \
+    cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
+    cp -a /var/lib/apt "${saved}/apt-lib-cache" && \
+    cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
+    cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
+    ls -al "${saved}" && ls -al "${saved}"/* && \
+    if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
+      timeout -v -k 10m 1h wormhole \
+        --appid TubeSync \
+        --relay-url "${WORMHOLE_RELAY}" \
+        --transit-helper "${WORMHOLE_TRANSIT}" \
+        send \
+        --code "${WORMHOLE_CODE}" \
+        "${saved}" || : ; \
+    else \
+      timeout -v -k 10m 1h wormhole send \
+        --code "${WORMHOLE_CODE}" \
+        "${saved}" || : ; \
+    fi ; \
+  ) && \
+  rm -rf "${cache_path}/.home-directories" "${saved}" "${cache_path}"/* && \
   rm -v -rf /tmp/*
 
 # Copy app
 COPY tubesync /app
 COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
+
+# patch background_task
+COPY patches/background_task/ \
+    /usr/local/lib/python3/dist-packages/background_task/
+
+# patch yt_dlp
+COPY patches/yt_dlp/ \
+    /usr/local/lib/python3/dist-packages/yt_dlp/
 
 # Build app
 RUN set -x && \
@@ -361,8 +446,6 @@ RUN set -x && \
   mkdir -v -p /config/cache/pycache && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video && \
-  # Link to the current python3 version
-  ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
   # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
@@ -370,14 +453,6 @@ RUN set -x && \
 
 # Copy root
 COPY config/root /
-
-# patch background_task
-COPY patches/background_task/ \
-    /usr/local/lib/python3/dist-packages/background_task/
-
-# patch yt_dlp
-COPY patches/yt_dlp/ \
-    /usr/local/lib/python3/dist-packages/yt_dlp/
 
 # Create a healthcheck
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
