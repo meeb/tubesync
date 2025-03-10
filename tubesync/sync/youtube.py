@@ -156,10 +156,13 @@ def get_media_info(url, days=None):
         'check_formats': True,
         'daterange': yt_dlp.utils.DateRange(start=start),
         'extractor_args': {
-            'youtube': {'formats': ['missing_pot']},
             'youtubetab': {'approximate_date': ['true']},
         },
+        'sleep_interval_requests': 2,
+        'verbose': True if settings.DEBUG else False,
     })
+    if start:
+        log.debug(f'get_media_info: used date range: {opts["daterange"]} for URL: {url}')
     response = {}
     with yt_dlp.YoutubeDL(opts) as y:
         try:
