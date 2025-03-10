@@ -404,7 +404,6 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     . "${wormhole_venv}/bin/activate" && \
     set -x && \
     { \
-      mkdir -v "${saved}/apt-lib-cache" || : ; \
       find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
     } && \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
