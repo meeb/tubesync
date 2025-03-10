@@ -279,6 +279,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var
     restored="${CACHE_PATH}/.restored" ; \
     cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
     cp -at /var/lib/apt/ "${restored}/${TARGETARCH}/apt-lib-cache"/* || : ; \
+    # to be careful, ensure that these files aren't from a different architecture
+    find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
   } && \
   apt-get update && \
   # Install locales
@@ -401,11 +403,14 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   ( set +x ; \
     . "${wormhole_venv}/bin/activate" && \
     set -x && \
+    { \
+      mkdir -v "${saved}/apt-lib-cache" || : ; \
+      find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
+    } && \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
     cp -a /var/lib/apt "${saved}/${TARGETARCH}/apt-lib-cache" && \
     cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
     cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
-    mkdir -v "${saved}/apt-lib-cache" && \
     ls -al "${saved}" && ls -al "${saved}"/* && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
       timeout -v -k 10m 1h wormhole \
