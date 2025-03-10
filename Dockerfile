@@ -267,7 +267,7 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=bind,from=restored-cache,target=${CACHE_PATH}/.restored \
@@ -278,7 +278,7 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   { \
     restored="${CACHE_PATH}/.restored" ; \
     cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
-    cp -at /var/lib/apt/ "${restored}/apt-lib-cache"/* || : ; \
+    cp -at /var/lib/apt/ "${restored}/${TARGETARCH}/apt-lib-cache"/* || : ; \
   } && \
   apt-get update && \
   # Install locales
@@ -323,7 +323,7 @@ WORKDIR /app
 # Set up the app
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=bind,from=restored-cache,target=${CACHE_PATH}/.restored \
-    --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
@@ -400,9 +400,10 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     . "${wormhole_venv}/bin/activate" && \
     set -x && \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
-    cp -a /var/lib/apt "${saved}/apt-lib-cache" && \
+    cp -a /var/lib/apt "${saved}/${TARGETARCH}/apt-lib-cache" && \
     cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
     cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
+    mkdir -v "${saved}/apt-lib-cache" && \
     ls -al "${saved}" && ls -al "${saved}"/* && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
       timeout -v -k 10m 1h wormhole \
