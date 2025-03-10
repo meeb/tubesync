@@ -17,7 +17,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
-from django.db.tansaction import atomic
+from django.db.transaction import atomic
 from django.db.utils import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from background_task import background
