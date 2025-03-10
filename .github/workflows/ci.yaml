@@ -95,6 +95,11 @@ jobs:
             docker-cache-tubesync-${{ hashFiles('.cache/reset') }}-
       - name: List cache directory on the runner
         run: |
+          # limited listing when the cache was restored
+          ls -al .cache &&
+          ls -al .cache/* &&
+          ls -al .cache/*/* &&
+          ls -al .cache/*/*/* ||
           ls -alR .cache
       - name: Start magic-wormhole services on the runner
         id: wormhole
