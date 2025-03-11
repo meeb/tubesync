@@ -276,6 +276,7 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   pkgconf \
   python3 \
   python3-libsass \
+  python3-python-socks \
   python3-wheel \
   curl \
   less \
