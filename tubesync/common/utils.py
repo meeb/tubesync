@@ -1,8 +1,12 @@
+import cProfile
+import emoji
+import io
 import os
+import pstats
 import string
+import time
 from datetime import datetime
 from urllib.parse import urlunsplit, urlencode, urlparse
-import emoji
 from yt_dlp.utils import LazyList
 from .errors import DatabaseConnectionError
 
@@ -172,3 +176,29 @@ def json_serial(obj):
     if isinstance(obj, LazyList):
         return list(obj)
     raise TypeError(f'Type {type(obj)} is not json_serial()-able')
+
+
+def time_func(func):
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        end = time.perf_counter()
+        elapsed = end - start
+        return (result, (start - end, start, end,),)
+    return wrapper
+
+
+def profile_func(func):
+    def wrapper(*args, **kwargs):
+        s = io.StringIO()
+        with cProfile.Profile() as pr:
+            pr.enable()
+            result = func(*args, **kwargs)
+            pr.disable()
+            ps = pstats.Stats(pr, stream=s)
+            ps.sort_stats(
+                pstats.SortKey.CUMULATIVE
+            ).print_stats()
+        return (result, (s.getvalue(), ps),)
+    return wrapper
+
