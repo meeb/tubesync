@@ -226,12 +226,9 @@ def index_source_task(source_id):
     source.last_crawl = timezone.now()
     #source.save()
     time_model_function(source, source.save)
-    num_videos = len(videos)
-    log.info(f'Found {num_videos} media items for source: {source}')
+    log.info(f'Found {len(videos)} media items for source: {source}')
     fields = lambda f, m: m.get_metadata_field(f)
-    tvn_format = '[{}' + f'/{num_videos}] {task.verbose_name}'
-    for vn, video in enumerate(videos, start=1):
-        task.verbose_name = tvn_format.format(vn)
+    for video in videos:
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
         if not key:
