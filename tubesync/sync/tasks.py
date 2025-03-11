@@ -196,7 +196,7 @@ def index_source_task(source_id):
     def time_model_function(instance, func):
         @time_func
         def f(o, c):
-            return o.c()
+            return c(o)
         rt = f(instance, func)
         elapsed = rt[1][0]
         log.debug(f'time_model_function: {instance}: {func}: took {elapsed:.6f} seconds')
