@@ -9,7 +9,6 @@ autopep8 = "*"
 [packages]
 django = "*"
 django-sass-processor = "*"
-libsass = "*"
 pillow = "*"
 whitenoise = "*"
 gunicorn = "*"
