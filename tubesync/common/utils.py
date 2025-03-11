@@ -147,8 +147,7 @@ def time_func(func):
         start = time.perf_counter()
         result = func(*args, **kwargs)
         end = time.perf_counter()
-        elapsed = end - start
-        return (result, (start - end, start, end,),)
+        return (result, (end - start, start, end,),)
     return wrapper
 
 
@@ -163,6 +162,6 @@ def profile_func(func):
             ps.sort_stats(
                 pstats.SortKey.CUMULATIVE
             ).print_stats()
-        return (result, (s.getvalue(), ps),)
+        return (result, (s.getvalue(), ps, s),)
     return wrapper
 
