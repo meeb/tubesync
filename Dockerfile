@@ -262,40 +262,14 @@ ENV S6_VERSION="${S6_VERSION}" \
     FFMPEG_DATE="${FFMPEG_DATE}" \
     FFMPEG_VERSION="${FFMPEG_VERSION}"
 
-# Install third party software
-COPY --from=s6-overlay / /
-COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
-
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
-    --mount=type=tmpfs,target=${CACHE_PATH} \
-    --mount=type=bind,from=restored-cache,target=${CACHE_PATH}/.restored \
+RUN \
   set -x && \
-  # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
-  # restore `apt` files
-  { \
-    restored="${CACHE_PATH}/.restored" ; \
-    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
-    cp -at /var/lib/apt/ "${restored}/${TARGETARCH}/apt-lib-cache"/* || : ; \
-    # to be careful, ensure that these files aren't from a different architecture
-    find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
-  } && \
   apt-get update && \
   # Install locales
   apt-get -y --no-install-recommends install locales && \
   printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
   locale-gen en_US.UTF-8 && \
-  # Install file
-  apt-get -y --no-install-recommends install file && \
-  # Installed s6 (using COPY earlier)
-  file -L /command/s6-overlay-suexec && \
-  # Installed ffmpeg (using COPY earlier)
-  /usr/local/bin/ffmpeg -version && \
-  file /usr/local/bin/ff* && \
-  # Clean up file
-  apt-get -y autoremove --purge file && \
   # Install dependencies we keep
   # Install required distro packages
   apt-get -y --no-install-recommends install \
@@ -312,6 +286,26 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var
   less \
   && \
   # Clean up
+  apt-get -y autopurge && \
+  apt-get -y autoclean && \
+  rm -rf /tmp/*
+
+# Install third party software
+COPY --from=s6-overlay / /
+COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
+
+RUN \
+  set -x && \
+  apt-get update && \
+  # Install file
+  apt-get -y --no-install-recommends install file && \
+  # Installed s6 (using COPY earlier)
+  file -L /command/s6-overlay-suexec && \
+  # Installed ffmpeg (using COPY earlier)
+  /usr/local/bin/ffmpeg -version && \
+  file /usr/local/bin/ff* && \
+  # Clean up
+  apt-get -y autoremove --purge file && \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
   rm -rf /tmp/*
@@ -338,6 +332,11 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     pycache="${cache_path}/pycache" ; \
     wormhole_venv="${cache_path}/wormhole" ; \
     mkdir -p "${saved}/${TARGETARCH}" ; \
+    # restore `apt` files
+    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
+    cp -at /var/lib/apt/ "${restored}/${TARGETARCH}/apt-lib-cache"/* || : ; \
+    # to be careful, ensure that these files aren't from a different architecture
+    find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
     # restore pipenv cached files
     cp -a "${restored}/pipenv-cache" "${pipenv_cache}" || : ; \
     # restore `magic-wormhole` virtual env
