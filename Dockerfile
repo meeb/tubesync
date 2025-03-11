@@ -267,21 +267,7 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
-    --mount=type=tmpfs,target=${CACHE_PATH} \
-    --mount=type=bind,from=restored-cache,target=${CACHE_PATH}/.restored \
-  set -x && \
-  # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
-  # restore `apt` files
-  { \
-    restored="${CACHE_PATH}/.restored" ; \
-    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
-    cp -at /var/lib/apt/ "${restored}/${TARGETARCH}/apt-lib-cache"/* || : ; \
-    # to be careful, ensure that these files aren't from a different architecture
-    find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
-  } && \
+RUN set -x && \
   apt-get update && \
   # Install locales
   apt-get -y --no-install-recommends install locales && \
@@ -340,6 +326,11 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     pycache="${cache_path}/pycache" ; \
     wormhole_venv="${cache_path}/wormhole" ; \
     mkdir -p "${saved}/${TARGETARCH}" ; \
+    # restore `apt` cached files
+    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
+    cp -at /var/lib/apt/ "${restored}/${TARGETARCH}/apt-lib-cache"/* || : ; \
+    # to be careful, ensure that these files aren't from a different architecture
+    find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
     # restore pipenv cached files
     cp -a "${restored}/pipenv-cache" "${pipenv_cache}" || : ; \
     # restore `magic-wormhole` virtual env
