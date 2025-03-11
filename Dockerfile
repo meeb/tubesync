@@ -314,7 +314,6 @@ RUN \
   apt-get -y autoclean && \
   rm -rf /tmp/*
 
-
 # Switch workdir to the the app
 WORKDIR /app
 
