@@ -8,12 +8,10 @@ autopep8 = "*"
 
 [packages]
 django = "*"
-django-sass-processor = "*"
-libsass = "*"
+django-sass-processor = {extras = ["management-command"], version = "*"}
 pillow = "*"
 whitenoise = "*"
 gunicorn = "*"
-django-compressor = "*"
 httptools = "*"
 django-background-tasks = ">=1.2.8"
 django-basicauth = "*"
@@ -22,3 +20,5 @@ mysqlclient = "*"
 yt-dlp = "*"
 requests = {extras = ["socks"], version = "*"}
 emoji = "*"
+brotli = "*"
+html5lib = "*"
