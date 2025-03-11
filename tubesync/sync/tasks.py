@@ -17,6 +17,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
+from django.db.transaction import atomic
 from django.db.utils import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from background_task import background
@@ -179,6 +180,7 @@ def cleanup_removed_media(source, videos):
 
 
 @background(schedule=300, remove_existing_tasks=True)
+@atomic(durable=True)
 def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
@@ -244,8 +246,9 @@ def index_source_task(source_id):
         if published_dt is not None:
             media.published = published_dt
         try:
-            #media.save()
-            time_model_function(media, media.save)
+            with atomic():
+                #media.save()
+                time_model_function(media, media.save)
             log.debug(f'Indexed media: {source} / {media}')
             # log the new media instances
             new_media_instance = (
@@ -635,9 +638,10 @@ def save_all_media_for_source(source_id):
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
-    for media in mqs:
-        if media.uuid not in already_saved:
-            media.save()
+    with atomic():
+        for media in mqs:
+            if media.uuid not in already_saved:
+                media.save()
 
 
 @background(schedule=60, remove_existing_tasks=True)
@@ -650,6 +654,7 @@ def rename_media(media_id):
 
 
 @background(schedule=300, remove_existing_tasks=True)
+@atomic(durable=True)
 def rename_all_media_for_source(source_id):
     try:
         source = Source.objects.get(pk=source_id)
@@ -677,7 +682,8 @@ def rename_all_media_for_source(source_id):
         downloaded=True,
     )
     for media in mqs:
-        media.rename_files()
+        with atomic():
+            media.rename_files()
 
 
 @background(schedule=60, remove_existing_tasks=True)
