@@ -282,6 +282,7 @@ RUN \
   pkgconf \
   python3 \
   python3-libsass \
+  python3-socks \
   python3-wheel \
   curl \
   less \
