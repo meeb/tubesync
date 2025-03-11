@@ -167,6 +167,7 @@ def task_task_failed(sender, task_id, completed_task, **kwargs):
 
 @receiver(post_save, sender=Media)
 def media_post_save(sender, instance, created, **kwargs):
+    media = instance
     # If the media is skipped manually, bail.
     if instance.manual_skip:
         return
@@ -176,12 +177,27 @@ def media_post_save(sender, instance, created, **kwargs):
     # Reset the skip flag if the download cap has changed if the media has not
     # already been downloaded
     downloaded = instance.downloaded
+    existing_media_metadata_task = get_media_metadata_task(str(instance.pk))
+    existing_media_download_task = get_media_download_task(str(instance.pk))
     if not downloaded:
-        skip_changed = filter_media(instance)
+        # the decision to download was already made if a download task exists
+        if not existing_media_download_task:
+            # Recalculate the "can_download" flag, this may
+            # need to change if the source specifications have been changed
+            if instance.metadata:
+                if instance.get_format_str():
+                    if not instance.can_download:
+                        instance.can_download = True
+                        can_download_changed = True
+                    else:
+                        if instance.can_download:
+                            instance.can_download = False
+                            can_download_changed = True
+            # Recalculate the "skip_changed" flag
+            skip_changed = filter_media(instance)
     else:
         # Downloaded media might need to be renamed
         # Check settings before any rename tasks are scheduled
-        media = instance
         rename_sources_setting = settings.RENAME_SOURCES or list()
         create_rename_task = (
             (
@@ -200,18 +216,6 @@ def media_post_save(sender, instance, created, **kwargs):
                 remove_existing_tasks=True
             )
 
-    # Recalculate the "can_download" flag, this may
-    # need to change if the source specifications have been changed
-    if instance.metadata:
-        if instance.get_format_str():
-            if not instance.can_download:
-                instance.can_download = True
-                can_download_changed = True
-        else:
-            if instance.can_download:
-                instance.can_download = False
-                can_download_changed = True
-    existing_media_metadata_task = get_media_metadata_task(str(instance.pk))
     # If the media is missing metadata schedule it to be downloaded
     if not (instance.skip or instance.metadata or existing_media_metadata_task):
         log.info(f'Scheduling task to download metadata for: {instance.url}')
@@ -239,7 +243,6 @@ def media_post_save(sender, instance, created, **kwargs):
                 verbose_name=verbose_name.format(instance.name),
                 remove_existing_tasks=True
             )
-    existing_media_download_task = get_media_download_task(str(instance.pk))
     # If the media has not yet been downloaded schedule it to be downloaded
     if not (instance.media_file_exists or instance.filepath.exists() or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
