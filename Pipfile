@@ -18,6 +18,7 @@ django-background-tasks = ">=1.2.8"
 django-basicauth = "*"
 psycopg2-binary = "*"
 mysqlclient = "*"
+PySocks = "*"
 urllib3 = {extras = ["socks"], version = "*"}
 requests = {extras = ["socks"], version = "*"}
 yt-dlp = "*"
