@@ -114,27 +114,26 @@ def get_source_completed_tasks(source_id, only_errors=False):
         q['failed_at__isnull'] = False
     return CompletedTask.objects.filter(**q).order_by('-failed_at')
 
+def get_tasks(task_name, id=None, /, instance=None):
+    assert not (id is None and instance is None)
+    arg = str(id or instance.pk)
+    return Task.objects.get_task(str(task_name), args=(arg,),)
+
+def get_first_task(task_name, id=None, /, *, instance=None):
+    tqs = get_tasks(task_name, id, instance).order_by('run_at')
+    return tqs[0] if tqs.count() else False
 
 def get_media_download_task(media_id):
-    try:
-        return Task.objects.get_task('sync.tasks.download_media',
-                                     args=(str(media_id),))[0]
-    except IndexError:
-        return False
+    return get_first_task('sync.tasks.download_media', media_id)
 
 def get_media_metadata_task(media_id):
-    try:
-        return Task.objects.get_task('sync.tasks.download_media_metadata',
-                                     args=(str(media_id),))[0]
-    except IndexError:
-        return False
+    return get_first_task('sync.tasks.download_media_metadata', media_id)
 
 def get_media_premiere_task(media_id):
-    try:
-        return Task.objects.get_task('sync.tasks.wait_for_media_premiere',
-                                     args=(str(media_id),))[0]
-    except IndexError:
-        return False
+    return get_first_task('sync.tasks.wait_for_media_premiere', media_id)
+
+def get_source_index_task(source_id):
+    return get_first_task('sync.tasks.index_source_task', source_id)
 
 def delete_task_by_source(task_name, source_id):
     now = timezone.now()
@@ -228,7 +227,13 @@ def index_source_task(source_id):
     time_model_function(source, source.save)
     log.info(f'Found {len(videos)} media items for source: {source}')
     fields = lambda f, m: m.get_metadata_field(f)
-    for video in videos:
+    task = get_source_index_task(source_id)
+    if task:
+        verbose_name = task.verbose_name
+        tvn_format = '[{}' + f'/{num_videos}] {verbose_name}'
+    for vn, video in enumerate(videos, start=1):
+        if task:
+            task.verbose_name = tvn_format.format(vn)
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
         if not key:
@@ -267,6 +272,8 @@ def index_source_task(source_id):
                 )
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
+    if task:
+            task.verbose_name = verbose_name
     # Tack on a cleanup of old completed tasks
     cleanup_completed_tasks()
     # Tack on a cleanup of old media
