@@ -162,7 +162,6 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: .
           platforms: linux/amd64,linux/arm64
           push: true
           provenance: false
@@ -173,6 +172,8 @@ jobs:
             type=registry,ref=${{ steps.upstream.outputs.ref }}
           cache-to: |
             type=gha,mode=max
+          build-contexts: |
+            cache-tubesync=.cache/saved
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             WORMHOLE_CODE=${{ steps.wormhole.outputs.code }}
