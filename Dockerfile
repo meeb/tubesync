@@ -286,6 +286,7 @@ ENV S6_VERSION="${S6_VERSION}" \
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
   set -x && \
+  ls -alR /var/*/apt && \
   apt-get update && \
   # Install dependencies we keep
   # Install required distro packages
@@ -332,8 +333,8 @@ WORKDIR /app
 # Set up the app
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=bind,from=restored-cache,target=${CACHE_PATH}/.restored \
-    --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+    --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
   # set up cache
