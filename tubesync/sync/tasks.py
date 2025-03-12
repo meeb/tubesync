@@ -201,7 +201,7 @@ def index_source_task(source_id):
             return c()
         rt = f(func)
         elapsed = rt[1][0]
-        log.debug(f'time_model_function: {instance}: {func}: took {elapsed:.6f} seconds')
+        log.debug(f'time_model_function: {func}: took {elapsed:.6f} seconds')
         return rt[0]
 
     try:
