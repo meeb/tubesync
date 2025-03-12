@@ -223,7 +223,48 @@ COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 FROM scratch AS restored-cache
 COPY --from=cache-tubesync / /
 
-FROM debian:${DEBIAN_VERSION} AS tubesync
+FROM alpine:${ALPINE_VERSION} AS populate-apt-cache-dirs
+ARG TARGETARCH
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+    --mount=type=bind,from=restored-cache,target=/restored \
+    set -x ; \
+    # restore `apt` files
+    cp -at /var/cache/apt/ "/restored/apt-cache-cache"/* || : ; \
+    cp -at /var/lib/apt/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
+
+FROM debian:${DEBIAN_VERSION} AS tubesync-base
+
+ARG TARGETARCH
+
+ENV DEBIAN_FRONTEND="noninteractive" \
+    HOME="/root" \
+    LANGUAGE="en_US.UTF-8" \
+    LANG="en_US.UTF-8" \
+    LC_ALL="en_US.UTF-8" \
+    TERM="xterm" \
+    # Do not include compiled byte-code
+    PIP_NO_COMPILE=1 \
+    PIP_ROOT_USER_ACTION='ignore'
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+    # to be careful, ensure that these files aren't from a different architecture
+    find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
+    # Update from the network and keep cache
+    rm -f /etc/apt/apt.conf.d/docker-clean ; \
+    set -x && \
+    apt-get update && \
+    # Install locales
+    apt-get -y --no-install-recommends install locales && \
+    printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
+    locale-gen en_US.UTF-8 && \
+    # Clean up
+    apt-get -y autopurge && \
+    apt-get -y autoclean && \
+    rm -v -rf /tmp/*
+
+FROM tubesync-base AS tubesync
 
 ARG S6_VERSION
 
@@ -237,29 +278,15 @@ ARG WORMHOLE_CODE
 ARG WORMHOLE_RELAY
 ARG WORMHOLE_TRANSIT
 
-ENV DEBIAN_FRONTEND="noninteractive" \
-    HOME="/root" \
-    LANGUAGE="en_US.UTF-8" \
-    LANG="en_US.UTF-8" \
-    LC_ALL="en_US.UTF-8" \
-    TERM="xterm" \
-    # Do not include compiled byte-code
-    PIP_NO_COMPILE=1 \
-    PIP_ROOT_USER_ACTION='ignore' \
-    S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
-
 ENV S6_VERSION="${S6_VERSION}" \
     FFMPEG_DATE="${FFMPEG_DATE}" \
     FFMPEG_VERSION="${FFMPEG_VERSION}"
 
 # Reminder: the SHELL handles all variables
-RUN \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
   set -x && \
   apt-get update && \
-  # Install locales
-  apt-get -y --no-install-recommends install locales && \
-  printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
-  locale-gen en_US.UTF-8 && \
   # Install dependencies we keep
   # Install required distro packages
   apt-get -y --no-install-recommends install \
@@ -275,10 +302,14 @@ RUN \
   python3-socks \
   python3-wheel \
   curl \
+  file \
   less \
   && \
   # Link to the current python3 version
   ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
+  # Create a 'app' user which the application will run as
+  groupadd app && \
+  useradd -M -d /app -s /bin/false -g app app && \
   # Clean up
   apt-get -y autopurge && \
   apt-get -y autoclean && \
@@ -289,20 +320,12 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 RUN \
-  set -x && \
-  apt-get update && \
-  # Install file
-  apt-get -y --no-install-recommends install file && \
-  # Installed s6 (using COPY earlier)
-  file -L /command/s6-overlay-suexec && \
-  # Installed ffmpeg (using COPY earlier)
-  /usr/local/bin/ffmpeg -version && \
-  file /usr/local/bin/ff* && \
-  # Clean up
-  apt-get -y autoremove --purge file && \
-  apt-get -y autopurge && \
-  apt-get -y autoclean && \
-  rm -rf /tmp/*
+    set -x && \
+    # Installed s6 (using COPY earlier)
+    file -L /command/s6-overlay-suexec && \
+    # Installed ffmpeg (using COPY earlier)
+    /usr/local/bin/ffmpeg -version && \
+    file /usr/local/bin/ff*
 
 # Switch workdir to the the app
 WORKDIR /app
@@ -323,11 +346,6 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     pycache="${cache_path}/pycache" ; \
     wormhole_venv="${cache_path}/wormhole" ; \
     mkdir -p "${saved}/${TARGETARCH}" ; \
-    # restore `apt` files
-    cp -at /var/cache/apt/ "${restored}/apt-cache-cache"/* || : ; \
-    cp -at /var/lib/apt/ "${restored}/${TARGETARCH}/apt-lib-cache"/* || : ; \
-    # to be careful, ensure that these files aren't from a different architecture
-    find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
     # restore pipenv cached files
     cp -a "${restored}/pipenv-cache" "${pipenv_cache}" || : ; \
     # restore `magic-wormhole` virtual env
@@ -345,8 +363,6 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     . "${wormhole_venv}/bin/activate" && \
     pip install magic-wormhole ; \
   ) && \
-  # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -362,9 +378,6 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   python3-pip \
   zlib1g-dev \
   && \
-  # Create a 'app' user which the application will run as
-  groupadd app && \
-  useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
   XDG_CACHE_HOME="${cache_path}" \
   PIPENV_VERBOSITY=64 \
@@ -457,6 +470,7 @@ HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck
 # ENVS and ports
 ENV PYTHONPATH="/app" \
     PYTHONPYCACHEPREFIX="/config/cache/pycache" \
+    S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0" \
     XDG_CACHE_HOME="/config/cache"
 EXPOSE 4848
 
