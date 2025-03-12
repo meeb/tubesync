@@ -27,7 +27,7 @@ from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm,
                     ConfirmDeleteMediaServerForm)
-from .utils import validate_url, delete_file
+from .utils import validate_url, delete_file, multi_key_sort
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
                     delete_task_by_media, index_source_task)
@@ -75,7 +75,9 @@ class DashboardView(TemplateView):
             data['average_bytes_per_media'] = 0
         # Latest downloads
         data['latest_downloads'] = Media.objects.filter(
-            downloaded=True, downloaded_filesize__isnull=False
+            downloaded=True,
+            download_date__isnull=False,
+            downloaded_filesize__isnull=False,
         ).defer('metadata').order_by('-download_date')[:10]
         # Largest downloads
         data['largest_downloads'] = Media.objects.filter(
@@ -782,24 +784,41 @@ class TasksView(ListView):
         prefix = '-' if 'ASC' != order else ''
         _priority = f'{prefix}priority'
         return qs.order_by(
-            'run_at',
             _priority,
+            'run_at',
         )
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
         now = timezone.now()
         qs = Task.objects.all()
+        errors_qs = qs.filter(attempts__gt=0, locked_by__isnull=True)
+        running_qs = qs.filter(locked_by__isnull=False)
+        scheduled_qs = qs.filter(locked_by__isnull=True)
 
         # Add to context data from ListView
         data['message'] = self.message
         data['source'] = self.filter_source
-        data['running'] = []
-        data['errors'] = []
-        data['scheduled'] = []
-        data['total_scheduled'] = qs.filter(locked_at__isnull=True).count()
+        data['running'] = list()
+        data['errors'] = list()
+        data['total_errors'] = errors_qs.count()
+        data['scheduled'] = list()
+        data['total_scheduled'] = scheduled_qs.count()
 
-        for task in qs.filter(locked_at__isnull=False):
+        def add_to_task(task):
+            obj, url = map_task_to_instance(task)
+            if not obj:
+                return False
+            setattr(task, 'instance', obj)
+            setattr(task, 'url', url)
+            setattr(task, 'run_now', task.run_at < now)
+            if task.has_error():
+                error_message = get_error_message(task)
+                setattr(task, 'error_message', error_message)
+                return 'error'
+            return True
+                    
+        for task in running_qs:
             # There was broken logic in `Task.objects.locked()`, work around it.
             # With that broken logic, the tasks never resume properly.
             # This check unlocks the tasks without a running process.
@@ -807,31 +826,27 @@ class TasksView(ListView):
             # - `True`: locked and PID exists
             # - `False`: locked and PID does not exist
             # - `None`: not `locked_by`, so there was no PID to check
-            if task.locked_by_pid_running() is False:
+            locked_by_pid_running = task.locked_by_pid_running()
+            if locked_by_pid_running is False:
                 task.locked_by = None
                 # do not wait for the task to expire
                 task.locked_at = None
                 task.save()
-            obj, url = map_task_to_instance(task)
-            if not obj:
-                # Orphaned task, ignore it (it will be deleted when it fires)
-                continue
-            setattr(task, 'instance', obj)
-            setattr(task, 'url', url)
-            setattr(task, 'run_now', task.run_at < now)
-            if task.locked_by_pid_running():
+            if locked_by_pid_running and add_to_task(task):
                 data['running'].append(task)
-            elif task.has_error():
-                error_message = get_error_message(task)
-                setattr(task, 'error_message', error_message)
-                data['errors'].append(task)
-            else:
-                data['scheduled'].append(task)
+
+        # show all the errors when they fit on one page
+        if (data['total_errors'] + len(data['running'])) < self.paginate_by:
+            for task in errors_qs:
+                if task in data['running']:
+                    continue
+                mapped = add_to_task(task)
+                if 'error' == mapped:
+                    data['errors'].append(task)
+                elif mapped:
+                    data['scheduled'].append(task)
 
         for task in data['tasks']:
-            obj, url = map_task_to_instance(task)
-            if not obj:
-                continue
             already_added = (
                 task in data['running'] or
                 task in data['errors'] or
@@ -839,10 +854,24 @@ class TasksView(ListView):
             )
             if already_added:
                 continue
-            setattr(task, 'instance', obj)
-            setattr(task, 'url', url)
-            setattr(task, 'run_now', task.run_at < now)
-            data['scheduled'].append(task)
+            mapped = add_to_task(task)
+            if 'error' == mapped:
+                data['errors'].append(task)
+            elif mapped:
+                data['scheduled'].append(task)
+
+        order = getattr(settings,
+            'BACKGROUND_TASK_PRIORITY_ORDERING',
+            'DESC'
+        )
+        sort_keys = (
+            # key, reverse
+            ('run_at', False),
+            ('priority', 'ASC' != order),
+            ('run_now', True),
+        )
+        data['errors'] = multi_key_sort(data['errors'], sort_keys, attr=True)
+        data['scheduled'] = multi_key_sort(data['scheduled'], sort_keys, attr=True)
 
         return data
 

@@ -18,6 +18,8 @@ import requests
 TIMEOUT = 5  # Seconds
 HTTP_USER = os.getenv('HTTP_USER')
 HTTP_PASS = os.getenv('HTTP_PASS')
+# never use proxy for healthcheck requests
+os.environ['no_proxy'] = '*'
 
 
 def do_heatlhcheck(url):
