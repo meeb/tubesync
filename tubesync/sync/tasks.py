@@ -258,6 +258,13 @@ def index_source_task(source_id):
             )
             if new_media_instance:
                 log.info(f'Indexed new media: {source} / {media}')
+                log.info(f'Scheduling task to download metadata for: {media.url}')
+                verbose_name = _('Downloading metadata for "{}"')
+                download_media_metadata(
+                    str(media.pk),
+                    priority=9,
+                    verbose_name=verbose_name.format(media.pk),
+                )
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
     # Tack on a cleanup of old completed tasks
