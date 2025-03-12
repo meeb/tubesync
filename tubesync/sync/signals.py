@@ -129,7 +129,7 @@ def source_post_save(sender, instance, created, **kwargs):
     verbose_name = _('Checking all media for source "{}"')
     save_all_media_for_source(
         str(instance.pk),
-        priority=9,
+        priority=25,
         verbose_name=verbose_name.format(instance.name),
         remove_existing_tasks=True
     )
@@ -211,7 +211,7 @@ def media_post_save(sender, instance, created, **kwargs):
             rename_media(
                 str(media.pk),
                 queue=str(media.pk),
-                priority=16,
+                priority=20,
                 verbose_name=verbose_name.format(media.key, media.name),
                 remove_existing_tasks=True
             )
