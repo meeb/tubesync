@@ -220,18 +220,8 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
-FROM alpine:${ALPINE_VERSION} AS restored-cache-copy
-
-ARG CACHE_PATH
-RUN --mount=type=bind,source=.cache/saved,target=/.host \
-    set -eux ; \
-    mkdir -v -p "${CACHE_PATH}" && \
-    cp -at "${CACHE_PATH}"/ /.host/*
-
 FROM scratch AS restored-cache
-
-ARG CACHE_PATH
-COPY --from=restored-cache-copy "${CACHE_PATH}" /
+COPY --from=cache-tubesync / /
 
 FROM debian:${DEBIAN_VERSION} AS tubesync
 
