@@ -225,7 +225,8 @@ def index_source_task(source_id):
     source.last_crawl = timezone.now()
     #source.save()
     time_model_function(source, source.save)
-    log.info(f'Found {len(videos)} media items for source: {source}')
+    num_videos = len(videos)
+    log.info(f'Found {num_videos} media items for source: {source}')
     fields = lambda f, m: m.get_metadata_field(f)
     task = get_source_index_task(source_id)
     if task:
