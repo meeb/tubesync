@@ -172,7 +172,6 @@ jobs:
             type=registry,ref=${{ steps.origin.outputs.ref }}
             type=registry,ref=${{ steps.upstream.outputs.ref }}
           cache-to: |
-            type=registry,ref=${{ steps.origin.outputs.ref }}
             type=gha,mode=max
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
