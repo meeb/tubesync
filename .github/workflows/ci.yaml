@@ -168,9 +168,12 @@ jobs:
           provenance: false
           tags: ${{ steps.origin.outputs.tag }}
           cache-from: |
+            type=gha
             type=registry,ref=${{ steps.origin.outputs.ref }}
             type=registry,ref=${{ steps.upstream.outputs.ref }}
-          cache-to: type=registry,ref=${{ steps.origin.outputs.ref }},mode=max
+          cache-to: |
+            type=registry,ref=${{ steps.origin.outputs.ref }}
+            type=gha,mode=max
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             WORMHOLE_CODE=${{ steps.wormhole.outputs.code }}
