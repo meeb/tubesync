@@ -286,7 +286,6 @@ ENV S6_VERSION="${S6_VERSION}" \
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
   set -x && \
-  ls -alR /var/*/apt && \
   apt-get update && \
   # Install dependencies we keep
   # Install required distro packages
