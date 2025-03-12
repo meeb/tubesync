@@ -230,7 +230,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/apt
     --mount=type=bind,from=restored-cache,target=/restored \
     set -x ; \
     # restore `apt` files
-    mkdir -v -p /apt-lib-cache /apt-lib-cache ; \
     cp -at /apt-cache-cache/ "/restored/apt-cache-cache"/* || : ; \
     cp -at /apt-lib-cache/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
 
@@ -248,8 +247,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_NO_COMPILE=1 \
     PIP_ROOT_USER_ACTION='ignore'
 
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt,from=populate-apt-cache-dirs \
     # to be careful, ensure that these files aren't from a different architecture
     find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
     # Update from the network and keep cache
