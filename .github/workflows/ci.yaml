@@ -34,8 +34,6 @@ jobs:
   containerise:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -131,12 +129,13 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: .
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=registry,ref=ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
           cache-to: type=inline
+          build-contexts: |
+            cache-tubesync=.cache/saved
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             WORMHOLE_CODE=${{ steps.wormhole.outputs.code }}
