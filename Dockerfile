@@ -464,7 +464,11 @@ RUN set -x && \
 COPY config/root /
 
 # Check nginx configuration copied from config/root/etc
-RUN set -x && nginx -t
+RUN set -x && \
+    mkdir -v -p /config/log && \
+    cp -a /var/log/nginx /config/log/ && \
+    cp -v -p /config/log/nginx/access.log /config/log/nginx/access.log.gz && \
+    nginx -t
 
 # Create a healthcheck
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
