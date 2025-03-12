@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='source',
             name='source_resolution',
-            field=models.CharField(choices=[('audio', 'Audio only'), ('360p', '360p (SD)'), ('480p', '480p (SD)'), ('720p', '720p (HD)'), ('1080p', '1080p (Full HD)'), ('1440p', '1440p (2K)'), ('2160p', '4320p (8K)'), ('4320p', '4320p (8K)')], db_index=True, default='1080p', help_text='Source resolution, desired video resolution to download', max_length=8, verbose_name='source resolution'),
+            field=models.CharField(choices=[('audio', 'Audio only'), ('360p', '360p (SD)'), ('480p', '480p (SD)'), ('720p', '720p (HD)'), ('1080p', '1080p (Full HD)'), ('1440p', '1440p (2K)'), ('2160p', '2160p (4K)'), ('4320p', '4320p (8K)')], db_index=True, default='1080p', help_text='Source resolution, desired video resolution to download', max_length=8, verbose_name='source resolution'),
         ),
     ]
 

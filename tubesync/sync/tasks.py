@@ -17,6 +17,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
+from django.db.transaction import atomic
 from django.db.utils import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from background_task import background
@@ -179,20 +180,43 @@ def cleanup_removed_media(source, videos):
 
 
 @background(schedule=300, remove_existing_tasks=True)
+@atomic(durable=True)
 def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
     '''
+
+    from common.utils import time_func, profile_func
+    def get_source(source_id):
+        @time_func
+        def f(sid):
+            return Source.objects.get(pk=sid)
+        rt = f(source_id)
+        elapsed = rt[1][0]
+        log.debug(f'get_source: took {elapsed:.6f} seconds')
+        return rt[0]
+    def time_model_function(instance, func):
+        @time_func
+        def f(c):
+            return c()
+        rt = f(func)
+        elapsed = rt[1][0]
+        log.debug(f'time_model_function: {func}: took {elapsed:.6f} seconds')
+        return rt[0]
+
     try:
-        source = Source.objects.get(pk=source_id)
+        #source = Source.objects.get(pk=source_id)
+        source = get_source(source_id)
     except Source.DoesNotExist:
         # Task triggered but the Source has been deleted, delete the task
         return
     # Reset any errors
     source.has_failed = False
-    source.save()
+    #source.save()
+    time_model_function(source, source.save)
     # Index the source
-    videos = source.index_media()
+    #videos = source.index_media()
+    videos = time_model_function(source, source.index_media)
     if not videos:
         raise NoMediaException(f'Source "{source}" (ID: {source_id}) returned no '
                                f'media to index, is the source key valid? Check the '
@@ -200,7 +224,8 @@ def index_source_task(source_id):
                                f'is reachable')
     # Got some media, update the last crawl timestamp
     source.last_crawl = timezone.now()
-    source.save()
+    #source.save()
+    time_model_function(source, source.save)
     log.info(f'Found {len(videos)} media items for source: {source}')
     fields = lambda f, m: m.get_metadata_field(f)
     for video in videos:
@@ -221,7 +246,9 @@ def index_source_task(source_id):
         if published_dt is not None:
             media.published = published_dt
         try:
-            media.save()
+            with atomic():
+                #media.save()
+                time_model_function(media, media.save)
             log.debug(f'Indexed media: {source} / {media}')
             # log the new media instances
             new_media_instance = (
@@ -331,7 +358,7 @@ def download_media_metadata(media_id):
         metadata = media.index_metadata()
     except YouTubeError as e:
         e_str = str(e)
-        log_exception = True
+        raise_exception = True
         if ': Premieres in ' in e_str:
             now = timezone.now()
             published_datetime = None
@@ -367,9 +394,9 @@ def download_media_metadata(media_id):
                     verbose_name=verbose_name.format(media.key, published_datetime.isoformat(' ', 'seconds')),
                     remove_existing_tasks=True,
                 )
-                log_exception = False
-        if log_exception:
-            log.exception(e)
+                raise_exception = False
+        if raise_exception:
+            raise
         log.debug(str(e))
         return
     response = metadata
@@ -597,6 +624,7 @@ def save_all_media_for_source(source_id):
         skip=False,
         manual_skip=False,
         downloaded=False,
+        metadata__isnull=False,
     )
     for media in refresh_qs:
         try:
@@ -610,9 +638,10 @@ def save_all_media_for_source(source_id):
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
-    for media in mqs:
-        if media.uuid not in already_saved:
-            media.save()
+    with atomic():
+        for media in mqs:
+            if media.uuid not in already_saved:
+                media.save()
 
 
 @background(schedule=60, remove_existing_tasks=True)
@@ -625,6 +654,7 @@ def rename_media(media_id):
 
 
 @background(schedule=300, remove_existing_tasks=True)
+@atomic(durable=True)
 def rename_all_media_for_source(source_id):
     try:
         source = Source.objects.get(pk=source_id)
@@ -652,7 +682,8 @@ def rename_all_media_for_source(source_id):
         downloaded=True,
     )
     for media in mqs:
-        media.rename_files()
+        with atomic():
+            media.rename_files()
 
 
 @background(schedule=60, remove_existing_tasks=True)
