@@ -206,9 +206,12 @@ def index_source_task(source_id):
     log.info(f'Found {num_videos} media items for source: {source}')
     fields = lambda f, m: m.get_metadata_field(f)
     task = get_source_index_task(source_id)
-    tvn_format = '[{}' + f'/{num_videos}] {task.verbose_name}'
+    if task:
+        verbose_name = task.verbose_name
+        tvn_format = '[{}' + f'/{num_videos}] {verbose_name}'
     for vn, video in enumerate(videos, start=1):
-        task.verbose_name = tvn_format.format(vn)
+        if task:
+            task.verbose_name = tvn_format.format(vn)
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
         if not key:
@@ -239,6 +242,8 @@ def index_source_task(source_id):
                 log.info(f'Indexed new media: {source} / {media}')
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
+    if task:
+            task.verbose_name = verbose_name
     # Tack on a cleanup of old completed tasks
     cleanup_completed_tasks()
     # Tack on a cleanup of old media
