@@ -17,6 +17,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
+from django.db.transaction import atomic
 from django.db.utils import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from background_task import background
@@ -179,6 +180,7 @@ def cleanup_removed_media(source, videos):
 
 
 @background(schedule=300, remove_existing_tasks=True)
+@atomic(durable=True)
 def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
@@ -221,7 +223,8 @@ def index_source_task(source_id):
         if published_dt is not None:
             media.published = published_dt
         try:
-            media.save()
+            with atomic():
+                media.save()
             log.debug(f'Indexed media: {source} / {media}')
             # log the new media instances
             new_media_instance = (
@@ -231,6 +234,13 @@ def index_source_task(source_id):
             )
             if new_media_instance:
                 log.info(f'Indexed new media: {source} / {media}')
+                log.info(f'Scheduling task to download metadata for: {media.url}')
+                verbose_name = _('Downloading metadata for "{}"')
+                download_media_metadata(
+                    str(media.pk),
+                    priority=9,
+                    verbose_name=verbose_name.format(media.pk),
+                )
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
     # Tack on a cleanup of old completed tasks
@@ -597,6 +607,7 @@ def save_all_media_for_source(source_id):
         skip=False,
         manual_skip=False,
         downloaded=False,
+        metadata__isnull=False,
     )
     for media in refresh_qs:
         try:
@@ -610,9 +621,10 @@ def save_all_media_for_source(source_id):
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
-    for media in mqs:
-        if media.uuid not in already_saved:
-            media.save()
+    with atomic():
+        for media in mqs:
+            if media.uuid not in already_saved:
+                media.save()
 
 
 @background(schedule=60, remove_existing_tasks=True)
@@ -625,6 +637,7 @@ def rename_media(media_id):
 
 
 @background(schedule=300, remove_existing_tasks=True)
+@atomic(durable=True)
 def rename_all_media_for_source(source_id):
     try:
         source = Source.objects.get(pk=source_id)
@@ -652,7 +665,8 @@ def rename_all_media_for_source(source_id):
         downloaded=True,
     )
     for media in mqs:
-        media.rename_files()
+        with atomic():
+            media.rename_files()
 
 
 @background(schedule=60, remove_existing_tasks=True)
