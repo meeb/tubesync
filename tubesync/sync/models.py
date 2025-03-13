@@ -1,16 +1,18 @@
-import os
-import uuid
 import json
+import os
 import re
+import uuid
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone as tz
+from io import BytesIO
 from pathlib import Path
 from xml.etree import ElementTree
 from django.conf import settings
 from django.db import models
 from django.core.exceptions import SuspiciousOperation
 from django.core.files.storage import FileSystemStorage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.validators import RegexValidator
 from django.utils.text import slugify
 from django.utils import timezone
@@ -22,7 +24,8 @@ from .youtube import (get_media_info as get_youtube_media_info,
                       download_media as download_youtube_media,
                       get_channel_image_info as get_youtube_channel_image_info)
 from .utils import (seconds_to_timestr, parse_media_format, filter_response,
-                    write_text_file, mkdir_p, directory_and_stem, glob_quote)
+                    write_text_file, mkdir_p, directory_and_stem, glob_quote,
+                    get_remote_image, resize_image_to_height)
 from .matching import (get_best_combined_format, get_best_audio_format,
                        get_best_video_format)
 from .fields import CommaSepChoiceField
@@ -1486,6 +1489,47 @@ class Media(models.Model):
         # Return the download paramaters
         return format_str, self.source.extension
 
+
+    def finish_download(self, format_str, container, downloaded_filepath=None):
+        if downloaded_filepath is None:
+            downloaded_filepath = self.filepath
+        filepath = Path(downloaded_filepath)
+        # Link the downloaded file to the object and update info about the download
+        self.media_file.name = str(filepath.relative_to(self.media_file.storage.location))
+        self.downloaded = True
+        self.download_date = timezone.now()
+        self.downloaded_filesize = os.path.getsize(filepath)
+        self.downloaded_container = container
+        if '+' in format_str:
+            # Seperate audio and video streams
+            vformat_code, aformat_code = format_str.split('+')
+            aformat = self.get_format_by_code(aformat_code)
+            vformat = self.get_format_by_code(vformat_code)
+            self.downloaded_format = vformat['format']
+            self.downloaded_height = vformat['height']
+            self.downloaded_width = vformat['width']
+            self.downloaded_audio_codec = aformat['acodec']
+            self.downloaded_video_codec = vformat['vcodec']
+            self.downloaded_container = container
+            self.downloaded_fps = vformat['fps']
+            self.downloaded_hdr = vformat['is_hdr']
+        else:
+            # Combined stream or audio-only stream
+            cformat_code = format_str
+            cformat = self.get_format_by_code(cformat_code)
+            self.downloaded_audio_codec = cformat['acodec']
+            if cformat['vcodec']:
+                # Combined
+                self.downloaded_format = cformat['format']
+                self.downloaded_height = cformat['height']
+                self.downloaded_width = cformat['width']
+                self.downloaded_video_codec = cformat['vcodec']
+                self.downloaded_fps = cformat['fps']
+                self.downloaded_hdr = cformat['is_hdr']
+            else:
+                self.downloaded_format = Val(SourceResolution.AUDIO)
+
+
     def index_metadata(self):
         '''
             Index the media metadata returning a dict of info.
@@ -1614,6 +1658,52 @@ class Media(models.Model):
                             parent_dir = parent_dir.parent
                     except OSError as e:
                         pass
+
+
+    def save_thumbnail(self, url=None):
+        if self.skip:
+            return
+        if url is None:
+            url = self.thumbnail
+        if not url:
+            return
+        width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
+        height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
+        i = get_remote_image(url)
+        log.info(f'Resizing {i.width}x{i.height} thumbnail to '
+                 f'{width}x{height}: {url}')
+        i = resize_image_to_height(i, width, height)
+        image_file = BytesIO()
+        i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
+        image_file.seek(0)
+        self.thumb.save(
+            'thumb',
+            SimpleUploadedFile(
+                'thumb',
+                image_file.read(),
+                'image/jpeg',
+            ),
+            save=True
+        )
+        log.info(f'Saved thumbnail for: {self} from: {url}')
+        return True
+
+
+    def wait_for_premiere(self):
+        hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
+
+        if self.has_metadata or not self.published:
+            return False
+
+        now = timezone.now()
+        if self.published < now:
+            self.manual_skip = False
+            self.skip = False
+        else:
+            self.manual_skip = True
+            self.title = _(f'Premieres in {hours(self.published - now)} hours')
+
+        return True
 
 
 class MediaServer(models.Model):
