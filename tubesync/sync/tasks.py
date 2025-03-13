@@ -114,27 +114,26 @@ def get_source_completed_tasks(source_id, only_errors=False):
         q['failed_at__isnull'] = False
     return CompletedTask.objects.filter(**q).order_by('-failed_at')
 
+def get_tasks(task_name, id=None, /, instance=None):
+    assert not (id is None and instance is None)
+    arg = str(id or instance.pk)
+    return Task.objects.get_task(str(task_name), args=(arg,),)
+
+def get_first_task(task_name, id=None, /, *, instance=None):
+    tqs = get_tasks(task_name, id, instance).order_by('run_at')
+    return tqs[0] if tqs.count() else False
 
 def get_media_download_task(media_id):
-    try:
-        return Task.objects.get_task('sync.tasks.download_media',
-                                     args=(str(media_id),))[0]
-    except IndexError:
-        return False
+    return get_first_task('sync.tasks.download_media', media_id)
 
 def get_media_metadata_task(media_id):
-    try:
-        return Task.objects.get_task('sync.tasks.download_media_metadata',
-                                     args=(str(media_id),))[0]
-    except IndexError:
-        return False
+    return get_first_task('sync.tasks.download_media_metadata', media_id)
 
 def get_media_premiere_task(media_id):
-    try:
-        return Task.objects.get_task('sync.tasks.wait_for_media_premiere',
-                                     args=(str(media_id),))[0]
-    except IndexError:
-        return False
+    return get_first_task('sync.tasks.wait_for_media_premiere', media_id)
+
+def get_source_index_task(source_id):
+    return get_first_task('sync.tasks.index_source_task', source_id)
 
 def delete_task_by_source(task_name, source_id):
     now = timezone.now()
@@ -185,16 +184,38 @@ def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
     '''
+
+    from common.utils import time_func, profile_func
+    def get_source(source_id):
+        @time_func
+        def f(sid):
+            return Source.objects.get(pk=sid)
+        rt = f(source_id)
+        elapsed = rt[1][0]
+        log.debug(f'get_source: took {elapsed:.6f} seconds')
+        return rt[0]
+    def time_model_function(instance, func):
+        @time_func
+        def f(c):
+            return c()
+        rt = f(func)
+        elapsed = rt[1][0]
+        log.debug(f'time_model_function: {func}: took {elapsed:.6f} seconds')
+        return rt[0]
+
     try:
-        source = Source.objects.get(pk=source_id)
+        #source = Source.objects.get(pk=source_id)
+        source = get_source(source_id)
     except Source.DoesNotExist:
         # Task triggered but the Source has been deleted, delete the task
         return
     # Reset any errors
     source.has_failed = False
-    source.save()
+    #source.save()
+    time_model_function(source, source.save)
     # Index the source
-    videos = source.index_media()
+    #videos = source.index_media()
+    videos = time_model_function(source, source.index_media)
     if not videos:
         raise NoMediaException(f'Source "{source}" (ID: {source_id}) returned no '
                                f'media to index, is the source key valid? Check the '
@@ -202,10 +223,19 @@ def index_source_task(source_id):
                                f'is reachable')
     # Got some media, update the last crawl timestamp
     source.last_crawl = timezone.now()
-    source.save()
-    log.info(f'Found {len(videos)} media items for source: {source}')
+    #source.save()
+    time_model_function(source, source.save)
+    num_videos = len(videos)
+    log.info(f'Found {num_videos} media items for source: {source}')
     fields = lambda f, m: m.get_metadata_field(f)
-    for video in videos:
+    task = get_source_index_task(source_id)
+    if task:
+        verbose_name = task.verbose_name
+        tvn_format = '[{}' + f'/{num_videos}] {verbose_name}'
+    for vn, video in enumerate(videos, start=1):
+        if task:
+            task.verbose_name = tvn_format.format(vn)
+            task.save(update_fields={'verbose_name'})
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
         if not key:
@@ -224,7 +254,8 @@ def index_source_task(source_id):
             media.published = published_dt
         try:
             with atomic():
-                media.save()
+                #media.save()
+                time_model_function(media, media.save)
             log.debug(f'Indexed media: {source} / {media}')
             # log the new media instances
             new_media_instance = (
@@ -243,6 +274,9 @@ def index_source_task(source_id):
                 )
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
+    if task:
+        task.verbose_name = verbose_name
+        task.save(update_fields={'verbose_name'})
     # Tack on a cleanup of old completed tasks
     cleanup_completed_tasks()
     # Tack on a cleanup of old media
