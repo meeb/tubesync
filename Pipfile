@@ -7,20 +7,20 @@ verify_ssl = true
 autopep8 = "*"
 
 [packages]
-django = "~=3.2"
-django-sass-processor = "*"
-libsass = "*"
+django = "*"
+django-sass-processor = {extras = ["management-command"], version = "*"}
 pillow = "*"
 whitenoise = "*"
 gunicorn = "*"
-django-compressor = "*"
 httptools = "*"
-django-background-tasks = "*"
+django-background-tasks = ">=1.2.8"
 django-basicauth = "*"
 psycopg2-binary = "*"
 mysqlclient = "*"
-yt-dlp = "*"
-redis = "*"
-hiredis = "*"
+PySocks = "*"
+urllib3 = {extras = ["socks"], version = "*"}
 requests = {extras = ["socks"], version = "*"}
+yt-dlp = "*"
 emoji = "*"
+brotli = "*"
+html5lib = "*"

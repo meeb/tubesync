@@ -1,9 +1,45 @@
+import os
 import string
 from datetime import datetime
 from urllib.parse import urlunsplit, urlencode, urlparse
 import emoji
 from yt_dlp.utils import LazyList
 from .errors import DatabaseConnectionError
+
+
+def getenv(key, default=None, /, *, integer=False, string=True):
+    '''
+        Guarantees a returned type from calling `os.getenv`
+        The caller can request the integer type,
+          or use the default string type.
+    '''
+
+    args = dict(key=key, default=default, integer=integer, string=string)
+    supported_types = dict(zip(args.keys(), (
+        (str,), # key
+        (
+            bool,
+            float,
+            int,
+            str,
+            None.__class__,
+        ), # default
+        (bool,) * (len(args.keys()) - 2),
+    )))
+    unsupported_type_msg = 'Unsupported type for positional argument, "{}": {}'
+    for k, t in supported_types.items():
+        v = args[k]
+        assert isinstance(v, t), unsupported_type_msg.format(k, type(v))
+
+    d = str(default) if default is not None else None
+
+    r = os.getenv(key, d)
+    if r is None:
+        if string: r = str()
+        if integer: r = int()
+    elif integer:
+        r = int(float(r))
+    return r
 
 
 def parse_database_connection_string(database_connection_string):
@@ -112,8 +148,8 @@ def append_uri_params(uri, params):
 def clean_filename(filename):
     if not isinstance(filename, str):
         raise ValueError(f'filename must be a str, got {type(filename)}')
-    to_scrub = '<>\/:*?"|%'
-    for char in to_scrub:
+    to_scrub = r'<>\/:*?"|%'
+    for char in list(to_scrub):
         filename = filename.replace(char, '')
     clean_filename = ''
     for c in filename:

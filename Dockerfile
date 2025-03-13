@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-ARG FFMPEG_DATE="2025-02-04-17-39"
-ARG FFMPEG_VERSION="N-118421-ga8595dae0f"
+ARG FFMPEG_DATE="2025-03-04-15-43"
+ARG FFMPEG_VERSION="N-118645-gf76195ff65"
 
 ARG S6_VERSION="3.2.0.2"
 
@@ -275,8 +275,9 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   pipenv \
   pkgconf \
   python3 \
+  python3-libsass \
+  python3-socks \
   python3-wheel \
-  redis-server \
   curl \
   less \
   && \
@@ -323,6 +324,7 @@ RUN --mount=type=tmpfs,target=/cache \
   HOME="/tmp/${HOME#/}" \
   XDG_CACHE_HOME='/cache' \
   PIPENV_VERBOSITY=64 \
+  PYTHONPYCACHEPREFIX=/cache/pycache \
     pipenv install --system --skip-lock && \
   # Clean up
   apt-get -y autoremove --purge \
@@ -369,6 +371,13 @@ RUN set -x && \
 # Copy root
 COPY config/root /
 
+# Check nginx configuration copied from config/root/etc
+RUN set -x && nginx -t
+
+# patch background_task
+COPY patches/background_task/ \
+    /usr/local/lib/python3/dist-packages/background_task/
+
 # patch yt_dlp
 COPY patches/yt_dlp/ \
     /usr/local/lib/python3/dist-packages/yt_dlp/
@@ -378,7 +387,8 @@ HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck
 
 # ENVS and ports
 ENV PYTHONPATH="/app" \
-    PYTHONPYCACHEPREFIX="/config/cache/pycache"
+    PYTHONPYCACHEPREFIX="/config/cache/pycache" \
+    XDG_CACHE_HOME="/config/cache"
 EXPOSE 4848
 
 # Volumes

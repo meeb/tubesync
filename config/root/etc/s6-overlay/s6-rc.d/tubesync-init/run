@@ -1,10 +1,8 @@
 #!/command/with-contenv bash
 
 # Change runtime user UID and GID
-PUID="${PUID:-911}"
-PUID="${PUID:-911}"
-groupmod -o -g "$PGID" app
-usermod -o -u "$PUID" app
+groupmod -o -g "${PGID:=911}" app
+usermod -o -u "${PUID:=911}" app
 
 # Reset permissions
 chown -R app:app /run/app
@@ -13,12 +11,10 @@ chown -R app:app /config
 chmod -R 0755 /config
 chown -R root:app /app
 chmod -R 0750 /app
+chmod 0755 /app/*.py /app/*.sh
+find /app -mindepth 2 -type f -execdir chmod 640 '{}' +
 chown -R app:app /app/common/static
-chmod -R 0750 /app/common/static
 chown -R app:app /app/static
-chmod -R 0750 /app/static
-find /app -type f ! -iname healthcheck.py -exec chmod 640 {} \;
-chmod 0755 /app/healthcheck.py
 
 # Optionally reset the download dir permissions
 if [ "${TUBESYNC_RESET_DOWNLOAD_DIR:=True}" == "True" ]

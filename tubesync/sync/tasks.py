@@ -10,13 +10,14 @@ import math
 import uuid
 from io import BytesIO
 from hashlib import sha1
-from datetime import datetime, timedelta, timezone as tz
+from datetime import datetime, timedelta
 from shutil import copyfile
 from PIL import Image
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
+from django.db.transaction import atomic
 from django.db.utils import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from background_task import background
@@ -51,6 +52,7 @@ def map_task_to_instance(task):
         'sync.tasks.download_media': Media,
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
+        'sync.tasks.rename_media': Media,
         'sync.tasks.rename_all_media_for_source': Source,
         'sync.tasks.wait_for_media_premiere': Media,
     }
@@ -177,7 +179,8 @@ def cleanup_removed_media(source, videos):
             media.delete()
 
 
-@background(schedule=0)
+@background(schedule=300, remove_existing_tasks=True)
+@atomic(durable=True)
 def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
@@ -213,20 +216,15 @@ def index_source_task(source_id):
         except Media.DoesNotExist:
             media = Media(key=key)
         media.source = source
-        media.duration = float(video.get(fields('duration', media), 0)) or None
+        media.duration = float(video.get(fields('duration', media), None) or 0) or None
         media.title = str(video.get(fields('title', media), ''))[:200]
         timestamp = video.get(fields('timestamp', media), None)
-        if timestamp is not None:
-            try:
-                timestamp_float = float(timestamp)
-                posix_epoch = datetime(1970, 1, 1, tzinfo=tz.utc)
-                published_dt = posix_epoch + timedelta(seconds=timestamp_float)
-            except Exception as e:
-                log.warn(f'Could not set published for: {source} / {media} with "{e}"')
-            else:
-                media.published = published_dt
+        published_dt = media.metadata_published(timestamp)
+        if published_dt is not None:
+            media.published = published_dt
         try:
-            media.save()
+            with atomic():
+                media.save()
             log.debug(f'Indexed media: {source} / {media}')
             # log the new media instances
             new_media_instance = (
@@ -236,6 +234,13 @@ def index_source_task(source_id):
             )
             if new_media_instance:
                 log.info(f'Indexed new media: {source} / {media}')
+                log.info(f'Scheduling task to download metadata for: {media.url}')
+                verbose_name = _('Downloading metadata for "{}"')
+                download_media_metadata(
+                    str(media.pk),
+                    priority=9,
+                    verbose_name=verbose_name.format(media.pk),
+                )
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
     # Tack on a cleanup of old completed tasks
@@ -316,7 +321,7 @@ def download_source_images(source_id):
     log.info(f'Thumbnail downloaded for source with ID: {source_id} / {source}')
 
 
-@background(schedule=0)
+@background(schedule=60, remove_existing_tasks=True)
 def download_media_metadata(media_id):
     '''
         Downloads the metadata for a media item.
@@ -336,7 +341,7 @@ def download_media_metadata(media_id):
         metadata = media.index_metadata()
     except YouTubeError as e:
         e_str = str(e)
-        log_exception = True
+        raise_exception = True
         if ': Premieres in ' in e_str:
             now = timezone.now()
             published_datetime = None
@@ -372,9 +377,9 @@ def download_media_metadata(media_id):
                     verbose_name=verbose_name.format(media.key, published_datetime.isoformat(' ', 'seconds')),
                     remove_existing_tasks=True,
                 )
-                log_exception = False
-        if log_exception:
-            log.exception(e)
+                raise_exception = False
+        if raise_exception:
+            raise
         log.debug(str(e))
         return
     response = metadata
@@ -385,6 +390,9 @@ def download_media_metadata(media_id):
     # Media must have a valid upload date
     if upload_date:
         media.published = timezone.make_aware(upload_date)
+    published = media.metadata_published()
+    if published:
+        media.published = published
 
     # Store title in DB so it's fast to access
     if media.metadata_title:
@@ -400,7 +408,7 @@ def download_media_metadata(media_id):
              f'{source} / {media}: {media_id}')
 
 
-@background(schedule=0)
+@background(schedule=60, remove_existing_tasks=True)
 def download_media_thumbnail(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
@@ -438,7 +446,7 @@ def download_media_thumbnail(media_id, url):
     return True
 
 
-@background(schedule=0)
+@background(schedule=60, remove_existing_tasks=True)
 def download_media(media_id):
     '''
         Downloads the media to disk and attaches it to the Media instance.
@@ -453,7 +461,11 @@ def download_media(media_id):
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
                  f'it is now marked to be skipped, not downloading')
         return
-    if media.downloaded and media.media_file and media.media_file.name:
+    downloaded_file_exists = (
+        media.media_file_exists or
+        media.filepath.exists()
+    )
+    if media.downloaded and downloaded_file_exists:
         # Media has been marked as downloaded before the download_media task was fired,
         # skip it
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
@@ -551,11 +563,13 @@ def download_media(media_id):
         err = (f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
                f'expected outfile does not exist: {filepath}')
         log.error(err)
+        # Try refreshing formats
+        media.refresh_formats
         # Raising an error here triggers the task to be re-attempted (or fail)
         raise DownloadFailedException(err)
 
 
-@background(schedule=0)
+@background(schedule=300, remove_existing_tasks=True)
 def rescan_media_server(mediaserver_id):
     '''
         Attempts to request a media rescan on a remote media server.
@@ -570,7 +584,7 @@ def rescan_media_server(mediaserver_id):
     mediaserver.update()
 
 
-@background(schedule=0)
+@background(schedule=300, remove_existing_tasks=True)
 def save_all_media_for_source(source_id):
     '''
         Iterates all media items linked to a source and saves them to
@@ -585,13 +599,45 @@ def save_all_media_for_source(source_id):
         log.error(f'Task save_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         return
+
+    already_saved = set()
+    mqs = Media.objects.filter(source=source)
+    refresh_qs = mqs.filter(
+        can_download=False,
+        skip=False,
+        manual_skip=False,
+        downloaded=False,
+        metadata__isnull=False,
+    )
+    for media in refresh_qs:
+        try:
+            media.refresh_formats
+        except YouTubeError as e:
+            log.debug(f'Failed to refresh formats for: {source} / {media.key}: {e!s}')
+            pass
+        else:
+            media.save()
+            already_saved.add(media.uuid)
+
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
-    for media in Media.objects.filter(source=source):
-        media.save()
+    with atomic():
+        for media in mqs:
+            if media.uuid not in already_saved:
+                media.save()
 
 
-@background(schedule=0)
+@background(schedule=60, remove_existing_tasks=True)
+def rename_media(media_id):
+    try:
+        media = Media.objects.defer('metadata', 'thumb').get(pk=media_id)
+    except Media.DoesNotExist:
+        return
+    media.rename_files()
+
+
+@background(schedule=300, remove_existing_tasks=True)
+@atomic(durable=True)
 def rename_all_media_for_source(source_id):
     try:
         source = Source.objects.get(pk=source_id)
@@ -600,10 +646,30 @@ def rename_all_media_for_source(source_id):
         log.error(f'Task rename_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         return
-    for media in Media.objects.filter(source=source):
-        media.rename_files()
+    # Check that the settings allow renaming
+    rename_sources_setting = settings.RENAME_SOURCES or list()
+    create_rename_tasks = (
+        (
+            source.directory and
+            source.directory in rename_sources_setting
+        ) or
+        settings.RENAME_ALL_SOURCES
+    )
+    if not create_rename_tasks:
+        return
+    mqs = Media.objects.all().defer(
+        'metadata',
+        'thumb',
+    ).filter(
+        source=source,
+        downloaded=True,
+    )
+    for media in mqs:
+        with atomic():
+            media.rename_files()
 
-@background(schedule=0)
+
+@background(schedule=60, remove_existing_tasks=True)
 def wait_for_media_premiere(media_id):
     hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
 

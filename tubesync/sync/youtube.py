@@ -85,6 +85,7 @@ def get_channel_image_info(url):
         'simulate': True,
         'logger': log,
         'extract_flat': True,  # Change to False to get detailed info
+        'check_formats': False,
     })
 
     with yt_dlp.YoutubeDL(opts) as y:
@@ -129,13 +130,30 @@ def _subscriber_only(msg='', response=None):
     return False
 
 
-def get_media_info(url):
+def get_media_info(url, days=None):
     '''
         Extracts information from a YouTube URL and returns it as a dict. For a channel
         or playlist this returns a dict of all the videos on the channel or playlist
         as well as associated metadata.
     '''
+    start = None
+    if days is not None:
+        try:
+            days = int(str(days), 10)
+        except Exception as e:
+            days = None
+        start = (
+            f'yesterday-{days!s}days' if days else None
+        )
     opts = get_yt_opts()
+    paths = opts.get('paths', dict())
+    if 'temp' in paths:
+        temp_dir_obj = TemporaryDirectory(prefix='.yt_dlp-', dir=paths['temp'])
+        temp_dir_path = Path(temp_dir_obj.name)
+        (temp_dir_path / '.ignore').touch(exist_ok=True)
+        paths.update({
+            'temp': str(temp_dir_path),
+        })
     opts.update({
         'ignoreerrors': False, # explicitly set this to catch exceptions
         'ignore_no_formats_error': False, # we must fail first to try again with this enabled
@@ -143,8 +161,17 @@ def get_media_info(url):
         'simulate': True,
         'logger': log,
         'extract_flat': True,
-        'extractor_args': {'youtubetab': {'approximate_date': ['true']}},
+        'check_formats': True,
+        'daterange': yt_dlp.utils.DateRange(start=start),
+        'extractor_args': {
+            'youtubetab': {'approximate_date': ['true']},
+        },
+        'paths': paths,
+        'sleep_interval_requests': 2,
+        'verbose': True if settings.DEBUG else False,
     })
+    if start:
+        log.debug(f'get_media_info: used date range: {opts["daterange"]} for URL: {url}')
     response = {}
     with yt_dlp.YoutubeDL(opts) as y:
         try:
@@ -248,7 +275,7 @@ def download_media(
         'writeautomaticsub': auto_subtitles,
         'subtitleslangs': sub_langs.split(','),
         'writethumbnail': embed_thumbnail,
-        'check_formats': False,
+        'check_formats': None,
         'overwrites': None,
         'sleep_interval': 10 + int(settings.DOWNLOAD_MEDIA_DELAY / 20),
         'max_sleep_interval': settings.DOWNLOAD_MEDIA_DELAY,

@@ -11,41 +11,61 @@ from .overrides.custom_filter import filter_custom
 
 # Check the filter conditions for instance, return is if the Skip property has changed so we can do other things
 def filter_media(instance: Media):
+    unskip = True
     # Assume we aren't skipping it, if any of these conditions are true, we skip it
     skip = False
 
     # Check if it's published
-    if not skip and filter_published(instance):
+    is_published = not filter_published(instance)
+    if not skip and not is_published:
         skip = True
 
     # Check if older than max_cap_age, skip
-    if not skip and filter_max_cap(instance):
+    video_too_old = is_published and filter_max_cap(instance)
+    if not skip and video_too_old:
         skip = True
 
     # Check if older than source_cutoff
-    if not skip and filter_source_cutoff(instance):
+    download_kept = not filter_source_cutoff(instance)
+    if not skip and not download_kept:
         skip = True
 
     # Check if we have filter_text and filter text matches
     if not skip and filter_filter_text(instance):
         skip = True
+        unskip = False
 
     # Check if the video is longer than the max, or shorter than the min
     if not skip and filter_duration(instance):
         skip = True
+        unskip = False
 
     # If we aren't already skipping the file, call our custom function that can be overridden
     if not skip and filter_custom(instance):
         log.info(f"Media: {instance.source} / {instance} has been skipped by Custom Filter")
         skip = True
+        unskip = False
+
+    keep_newly_published_video = (
+        is_published and download_kept and
+        not (instance.downloaded or video_too_old)
+    )
 
     # Check if skipping
+    if not keep_newly_published_video:
+        unskip = False
     if instance.skip != skip:
+        was_skipped = instance.skip
         instance.skip = skip
-        log.info(
-            f"Media: {instance.source} / {instance} has changed skip setting to {skip}"
-        )
-        return True
+
+        if was_skipped and not (unskip or skip):
+            instance.skip = True
+
+        if instance.skip != was_skipped:
+            log.info(
+                f"Media: {instance.source} / {instance} has changed skip setting to {instance.skip}"
+            )
+            return True
 
     return False
 
@@ -110,14 +130,7 @@ def filter_max_cap(instance: Media):
         return False
 
     max_cap_age = instance.source.download_cap_date
-    if not max_cap_age:
-        log.debug(
-            f"Media: {instance.source} / {instance} has not max_cap_age "
-            f"so not skipping based on max_cap_age"
-        )
-        return False
-
-    if instance.published <= max_cap_age:
+    if max_cap_age and instance.published <= max_cap_age:
         # log new media instances, not every media instance every time
         if not instance.skip:
             log.info(

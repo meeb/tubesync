@@ -1,5 +1,5 @@
-import os
 from pathlib import Path
+from common.utils import getenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -97,7 +97,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = os.getenv('TZ', 'UTC')
+TIME_ZONE = getenv('TZ', 'UTC')
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
@@ -119,6 +119,8 @@ Disallow: /
 '''.strip()
 
 
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 
@@ -208,6 +210,9 @@ if MAX_RUN_TIME < 600:
     MAX_RUN_TIME = 600
 
 DOWNLOAD_MEDIA_DELAY = 60 + (MAX_RUN_TIME / 20)
+
+if RENAME_SOURCES or RENAME_ALL_SOURCES:
+    BACKGROUND_TASK_ASYNC_THREADS += 1
 
 if BACKGROUND_TASK_ASYNC_THREADS > MAX_BACKGROUND_TASK_ASYNC_THREADS:
     BACKGROUND_TASK_ASYNC_THREADS = MAX_BACKGROUND_TASK_ASYNC_THREADS
