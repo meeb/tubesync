@@ -24,7 +24,7 @@
   <div class="col s12">
     <div class="collection">
     {% for source in sources %}
-      <span class="collection-item flex-collection-container" style="display: block !important; overflow-wrap: anywhere;">
+      <span class="collection-item flex-collection-container issue-641">
         <a href="{% url 'sync:source' pk=source.pk %}" class="flex-grow">
           {{ source.icon|safe }} <strong>{{ source.name }}</strong> ({{ source.get_source_type_display }} &quot;{{ source.key }}&quot;)<br>
           {{ source.format_summary }}<br>
