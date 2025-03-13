@@ -225,10 +225,9 @@ COPY --from=cache-tubesync / /
 
 FROM alpine:${ALPINE_VERSION} AS populate-apt-cache-dirs
 ARG TARGETARCH
-RUN --mount=type=cache,sharing=locked,target=/apt-lib-cache \
-    --mount=type=cache,sharing=locked,target=/apt-cache-cache \
-    --mount=type=bind,from=restored-cache,target=/restored \
-    set -x ; \
+RUN --mount=type=bind,from=restored-cache,target=/restored \
+    set -ex ; \
+    mkdir -v -p /apt-cache-cache /apt-lib-cache ; \
     # restore `apt` files
     cp -at /apt-cache-cache/ "/restored/apt-cache-cache"/* || : ; \
     # to be careful, ensure that these files aren't from a different architecture
@@ -334,8 +333,8 @@ WORKDIR /app
 # Set up the app
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=bind,from=restored-cache,target=${CACHE_PATH}/.restored \
-    --mount=type=cache,sharing=private,target=/var/lib/apt,source=apt-lib-cache,from=populate-apt-cache-dirs \
-    --mount=type=cache,sharing=private,target=/var/cache/apt,source=apt-cache-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
   # set up cache
