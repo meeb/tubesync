@@ -17,6 +17,7 @@ from django.conf import settings
 from .hooks import postprocessor_hook, progress_hook
 from .utils import mkdir_p
 import yt_dlp
+import yt_dlp.patch.check_thumbnails
 from yt_dlp.utils import remove_end
 
 
@@ -162,6 +163,7 @@ def get_media_info(url, days=None):
         'logger': log,
         'extract_flat': True,
         'check_formats': True,
+        'check_thumbnails': False,
         'daterange': yt_dlp.utils.DateRange(start=start),
         'extractor_args': {
             'youtubetab': {'approximate_date': ['true']},
