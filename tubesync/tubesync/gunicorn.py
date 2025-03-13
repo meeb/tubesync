@@ -23,7 +23,7 @@ def get_bind():
 
 
 workers = get_num_workers()
-timeout = 30
+timeout = 90
 chdir = '/app'
 daemon = False
 pidfile = '/run/app/gunicorn.pid'
