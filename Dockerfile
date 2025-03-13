@@ -220,12 +220,9 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
-FROM scratch AS restored-cache
-COPY --from=cache-tubesync / /
-
 FROM alpine:${ALPINE_VERSION} AS populate-apt-cache-dirs
 ARG TARGETARCH
-RUN --mount=type=bind,from=restored-cache,target=/restored \
+RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     set -ex ; \
     mkdir -v -p /apt-cache-cache /apt-lib-cache ; \
     # restore `apt` files
@@ -235,15 +232,17 @@ RUN --mount=type=bind,from=restored-cache,target=/restored \
     cp -at /apt-lib-cache/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
 
 FROM alpine:${ALPINE_VERSION} AS populate-pipenv-cache-dir
-RUN --mount=type=bind,from=restored-cache,target=/restored \
+RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     set -x ; \
-    cp -at / '/restored/pipenv-cache' || : ;
+    cp -at / '/restored/pipenv-cache' || \
+        mkdir -v /pipenv-cache ;
 
 FROM alpine:${ALPINE_VERSION} AS populate-wormhole-dir
 ARG TARGETARCH
-RUN --mount=type=bind,from=restored-cache,target=/restored \
+RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     set -x ; \
-    cp -at / "/restored/${TARGETARCH}/wormhole" || : ;
+    cp -at / "/restored/${TARGETARCH}/wormhole" || \
+        mkdir -v /wormhole ;
     
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
@@ -260,9 +259,9 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_ROOT_USER_ACTION='ignore'
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
     # to be careful, ensure that these files aren't from a different architecture
-    find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
+    rm -f /var/cache/apt/*cache.bin ; \
     # Update from the network and keep cache
     rm -f /etc/apt/apt.conf.d/docker-clean ; \
     set -x && \
@@ -271,6 +270,11 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y --no-install-recommends install locales && \
     printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
     locale-gen en_US.UTF-8 && \
+    apt-get -y --no-install-recommends install \
+    curl \
+    file \
+    less \
+    && \
     # Clean up
     apt-get -y autopurge && \
     apt-get -y autoclean && \
@@ -296,7 +300,7 @@ ENV S6_VERSION="${S6_VERSION}" \
 
 # Reminder: the SHELL handles all variables
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
   set -x && \
   apt-get update && \
   # Install dependencies we keep
@@ -310,10 +314,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   pipenv \
   pkgconf \
   python3 \
+  python3-venv \
   python3-wheel \
-  curl \
-  file \
-  less \
   && \
   # Create a 'app' user which the application will run as
   groupadd app && \
@@ -351,23 +353,21 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   set -x && \
   # set up cache
   { \
-    cache_path="${CACHE_PATH}" ; \
-    saved="${cache_path}/.saved" ; \
+    saved="${CACHE_PATH}/.saved" ; \
     pipenv_cache="${CACHE_PATH}/pipenv" ; \
-    pycache="${cache_path}/pycache" ; \
+    pycache="${CACHE_PATH}/pycache" ; \
     wormhole_venv="${CACHE_PATH}/wormhole" ; \
     mkdir -p "${saved}/${TARGETARCH}" ; \
     # keep the real HOME clean
-    mkdir -p "${cache_path}/.home-directories" ; \
-    cp -at "${cache_path}/.home-directories/" "${HOME}" && \
-    HOME="${cache_path}/.home-directories/${HOME#/}" ; \
+    mkdir -p "${CACHE_PATH}/.home-directories" ; \
+    cp -at "${CACHE_PATH}/.home-directories/" "${HOME}" && \
+    HOME="${CACHE_PATH}/.home-directories/${HOME#/}" ; \
   } && \
   # install magic-wormhole
-  # I want to use venv here, but python3-venv is not installed
-  # pipenv installed python3-virtualenv
   ( test -d "${wormhole_venv}/bin" || \
-    virtualenv --download "${wormhole_venv}" && \
-    . "${wormhole_venv}/bin/activate" && \
+    python3 -m venv --clear --system-site-packages --upgrade-deps "${wormhole_venv}" ; \
+    . "${wormhole_venv}/bin/activate" || exit ; \
+    test -x "${wormhole_venv}/bin/wormhole" || \
     pip install magic-wormhole ; \
   ) && \
   apt-get update && \
@@ -386,7 +386,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   zlib1g-dev \
   && \
   # Install non-distro packages
-  XDG_CACHE_HOME="${cache_path}" \
+  XDG_CACHE_HOME="${CACHE_PATH}" \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
@@ -419,6 +419,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
     cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
     ls -al "${saved}" && ls -al "${saved}"/* && \
+    ls -al "${saved}/${TARGETARCH}"/* && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
       timeout -v -k 10m 1h wormhole \
         --appid TubeSync \
