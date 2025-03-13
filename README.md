@@ -70,7 +70,7 @@ currently just Plex, to complete the PVR experience.
 
 TubeSync is designed to be run in a container, such as via Docker or Podman. It also
 works in a Docker Compose stack. `amd64` (most desktop PCs and servers) and `arm64`
-(modern ARM computers, such as the Rasperry Pi 3 or later) are supported.
+(modern ARM computers, such as the Raspberry Pi 3 or later) are supported.
 
 Example (with Docker on *nix):
 
@@ -356,7 +356,7 @@ etc.). Configuration of this is beyond the scope of this README.
 Only two are supported, for the moment:
 - `amd64` (most desktop PCs and servers)
 -  `arm64`
-(modern ARM computers, such as the Rasperry Pi 3 or later)
+(modern ARM computers, such as the Raspberry Pi 3 or later)
 
 Others may be made available, if there is demand.
 
