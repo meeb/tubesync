@@ -43,6 +43,8 @@ def source_pre_save(sender, instance, **kwargs):
         work_directory = existing_dirpath
         for _count in range(parents_count, 0, -1):
             work_directory = work_directory.parent
+        if not Path(work_directory).resolve(strict=True).is_relative_to(Path(settings.DOWNLOAD_ROOT)):
+            work_directory = Path(settings.DOWNLOAD_ROOT)
         with TemporaryDirectory(suffix=('.'+new_dirpath.name), prefix='.tmp.', dir=work_directory) as tmp_dir:
             tmp_dirpath = Path(tmp_dir)
             existed = None
