@@ -212,7 +212,7 @@ def index_source_task(source_id):
     for vn, video in enumerate(videos, start=1):
         if task:
             task.verbose_name = tvn_format.format(vn)
-            task.save(update_fields=('verbose_name'))
+            task.save(update_fields={'verbose_name'})
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
         if not key:
@@ -245,7 +245,7 @@ def index_source_task(source_id):
             log.error(f'Index media failed: {source} / {media} with "{e}"')
     if task:
         task.verbose_name = verbose_name
-        task.save(update_fields=('verbose_name'))
+        task.save(update_fields={'verbose_name'})
     # Tack on a cleanup of old completed tasks
     cleanup_completed_tasks()
     # Tack on a cleanup of old media
