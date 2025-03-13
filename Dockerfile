@@ -229,11 +229,22 @@ RUN --mount=type=bind,from=restored-cache,target=/restored \
     set -ex ; \
     mkdir -v -p /apt-cache-cache /apt-lib-cache ; \
     # restore `apt` files
-    cp -at /apt-cache-cache/ "/restored/apt-cache-cache"/* || : ; \
+    cp -at /apt-cache-cache/ /restored/apt-cache-cache/* || : ; \
     # to be careful, ensure that these files aren't from a different architecture
     rm -v -f /apt-cache-cache/*cache.bin ; \
     cp -at /apt-lib-cache/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
 
+FROM alpine:${ALPINE_VERSION} AS populate-pipenv-cache-dir
+RUN --mount=type=bind,from=restored-cache,target=/restored \
+    set -x ; \
+    cp -at / '/restored/pipenv-cache' || : ;
+
+FROM alpine:${ALPINE_VERSION} AS populate-wormhole-dir
+ARG TARGETARCH
+RUN --mount=type=bind,from=restored-cache,target=/restored \
+    set -x ; \
+    cp -at / "/restored/${TARGETARCH}/wormhole" || : ;
+    
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
 ARG TARGETARCH
@@ -248,8 +259,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_NO_COMPILE=1 \
     PIP_ROOT_USER_ACTION='ignore'
 
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
     # to be careful, ensure that these files aren't from a different architecture
     find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
     # Update from the network and keep cache
@@ -284,8 +295,8 @@ ENV S6_VERSION="${S6_VERSION}" \
     FFMPEG_VERSION="${FFMPEG_VERSION}"
 
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
   set -x && \
   apt-get update && \
   # Install dependencies we keep
@@ -310,7 +321,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var
   # Clean up
   apt-get -y autopurge && \
   apt-get -y autoclean && \
-  rm -rf /tmp/*
+  rm -v -rf /tmp/*
 
 # Install third party software
 COPY --from=s6-overlay / /
@@ -332,24 +343,20 @@ WORKDIR /app
 
 # Set up the app
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
-    --mount=type=bind,from=restored-cache,target=${CACHE_PATH}/.restored \
     --mount=type=cache,sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
     --mount=type=cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,sharing=private,target=${CACHE_PATH}/pipenv,source=/pipenv-cache,from=populate-pipenv-cache-dir \
+    --mount=type=cache,sharing=private,target=${CACHE_PATH}/wormhole,source=/wormhole,from=populate-wormhole-dir \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
   # set up cache
   { \
     cache_path="${CACHE_PATH}" ; \
-    restored="${cache_path}/.restored" ; \
     saved="${cache_path}/.saved" ; \
-    pipenv_cache="${cache_path}/pipenv" ; \
+    pipenv_cache="${CACHE_PATH}/pipenv" ; \
     pycache="${cache_path}/pycache" ; \
-    wormhole_venv="${cache_path}/wormhole" ; \
+    wormhole_venv="${CACHE_PATH}/wormhole" ; \
     mkdir -p "${saved}/${TARGETARCH}" ; \
-    # restore pipenv cached files
-    cp -a "${restored}/pipenv-cache" "${pipenv_cache}" || : ; \
-    # restore `magic-wormhole` virtual env
-    cp -at "${cache_path}/" "${restored}/${TARGETARCH}/wormhole" || : ; \
     # keep the real HOME clean
     mkdir -p "${cache_path}/.home-directories" ; \
     cp -at "${cache_path}/.home-directories/" "${HOME}" && \
@@ -426,7 +433,6 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
         "${saved}" || : ; \
     fi ; \
   ) && \
-  rm -rf "${cache_path}/.home-directories" "${saved}" "${cache_path}"/* && \
   rm -v -rf /tmp/*
 
 # Copy app
