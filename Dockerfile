@@ -231,6 +231,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/apt
     set -x ; \
     # restore `apt` files
     cp -at /apt-cache-cache/ "/restored/apt-cache-cache"/* || : ; \
+    # to be careful, ensure that these files aren't from a different architecture
+    rm -v -f /apt-cache-cache/*cache.bin ; \
     cp -at /apt-lib-cache/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
 
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
@@ -332,8 +334,8 @@ WORKDIR /app
 # Set up the app
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=bind,from=restored-cache,target=${CACHE_PATH}/.restored \
-    --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,from=populate-apt-cache-dirs \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
   # set up cache
