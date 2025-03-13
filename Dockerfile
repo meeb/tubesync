@@ -22,6 +22,42 @@ ARG S6_CHECKSUM_ALGORITHM="sha256"
 ARG CACHE_PATH="/cache"
 
 
+FROM debian:${DEBIAN_VERSION} AS tubesync-base
+
+ARG TARGETARCH
+
+ENV DEBIAN_FRONTEND="noninteractive" \
+    HOME="/root" \
+    LANGUAGE="en_US.UTF-8" \
+    LANG="en_US.UTF-8" \
+    LC_ALL="en_US.UTF-8" \
+    TERM="xterm" \
+    # Do not include compiled byte-code
+    PIP_NO_COMPILE=1 \
+    PIP_ROOT_USER_ACTION='ignore'
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    # to be careful, ensure that these files aren't from a different architecture
+    rm -f /var/cache/apt/*cache.bin ; \
+    # Update from the network and keep cache
+    rm -f /etc/apt/apt.conf.d/docker-clean ; \
+    set -x && \
+    apt-get update && \
+    # Install locales
+    apt-get -y --no-install-recommends install locales && \
+    printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
+    locale-gen en_US.UTF-8 && \
+    apt-get -y --no-install-recommends install \
+    curl \
+    file \
+    less \
+    && \
+    # Clean up
+    apt-get -y autopurge && \
+    apt-get -y autoclean && \
+    rm -v -rf /tmp/*
+
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
@@ -244,42 +280,6 @@ RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     cp -at / "/restored/${TARGETARCH}/wormhole" || \
         mkdir -v /wormhole ;
     
-FROM debian:${DEBIAN_VERSION} AS tubesync-base
-
-ARG TARGETARCH
-
-ENV DEBIAN_FRONTEND="noninteractive" \
-    HOME="/root" \
-    LANGUAGE="en_US.UTF-8" \
-    LANG="en_US.UTF-8" \
-    LC_ALL="en_US.UTF-8" \
-    TERM="xterm" \
-    # Do not include compiled byte-code
-    PIP_NO_COMPILE=1 \
-    PIP_ROOT_USER_ACTION='ignore'
-
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
-    # to be careful, ensure that these files aren't from a different architecture
-    rm -f /var/cache/apt/*cache.bin ; \
-    # Update from the network and keep cache
-    rm -f /etc/apt/apt.conf.d/docker-clean ; \
-    set -x && \
-    apt-get update && \
-    # Install locales
-    apt-get -y --no-install-recommends install locales && \
-    printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
-    locale-gen en_US.UTF-8 && \
-    apt-get -y --no-install-recommends install \
-    curl \
-    file \
-    less \
-    && \
-    # Clean up
-    apt-get -y autopurge && \
-    apt-get -y autoclean && \
-    rm -v -rf /tmp/*
-
 FROM tubesync-base AS tubesync
 
 ARG S6_VERSION
