@@ -19,6 +19,8 @@ ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 
+ARG CACHE_PATH="/cache"
+
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -218,12 +220,34 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
-FROM debian:${DEBIAN_VERSION} AS tubesync
+FROM scratch AS restored-cache
+COPY --from=cache-tubesync / /
 
-ARG S6_VERSION
+FROM alpine:${ALPINE_VERSION} AS populate-apt-cache-dirs
+ARG TARGETARCH
+RUN --mount=type=bind,from=restored-cache,target=/restored \
+    set -ex ; \
+    mkdir -v -p /apt-cache-cache /apt-lib-cache ; \
+    # restore `apt` files
+    cp -at /apt-cache-cache/ /restored/apt-cache-cache/* || : ; \
+    # to be careful, ensure that these files aren't from a different architecture
+    rm -v -f /apt-cache-cache/*cache.bin ; \
+    cp -at /apt-lib-cache/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
 
-ARG FFMPEG_DATE
-ARG FFMPEG_VERSION
+FROM alpine:${ALPINE_VERSION} AS populate-pipenv-cache-dir
+RUN --mount=type=bind,from=restored-cache,target=/restored \
+    set -x ; \
+    cp -at / '/restored/pipenv-cache' || : ;
+
+FROM alpine:${ALPINE_VERSION} AS populate-wormhole-dir
+ARG TARGETARCH
+RUN --mount=type=bind,from=restored-cache,target=/restored \
+    set -x ; \
+    cp -at / "/restored/${TARGETARCH}/wormhole" || : ;
+    
+FROM debian:${DEBIAN_VERSION} AS tubesync-base
+
+ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND="noninteractive" \
     HOME="/root" \
@@ -233,37 +257,48 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     TERM="xterm" \
     # Do not include compiled byte-code
     PIP_NO_COMPILE=1 \
-    PIP_ROOT_USER_ACTION='ignore' \
-    S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
+    PIP_ROOT_USER_ACTION='ignore'
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
+    # to be careful, ensure that these files aren't from a different architecture
+    find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
+    # Update from the network and keep cache
+    rm -f /etc/apt/apt.conf.d/docker-clean ; \
+    set -x && \
+    apt-get update && \
+    # Install locales
+    apt-get -y --no-install-recommends install locales && \
+    printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
+    locale-gen en_US.UTF-8 && \
+    # Clean up
+    apt-get -y autopurge && \
+    apt-get -y autoclean && \
+    rm -v -rf /tmp/*
+
+FROM tubesync-base AS tubesync
+
+ARG S6_VERSION
+
+ARG FFMPEG_DATE
+ARG FFMPEG_VERSION
+
+ARG CACHE_PATH
+ARG TARGETARCH
+
+ARG WORMHOLE_CODE
+ARG WORMHOLE_RELAY
+ARG WORMHOLE_TRANSIT
 
 ENV S6_VERSION="${S6_VERSION}" \
     FFMPEG_DATE="${FFMPEG_DATE}" \
     FFMPEG_VERSION="${FFMPEG_VERSION}"
 
-# Install third party software
-COPY --from=s6-overlay / /
-COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
-
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
   set -x && \
-  # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
-  # Install locales
-  apt-get -y --no-install-recommends install locales && \
-  printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
-  locale-gen en_US.UTF-8 && \
-  # Install file
-  apt-get -y --no-install-recommends install file && \
-  # Installed s6 (using COPY earlier)
-  file -L /command/s6-overlay-suexec && \
-  # Installed ffmpeg (using COPY earlier)
-  /usr/local/bin/ffmpeg -version && \
-  file /usr/local/bin/ff* && \
-  # Clean up file
-  apt-get -y autoremove --purge file && \
   # Install dependencies we keep
   # Install required distro packages
   apt-get -y --no-install-recommends install \
@@ -279,13 +314,29 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   python3-socks \
   python3-wheel \
   curl \
+  file \
   less \
   && \
+  # Create a 'app' user which the application will run as
+  groupadd app && \
+  useradd -M -d /app -s /bin/false -g app app && \
   # Clean up
   apt-get -y autopurge && \
   apt-get -y autoclean && \
-  rm -rf /tmp/*
+  rm -v -rf /tmp/*
 
+# Install third party software
+COPY --from=s6-overlay / /
+COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
+
+RUN \
+    set -x && \
+    # Installed s6 (using COPY earlier)
+    file -L /command/s6-overlay-suexec && \
+    # Installed ffmpeg (using COPY earlier)
+    /usr/local/bin/ffmpeg -version && \
+    file /usr/local/bin/ff*
+    
 # Copy over pip.conf to use piwheels
 COPY pip.conf /etc/pip.conf
 
@@ -293,14 +344,34 @@ COPY pip.conf /etc/pip.conf
 WORKDIR /app
 
 # Set up the app
-RUN --mount=type=tmpfs,target=/cache \
-    --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
-    --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+RUN --mount=type=tmpfs,target=${CACHE_PATH} \
+    --mount=type=cache,sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,sharing=private,target=${CACHE_PATH}/pipenv,source=/pipenv-cache,from=populate-pipenv-cache-dir \
+    --mount=type=cache,sharing=private,target=${CACHE_PATH}/wormhole,source=/wormhole,from=populate-wormhole-dir \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
-  # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
+  # set up cache
+  { \
+    cache_path="${CACHE_PATH}" ; \
+    saved="${cache_path}/.saved" ; \
+    pipenv_cache="${CACHE_PATH}/pipenv" ; \
+    pycache="${cache_path}/pycache" ; \
+    wormhole_venv="${CACHE_PATH}/wormhole" ; \
+    mkdir -p "${saved}/${TARGETARCH}" ; \
+    # keep the real HOME clean
+    mkdir -p "${cache_path}/.home-directories" ; \
+    cp -at "${cache_path}/.home-directories/" "${HOME}" && \
+    HOME="${cache_path}/.home-directories/${HOME#/}" ; \
+  } && \
+  # install magic-wormhole
+  # I want to use venv here, but python3-venv is not installed
+  # pipenv installed python3-virtualenv
+  ( test -d "${wormhole_venv}/bin" || \
+    virtualenv --download "${wormhole_venv}" && \
+    . "${wormhole_venv}/bin/activate" && \
+    pip install magic-wormhole ; \
+  ) && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -316,15 +387,10 @@ RUN --mount=type=tmpfs,target=/cache \
   python3-pip \
   zlib1g-dev \
   && \
-  # Create a 'app' user which the application will run as
-  groupadd app && \
-  useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
-  cp -at /tmp/ "${HOME}" && \
-  HOME="/tmp/${HOME#/}" \
-  XDG_CACHE_HOME='/cache' \
+  XDG_CACHE_HOME="${cache_path}" \
   PIPENV_VERBOSITY=64 \
-  PYTHONPYCACHEPREFIX=/cache/pycache \
+  PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
   # Clean up
   apt-get -y autoremove --purge \
@@ -342,6 +408,33 @@ RUN --mount=type=tmpfs,target=/cache \
   && \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
+  # Save our saved directory to the cache directory on the runner
+  test -z "${WORMHOLE_CODE}" || \
+  ( set +x ; \
+    . "${wormhole_venv}/bin/activate" && \
+    set -x && \
+    { \
+      find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
+    } && \
+    cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
+    cp -a /var/lib/apt "${saved}/${TARGETARCH}/apt-lib-cache" && \
+    cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
+    cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
+    ls -al "${saved}" && ls -al "${saved}"/* && \
+    if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
+      timeout -v -k 10m 1h wormhole \
+        --appid TubeSync \
+        --relay-url "${WORMHOLE_RELAY}" \
+        --transit-helper "${WORMHOLE_TRANSIT}" \
+        send \
+        --code "${WORMHOLE_CODE}" \
+        "${saved}" || : ; \
+    else \
+      timeout -v -k 10m 1h wormhole send \
+        --code "${WORMHOLE_CODE}" \
+        "${saved}" || : ; \
+    fi ; \
+  ) && \
   rm -v -rf /tmp/*
 
 # Copy app
@@ -388,6 +481,7 @@ HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck
 # ENVS and ports
 ENV PYTHONPATH="/app" \
     PYTHONPYCACHEPREFIX="/config/cache/pycache" \
+    S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0" \
     XDG_CACHE_HOME="/config/cache"
 EXPOSE 4848
 
