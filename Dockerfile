@@ -247,8 +247,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_NO_COMPILE=1 \
     PIP_ROOT_USER_ACTION='ignore'
 
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt,from=populate-apt-cache-dirs \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt,from=populate-apt-cache-dirs \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=locked,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     # to be careful, ensure that these files aren't from a different architecture
     find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
     # Update from the network and keep cache
@@ -332,8 +332,8 @@ WORKDIR /app
 # Set up the app
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=bind,from=restored-cache,target=${CACHE_PATH}/.restored \
-    --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,from=populate-apt-cache-dirs \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
   # set up cache
