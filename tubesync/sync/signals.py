@@ -146,9 +146,22 @@ def source_pre_delete(sender, instance, **kwargs):
     instance.deactivate()
     log.info(f'Deleting tasks for source: {instance.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
-    for media in Media.objects.filter(source=instance):
-        log.info(f'Deleting media for source: {instance.name} item: {media.name}')
-        media.delete()
+    # Schedule deletion of media
+    verbose_name = _('Deleting all media for source "{}"')
+    delete_all_media_for_source(
+        str(instance.pk),
+        str(instance.name),
+        priority=1,
+        verbose_name=verbose_name.format(instance.name),
+    )
+    # Try to do it all immediately
+    # If this is killed, the scheduled task should do the work instead.
+    delete_all_media_for_source.now(
+        str(instance.pk),
+        str(instance.name),
+        priority=0,
+        verbose_name=verbose_name.format(instance.name),
+    )
 
 
 @receiver(post_delete, sender=Source)

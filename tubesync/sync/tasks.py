@@ -690,3 +690,24 @@ def wait_for_media_premiere(media_id):
         media.title = _(f'Premieres in {hours(media.published - now)} hours')
         media.save()
 
+@background(schedule=300, remove_existing_tasks=False)
+@atomic(durable=True)
+def delete_all_media_for_source(source_id, source_name):
+    source = None
+    try:
+        source = Source.objects.get(pk=source_id)
+    except Source.DoesNotExist:
+        # Task triggered but the source no longer exists, do nothing
+        log.error(f'Task delete_all_media_for_source(pk={source_id}) called but no '
+                  f'source exists with ID: {source_id}')
+        pass
+    mqs = Media.objects.all().defer(
+        'metadata',
+    ).filter(
+        source=source or source_id,
+    )
+    for media in mqs:
+        log.info(f'Deleting media for source: {source_name} item: {media.name}')
+        with atomic():
+            media.delete()
+
