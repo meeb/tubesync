@@ -184,37 +184,16 @@ def index_source_task(source_id):
         Indexes media available from a Source object.
     '''
 
-    from common.utils import time_func, profile_func
-    def get_source(source_id):
-        @time_func
-        def f(sid):
-            return Source.objects.get(pk=sid)
-        rt = f(source_id)
-        elapsed = rt[1][0]
-        log.debug(f'get_source: took {elapsed:.6f} seconds')
-        return rt[0]
-    def time_model_function(instance, func):
-        @time_func
-        def f(c):
-            return c()
-        rt = f(func)
-        elapsed = rt[1][0]
-        log.debug(f'time_model_function: {func}: took {elapsed:.6f} seconds')
-        return rt[0]
-
     try:
-        #source = Source.objects.get(pk=source_id)
-        source = get_source(source_id)
+        source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist:
         # Task triggered but the Source has been deleted, delete the task
         return
     # Reset any errors
     source.has_failed = False
-    #source.save()
-    time_model_function(source, source.save)
+    source.save()
     # Index the source
-    #videos = source.index_media()
-    videos = time_model_function(source, source.index_media)
+    videos = source.index_media()
     if not videos:
         raise NoMediaException(f'Source "{source}" (ID: {source_id}) returned no '
                                f'media to index, is the source key valid? Check the '
@@ -222,8 +201,7 @@ def index_source_task(source_id):
                                f'is reachable')
     # Got some media, update the last crawl timestamp
     source.last_crawl = timezone.now()
-    #source.save()
-    time_model_function(source, source.save)
+    source.save()
     log.info(f'Found {len(videos)} media items for source: {source}')
     fields = lambda f, m: m.get_metadata_field(f)
     for video in videos:
@@ -244,8 +222,7 @@ def index_source_task(source_id):
         if published_dt is not None:
             media.published = published_dt
         try:
-            #media.save()
-            time_model_function(media, media.save)
+            media.save()
             log.debug(f'Indexed media: {source} / {media}')
             # log the new media instances
             new_media_instance = (
