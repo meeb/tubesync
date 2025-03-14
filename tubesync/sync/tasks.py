@@ -692,7 +692,6 @@ def wait_for_media_premiere(media_id):
         media.save()
 
 @background(schedule=300, remove_existing_tasks=False)
-@atomic(durable=True)
 def delete_all_media_for_source(source_id, source_name):
     source = None
     try:
