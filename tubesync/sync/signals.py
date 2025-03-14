@@ -1,4 +1,5 @@
 from pathlib import Path
+from shutil import rmtree
 from tempfile import TemporaryDirectory
 from django.conf import settings
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
@@ -151,6 +152,11 @@ def source_post_delete(sender, instance, **kwargs):
     # Triggered after a source is deleted
     log.info(f'Deleting tasks for source: {instance.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
+    source = instance
+    # Remove the directory, if the user requested that
+    directory_path = Path(source.directory_path)
+    if (directory_path / '.to_be_removed').is_file():
+        rmtree(directory_path, True)
 
 
 @receiver(task_failed, sender=Task)
