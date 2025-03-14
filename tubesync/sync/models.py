@@ -334,6 +334,15 @@ class Source(models.Model):
         return slugify(replaced)[:80]
 
     @property
+    def is_active(self):
+        active = (
+            self.download_media or
+            self.index_streams or
+            self.index_videos
+        )
+        return self.source.index_schedule and active
+
+    @property
     def is_audio(self):
         return self.source_resolution == SourceResolution.AUDIO.value
 
