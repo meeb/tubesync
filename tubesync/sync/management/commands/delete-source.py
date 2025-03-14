@@ -42,6 +42,7 @@ class Command(BaseCommand):
             rescan_media_server(
                 str(mediaserver.pk),
                 priority=0,
+                schedule=30,
                 verbose_name=verbose_name.format(mediaserver),
                 remove_existing_tasks=True
             )
