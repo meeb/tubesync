@@ -3,7 +3,6 @@ import os
 import json
 from base64 import b64decode
 import pathlib
-import shutil
 import sys
 from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponseNotFound, HttpResponseRedirect
@@ -415,15 +414,8 @@ class DeleteSourceView(DeleteView, FormMixin):
         delete_media = True if delete_media_val is not False else False
         if delete_media:
             source = self.get_object()
-            for media in Media.objects.filter(source=source):
-                if media.media_file:
-                    file_path = media.media_file.path
-                    matching_files = glob.glob(os.path.splitext(file_path)[0] + '.*')
-                    for file in matching_files:
-                        delete_file(file)
-            directory_path = source.directory_path
-            if os.path.exists(directory_path):
-                shutil.rmtree(directory_path, True)
+            directory_path = pathlib.Path(source.directory_path)
+            (directory_path / '.to_be_removed').touch(exist_ok=True)
         return super().post(request, *args, **kwargs)
 
     def get_success_url(self):

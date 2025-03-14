@@ -333,6 +333,27 @@ class Source(models.Model):
         replaced = self.name.replace('_', '-').replace('&', 'and').replace('+', 'and')
         return slugify(replaced)[:80]
 
+    def deactivate(self):
+        self.download_media = False
+        self.index_streams = False
+        self.index_videos = False
+        self.index_schedule = IndexSchedule.NEVER
+        self.save(update_fields={
+            'download_media',
+            'index_streams',
+            'index_videos',
+            'index_schedule',
+        })
+
+    @property
+    def is_active(self):
+        active = (
+            self.download_media or
+            self.index_streams or
+            self.index_videos
+        )
+        return self.source.index_schedule and active
+
     @property
     def is_audio(self):
         return self.source_resolution == SourceResolution.AUDIO.value

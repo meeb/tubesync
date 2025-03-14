@@ -1,4 +1,5 @@
 from pathlib import Path
+from shutil import rmtree
 from tempfile import TemporaryDirectory
 from django.conf import settings
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
@@ -141,16 +142,36 @@ def source_post_save(sender, instance, created, **kwargs):
 def source_pre_delete(sender, instance, **kwargs):
     # Triggered before a source is deleted, delete all media objects to trigger
     # the Media models post_delete signal
-    for media in Media.objects.filter(source=instance):
-        log.info(f'Deleting media for source: {instance.name} item: {media.name}')
-        media.delete()
+    log.info(f'Deactivating source: {instance.name}')
+    instance.deactivate()
+    log.info(f'Deleting tasks for source: {instance.name}')
+    delete_task_by_source('sync.tasks.index_source_task', instance.pk)
+    # Schedule deletion of media
+    verbose_name = _('Deleting all media for source "{}"')
+    delete_all_media_for_source(
+        str(instance.pk),
+        str(instance.name),
+        priority=1,
+        verbose_name=verbose_name.format(instance.name),
+    )
+    # Try to do it all immediately
+    # If this is killed, the scheduled task should do the work instead.
+    delete_all_media_for_source.now(
+        str(instance.pk),
+        str(instance.name),
+        priority=0,
+        verbose_name=verbose_name.format(instance.name),
+    )
 
 
 @receiver(post_delete, sender=Source)
 def source_post_delete(sender, instance, **kwargs):
     # Triggered after a source is deleted
-    log.info(f'Deleting tasks for source: {instance.name}')
-    delete_task_by_source('sync.tasks.index_source_task', instance.pk)
+    source = instance
+    # Remove the directory, if the user requested that
+    directory_path = Path(source.directory_path)
+    if (directory_path / '.to_be_removed').is_file():
+        rmtree(directory_path, True)
 
 
 @receiver(task_failed, sender=Task)
@@ -344,6 +365,8 @@ def media_post_delete(sender, instance, **kwargs):
             log.info(f'Deleting file for: {instance} path: {file}')
             delete_file(file)
 
+    if not instance.source.is_active
+        return
     # Schedule a task to update media servers
     for mediaserver in MediaServer.objects.all():
         log.info(f'Scheduling media server updates')
