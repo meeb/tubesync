@@ -352,7 +352,7 @@ class Source(models.Model):
             self.index_streams or
             self.index_videos
         )
-        return self.source.index_schedule and active
+        return self.index_schedule and active
 
     @property
     def is_audio(self):
