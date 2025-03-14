@@ -183,7 +183,6 @@ def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
     '''
-
     try:
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist:
