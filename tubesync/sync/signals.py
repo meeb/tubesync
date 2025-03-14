@@ -142,6 +142,8 @@ def source_post_save(sender, instance, created, **kwargs):
 def source_pre_delete(sender, instance, **kwargs):
     # Triggered before a source is deleted, delete all media objects to trigger
     # the Media models post_delete signal
+    log.info(f'Deleting tasks for source: {instance.name}')
+    delete_task_by_source('sync.tasks.index_source_task', instance.pk)
     for media in Media.objects.filter(source=instance):
         log.info(f'Deleting media for source: {instance.name} item: {media.name}')
         media.delete()
@@ -150,8 +152,6 @@ def source_pre_delete(sender, instance, **kwargs):
 @receiver(post_delete, sender=Source)
 def source_post_delete(sender, instance, **kwargs):
     # Triggered after a source is deleted
-    log.info(f'Deleting tasks for source: {instance.name}')
-    delete_task_by_source('sync.tasks.index_source_task', instance.pk)
     source = instance
     # Remove the directory, if the user requested that
     directory_path = Path(source.directory_path)
