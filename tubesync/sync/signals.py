@@ -43,6 +43,8 @@ def source_pre_save(sender, instance, **kwargs):
         work_directory = existing_dirpath
         for _count in range(parents_count, 0, -1):
             work_directory = work_directory.parent
+        if not Path(work_directory).resolve(strict=True).is_relative_to(Path(settings.DOWNLOAD_ROOT)):
+            work_directory = Path(settings.DOWNLOAD_ROOT)
         with TemporaryDirectory(suffix=('.'+new_dirpath.name), prefix='.tmp.', dir=work_directory) as tmp_dir:
             tmp_dirpath = Path(tmp_dir)
             existed = None
@@ -129,7 +131,7 @@ def source_post_save(sender, instance, created, **kwargs):
     verbose_name = _('Checking all media for source "{}"')
     save_all_media_for_source(
         str(instance.pk),
-        priority=9,
+        priority=25,
         verbose_name=verbose_name.format(instance.name),
         remove_existing_tasks=True
     )
@@ -211,7 +213,7 @@ def media_post_save(sender, instance, created, **kwargs):
             rename_media(
                 str(media.pk),
                 queue=str(media.pk),
-                priority=16,
+                priority=20,
                 verbose_name=verbose_name.format(media.key, media.name),
                 remove_existing_tasks=True
             )
