@@ -142,6 +142,8 @@ def source_post_save(sender, instance, created, **kwargs):
 def source_pre_delete(sender, instance, **kwargs):
     # Triggered before a source is deleted, delete all media objects to trigger
     # the Media models post_delete signal
+    log.info(f'Deactivating source: {instance.name}')
+    instance.deactivate()
     log.info(f'Deleting tasks for source: {instance.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
     for media in Media.objects.filter(source=instance):
