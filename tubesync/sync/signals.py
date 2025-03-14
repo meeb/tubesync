@@ -344,6 +344,8 @@ def media_post_delete(sender, instance, **kwargs):
             log.info(f'Deleting file for: {instance} path: {file}')
             delete_file(file)
 
+    if not instance.source.is_active
+        return
     # Schedule a task to update media servers
     for mediaserver in MediaServer.objects.all():
         log.info(f'Scheduling media server updates')
