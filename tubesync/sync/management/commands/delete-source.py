@@ -34,6 +34,7 @@ class Command(BaseCommand):
         # Delete the source, triggering pre-delete signals for each media item
         log.info(f'Found source with UUID "{source.uuid}" with name '
                  f'"{source.name}" and deleting it, this may take some time!')
+        log.info(f'Source directory: {source.directory_path}')
         source.delete()
         # Update any media servers
         for mediaserver in MediaServer.objects.all():
