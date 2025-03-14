@@ -55,6 +55,7 @@ def map_task_to_instance(task):
         'sync.tasks.rename_media': Media,
         'sync.tasks.rename_all_media_for_source': Source,
         'sync.tasks.wait_for_media_premiere': Media,
+        'sync.tasks.delete_all_media_for_source': Source,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
