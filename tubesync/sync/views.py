@@ -858,9 +858,9 @@ class TasksView(ListView):
         )
         sort_keys = (
             # key, reverse
-            ('run_now', True),
-            ('priority', 'ASC' != order),
             ('run_at', False),
+            ('priority', 'ASC' != order),
+            ('run_now', True),
         )
         data['errors'] = multi_key_sort(data['errors'], sort_keys, attr=True)
         data['scheduled'] = multi_key_sort(data['scheduled'], sort_keys, attr=True)
