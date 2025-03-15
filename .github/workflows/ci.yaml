@@ -138,6 +138,7 @@ jobs:
             cache-tubesync=.cache/saved
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
+          secrets-env: |
             WORMHOLE_CODE=${{ steps.wormhole.outputs.code }}
             WORMHOLE_RELAY=${{ steps.wormhole.outputs.relay }}
             WORMHOLE_TRANSIT=${{ steps.wormhole.outputs.transit }}
