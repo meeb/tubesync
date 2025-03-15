@@ -48,15 +48,9 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y --no-install-recommends install locales && \
     printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
     locale-gen en_US.UTF-8 && \
-    apt-get -y --no-install-recommends install \
-    curl \
-    file \
-    less \
-    && \
     # Clean up
     apt-get -y autopurge && \
-    apt-get -y autoclean && \
-    rm -v -rf /tmp/*
+    apt-get -y autoclean
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -279,7 +273,7 @@ RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     set -x ; \
     cp -at / "/restored/${TARGETARCH}/wormhole" || \
         mkdir -v /wormhole ;
-    
+
 FROM tubesync-base AS tubesync
 
 ARG S6_VERSION
@@ -312,6 +306,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   python3-socks \
   python3-venv \
   python3-wheel \
+  curl \
+  less \
   && \
   # Link to the current python3 version
   ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
@@ -320,20 +316,28 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   useradd -M -d /app -s /bin/false -g app app && \
   # Clean up
   apt-get -y autopurge && \
-  apt-get -y autoclean && \
-  rm -v -rf /tmp/*
+  apt-get -y autoclean
 
 # Install third party software
 COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
-RUN \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
     set -x && \
+    apt-get update && \
+    # Install file
+    apt-get -y --no-install-recommends install file && \
     # Installed s6 (using COPY earlier)
     file -L /command/s6-overlay-suexec && \
     # Installed ffmpeg (using COPY earlier)
     /usr/local/bin/ffmpeg -version && \
-    file /usr/local/bin/ff*
+    file /usr/local/bin/ff* && \
+    # Clean up file
+    apt-get -y autoremove --purge file && \
+    # Clean up
+    apt-get -y autopurge && \
+    apt-get -y autoclean
 
 # Switch workdir to the the app
 WORKDIR /app
