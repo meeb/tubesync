@@ -279,7 +279,7 @@ RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     set -x ; \
     cp -at / "/restored/${TARGETARCH}/wormhole" || \
         mkdir -v /wormhole ;
-    
+
 FROM tubesync-base AS tubesync
 
 ARG S6_VERSION
