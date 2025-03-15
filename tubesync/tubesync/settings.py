@@ -172,6 +172,7 @@ YOUTUBE_DEFAULTS = {
     'ignoreerrors': True,   # Skip on errors (such as unavailable videos in playlists)
     'cachedir': False,      # Disable on-disk caching
     'addmetadata': True,    # Embed metadata during postprocessing where available
+    'geo_verification_proxy': getenv('geo_verification_proxy'),
 }
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 
