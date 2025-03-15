@@ -161,6 +161,10 @@ jobs:
               done &)
       - name: Build and push
         uses: docker/build-push-action@v6
+        env:
+          WORMHOLE_CODE: ${{ steps.wormhole.outputs.code }}
+          WORMHOLE_RELAY: ${{ steps.wormhole.outputs.relay }}
+          WORMHOLE_TRANSIT: ${{ steps.wormhole.outputs.transit }}
         with:
           platforms: linux/amd64,linux/arm64
           push: true
@@ -176,6 +180,9 @@ jobs:
             cache-tubesync=.cache/saved
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
-            WORMHOLE_CODE=${{ steps.wormhole.outputs.code }}
-            WORMHOLE_RELAY=${{ steps.wormhole.outputs.relay }}
-            WORMHOLE_TRANSIT=${{ steps.wormhole.outputs.transit }}
+          build-contexts: |
+            cache-tubesync=.cache/saved
+          secret-envs: |
+            WORMHOLE_CODE=WORMHOLE_CODE
+            WORMHOLE_RELAY=WORMHOLE_RELAY
+            WORMHOLE_TRANSIT=WORMHOLE_TRANSIT
