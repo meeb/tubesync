@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - 'test-*'
 
 jobs:
   test:
@@ -28,23 +28,56 @@ jobs:
           pip install pipenv
           pipenv install --system --skip-lock
       - name: Set up Django environment
-        run: cp tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
+        run: |
+          cp -v -p tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
+          cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/yt_dlp/ patches/yt_dlp/*
       - name: Run Django tests
         run: cd tubesync && python3 manage.py test --verbosity=2
   containerise:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Find upstream GitHub owner
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          GH_UPSTREAM_OWNER='.parent.owner.login' ;
+          GH_UPSTREAM_REPO='.parent.name' ;
+          GH_UPSTREAM_SLUG='.parent.full_name' ;
+          {
+            for var in GH_UPSTREAM_OWNER # GH_UPSTREAM_REPO GH_UPSTREAM_SLUG
+            do
+              # jq_arg="$( eval printf -- "'%s\n'" "$(printf -- '"${%s}"' "${var}")" )"
+              jq_arg="$( eval printf -- "'%s\n'" '"${'"${var}"'}"' )"
+              delim='"'"${var}"'_EOF"' ;
+              printf -- '%s<<%s\n' "${var}" "${delim}" ;
+              gh api repos/:owner/:repo --cache 5m --jq "${jq_arg}" ;
+              printf -- '%s\n' "${delim}" ;
+            done
+            unset -v delim jq_arg var
+          } >> "$GITHUB_ENV"
+      - name: Upstream registry ref
+        id: upstream
+        run: |
+          user_lowercase="$(printf -- '%s\n' "${GH_UPSTREAM_OWNER}" | awk '{print tolower($0);}')" ;
+          printf >> "$GITHUB_OUTPUT" -- '%s=ghcr.io/%s/%s:latest\n' \
+            ref "${user_lowercase}" "${IMAGE_NAME}" \
+            tag "${user_lowercase}" "${IMAGE_NAME}" ;
+      - name: Registry ref
+        id: origin
+        run: |
+          user_lowercase="$(printf -- '%s\n' "${GITHUB_ACTOR}" | awk '{print tolower($0);}')" ;
+          printf >> "$GITHUB_OUTPUT" -- '%s=ghcr.io/%s/%s:%s\n' \
+            'ref' "${user_lowercase}" "${IMAGE_NAME}" 'cache' \
+            'tag' "${user_lowercase}" "${IMAGE_NAME}" 'latest' ;
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
+        id: buildx
         uses: docker/setup-buildx-action@v3
       - name: Log into GitHub Container Registry
-        run: echo "${{ secrets.REGISTRY_ACCESS_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
-      - name: Lowercase github username for ghcr
-        id: string
-        uses: ASzc/change-string-case-action@v6
-        with:
-          string: ${{ github.actor }}
+        run: echo '${{ secrets.GITHUB_TOKEN }}' | docker login --password-stdin --username '${{ github.actor }}' 'https://ghcr.io'
       - name: Create cache directory on the runner
         run: |
           mkdir -v -p .cache
@@ -135,9 +168,16 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
-          cache-from: type=registry,ref=ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
-          cache-to: type=inline
+          provenance: false
+          tags: ${{ steps.origin.outputs.tag }}
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ steps.origin.outputs.ref }}
+            type=registry,ref=${{ steps.upstream.outputs.ref }}
+          cache-to: |
+            type=gha,mode=max
+          build-contexts: |
+            cache-tubesync=.cache/saved
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
           build-contexts: |
