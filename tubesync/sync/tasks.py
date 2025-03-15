@@ -186,8 +186,7 @@ def index_source_task(source_id):
         Indexes media available from a Source object.
     '''
     try:
-        #source = Source.objects.get(pk=source_id)
-        source = get_source(source_id)
+        source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist:
         # Task triggered but the Source has been deleted, delete the task
         return
@@ -195,8 +194,7 @@ def index_source_task(source_id):
     source.has_failed = False
     source.save()
     # Index the source
-    #videos = source.index_media()
-    videos = time_model_function(source, source.index_media)
+    videos = source.index_media()
     if not videos:
         raise NoMediaException(f'Source "{source}" (ID: {source_id}) returned no '
                                f'media to index, is the source key valid? Check the '
