@@ -322,8 +322,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
     set -x && \
     apt-get update && \
     # Install file
@@ -338,14 +338,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     # Clean up
     apt-get -y autopurge && \
     apt-get -y autoclean
-
-RUN \
-    set -x && \
-    # Installed s6 (using COPY earlier)
-    file -L /command/s6-overlay-suexec && \
-    # Installed ffmpeg (using COPY earlier)
-    /usr/local/bin/ffmpeg -version && \
-    file /usr/local/bin/ff*
 
 # Switch workdir to the the app
 WORKDIR /app
