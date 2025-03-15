@@ -146,7 +146,11 @@ def source_pre_delete(sender, instance, **kwargs):
     instance.deactivate()
     log.info(f'Deleting tasks for source: {instance.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
+    delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
+    delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
+    delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
     # Schedule deletion of media
+    delete_task_by_source('sync.tasks.delete_all_media_for_source', instance.pk)
     verbose_name = _('Deleting all media for source "{}"')
     delete_all_media_for_source(
         str(instance.pk),
@@ -166,9 +170,16 @@ def source_pre_delete(sender, instance, **kwargs):
 def source_post_delete(sender, instance, **kwargs):
     # Triggered after a source is deleted
     source = instance
+    log.info(f'Deleting tasks for removed source: {source.name}')
+    delete_task_by_source('sync.tasks.index_source_task', instance.pk)
+    delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
+    delete_task_by_source('sync.tasks.delete_all_media_for_source', instance.pk)
+    delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
+    delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
     # Remove the directory, if the user requested that
     directory_path = Path(source.directory_path)
     if (directory_path / '.to_be_removed').is_file():
+        log.info(f'Deleting directory for: {source.name}: {directory_path}')
         rmtree(directory_path, True)
 
 
