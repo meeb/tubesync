@@ -339,16 +339,15 @@ WORKDIR /app
 
 ARG CACHE_PATH
 
-ARG WORMHOLE_CODE \
-    WORMHOLE_RELAY \
-    WORMHOLE_TRANSIT
-
 # Set up the app
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=cache,sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
     --mount=type=cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
     --mount=type=cache,sharing=private,target=${CACHE_PATH}/pipenv,source=/pipenv-cache,from=populate-pipenv-cache-dir \
     --mount=type=cache,sharing=private,target=${CACHE_PATH}/wormhole,source=/wormhole,from=populate-wormhole-dir \
+    --mount=type=secret,id=WORMHOLE_CODE \
+    --mount=type=secret,id=WORMHOLE_RELAY \
+    --mount=type=secret,id=WORMHOLE_TRANSIT \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
   # set up cache
