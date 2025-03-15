@@ -284,17 +284,23 @@ FROM tubesync-base AS tubesync
 
 ARG S6_VERSION
 
-ARG FFMPEG_DATE FFMPEG_VERSION
+ARG FFMPEG_DATE
+ARG FFMPEG_VERSION
+
+ARG CACHE_PATH
+ARG TARGETARCH
+
+ARG WORMHOLE_CODE
+ARG WORMHOLE_RELAY
+ARG WORMHOLE_TRANSIT
 
 ENV S6_VERSION="${S6_VERSION}" \
     FFMPEG_DATE="${FFMPEG_DATE}" \
     FFMPEG_VERSION="${FFMPEG_VERSION}"
 
-ARG TARGETARCH
-
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
   set -x && \
   apt-get update && \
   # Install dependencies we keep
@@ -338,17 +344,12 @@ RUN \
 # Switch workdir to the the app
 WORKDIR /app
 
-ARG CACHE_PATH
-
 # Set up the app
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=cache,sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
     --mount=type=cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
     --mount=type=cache,sharing=private,target=${CACHE_PATH}/pipenv,source=/pipenv-cache,from=populate-pipenv-cache-dir \
     --mount=type=cache,sharing=private,target=${CACHE_PATH}/wormhole,source=/wormhole,from=populate-wormhole-dir \
-    --mount=type=secret,id=WORMHOLE_CODE \
-    --mount=type=secret,id=WORMHOLE_RELAY \
-    --mount=type=secret,id=WORMHOLE_TRANSIT \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
   # set up cache
