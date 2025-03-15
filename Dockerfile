@@ -290,8 +290,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   useradd -M -d /app -s /bin/false -g app app && \
   # Clean up
   apt-get -y autopurge && \
-  apt-get -y autoclean && \
-  rm -v -rf /tmp/*
+  apt-get -y autoclean
 
 # Install third party software
 COPY --from=s6-overlay / /
