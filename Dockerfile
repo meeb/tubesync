@@ -255,34 +255,17 @@ ARG S6_VERSION
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 
+ARG TARGETARCH
+
 ENV S6_VERSION="${S6_VERSION}" \
     FFMPEG_DATE="${FFMPEG_DATE}" \
     FFMPEG_VERSION="${FFMPEG_VERSION}"
 
-# Install third party software
-COPY --from=s6-overlay / /
-COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
-
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
   set -x && \
-  # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
-  # Install locales
-  apt-get -y --no-install-recommends install locales && \
-  printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
-  locale-gen en_US.UTF-8 && \
-  # Install file
-  apt-get -y --no-install-recommends install file && \
-  # Installed s6 (using COPY earlier)
-  file -L /command/s6-overlay-suexec && \
-  # Installed ffmpeg (using COPY earlier)
-  /usr/local/bin/ffmpeg -version && \
-  file /usr/local/bin/ff* && \
-  # Clean up file
-  apt-get -y autoremove --purge file && \
   # Install dependencies we keep
   # Install required distro packages
   apt-get -y --no-install-recommends install \
@@ -302,10 +285,34 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   && \
   # Link to the current python3 version
   ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
+  # Create a 'app' user which the application will run as
+  groupadd app && \
+  useradd -M -d /app -s /bin/false -g app app && \
   # Clean up
   apt-get -y autopurge && \
   apt-get -y autoclean && \
-  rm -rf /tmp/*
+  rm -v -rf /tmp/*
+
+# Install third party software
+COPY --from=s6-overlay / /
+COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    set -x && \
+    apt-get update && \
+    # Install file
+    apt-get -y --no-install-recommends install file && \
+    # Installed s6 (using COPY earlier)
+    file -L /command/s6-overlay-suexec && \
+    # Installed ffmpeg (using COPY earlier)
+    /usr/local/bin/ffmpeg -version && \
+    file /usr/local/bin/ff* && \
+    # Clean up file
+    apt-get -y autoremove --purge file && \
+    # Clean up
+    apt-get -y autopurge && \
+    apt-get -y autoclean
 
 # Copy over pip.conf to use piwheels
 COPY pip.conf /etc/pip.conf
@@ -316,12 +323,10 @@ WORKDIR /app
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
-    --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+    --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
-  # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -337,9 +342,6 @@ RUN --mount=type=tmpfs,target=/cache \
   python3-pip \
   zlib1g-dev \
   && \
-  # Create a 'app' user which the application will run as
-  groupadd app && \
-  useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
   cp -at /tmp/ "${HOME}" && \
   HOME="/tmp/${HOME#/}" \
