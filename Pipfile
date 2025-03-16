@@ -15,7 +15,7 @@ gunicorn = "*"
 httptools = "*"
 django-background-tasks = ">=1.2.8"
 django-basicauth = "*"
-psycopg2-binary = "*"
+psycopg = {extras = ["binary", "pool"], version = "*"}
 mysqlclient = "*"
 PySocks = "*"
 urllib3 = {extras = ["socks"], version = "*"}
