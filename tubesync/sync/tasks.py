@@ -180,7 +180,6 @@ def cleanup_removed_media(source, videos):
 
 
 @background(schedule=300, remove_existing_tasks=True)
-@atomic(durable=True)
 def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
@@ -211,9 +210,6 @@ def index_source_task(source_id):
         verbose_name = task.verbose_name
         tvn_format = '[{}' + f'/{num_videos}] {verbose_name}'
     for vn, video in enumerate(videos, start=1):
-        if task:
-            task.verbose_name = tvn_format.format(vn)
-            task.save(update_fields={'verbose_name'})
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
         if not key:
@@ -230,8 +226,12 @@ def index_source_task(source_id):
         published_dt = media.metadata_published(timestamp)
         if published_dt is not None:
             media.published = published_dt
+        if task:
+            task.verbose_name = tvn_format.format(vn)
         try:
             with atomic():
+                if task:
+                    task.save(update_fields={'verbose_name'})
                 media.save()
             log.debug(f'Indexed media: {source} / {media}')
             # log the new media instances
