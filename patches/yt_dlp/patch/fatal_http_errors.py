@@ -10,7 +10,7 @@ class PatchedYoutubeIE(YoutubeIE):
             pp = self._configuration_arg('player_params', [None], casesense=True)[0]
             if pp:
                 query['pp'] = pp
-            webpage = self._download_webpage_with_retries(webpage_url, video_id, query=query)
+            webpage = self._download_webpage_with_retries(webpage_url, video_id, retry_fatal=True, query=query)
 
         master_ytcfg = self.extract_ytcfg(video_id, webpage) or self._get_default_ytcfg()
 
