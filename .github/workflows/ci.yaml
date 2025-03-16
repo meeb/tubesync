@@ -102,6 +102,7 @@ jobs:
           ls -al .cache/*/*/* ||
           ls -alR .cache
       - name: Start magic-wormhole services on the runner
+        if: ${{ 'true' != steps.cache.outputs.cache-hit }}
         id: wormhole
         run: |
           rm -rf .cache/runner/wormhole
