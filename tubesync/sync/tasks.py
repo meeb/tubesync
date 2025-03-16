@@ -575,7 +575,8 @@ def download_media(media_id):
                f'expected outfile does not exist: {filepath}')
         log.error(err)
         # Try refreshing formats
-        media.refresh_formats
+        if media.has_metadata:
+            media.refresh_formats
         # Raising an error here triggers the task to be re-attempted (or fail)
         raise DownloadFailedException(err)
 
