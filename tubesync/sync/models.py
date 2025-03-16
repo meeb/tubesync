@@ -1276,7 +1276,8 @@ class Media(models.Model):
         # Create a suitable filename from the source media_format
         media_format = str(self.source.media_format)
         media_details = self.format_dict
-        return media_format.format(**media_details)
+        result = media_format.format(**media_details)
+        return '.' + result if '/' == result[0] else result
 
     @property
     def directory_path(self):
