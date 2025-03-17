@@ -169,7 +169,7 @@ def get_media_info(url, days=None):
             'youtubetab': {'approximate_date': ['true']},
         },
         'paths': paths,
-        'sleep_interval_requests': 2,
+        'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
         'verbose': True if settings.DEBUG else False,
     })
     if start:
@@ -281,7 +281,7 @@ def download_media(
         'overwrites': None,
         'sleep_interval': 10 + int(settings.DOWNLOAD_MEDIA_DELAY / 20),
         'max_sleep_interval': settings.DOWNLOAD_MEDIA_DELAY,
-        'sleep_interval_requests': 5,
+        'sleep_interval_requests': 1 + (2 * settings.BACKGROUND_TASK_ASYNC_THREADS),
         'paths': opts.get('paths', dict()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),
         'postprocessor_hooks': opts.get('postprocessor_hooks', list()),
