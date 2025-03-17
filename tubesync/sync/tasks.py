@@ -209,58 +209,61 @@ def index_source_task(source_id):
     if task:
         verbose_name = task.verbose_name
         tvn_format = '[{}' + f'/{num_videos}] {verbose_name}'
-    for vn, video in enumerate(videos, start=1):
-        # Create or update each video as a Media object
-        key = video.get(source.key_field, None)
-        if not key:
-            # Video has no unique key (ID), it can't be indexed
-            continue
-        try:
-            media = Media.objects.get(key=key, source=source)
-        except Media.DoesNotExist:
-            media = Media(key=key)
-        media.source = source
-        media.duration = float(video.get(fields('duration', media), None) or 0) or None
-        media.title = str(video.get(fields('title', media), ''))[:200]
-        timestamp = video.get(fields('timestamp', media), None)
-        published_dt = media.metadata_published(timestamp)
-        if published_dt is not None:
-            media.published = published_dt
-        if task:
-            task.verbose_name = tvn_format.format(vn)
-        try:
-            with atomic():
-                if task:
-                    task.save(update_fields={'verbose_name'})
-                media.save()
-            log.debug(f'Indexed media: {source} / {media}')
-            # log the new media instances
-            new_media_instance = (
-                media.created and
-                source.last_crawl and
-                media.created >= source.last_crawl
-            )
-            if new_media_instance:
-                log.info(f'Indexed new media: {source} / {media}')
-                log.info(f'Scheduling task to download metadata for: {media.url}')
-                verbose_name = _('Downloading metadata for "{}"')
-                download_media_metadata(
-                    str(media.pk),
-                    priority=9,
-                    verbose_name=verbose_name.format(media.pk),
+    with atomic(durable=True):
+        for vn, video in enumerate(videos, start=1):
+            # Create or update each video as a Media object
+            key = video.get(source.key_field, None)
+            if not key:
+                # Video has no unique key (ID), it can't be indexed
+                continue
+            try:
+                media = Media.objects.get(key=key, source=source)
+            except Media.DoesNotExist:
+                media = Media(key=key)
+            media.source = source
+            media.duration = float(video.get(fields('duration', media), None) or 0) or None
+            media.title = str(video.get(fields('title', media), ''))[:200]
+            timestamp = video.get(fields('timestamp', media), None)
+            published_dt = media.metadata_published(timestamp)
+            if published_dt is not None:
+                media.published = published_dt
+            if task:
+                task.verbose_name = tvn_format.format(vn)
+            try:
+                with atomic():
+                    if task:
+                        task.save(update_fields={'verbose_name'})
+                    media.save()
+            except IntegrityError as e:
+                log.error(f'Index media failed: {source} / {media} with "{e}"')
+            else:
+                log.debug(f'Indexed media: {source} / {media}')
+                # log the new media instances
+                new_media_instance = (
+                    media.created and
+                    source.last_crawl and
+                    media.created >= source.last_crawl
                 )
-        except IntegrityError as e:
-            log.error(f'Index media failed: {source} / {media} with "{e}"')
+                if new_media_instance:
+                    log.info(f'Indexed new media: {source} / {media}')
+                    log.info(f'Scheduling task to download metadata for: {media.url}')
+                    verbose_name = _('Downloading metadata for "{}"')
+                    download_media_metadata(
+                        str(media.pk),
+                        priority=20,
+                        verbose_name=verbose_name.format(media.pk),
+                    )
     if task:
         task.verbose_name = verbose_name
         task.save(update_fields={'verbose_name'})
     # Tack on a cleanup of old completed tasks
     cleanup_completed_tasks()
-    # Tack on a cleanup of old media
-    cleanup_old_media()
-    if source.delete_removed_media:
-        log.info(f'Cleaning up media no longer in source: {source}')
-        cleanup_removed_media(source, videos)
+    with atomic(durable=True):
+        # Tack on a cleanup of old media
+        cleanup_old_media()
+        if source.delete_removed_media:
+            log.info(f'Cleaning up media no longer in source: {source}')
+            cleanup_removed_media(source, videos)
 
 
 @background(schedule=0)
