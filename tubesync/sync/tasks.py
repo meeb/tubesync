@@ -205,11 +205,11 @@ def index_source_task(source_id):
     num_videos = len(videos)
     log.info(f'Found {num_videos} media items for source: {source}')
     fields = lambda f, m: m.get_metadata_field(f)
+    task = get_source_index_task(source_id)
+    if task:
+        verbose_name = task.verbose_name
+        tvn_format = '[{}' + f'/{num_videos}] {verbose_name}'
     with atomic(durable=True):
-        task = get_source_index_task(source_id)
-        if task:
-            verbose_name = task.verbose_name
-            tvn_format = '[{}' + f'/{num_videos}] {verbose_name}'
         for vn, video in enumerate(videos, start=1):
             # Create or update each video as a Media object
             key = video.get(source.key_field, None)
@@ -253,9 +253,9 @@ def index_source_task(source_id):
                         priority=20,
                         verbose_name=verbose_name.format(media.pk),
                     )
-        if task:
-            task.verbose_name = verbose_name
-            task.save(update_fields={'verbose_name'})
+    if task:
+        task.verbose_name = verbose_name
+        task.save(update_fields={'verbose_name'})
     # Tack on a cleanup of old completed tasks
     cleanup_completed_tasks()
     with atomic(durable=True):
