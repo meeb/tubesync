@@ -313,9 +313,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y autopurge && \
     apt-get -y autoclean
 
-# Copy over pip.conf to use piwheels
-COPY pip.conf /etc/pip.conf
-
 # Switch workdir to the the app
 WORKDIR /app
 
