@@ -23,7 +23,7 @@ from django.utils.translation import gettext_lazy as _
 from background_task import background
 from background_task.models import Task, CompletedTask
 from common.logger import log
-from common.errors import NoMediaException, DownloadFailedException
+from common.errors import NoMediaException, NoMetadataException, DownloadFailedException
 from common.utils import json_serial
 from .models import Source, Media, MediaServer
 from .utils import (get_remote_image, resize_image_to_height, delete_file,
@@ -423,7 +423,7 @@ def download_media_thumbnail(media_id, url):
         # Task triggered but the media no longer exists, do nothing
         return
     if not media.has_metadata:
-        raise DownloadFailedException('Metadata is not yet available.')
+        raise NoMetadataException('Metadata is not yet available.')
     if media.skip:
         # Media was toggled to be skipped after the task was scheduled
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
@@ -462,7 +462,7 @@ def download_media(media_id):
         # Task triggered but the media no longer exists, do nothing
         return
     if not media.has_metadata:
-        raise DownloadFailedException('Metadata is not yet available.')
+        raise NoMetadataException('Metadata is not yet available.')
     if media.skip:
         # Media was toggled to be skipped after the task was scheduled
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
