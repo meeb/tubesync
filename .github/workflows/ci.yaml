@@ -67,7 +67,7 @@ jobs:
           # Delete the oldest unused cache entries
           gh cache --repo "${GITHUB_REPOSITORY}" list --sort last_accessed_at --order asc --ref "${GITHUB_REF}" | \
             awk '$NF == $(NF-1) {print $1}' | \
-            xargs -r -t -n 1 gh cache delete 2>&1 | \
+            xargs -r -t -n 1 gh cache --repo "${GITHUB_REPOSITORY}" delete 2>&1 | \
             tee /dev/stderr | wc -l ;
       - name: Upstream registry ref
         id: upstream
@@ -90,6 +90,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Log into GitHub Container Registry
         run: echo '${{ secrets.GITHUB_TOKEN }}' | docker login --password-stdin --username '${{ github.actor }}' 'https://ghcr.io'
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Create cache directory on the runner
         run: |
           mkdir -v -p .cache
