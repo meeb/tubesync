@@ -49,7 +49,7 @@ jobs:
           DOCKER_REGISTRY: https://ghcr.io
           DOCKER_USERNAME: ${{ github.actor }}
           DOCKER_TOKEN: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
-        run: echo '${{ env.DOCKER_TOKEN }}' | docker login --password-stdin --username '${{ env.DOCKER_USERNAME }}' '${{ env.DOCKER_REGISTRY }}'
+        run: echo "${DOCKER_TOKEN}" | docker login --password-stdin --username "${DOCKER_USERNAME}" "${DOCKER_REGISTRY}"
       - name: Lowercase github username for ghcr
         id: string
         uses: ASzc/change-string-case-action@v6
