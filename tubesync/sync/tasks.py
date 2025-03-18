@@ -190,6 +190,23 @@ def index_source_task(source_id):
     except Source.DoesNotExist:
         # Task triggered but the Source has been deleted, delete the task
         return
+    # An inactive Source would return an empty list for videos anyway
+    if not source.is_active:
+        cleanup_completed_tasks()
+        # deleting expired media should still happen when an index task is requested
+        with atomic(durable=True):
+            cleanup_old_media()
+            # Schedule a task to update media servers
+            log.info(f'Scheduling media server updates')
+            verbose_name = _('Request media server rescan for "{}"')
+            for mediaserver in MediaServer.objects.all():
+                rescan_media_server(
+                    str(mediaserver.pk),
+                    priority=30,
+                    verbose_name=verbose_name.format(mediaserver),
+                    remove_existing_tasks=True,
+                )
+        return
     # Reset any errors
     source.has_failed = False
     source.save()
@@ -253,6 +270,17 @@ def index_source_task(source_id):
         if source.delete_removed_media:
             log.info(f'Cleaning up media no longer in source: {source}')
             cleanup_removed_media(source, videos)
+
+        # Schedule a task to update media servers
+        log.info(f'Scheduling media server updates')
+        verbose_name = _('Request media server rescan for "{}"')
+        for mediaserver in MediaServer.objects.all():
+            rescan_media_server(
+                str(mediaserver.pk),
+                priority=30,
+                verbose_name=verbose_name.format(mediaserver),
+                remove_existing_tasks=True,
+            )
 
 
 @background(schedule=0)
