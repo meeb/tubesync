@@ -1,8 +1,9 @@
+from functools import partial
 from pathlib import Path
-from shutil import rmtree
 from tempfile import TemporaryDirectory
 from django.conf import settings
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
+from django.db.transaction import on_commit
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from background_task.signals import task_failed
@@ -142,6 +143,7 @@ def source_post_save(sender, instance, created, **kwargs):
 def source_pre_delete(sender, instance, **kwargs):
     # Triggered before a source is deleted, delete all media objects to trigger
     # the Media models post_delete signal
+    source = instance
     log.info(f'Deactivating source: {instance.name}')
     instance.deactivate()
     log.info(f'Deleting tasks for source: {instance.name}')
@@ -152,12 +154,14 @@ def source_pre_delete(sender, instance, **kwargs):
     # Schedule deletion of media
     delete_task_by_source('sync.tasks.delete_all_media_for_source', instance.pk)
     verbose_name = _('Deleting all media for source "{}"')
-    delete_all_media_for_source(
-        str(instance.pk),
-        str(instance.name),
+    on_commit(partial(
+        delete_all_media_for_source,
+        str(source.pk),
+        str(source.name),
+        source.directory_path,
         priority=1,
-        verbose_name=verbose_name.format(instance.name),
-    )
+        verbose_name=verbose_name.format(source.name),
+    ))
 
 
 @receiver(post_delete, sender=Source)
@@ -167,7 +171,6 @@ def source_post_delete(sender, instance, **kwargs):
     log.info(f'Deleting tasks for removed source: {source.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
     delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
-    delete_task_by_source('sync.tasks.delete_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
 
