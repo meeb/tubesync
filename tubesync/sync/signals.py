@@ -158,12 +158,6 @@ def source_pre_delete(sender, instance, **kwargs):
         priority=1,
         verbose_name=verbose_name.format(instance.name),
     )
-    # Try to do it all immediately
-    # If this is killed, the scheduled task should do the work instead.
-    delete_all_media_for_source.now(
-        str(instance.pk),
-        str(instance.name),
-    )
 
 
 @receiver(post_delete, sender=Source)
@@ -176,11 +170,6 @@ def source_post_delete(sender, instance, **kwargs):
     delete_task_by_source('sync.tasks.delete_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
-    # Remove the directory, if the user requested that
-    directory_path = Path(source.directory_path)
-    if (directory_path / '.to_be_removed').is_file():
-        log.info(f'Deleting directory for: {source.name}: {directory_path}')
-        rmtree(directory_path, True)
 
 
 @receiver(task_failed, sender=Task)
