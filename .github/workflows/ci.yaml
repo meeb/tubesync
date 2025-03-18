@@ -57,7 +57,8 @@ jobs:
             done
             unset -v delim jq_arg var
           } >> "$GITHUB_ENV"
-          gh cache list --sort last_accessed_at --order asc
+          gh cache list --sort last_accessed_at --order asc | \
+            awk '$NF == $(NF-1) {print}'
       - name: Upstream registry ref
         id: upstream
         run: |
