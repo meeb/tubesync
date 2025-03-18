@@ -57,8 +57,10 @@ jobs:
             done
             unset -v delim jq_arg var
           } >> "$GITHUB_ENV"
-          gh cache list --sort last_accessed_at --order asc | \
-            awk '$NF == $(NF-1) {print}'
+          # Delete the oldest unused cache entries
+          gh cache list --sort last_accessed_at --order asc --ref '${{ github.ref }}' | \
+            awk '$NF == $(NF-1) {print $1}' | \
+            xargs -r -t -n 1 gh cache delete
       - name: Upstream registry ref
         id: upstream
         run: |
