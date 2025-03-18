@@ -192,14 +192,13 @@ def cleanup_removed_media(source, videos):
     if not source.delete_removed_media:
         return
     log.info(f'Cleaning up media no longer in source: {source}')
-    with atomic(durable=True):
-        media_objects = Media.objects.filter(source=source)
-        for media in media_objects:
-            matching_source_item = [video['id'] for video in videos if video['id'] == media.key]
-            if not matching_source_item:
-                log.info(f'{media.name} is no longer in source, removing')
-                with atomic():
-                    media.delete()
+    media_objects = Media.objects.filter(source=source)
+    for media in media_objects:
+        matching_source_item = [video['id'] for video in videos if video['id'] == media.key]
+        if not matching_source_item:
+            log.info(f'{media.name} is no longer in source, removing')
+            with atomic():
+                media.delete()
     schedule_media_servers_update()
 
 
@@ -209,6 +208,8 @@ def index_source_task(source_id):
         Indexes media available from a Source object.
     '''
     cleanup_completed_tasks()
+    # deleting expired media should happen any time an index task is requested
+    cleanup_old_media()
     try:
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist:
@@ -216,8 +217,6 @@ def index_source_task(source_id):
         return
     # An inactive Source would return an empty list for videos anyway
     if not source.is_active:
-        # deleting expired media should still happen when an index task is requested
-        cleanup_old_media()
         return
     # Reset any errors
     source.has_failed = False
@@ -274,9 +273,8 @@ def index_source_task(source_id):
                         priority=20,
                         verbose_name=verbose_name.format(media.pk),
                     )
-    # Cleanup of old downloaded media and media no longer available from the source
-    cleanup_old_media()
-    cleanup_removed_media(source, videos)
+        # Cleanup of media no longer available from the source
+        cleanup_removed_media(source, videos)
 
 
 @background(schedule=0)
