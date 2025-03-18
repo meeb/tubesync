@@ -57,6 +57,7 @@ jobs:
             done
             unset -v delim jq_arg var
           } >> "$GITHUB_ENV"
+          gh cache list --sort last_accessed_at --order asc
       - name: Upstream registry ref
         id: upstream
         run: |
