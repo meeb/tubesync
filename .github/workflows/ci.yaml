@@ -36,8 +36,6 @@ jobs:
   containerise:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
       - name: Set environment variables with GitHub CLI
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,7 +50,7 @@ jobs:
               jq_arg="$( eval printf -- "'%s\n'" '"${'"${var}"'}"' )"
               delim='"'"${var}"'_EOF"' ;
               printf -- '%s<<%s\n' "${var}" "${delim}" ;
-              gh api repos/:owner/:repo --cache 5m --jq "${jq_arg}" ;
+              gh api "repos/${GITHUB_REPOSITORY}" --cache 5m --jq "${jq_arg}" ;
               printf -- '%s\n' "${delim}" ;
             done
 
