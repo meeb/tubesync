@@ -377,14 +377,13 @@ def media_post_delete(sender, instance, **kwargs):
     if not instance.source.is_active:
         return
     # Schedule a task to update media servers
+    log.info(f'Scheduling media server updates')
+    verbose_name = _('Request media server rescan for "{}"')
     for mediaserver in MediaServer.objects.all():
-        log.info(f'Scheduling media server updates')
-        verbose_name = _('Request media server rescan for "{}"')
         rescan_media_server(
             str(mediaserver.pk),
-            schedule=5,
-            priority=0,
+            priority=30,
             verbose_name=verbose_name.format(mediaserver),
-            remove_existing_tasks=True
+            remove_existing_tasks=True,
         )
 
