@@ -38,7 +38,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Find upstream GitHub owner
+      - name: Set environment variables with GitHub CLI
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -55,8 +55,14 @@ jobs:
               gh api repos/:owner/:repo --cache 5m --jq "${jq_arg}" ;
               printf -- '%s\n' "${delim}" ;
             done
+            var='FFMPEG_DATE'
+            delim='"'"${var}"'_EOF"' ;
+            printf -- '%s<<%s\n' "${var}" "${delim}" ;
+            printf -- '%s\n' '2025-03-18-14-20' ;
+            printf -- '%s\n' "${delim}" ;
             unset -v delim jq_arg var
           } >> "$GITHUB_ENV"
+
           # Delete the oldest unused cache entries
           gh cache list --sort last_accessed_at --order asc --ref '${{ github.ref }}' | \
             awk '$NF == $(NF-1) {print $1}' | \
@@ -183,7 +189,7 @@ jobs:
             type=gha,mode=max
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
-            FFMPEG_DATE=2025-03-18-14-20
+            FFMPEG_DATE=${{ env.FFMPEG_DATE }}
             FFMPEG_VERSION=N
           build-contexts: |
             cache-tubesync=.cache/saved
