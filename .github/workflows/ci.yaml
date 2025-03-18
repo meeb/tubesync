@@ -55,10 +55,13 @@ jobs:
               gh api repos/:owner/:repo --cache 5m --jq "${jq_arg}" ;
               printf -- '%s\n' "${delim}" ;
             done
+
+            # Fetch the latest+1 release from yt-dlp/FFmpeg-Builds
             var='FFMPEG_DATE'
+            jq_arg='.[1].tag_name[10:]'
             delim='"'"${var}"'_EOF"' ;
             printf -- '%s<<%s\n' "${var}" "${delim}" ;
-            printf -- '%s\n' '2025-03-18-14-20' ;
+            gh api repos/yt-dlp/FFmpeg-Builds/releases --cache 12h --jq "${jq_arg}" ;
             printf -- '%s\n' "${delim}" ;
             unset -v delim jq_arg var
           } >> "$GITHUB_ENV"
