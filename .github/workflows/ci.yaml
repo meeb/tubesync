@@ -183,8 +183,8 @@ jobs:
             type=gha,mode=max
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
-            FFMPEG_DATE='2025-03-18-14-20'
-            FFMPEG_VERSION='N'
+            FFMPEG_DATE=2025-03-18-14-20
+            FFMPEG_VERSION=N
           build-contexts: |
             cache-tubesync=.cache/saved
           secret-envs: |
