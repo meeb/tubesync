@@ -52,24 +52,23 @@ jobs:
               printf -- '%s<<%s\n' "${var}" "${delim}" ;
               gh api "repos/${GITHUB_REPOSITORY}" --cache 5m --jq "${jq_arg}" ;
               printf -- '%s\n' "${delim}" ;
-            done
+            done ;
 
             # Fetch the latest+1 release from yt-dlp/FFmpeg-Builds
-            var='FFMPEG_DATE'
-            jq_arg='.[1].tag_name[10:]'
+            var='FFMPEG_DATE' ;
             delim='"'"${var}"'_EOF"' ;
+            jq_arg='.[1].tag_name[10:]' ;
             printf -- '%s<<%s\n' "${var}" "${delim}" ;
             gh api repos/yt-dlp/FFmpeg-Builds/releases --cache 12h --jq "${jq_arg}" ;
             printf -- '%s\n' "${delim}" ;
-            unset -v delim jq_arg var
+            unset -v delim jq_arg var ;
           } >> "$GITHUB_ENV"
 
-          env
           # Delete the oldest unused cache entries
-          gh cache list --sort last_accessed_at --order asc --ref '${{ github.ref }}' | \
+          gh cache --repo "${GITHUB_REPOSITORY}" list --sort last_accessed_at --order asc --ref "${GITHUB_REF}" | \
             awk '$NF == $(NF-1) {print $1}' | \
-            xargs -r -t -n 1 gh cache delete | \
-            tee /dev/stderr | wc -l
+            xargs -r -t -n 1 gh cache delete 2>&1 | \
+            tee /dev/stderr | wc -l ;
       - name: Upstream registry ref
         id: upstream
         run: |
