@@ -276,12 +276,12 @@ def index_source_task(source_id):
             if new_media_instance:
                 log.info(f'Indexed new media: {source} / {media}')
                 log.info(f'Scheduling task to download metadata for: {media.url}')
-                    verbose_name = _('Downloading metadata for "{}"')
-                    download_media_metadata(
-                        str(media.pk),
-                        priority=20,
-                        verbose_name=verbose_name.format(media.pk),
-                    )
+                verbose_name = _('Downloading metadata for "{}"')
+                download_media_metadata(
+                    str(media.pk),
+                    priority=20,
+                    verbose_name=verbose_name.format(media.pk),
+                )
     if task:
         task.verbose_name = verbose_name
         with atomic():
