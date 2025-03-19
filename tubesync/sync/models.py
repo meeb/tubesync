@@ -237,7 +237,7 @@ class Source(models.Model):
         _('source video codec'),
         max_length=8,
         db_index=True,
-        choices=list(reversed(YouTube_VideoCodec.choices[1:])),
+        choices=list(reversed(YouTube_VideoCodec.choices)),
         default=YouTube_VideoCodec.VP9,
         help_text=_('Source video codec, desired video encoding format to download (ignored if "resolution" is audio only)')
     )
@@ -332,6 +332,27 @@ class Source(models.Model):
     def slugname(self):
         replaced = self.name.replace('_', '-').replace('&', 'and').replace('+', 'and')
         return slugify(replaced)[:80]
+
+    def deactivate(self):
+        self.download_media = False
+        self.index_streams = False
+        self.index_videos = False
+        self.index_schedule = IndexSchedule.NEVER
+        self.save(update_fields={
+            'download_media',
+            'index_streams',
+            'index_videos',
+            'index_schedule',
+        })
+
+    @property
+    def is_active(self):
+        active = (
+            self.download_media or
+            self.index_streams or
+            self.index_videos
+        )
+        return self.index_schedule and active
 
     @property
     def is_audio(self):
@@ -779,6 +800,7 @@ class Media(models.Model):
         if self.created and self.downloaded and not self.media_file_exists:
             fp_list = list((self.filepath,))
             if self.media_file:
+                # Try the new computed directory + the file base name from the database
                 fp_list.append(self.filepath.parent / Path(self.media_file.path).name)
             for filepath in fp_list:
                 if filepath.exists():
@@ -792,8 +814,9 @@ class Media(models.Model):
                         update_fields = {'media_file', 'skip'}.union(update_fields)
 
         # Trigger an update of derived fields from metadata
-        if self.metadata:
+        if update_fields is None or 'metadata' in update_fields:
             setattr(self, '_cached_metadata_dict', None)
+        if self.metadata:
             self.title = self.metadata_title[:200]
             self.duration = self.metadata_duration
         if update_fields is not None and "metadata" in update_fields:
@@ -1056,6 +1079,17 @@ class Media(models.Model):
         return self.metadata is not None
 
 
+    def save_to_metadata(self, key, value, /):
+        data = self.loaded_metadata
+        data[key] = value
+        from common.utils import json_serial
+        compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
+        self.metadata = compact_json
+        self.save(update_fields={'metadata'})
+        from common.logger import log
+        log.debug(f'Saved to metadata: {self.key} / {self.uuid}: {key=}: {value}')
+
+
     @property
     def reduce_data(self):
         now = timezone.now()
@@ -1115,18 +1149,32 @@ class Media(models.Model):
 
     @property
     def refresh_formats(self):
+        if not self.has_metadata:
+            return
         data = self.loaded_metadata
         metadata_seconds = data.get('epoch', None)
         if not metadata_seconds:
             self.metadata = None
+            self.save(update_fields={'metadata'})
             return False
 
         now = timezone.now()
-        formats_seconds = data.get('formats_epoch', metadata_seconds)
+        attempted_key = '_refresh_formats_attempted'
+        attempted_seconds = data.get(attempted_key)
+        if attempted_seconds:
+            # skip for recent unsuccessful refresh attempts also
+            attempted_dt = self.metadata_published(attempted_seconds)
+            if (now - attempted_dt) < timedelta(seconds=self.source.index_schedule):
+                return False
+        # skip for recent successful formats refresh
+        refreshed_key = 'formats_epoch'
+        formats_seconds = data.get(refreshed_key, metadata_seconds)
         metadata_dt = self.metadata_published(formats_seconds)
         if (now - metadata_dt) < timedelta(seconds=self.source.index_schedule):
             return False
 
+        last_attempt = round((now - self.posix_epoch).total_seconds())
+        self.save_to_metadata(attempted_key, last_attempt)
         self.skip = False
         metadata = self.index_metadata()
         if self.skip:
@@ -1137,14 +1185,10 @@ class Media(models.Model):
             response = filter_response(metadata, True)
 
         field = self.get_metadata_field('formats')
-        data[field] = response.get(field, [])
+        self.save_to_metadata(field, response.get(field, []))
+        self.save_to_metadata(refreshed_key, response.get('epoch', formats_seconds))
         if data.get('availability', 'public') != response.get('availability', 'public'):
-            data['availability'] = response.get('availability', 'public')
-        data['formats_epoch'] = response.get('epoch', formats_seconds)
-
-        from common.utils import json_serial
-        compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
-        self.metadata = compact_json
+            self.save_to_metadata('availability', response.get('availability', 'public'))
         return True
 
 
@@ -1255,7 +1299,8 @@ class Media(models.Model):
         # Create a suitable filename from the source media_format
         media_format = str(self.source.media_format)
         media_details = self.format_dict
-        return media_format.format(**media_details)
+        result = media_format.format(**media_details)
+        return '.' + result if '/' == result[0] else result
 
     @property
     def directory_path(self):
@@ -1507,17 +1552,35 @@ class Media(models.Model):
 
     def calculate_episode_number(self):
         if self.source.is_playlist:
-            sorted_media = Media.objects.filter(source=self.source)
+            sorted_media = Media.objects.filter(
+                source=self.source,
+                metadata__isnull=False,
+            ).order_by(
+                'published',
+                'created',
+                'key',
+            )
         else:
-            self_year = self.upload_date.year if self.upload_date else self.created.year
-            filtered_media = Media.objects.filter(source=self.source, published__year=self_year)
-            filtered_media = [m for m in filtered_media if m.upload_date is not None]
-            sorted_media = sorted(filtered_media, key=lambda x: (x.upload_date, x.key))
-        position_counter = 1
-        for media in sorted_media:
+            self_year = self.created.year # unlikely to be accurate
+            if self.published:
+                self_year = self.published.year
+            elif self.has_metadata and self.upload_date:
+                self_year = self.upload_date.year
+            elif self.download_date:
+                # also, unlikely to be accurate
+                self_year = self.download_date.year
+            sorted_media = Media.objects.filter(
+                source=self.source,
+                metadata__isnull=False,
+                published__year=self_year,
+            ).order_by(
+                'published',
+                'created',
+                'key',
+            )
+        for counter, media in enumerate(sorted_media, start=1):
             if media == self:
-                return position_counter
-            position_counter += 1
+                return counter
 
     def get_episode_str(self, use_padding=False):
         episode_number = self.calculate_episode_number()

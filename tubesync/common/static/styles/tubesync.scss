@@ -30,3 +30,8 @@ html {
 .help-text > i {
     padding-right: 6px;
 }
+
+.issue-641 {
+    display: block !important;
+    overflow-wrap: anywhere;
+}

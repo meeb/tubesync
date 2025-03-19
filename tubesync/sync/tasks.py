@@ -23,7 +23,7 @@ from django.utils.translation import gettext_lazy as _
 from background_task import background
 from background_task.models import Task, CompletedTask
 from common.logger import log
-from common.errors import NoMediaException, DownloadFailedException
+from common.errors import NoMediaException, NoMetadataException, DownloadFailedException
 from common.utils import json_serial
 from .models import Source, Media, MediaServer
 from .utils import (get_remote_image, resize_image_to_height, delete_file,
@@ -55,6 +55,7 @@ def map_task_to_instance(task):
         'sync.tasks.rename_media': Media,
         'sync.tasks.rename_all_media_for_source': Source,
         'sync.tasks.wait_for_media_premiere': Media,
+        'sync.tasks.delete_all_media_for_source': Source,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
@@ -234,6 +235,9 @@ def index_source_task(source_id):
                 task.save(update_fields={'verbose_name'})
         try:
             media.save()
+        except IntegrityError as e:
+            log.error(f'Index media failed: {source} / {media} with "{e}"')
+        else:
             log.debug(f'Indexed media: {source} / {media}')
             # log the new media instances
             new_media_instance = (
@@ -243,19 +247,25 @@ def index_source_task(source_id):
             )
             if new_media_instance:
                 log.info(f'Indexed new media: {source} / {media}')
-        except IntegrityError as e:
-            log.error(f'Index media failed: {source} / {media} with "{e}"')
+                log.info(f'Scheduling task to download metadata for: {media.url}')
+                verbose_name = _('Downloading metadata for "{}"')
+                download_media_metadata(
+                    str(media.pk),
+                    priority=20,
+                    verbose_name=verbose_name.format(media.pk),
+                )
     if task:
         task.verbose_name = verbose_name
         with atomic():
             task.save(update_fields={'verbose_name'})
     # Tack on a cleanup of old completed tasks
     cleanup_completed_tasks()
-    # Tack on a cleanup of old media
-    cleanup_old_media()
-    if source.delete_removed_media:
-        log.info(f'Cleaning up media no longer in source: {source}')
-        cleanup_removed_media(source, videos)
+    with atomic(durable=True):
+        # Tack on a cleanup of old media
+        cleanup_old_media()
+        if source.delete_removed_media:
+            log.info(f'Cleaning up media no longer in source: {source}')
+            cleanup_removed_media(source, videos)
 
 
 @background(schedule=0)
@@ -425,6 +435,8 @@ def download_media_thumbnail(media_id, url):
     except Media.DoesNotExist:
         # Task triggered but the media no longer exists, do nothing
         return
+    if not media.has_metadata:
+        raise NoMetadataException('Metadata is not yet available.')
     if media.skip:
         # Media was toggled to be skipped after the task was scheduled
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
@@ -462,6 +474,8 @@ def download_media(media_id):
     except Media.DoesNotExist:
         # Task triggered but the media no longer exists, do nothing
         return
+    if not media.has_metadata:
+        raise NoMetadataException('Metadata is not yet available.')
     if media.skip:
         # Media was toggled to be skipped after the task was scheduled
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
@@ -570,7 +584,8 @@ def download_media(media_id):
                f'expected outfile does not exist: {filepath}')
         log.error(err)
         # Try refreshing formats
-        media.refresh_formats
+        if media.has_metadata:
+            media.refresh_formats
         # Raising an error here triggers the task to be re-attempted (or fail)
         raise DownloadFailedException(err)
 
@@ -714,4 +729,24 @@ def wait_for_media_premiere(media_id):
         media.manual_skip = True
         media.title = _(f'Premieres in {hours(media.published - now)} hours')
         media.save()
+
+@background(schedule=300, remove_existing_tasks=False)
+def delete_all_media_for_source(source_id, source_name):
+    source = None
+    try:
+        source = Source.objects.get(pk=source_id)
+    except Source.DoesNotExist:
+        # Task triggered but the source no longer exists, do nothing
+        log.error(f'Task delete_all_media_for_source(pk={source_id}) called but no '
+                  f'source exists with ID: {source_id}')
+        pass
+    mqs = Media.objects.all().defer(
+        'metadata',
+    ).filter(
+        source=source or source_id,
+    )
+    for media in mqs:
+        log.info(f'Deleting media for source: {source_name} item: {media.name}')
+        with atomic():
+            media.delete()
 
