@@ -1097,7 +1097,8 @@ class Media(models.Model):
             data = json.loads(self.metadata or "{}")
             if '_reduce_data_ran_at' in data.keys():
                 total_seconds = data['_reduce_data_ran_at']
-                ran_at = self.posix_epoch + timedelta(seconds=total_seconds)
+                assert isinstance(total_seconds, int), type(total_seconds)
+                ran_at = self.metadata_published(total_seconds)
                 if (now - ran_at) < timedelta(hours=1):
                     return data
 
