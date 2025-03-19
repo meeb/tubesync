@@ -162,24 +162,46 @@ def cleanup_completed_tasks():
     CompletedTask.objects.filter(run_at__lt=delta).delete()
 
 
+def schedule_media_servers_update():
+    with atomic():
+        # Schedule a task to update media servers
+        log.info(f'Scheduling media server updates')
+        verbose_name = _('Request media server rescan for "{}"')
+        for mediaserver in MediaServer.objects.all():
+            rescan_media_server(
+                str(mediaserver.pk),
+                priority=30,
+                verbose_name=verbose_name.format(mediaserver),
+                remove_existing_tasks=True,
+            )
+
+
 def cleanup_old_media():
-    for source in Source.objects.filter(delete_old_media=True, days_to_keep__gt=0):
-        delta = timezone.now() - timedelta(days=source.days_to_keep)
-        for media in source.media_source.filter(downloaded=True, download_date__lt=delta):
-            log.info(f'Deleting expired media: {source} / {media} '
-                     f'(now older than {source.days_to_keep} days / '
-                     f'download_date before {delta})')
-            # .delete() also triggers a pre_delete signal that removes the files
-            media.delete()
+    with atomic():
+        for source in Source.objects.filter(delete_old_media=True, days_to_keep__gt=0):
+            delta = timezone.now() - timedelta(days=source.days_to_keep)
+            for media in source.media_source.filter(downloaded=True, download_date__lt=delta):
+                log.info(f'Deleting expired media: {source} / {media} '
+                         f'(now older than {source.days_to_keep} days / '
+                         f'download_date before {delta})')
+                with atomic():
+                    # .delete() also triggers a pre_delete/post_delete signals that remove files
+                    media.delete()
+    schedule_media_servers_update()
 
 
 def cleanup_removed_media(source, videos):
+    if not source.delete_removed_media:
+        return
+    log.info(f'Cleaning up media no longer in source: {source}')
     media_objects = Media.objects.filter(source=source)
     for media in media_objects:
         matching_source_item = [video['id'] for video in videos if video['id'] == media.key]
         if not matching_source_item:
             log.info(f'{media.name} is no longer in source, removing')
-            media.delete()
+            with atomic():
+                media.delete()
+    schedule_media_servers_update()
 
 
 @background(schedule=300, remove_existing_tasks=True)
@@ -187,10 +209,16 @@ def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
     '''
+    cleanup_completed_tasks()
+    # deleting expired media should happen any time an index task is requested
+    cleanup_old_media()
     try:
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist:
         # Task triggered but the Source has been deleted, delete the task
+        return
+    # An inactive Source would return an empty list for videos anyway
+    if not source.is_active:
         return
     # Reset any errors
     source.has_failed = False
@@ -258,14 +286,8 @@ def index_source_task(source_id):
         task.verbose_name = verbose_name
         with atomic():
             task.save(update_fields={'verbose_name'})
-    # Tack on a cleanup of old completed tasks
-    cleanup_completed_tasks()
-    with atomic(durable=True):
-        # Tack on a cleanup of old media
-        cleanup_old_media()
-        if source.delete_removed_media:
-            log.info(f'Cleaning up media no longer in source: {source}')
-            cleanup_removed_media(source, videos)
+    # Cleanup of media no longer available from the source
+    cleanup_removed_media(source, videos)
 
 
 @background(schedule=0)
