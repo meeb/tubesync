@@ -198,6 +198,6 @@ def profile_func(func):
             ps.sort_stats(
                 pstats.SortKey.CUMULATIVE
             ).print_stats()
-        return (result, (s.getvalue(), ps, s),)
+        return (result, (s.getvalue(), ps, s,),)
     return wrapper
 
