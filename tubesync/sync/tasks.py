@@ -254,12 +254,10 @@ def index_source_task(source_id):
                         priority=20,
                         verbose_name=verbose_name.format(media.pk),
                     )
-
     if task:
         task.verbose_name = verbose_name
         with atomic():
             task.save(update_fields={'verbose_name'})
-
     # Tack on a cleanup of old completed tasks
     cleanup_completed_tasks()
     with atomic(durable=True):
