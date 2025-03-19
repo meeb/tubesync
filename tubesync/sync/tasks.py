@@ -133,6 +133,9 @@ def get_media_metadata_task(media_id):
 def get_media_premiere_task(media_id):
     return get_first_task('sync.tasks.wait_for_media_premiere', media_id)
 
+def get_source_check_task(source_id):
+    return get_first_task('sync.tasks.save_all_media_for_source', source_id)
+
 def get_source_index_task(source_id):
     return get_first_task('sync.tasks.index_source_task', source_id)
 
@@ -209,53 +212,52 @@ def index_source_task(source_id):
     if task:
         verbose_name = task.verbose_name
         tvn_format = '[{}' + f'/{num_videos}] {verbose_name}'
-    with atomic(durable=True):
-        for vn, video in enumerate(videos, start=1):
-            # Create or update each video as a Media object
-            key = video.get(source.key_field, None)
-            if not key:
-                # Video has no unique key (ID), it can't be indexed
-                continue
-            try:
-                media = Media.objects.get(key=key, source=source)
-            except Media.DoesNotExist:
-                media = Media(key=key)
-            media.source = source
-            media.duration = float(video.get(fields('duration', media), None) or 0) or None
-            media.title = str(video.get(fields('title', media), ''))[:200]
-            timestamp = video.get(fields('timestamp', media), None)
-            published_dt = media.metadata_published(timestamp)
-            if published_dt is not None:
-                media.published = published_dt
-            if task:
-                task.verbose_name = tvn_format.format(vn)
-            try:
-                with atomic():
-                    if task:
-                        task.save(update_fields={'verbose_name'})
-                    media.save()
-            except IntegrityError as e:
-                log.error(f'Index media failed: {source} / {media} with "{e}"')
-            else:
-                log.debug(f'Indexed media: {source} / {media}')
-                # log the new media instances
-                new_media_instance = (
-                    media.created and
-                    source.last_crawl and
-                    media.created >= source.last_crawl
+    for vn, video in enumerate(videos, start=1):
+        # Create or update each video as a Media object
+        key = video.get(source.key_field, None)
+        if not key:
+            # Video has no unique key (ID), it can't be indexed
+            continue
+        try:
+            media = Media.objects.get(key=key, source=source)
+        except Media.DoesNotExist:
+            media = Media(key=key)
+        media.source = source
+        media.duration = float(video.get(fields('duration', media), None) or 0) or None
+        media.title = str(video.get(fields('title', media), ''))[:200]
+        timestamp = video.get(fields('timestamp', media), None)
+        published_dt = media.metadata_published(timestamp)
+        if published_dt is not None:
+            media.published = published_dt
+        if task:
+            task.verbose_name = tvn_format.format(vn)
+            with atomic():
+                task.save(update_fields={'verbose_name'})
+        try:
+            media.save()
+        except IntegrityError as e:
+            log.error(f'Index media failed: {source} / {media} with "{e}"')
+        else:
+            log.debug(f'Indexed media: {source} / {media}')
+            # log the new media instances
+            new_media_instance = (
+                media.created and
+                source.last_crawl and
+                media.created >= source.last_crawl
+            )
+            if new_media_instance:
+                log.info(f'Indexed new media: {source} / {media}')
+                log.info(f'Scheduling task to download metadata for: {media.url}')
+                verbose_name = _('Downloading metadata for "{}"')
+                download_media_metadata(
+                    str(media.pk),
+                    priority=20,
+                    verbose_name=verbose_name.format(media.pk),
                 )
-                if new_media_instance:
-                    log.info(f'Indexed new media: {source} / {media}')
-                    log.info(f'Scheduling task to download metadata for: {media.url}')
-                    verbose_name = _('Downloading metadata for "{}"')
-                    download_media_metadata(
-                        str(media.pk),
-                        priority=20,
-                        verbose_name=verbose_name.format(media.pk),
-                    )
     if task:
         task.verbose_name = verbose_name
-        task.save(update_fields={'verbose_name'})
+        with atomic():
+            task.save(update_fields={'verbose_name'})
     # Tack on a cleanup of old completed tasks
     cleanup_completed_tasks()
     with atomic(durable=True):
@@ -621,6 +623,7 @@ def save_all_media_for_source(source_id):
 
     already_saved = set()
     mqs = Media.objects.filter(source=source)
+    task = get_source_check_task(source_id)
     refresh_qs = mqs.filter(
         can_download=False,
         skip=False,
@@ -628,22 +631,40 @@ def save_all_media_for_source(source_id):
         downloaded=False,
         metadata__isnull=False,
     )
-    for media in refresh_qs:
+    if task:
+        verbose_name = task.verbose_name
+        tvn_format = '[{}' + f'/{refresh_qs.count()}] {verbose_name}'
+    for mn, media in enumerate(refresh_qs, start=1):
+        if task:
+            task.verbose_name = tvn_format.format(mn)
+            with atomic():
+                task.save(update_fields={'verbose_name'})
         try:
             media.refresh_formats
         except YouTubeError as e:
             log.debug(f'Failed to refresh formats for: {source} / {media.key}: {e!s}')
             pass
         else:
-            media.save()
+            with atomic():
+                media.save()
             already_saved.add(media.uuid)
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
-    with atomic():
-        for media in mqs:
+    if task:
+        tvn_format = '[{}' + f'/{mqs.count()}] {verbose_name}'
+    for mn, media in enumerate(mqs, start=1):
+        if task:
+            task.verbose_name = tvn_format.format(mn)
+            with atomic():
+                task.save(update_fields={'verbose_name'})
             if media.uuid not in already_saved:
-                media.save()
+                with atomic():
+                    media.save()
+    if task:
+        task.verbose_name = verbose_name
+        with atomic():
+            task.save(update_fields={'verbose_name'})
 
 
 @background(schedule=60, remove_existing_tasks=True)
