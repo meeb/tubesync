@@ -39,6 +39,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
+      - name: Set environment variables with GitHub CLI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            # Fetch the latest+1 release from yt-dlp/FFmpeg-Builds
+            var='FFMPEG_DATE' ;
+            delim='"'"${var}"'_EOF"' ;
+            jq_arg='.[1].tag_name[10:]' ;
+            printf -- '%s<<%s\n' "${var}" "${delim}" ;
+            gh api repos/yt-dlp/FFmpeg-Builds/releases --cache 12h --jq "${jq_arg}" ;
+            printf -- '%s\n' "${delim}" ;
+            unset -v delim jq_arg var ;
+          } >> "${GITHUB_ENV}"
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -66,3 +80,5 @@ jobs:
           cache-to: type=inline
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
+            FFMPEG_DATE=${{ env.FFMPEG_DATE }}
+            FFMPEG_VERSION=N
