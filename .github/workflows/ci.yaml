@@ -74,7 +74,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'true' || 'false' }}
           tags: ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=registry,ref=ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
           cache-to: type=inline
