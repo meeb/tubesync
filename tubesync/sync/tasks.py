@@ -231,7 +231,7 @@ def index_source_task(source_id):
         if task:
             task.verbose_name = tvn_format.format(vn)
             with atomic():
-                    task.save(update_fields={'verbose_name'})
+                task.save(update_fields={'verbose_name'})
         try:
             media.save()
             log.debug(f'Indexed media: {source} / {media}')
