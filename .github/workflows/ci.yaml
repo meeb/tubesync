@@ -39,9 +39,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
+      - name: Retrieve yt-dlp/FFmpeg-Builds releases with GitHub CLI
+        id: ffmpeg
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            var='releases' ;
+            delim='"'"${var}"'_EOF"' ;
+            printf -- '%s<<%s\n' "${var}" "${delim}" ;
+            jq_arg='[ .[] | select( .tag_name | contains("autobuild-") ) | select( .prerelease == false ) | select( .draft == false ) | { "date": .tag_name[10:], "versions": [ .assets[] | select( .name | contains("ffmpeg-") ) | select( .name | contains("-linux64-") ) | .name[7:(.name | index("-linux64-"))] ], } ]' ;
+            gh api repos/yt-dlp/FFmpeg-Builds/releases --cache 12h --jq "${jq_arg}" ;
+            printf -- '%s\n' "${delim}" ;
+            unset -v delim jq_arg var ;
+          } >> "${GITHUB_OUTPUT}"
       - name: Set environment variables with GitHub CLI
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FFMPEG_RELEASES: ${{ steps.ffmpeg.outputs.releases }}
         run: |
           {
             # Fetch the latest+1 release from yt-dlp/FFmpeg-Builds
