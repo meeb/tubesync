@@ -34,7 +34,10 @@ jobs:
       - name: Run Django tests
         run: cd tubesync && python3 manage.py test --verbosity=2
   containerise:
+    if: ${{ !cancelled() }}
+    needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - name: Set environment variables with GitHub CLI
         env:
@@ -62,7 +65,7 @@ jobs:
             gh api repos/yt-dlp/FFmpeg-Builds/releases --cache 12h --jq "${jq_arg}" ;
             printf -- '%s\n' "${delim}" ;
             unset -v delim jq_arg var ;
-          } >> "$GITHUB_ENV"
+          } >> "${GITHUB_ENV}"
 
           # Delete the oldest unused cache entries
           printf -- '%s\n' 'Deleting unused cache entries' ;
@@ -90,7 +93,11 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v3
       - name: Log into GitHub Container Registry
-        run: echo '${{ secrets.GITHUB_TOKEN }}' | docker login --password-stdin --username '${{ github.actor }}' 'https://ghcr.io'
+        env:
+          DOCKER_REGISTRY: https://ghcr.io
+          DOCKER_USERNAME: ${{ github.actor }}
+          DOCKER_TOKEN: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+        run: echo "${DOCKER_TOKEN}" | docker login --password-stdin --username "${DOCKER_USERNAME}" "${DOCKER_REGISTRY}"
       - name: Checkout
         uses: actions/checkout@v4
       - name: Create cache directory on the runner
@@ -176,6 +183,7 @@ jobs:
                   rm -rf removed/* || : ;
               done &)
       - name: Build and push
+        timeout-minutes: 90
         uses: docker/build-push-action@v6
         env:
           WORMHOLE_CODE: ${{ steps.wormhole.outputs.code }}
@@ -183,7 +191,7 @@ jobs:
           WORMHOLE_TRANSIT: ${{ steps.wormhole.outputs.transit }}
         with:
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ 'success' == needs.test.result && 'true' || 'false' }}
           provenance: false
           tags: ${{ steps.origin.outputs.tag }}
           cache-from: |
@@ -195,7 +203,6 @@ jobs:
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             FFMPEG_DATE=${{ env.FFMPEG_DATE }}
-            FFMPEG_VERSION=N
           build-contexts: |
             cache-tubesync=.cache/saved
           secret-envs: |
