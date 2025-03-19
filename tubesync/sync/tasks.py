@@ -230,11 +230,10 @@ def index_source_task(source_id):
             media.published = published_dt
         if task:
             task.verbose_name = tvn_format.format(vn)
-        try:
             with atomic():
-                if task:
                     task.save(update_fields={'verbose_name'})
-                media.save()
+        try:
+            media.save()
             log.debug(f'Indexed media: {source} / {media}')
             # log the new media instances
             new_media_instance = (
@@ -248,7 +247,8 @@ def index_source_task(source_id):
             log.error(f'Index media failed: {source} / {media} with "{e}"')
     if task:
         task.verbose_name = verbose_name
-        task.save(update_fields={'verbose_name'})
+        with atomic():
+            task.save(update_fields={'verbose_name'})
     # Tack on a cleanup of old completed tasks
     cleanup_completed_tasks()
     # Tack on a cleanup of old media
