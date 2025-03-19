@@ -34,7 +34,7 @@ jobs:
       - name: Run Django tests
         run: cd tubesync && python3 manage.py test --verbosity=2
   containerise:
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 120
