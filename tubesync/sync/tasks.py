@@ -132,6 +132,9 @@ def get_media_metadata_task(media_id):
 def get_media_premiere_task(media_id):
     return get_first_task('sync.tasks.wait_for_media_premiere', media_id)
 
+def get_source_check_task(source_id):
+    return get_first_task('sync.tasks.save_all_media_for_source', source_id)
+
 def get_source_index_task(source_id):
     return get_first_task('sync.tasks.index_source_task', source_id)
 
@@ -605,6 +608,7 @@ def save_all_media_for_source(source_id):
 
     already_saved = set()
     mqs = Media.objects.filter(source=source)
+    task = get_source_check_task(source_id)
     refresh_qs = mqs.filter(
         can_download=False,
         skip=False,
@@ -612,22 +616,40 @@ def save_all_media_for_source(source_id):
         downloaded=False,
         metadata__isnull=False,
     )
-    for media in refresh_qs:
+    if task:
+        verbose_name = task.verbose_name
+        tvn_format = '[{}' + f'/{refresh_qs.count()}] {verbose_name}'
+    for mn, media in enumerate(refresh_qs, start=1):
+        if task:
+            task.verbose_name = tvn_format.format(mn)
+            with atomic():
+                task.save(update_fields={'verbose_name'})
         try:
             media.refresh_formats
         except YouTubeError as e:
             log.debug(f'Failed to refresh formats for: {source} / {media.key}: {e!s}')
             pass
         else:
-            media.save()
+            with atomic():
+                media.save()
             already_saved.add(media.uuid)
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
-    with atomic():
-        for media in mqs:
+    if task:
+        tvn_format = '[{}' + f'/{mqs.count()}] {verbose_name}'
+    for mn, media in enumerate(mqs, start=1):
+        if task:
+            task.verbose_name = tvn_format.format(mn)
+            with atomic():
+                task.save(update_fields={'verbose_name'})
             if media.uuid not in already_saved:
-                media.save()
+                with atomic():
+                    media.save()
+    if task:
+        task.verbose_name = verbose_name
+        with atomic():
+            task.save(update_fields={'verbose_name'})
 
 
 @background(schedule=60, remove_existing_tasks=True)
