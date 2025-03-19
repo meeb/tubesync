@@ -1,5 +1,5 @@
-import os
 from pathlib import Path
+from common.utils import getenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -97,7 +97,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = os.getenv('TZ', 'UTC')
+TIME_ZONE = getenv('TZ', 'UTC')
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
@@ -172,6 +172,7 @@ YOUTUBE_DEFAULTS = {
     'ignoreerrors': True,   # Skip on errors (such as unavailable videos in playlists)
     'cachedir': False,      # Disable on-disk caching
     'addmetadata': True,    # Embed metadata during postprocessing where available
+    'geo_verification_proxy': getenv('geo_verification_proxy').strip() or None,
 }
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 

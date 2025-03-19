@@ -20,6 +20,36 @@ ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 
 
+FROM debian:${DEBIAN_VERSION} AS tubesync-base
+
+ARG TARGETARCH
+
+ENV DEBIAN_FRONTEND="noninteractive" \
+    HOME="/root" \
+    LANGUAGE="en_US.UTF-8" \
+    LANG="en_US.UTF-8" \
+    LC_ALL="en_US.UTF-8" \
+    TERM="xterm" \
+    # Do not include compiled byte-code
+    PIP_NO_COMPILE=1 \
+    PIP_ROOT_USER_ACTION='ignore'
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    # to be careful, ensure that these files aren't from a different architecture
+    rm -f /var/cache/apt/*cache.bin ; \
+    # Update from the network and keep cache
+    rm -f /etc/apt/apt.conf.d/docker-clean ; \
+    set -x && \
+    apt-get update && \
+    # Install locales
+    apt-get -y --no-install-recommends install locales && \
+    printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
+    locale-gen en_US.UTF-8 && \
+    # Clean up
+    apt-get -y autopurge && \
+    apt-get -y autoclean
+
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
@@ -218,52 +248,24 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
-FROM debian:${DEBIAN_VERSION} AS tubesync
+FROM tubesync-base AS tubesync
 
 ARG S6_VERSION
 
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 
-ENV DEBIAN_FRONTEND="noninteractive" \
-    HOME="/root" \
-    LANGUAGE="en_US.UTF-8" \
-    LANG="en_US.UTF-8" \
-    LC_ALL="en_US.UTF-8" \
-    TERM="xterm" \
-    # Do not include compiled byte-code
-    PIP_NO_COMPILE=1 \
-    PIP_ROOT_USER_ACTION='ignore' \
-    S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0"
+ARG TARGETARCH
 
 ENV S6_VERSION="${S6_VERSION}" \
     FFMPEG_DATE="${FFMPEG_DATE}" \
     FFMPEG_VERSION="${FFMPEG_VERSION}"
 
-# Install third party software
-COPY --from=s6-overlay / /
-COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
-
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
   set -x && \
-  # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
-  # Install locales
-  apt-get -y --no-install-recommends install locales && \
-  printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
-  locale-gen en_US.UTF-8 && \
-  # Install file
-  apt-get -y --no-install-recommends install file && \
-  # Installed s6 (using COPY earlier)
-  file -L /command/s6-overlay-suexec && \
-  # Installed ffmpeg (using COPY earlier)
-  /usr/local/bin/ffmpeg -version && \
-  file /usr/local/bin/ff* && \
-  # Clean up file
-  apt-get -y autoremove --purge file && \
   # Install dependencies we keep
   # Install required distro packages
   apt-get -y --no-install-recommends install \
@@ -281,13 +283,35 @@ RUN --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
   curl \
   less \
   && \
+  # Link to the current python3 version
+  ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
+  # Create a 'app' user which the application will run as
+  groupadd app && \
+  useradd -M -d /app -s /bin/false -g app app && \
   # Clean up
   apt-get -y autopurge && \
-  apt-get -y autoclean && \
-  rm -rf /tmp/*
+  apt-get -y autoclean
 
-# Copy over pip.conf to use piwheels
-COPY pip.conf /etc/pip.conf
+# Install third party software
+COPY --from=s6-overlay / /
+COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    set -x && \
+    apt-get update && \
+    # Install file
+    apt-get -y --no-install-recommends install file && \
+    # Installed s6 (using COPY earlier)
+    file -L /command/s6-overlay-suexec && \
+    # Installed ffmpeg (using COPY earlier)
+    /usr/local/bin/ffmpeg -version && \
+    file /usr/local/bin/ff* && \
+    # Clean up file
+    apt-get -y autoremove --purge file && \
+    # Clean up
+    apt-get -y autopurge && \
+    apt-get -y autoclean
 
 # Switch workdir to the the app
 WORKDIR /app
@@ -295,12 +319,10 @@ WORKDIR /app
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
-    --mount=type=cache,id=apt-lib-cache,sharing=locked,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+    --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
-  # Update from the network and keep cache
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -316,9 +338,6 @@ RUN --mount=type=tmpfs,target=/cache \
   python3-pip \
   zlib1g-dev \
   && \
-  # Create a 'app' user which the application will run as
-  groupadd app && \
-  useradd -M -d /app -s /bin/false -g app app && \
   # Install non-distro packages
   cp -at /tmp/ "${HOME}" && \
   HOME="/tmp/${HOME#/}" \
@@ -348,12 +367,18 @@ RUN --mount=type=tmpfs,target=/cache \
 COPY tubesync /app
 COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
 
+# patch background_task
+COPY patches/background_task/ \
+    /usr/local/lib/python3/dist-packages/background_task/
+
+# patch yt_dlp
+COPY patches/yt_dlp/ \
+    /usr/local/lib/python3/dist-packages/yt_dlp/
+
 # Build app
 RUN set -x && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   rm -rf /app/db.sqlite3 && \
-  # Check nginx configuration
-  nginx -t && \
   # Run any required app commands
   /usr/bin/python3 -B /app/manage.py compilescss && \
   /usr/bin/python3 -B /app/manage.py collectstatic --no-input --link && \
@@ -363,8 +388,6 @@ RUN set -x && \
   mkdir -v -p /config/cache/pycache && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video && \
-  # Link to the current python3 version
-  ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
   # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
@@ -373,13 +396,8 @@ RUN set -x && \
 # Copy root
 COPY config/root /
 
-# patch background_task
-COPY patches/background_task/ \
-    /usr/local/lib/python3/dist-packages/background_task/
-
-# patch yt_dlp
-COPY patches/yt_dlp/ \
-    /usr/local/lib/python3/dist-packages/yt_dlp/
+# Check nginx configuration copied from config/root/etc
+RUN set -x && nginx -t
 
 # Create a healthcheck
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
@@ -387,6 +405,7 @@ HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck
 # ENVS and ports
 ENV PYTHONPATH="/app" \
     PYTHONPYCACHEPREFIX="/config/cache/pycache" \
+    S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0" \
     XDG_CACHE_HOME="/config/cache"
 EXPOSE 4848
 

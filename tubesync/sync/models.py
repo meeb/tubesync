@@ -333,6 +333,27 @@ class Source(models.Model):
         replaced = self.name.replace('_', '-').replace('&', 'and').replace('+', 'and')
         return slugify(replaced)[:80]
 
+    def deactivate(self):
+        self.download_media = False
+        self.index_streams = False
+        self.index_videos = False
+        self.index_schedule = IndexSchedule.NEVER
+        self.save(update_fields={
+            'download_media',
+            'index_streams',
+            'index_videos',
+            'index_schedule',
+        })
+
+    @property
+    def is_active(self):
+        active = (
+            self.download_media or
+            self.index_streams or
+            self.index_videos
+        )
+        return self.index_schedule and active
+
     @property
     def is_audio(self):
         return self.source_resolution == SourceResolution.AUDIO.value
@@ -1255,7 +1276,8 @@ class Media(models.Model):
         # Create a suitable filename from the source media_format
         media_format = str(self.source.media_format)
         media_details = self.format_dict
-        return media_format.format(**media_details)
+        result = media_format.format(**media_details)
+        return '.' + result if '/' == result[0] else result
 
     @property
     def directory_path(self):
@@ -1507,17 +1529,35 @@ class Media(models.Model):
 
     def calculate_episode_number(self):
         if self.source.is_playlist:
-            sorted_media = Media.objects.filter(source=self.source)
+            sorted_media = Media.objects.filter(
+                source=self.source,
+                metadata__isnull=False,
+            ).order_by(
+                'published',
+                'created',
+                'key',
+            )
         else:
-            self_year = self.upload_date.year if self.upload_date else self.created.year
-            filtered_media = Media.objects.filter(source=self.source, published__year=self_year)
-            filtered_media = [m for m in filtered_media if m.upload_date is not None]
-            sorted_media = sorted(filtered_media, key=lambda x: (x.upload_date, x.key))
-        position_counter = 1
-        for media in sorted_media:
+            self_year = self.created.year # unlikely to be accurate
+            if self.published:
+                self_year = self.published.year
+            elif self.has_metadata and self.upload_date:
+                self_year = self.upload_date.year
+            elif self.download_date:
+                # also, unlikely to be accurate
+                self_year = self.download_date.year
+            sorted_media = Media.objects.filter(
+                source=self.source,
+                metadata__isnull=False,
+                published__year=self_year,
+            ).order_by(
+                'published',
+                'created',
+                'key',
+            )
+        for counter, media in enumerate(sorted_media, start=1):
             if media == self:
-                return position_counter
-            position_counter += 1
+                return counter
 
     def get_episode_str(self, use_padding=False):
         episode_number = self.calculate_episode_number()

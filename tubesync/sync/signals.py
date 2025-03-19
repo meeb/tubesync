@@ -1,4 +1,5 @@
 from pathlib import Path
+from shutil import rmtree
 from tempfile import TemporaryDirectory
 from django.conf import settings
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
@@ -12,8 +13,8 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     download_media_thumbnail, download_media_metadata,
                     map_task_to_instance, check_source_directory_exists,
                     download_media, rescan_media_server, download_source_images,
-                    save_all_media_for_source, rename_media,
-                    get_media_metadata_task, get_media_download_task)
+                    delete_all_media_for_source, save_all_media_for_source,
+                    rename_media, get_media_metadata_task, get_media_download_task)
 from .utils import delete_file, glob_quote, mkdir_p
 from .filtering import filter_media
 from .choices import Val, YouTube_SourceType
@@ -43,6 +44,8 @@ def source_pre_save(sender, instance, **kwargs):
         work_directory = existing_dirpath
         for _count in range(parents_count, 0, -1):
             work_directory = work_directory.parent
+        if not Path(work_directory).resolve(strict=True).is_relative_to(Path(settings.DOWNLOAD_ROOT)):
+            work_directory = Path(settings.DOWNLOAD_ROOT)
         with TemporaryDirectory(suffix=('.'+new_dirpath.name), prefix='.tmp.', dir=work_directory) as tmp_dir:
             tmp_dirpath = Path(tmp_dir)
             existed = None
@@ -129,7 +132,7 @@ def source_post_save(sender, instance, created, **kwargs):
     verbose_name = _('Checking all media for source "{}"')
     save_all_media_for_source(
         str(instance.pk),
-        priority=9,
+        priority=25,
         verbose_name=verbose_name.format(instance.name),
         remove_existing_tasks=True
     )
@@ -139,16 +142,45 @@ def source_post_save(sender, instance, created, **kwargs):
 def source_pre_delete(sender, instance, **kwargs):
     # Triggered before a source is deleted, delete all media objects to trigger
     # the Media models post_delete signal
-    for media in Media.objects.filter(source=instance):
-        log.info(f'Deleting media for source: {instance.name} item: {media.name}')
-        media.delete()
+    log.info(f'Deactivating source: {instance.name}')
+    instance.deactivate()
+    log.info(f'Deleting tasks for source: {instance.name}')
+    delete_task_by_source('sync.tasks.index_source_task', instance.pk)
+    delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
+    delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
+    delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
+    # Schedule deletion of media
+    delete_task_by_source('sync.tasks.delete_all_media_for_source', instance.pk)
+    verbose_name = _('Deleting all media for source "{}"')
+    delete_all_media_for_source(
+        str(instance.pk),
+        str(instance.name),
+        priority=1,
+        verbose_name=verbose_name.format(instance.name),
+    )
+    # Try to do it all immediately
+    # If this is killed, the scheduled task should do the work instead.
+    delete_all_media_for_source.now(
+        str(instance.pk),
+        str(instance.name),
+    )
 
 
 @receiver(post_delete, sender=Source)
 def source_post_delete(sender, instance, **kwargs):
     # Triggered after a source is deleted
-    log.info(f'Deleting tasks for source: {instance.name}')
+    source = instance
+    log.info(f'Deleting tasks for removed source: {source.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
+    delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
+    delete_task_by_source('sync.tasks.delete_all_media_for_source', instance.pk)
+    delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
+    delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
+    # Remove the directory, if the user requested that
+    directory_path = Path(source.directory_path)
+    if (directory_path / '.to_be_removed').is_file():
+        log.info(f'Deleting directory for: {source.name}: {directory_path}')
+        rmtree(directory_path, True)
 
 
 @receiver(task_failed, sender=Task)
@@ -211,7 +243,7 @@ def media_post_save(sender, instance, created, **kwargs):
             rename_media(
                 str(media.pk),
                 queue=str(media.pk),
-                priority=16,
+                priority=20,
                 verbose_name=verbose_name.format(media.key, media.name),
                 remove_existing_tasks=True
             )
@@ -222,7 +254,7 @@ def media_post_save(sender, instance, created, **kwargs):
         verbose_name = _('Downloading metadata for "{}"')
         download_media_metadata(
             str(instance.pk),
-            priority=10,
+            priority=20,
             verbose_name=verbose_name.format(instance.pk),
             remove_existing_tasks=True
         )
@@ -342,6 +374,8 @@ def media_post_delete(sender, instance, **kwargs):
             log.info(f'Deleting file for: {instance} path: {file}')
             delete_file(file)
 
+    if not instance.source.is_active:
+        return
     # Schedule a task to update media servers
     for mediaserver in MediaServer.objects.all():
         log.info(f'Scheduling media server updates')
