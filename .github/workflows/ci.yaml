@@ -81,4 +81,3 @@ jobs:
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             FFMPEG_DATE=${{ env.FFMPEG_DATE }}
-            FFMPEG_VERSION=N
