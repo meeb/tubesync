@@ -1202,9 +1202,8 @@ class Media(models.Model):
 
     @property
     def thumbnail(self):
-        if not self.has_metadata:
-            return f'https://i.ytimg.com/vi/{self.key}/maxresdefault.jpg'
-        return self.get_metadata_first_value('thumbnail', '')
+        default = f'https://i.ytimg.com/vi/{self.key}/maxresdefault.jpg'
+        return self.get_metadata_first_value('thumbnail', default)
 
     @property
     def name(self):
