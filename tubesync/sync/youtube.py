@@ -132,7 +132,7 @@ def _subscriber_only(msg='', response=None):
     return False
 
 
-def get_media_info(url, days=None):
+def get_media_info(url, /, *, days=None, info_json=None):
     '''
         Extracts information from a YouTube URL and returns it as a dict. For a channel
         or playlist this returns a dict of all the videos on the channel or playlist
@@ -148,7 +148,9 @@ def get_media_info(url, days=None):
             f'yesterday-{days!s}days' if days else None
         )
     opts = get_yt_opts()
-    paths = opts.get('paths', dict())
+    class NoDefaultValue: pass # a unique Singleton, that may be checked for later
+    user_set = lambda k, d, default=NoDefaultValue: d[k] if k in d.keys() else default
+    paths = user_set('paths', opts, dict()) # opts.get('paths', dict())
     if 'temp' in paths:
         temp_dir_obj = TemporaryDirectory(prefix='.yt_dlp-', dir=paths['temp'])
         temp_dir_path = Path(temp_dir_obj.name)
@@ -159,12 +161,14 @@ def get_media_info(url, days=None):
     opts.update({
         'ignoreerrors': False, # explicitly set this to catch exceptions
         'ignore_no_formats_error': False, # we must fail first to try again with this enabled
+        'overwrites': False,
         'skip_download': True,
         'simulate': True,
         'logger': log,
         'extract_flat': True,
         'check_formats': True,
         'check_thumbnails': False,
+        'clean_infojson': False,
         'daterange': yt_dlp.utils.DateRange(start=start),
         'extractor_args': {
             'youtubetab': {'approximate_date': ['true']},
@@ -172,9 +176,20 @@ def get_media_info(url, days=None):
         'paths': paths,
         'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
         'verbose': True if settings.DEBUG else False,
+        'writeinfojson': user_set('writeinfojson', opts, bool(info_json)),
     })
     if start:
         log.debug(f'get_media_info: used date range: {opts["daterange"]} for URL: {url}')
+    try:
+        info_json_path = Path(info_json).resolve(strict=False)
+    except:
+        pass
+    else:
+        opts['paths'].update({
+            'infojson': user_set('infojson', opts['paths'], str(info_json_path))
+        })
+    if 'infojson' not in opts['paths'].keys():
+        opts.update({'writeinfojson': False})
     response = {}
     with yt_dlp.YoutubeDL(opts) as y:
         try:
