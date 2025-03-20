@@ -69,35 +69,17 @@ jobs:
               -F repo="${GH_API_GQL_REPO}" \
               -F releases="${GH_API_GQL_RELEASES}" \
               -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
-      - name: Set environment variables with GitHub CLI
-        env:
-          GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set environment variables with jq
         run: |
+          # jq
           cat >| .ffmpeg.releases.json <<'EOF'
           ${{ steps.ffmpeg.outputs.releases }}
           EOF
 
-          # gh api
-          GH_UPSTREAM_OWNER='.parent.owner.login' ;
-          GH_UPSTREAM_REPO='.parent.name' ;
-          GH_UPSTREAM_SLUG='.parent.full_name' ;
-
-          # jq
-          FFMPEG_DATE='[foreach .[] as $release ([{}, []]; [ .[0] + {($release.commit): ([ $release.date ] + (.[0][($release.commit)] // []) ) }, [ .[1][0] // $release.commit ] ] ; .[0][(.[1][0])] ) ][-1][0]' ;
+          FFMPEG_DATE='[foreach .[] as $release ([{}, []]; [ .[0] + { ($release.commit): ([ $release.date ] + (.[0][($release.commit)] // [])) }, [ .[1][0] // $release.commit ] ] ; .[0][(.[1][0])] )][-1][0]' ;
           FFMPEG_VERSION='.[]|select(.date == $previous)|.versions[]|select(startswith("N-"))' ;
 
           {
-            for var in GH_UPSTREAM_OWNER # GH_UPSTREAM_REPO GH_UPSTREAM_SLUG
-            do
-              # jq_arg="$( eval printf -- "'%s\n'" "$(printf -- '"${%s}"' "${var}")" )" ;
-              jq_arg="$( eval printf -- "'%s\n'" '"${'"${var}"'}"' )" ;
-              delim='"'"${var}"'_EOF"' ;
-              printf -- '%s<<%s\n' "${var}" "${delim}" ;
-              gh api "repos/${GITHUB_REPOSITORY}" --cache 5m --jq "${jq_arg}" ;
-              printf -- '%s\n' "${delim}" ;
-            done ;
-
             for var in FFMPEG_DATE FFMPEG_VERSION
             do
               # jq_arg="$( eval printf -- "'%s\n'" "$(printf -- '"${%s}"' "${var}")" )" ;
@@ -107,6 +89,29 @@ jobs:
               jq -r --arg previous "${previous_value-}" "${jq_arg}" -- .ffmpeg.releases.json ;
               printf -- '%s\n' "${delim}" ;
               previous_value="$( jq -r --arg previous "${previous_value-}" "${jq_arg}" -- .ffmpeg.releases.json )" ;
+            done ;
+            unset -v delim jq_arg previous_value var ;
+          } >> "${GITHUB_ENV}"
+          rm -v -f .ffmpeg.releases.json
+      - name: Set environment variables with GitHub CLI
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # gh api
+          GH_UPSTREAM_OWNER='.parent.owner.login' ;
+          GH_UPSTREAM_REPO='.parent.name' ;
+          GH_UPSTREAM_SLUG='.parent.full_name' ;
+
+          {
+            for var in GH_UPSTREAM_OWNER # GH_UPSTREAM_REPO GH_UPSTREAM_SLUG
+            do
+              # jq_arg="$( eval printf -- "'%s\n'" "$(printf -- '"${%s}"' "${var}")" )" ;
+              jq_arg="$( eval printf -- "'%s\n'" '"${'"${var}"'}"' )" ;
+              delim='"'"${var}"'_EOF"' ;
+              printf -- '%s<<%s\n' "${var}" "${delim}" ;
+              gh api "repos/${GITHUB_REPOSITORY}" --cache 1h --jq "${jq_arg}" ;
+              printf -- '%s\n' "${delim}" ;
             done ;
             unset -v delim jq_arg var ;
           } >> "${GITHUB_ENV}"
