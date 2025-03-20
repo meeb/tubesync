@@ -69,7 +69,7 @@ jobs:
               -F repo="${GH_API_GQL_REPO}" \
               -F releases="${GH_API_GQL_RELEASES}" \
               -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
-      - name: Set environment variables with GitHub CLI
+      - name: Set environment variables with jq
         run: |
           cat >| .ffmpeg.releases.json <<'EOF'
           ${{ steps.ffmpeg.outputs.releases }}
