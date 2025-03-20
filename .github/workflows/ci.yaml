@@ -39,10 +39,43 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - name: Set environment variables with GitHub CLI
+      - name: Retrieve yt-dlp/FFmpeg-Builds releases with GitHub CLI
+        id: ffmpeg
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_API_GQL_ASSETS: 25
+          GH_API_GQL_RELEASES: 35
+          GH_API_GQL_OWNER: yt-dlp
+          GH_API_GQL_REPO: FFmpeg-Builds
         run: |
+          gql_query='query($repo: String!, $owner: String!, $releases: Int!, $assets: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC}) { nodes { tagName, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } }, releaseAssets(first: $assets) { totalCount, nodes { name, size, downloadUrl } } } } } }' ;
+          gql_jq='[ .data.repository.releases.nodes[] | select((.isLatest or .isDraft or .isPrerelease) | not) | { "tag": .tag.name, "commit": .tag.target.oid, "date": .tag.name[1+(.tag.name|index("-")):], "assets": { "limit": '"${GH_API_GQL_ASSETS}"', "totalCount": .releaseAssets.totalCount }, "files": .releaseAssets.nodes, "versions": [ .releaseAssets.nodes[].name | select(contains("-linux64-"))[1+index("-"):index("-linux64-")] ] } ]' ;
+          {
+            var='releases' ;
+            delim='"'"${var}"'_EOF"' ;
+            printf -- '%s<<%s\n' "${var}" "${delim}" ;
+            gh api graphql --cache 12h \
+              -F assets="${GH_API_GQL_ASSETS}" \
+              -F owner="${GH_API_GQL_OWNER}" \
+              -F repo="${GH_API_GQL_REPO}" \
+              -F releases="${GH_API_GQL_RELEASES}" \
+              -f query="${gql_query}" --jq "${gql_jq}" ;
+            printf -- '%s\n' "${delim}" ;
+            unset -v delim jq_arg var ;
+          } >> "${GITHUB_OUTPUT}"
+            gh api graphql --cache 12h \
+              -F assets="${GH_API_GQL_ASSETS}" \
+              -F owner="${GH_API_GQL_OWNER}" \
+              -F repo="${GH_API_GQL_REPO}" \
+              -F releases="${GH_API_GQL_RELEASES}" \
+              -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
+      - name: Set environment variables with GitHub CLI
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cat >| .ffmpeg.releases.json <<'EOF'
+          ${{ steps.ffmpeg.outputs.releases }}
+          EOF
           GH_UPSTREAM_OWNER='.parent.owner.login' ;
           GH_UPSTREAM_REPO='.parent.name' ;
           GH_UPSTREAM_SLUG='.parent.full_name' ;
@@ -57,12 +90,20 @@ jobs:
               printf -- '%s\n' "${delim}" ;
             done ;
 
-            # Fetch the latest+1 release from yt-dlp/FFmpeg-Builds
             var='FFMPEG_DATE' ;
             delim='"'"${var}"'_EOF"' ;
-            jq_arg='.[1].tag_name[10:]' ;
             printf -- '%s<<%s\n' "${var}" "${delim}" ;
-            gh api repos/yt-dlp/FFmpeg-Builds/releases --cache 12h --jq "${jq_arg}" ;
+            jq_arg='[foreach .[] as $release ([{}, []]; [ .[0] + {($release.commit): ([ $release.date ] + (.[0][($release.commit)] // []) ) }, [ .[1][0] // $release.commit ] ] ; .[0][(.[1][0])] ) ][-1][0]' ;
+            jq -r "${jq_arg}" -- .ffmpeg.releases.json ;
+            printf -- '%s\n' "${delim}" ;
+
+            ffmpeg_date="$( jq -r "${jq_arg}" -- .ffmpeg.releases.json )"
+            
+            var='FFMPEG_VERSION' ;
+            delim='"'"${var}"'_EOF"' ;
+            printf -- '%s<<%s\n' "${var}" "${delim}" ;
+            jq_arg='.[]|select(.date == $date)|.versions[]|select(startswith("N-"))' ;
+            jq -r --arg date "${ffmpeg_date}" "${jq_arg}" -- .ffmpeg.releases.json ;
             printf -- '%s\n' "${delim}" ;
             unset -v delim jq_arg var ;
           } >> "${GITHUB_ENV}"
@@ -203,6 +244,7 @@ jobs:
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             FFMPEG_DATE=${{ env.FFMPEG_DATE }}
+            FFMPEG_VERSION=${{ env.FFMPEG_VERSION }}
           build-contexts: |
             cache-tubesync=.cache/saved
           secret-envs: |
