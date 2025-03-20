@@ -71,6 +71,7 @@ jobs:
               -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
       - name: Set environment variables with GitHub CLI
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
           cat >| .ffmpeg.releases.json <<'EOF'
@@ -105,14 +106,15 @@ jobs:
             jq_arg='.[]|select(.date == $date)|.versions[]|select(startswith("N-"))' ;
             jq -r --arg date "${ffmpeg_date}" "${jq_arg}" -- .ffmpeg.releases.json ;
             printf -- '%s\n' "${delim}" ;
+
             unset -v delim jq_arg var ;
           } >> "${GITHUB_ENV}"
 
           # Delete the oldest unused cache entries
           printf -- '%s\n' 'Deleting unused cache entries' ;
-          gh cache --repo "${GITHUB_REPOSITORY}" list --sort last_accessed_at --order asc --ref "${GITHUB_REF}" | \
+          gh cache list --sort last_accessed_at --order asc --ref "${GITHUB_REF}" | \
             awk '$NF == $(NF-1) {print $1}' | \
-            xargs -r -t -n 1 gh cache --repo "${GITHUB_REPOSITORY}" delete 2>&1 | \
+            xargs -r -t -n 1 gh cache delete 2>&1 | \
             tee /dev/stderr | wc -l | xargs -n 1 printf -- 'Total deleted: %d\n' ;
       - name: Upstream registry ref
         id: upstream
