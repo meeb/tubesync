@@ -1,10 +1,8 @@
 #!/command/with-contenv bash
 
 # Change runtime user UID and GID
-PUID="${PUID:-911}"
-PUID="${PUID:-911}"
-groupmod -o -g "$PGID" app
-usermod -o -u "$PUID" app
+groupmod -o -g "${PGID:=911}" app
+usermod -o -u "${PUID:=911}" app
 
 # Reset permissions
 chown -R app:app /run/app

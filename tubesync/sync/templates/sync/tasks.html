@@ -35,7 +35,7 @@
 </div>
 <div class="row">
   <div class="col s12">
-    <h2>{{ errors|length|intcomma }} Error{{ errors|length|pluralize }}</h2>
+    <h2>{{ total_errors|intcomma }} Total Error{{ total_errors|pluralize }} ({{ errors|length|intcomma }} on this page)</h2>
     <p>
       Tasks which generated an error are shown here. Tasks are retried a couple of
       times, so if there was an intermittent error such as a download got interrupted
@@ -49,14 +49,14 @@
           <i class="fas fa-history"></i> Task will be retried at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
         </a>
       {% empty %}
-        <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no tasks with errors.</span>
+        <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no tasks with errors on this page.</span>
       {% endfor %}
     </div>
   </div>
 </div>
 <div class="row">
   <div class="col s12">
-    <h2>{{ total_scheduled|intcomma }} Scheduled</h2>
+    <h2>{{ total_scheduled|intcomma }} Scheduled ({{ scheduled|length|intcomma }} on this page)</h2>
     <p>
       Tasks which are scheduled to run in the future or are waiting in a queue to be
       processed. They can be waiting for an available worker to run immediately, or
@@ -70,7 +70,7 @@
           <i class="fas fa-redo"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>{% endif %}
         </a>
       {% empty %}
-        <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no scheduled tasks.</span>
+        <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no scheduled tasks on this page.</span>
       {% endfor %}
     </div>
   </div>
