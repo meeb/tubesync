@@ -71,8 +71,8 @@ jobs:
               -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
       - name: Set environment variables with GitHub CLI
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cat >| .ffmpeg.releases.json <<'EOF'
           ${{ steps.ffmpeg.outputs.releases }}
