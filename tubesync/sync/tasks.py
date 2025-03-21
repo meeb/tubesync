@@ -24,7 +24,7 @@ from background_task import background
 from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import NoMediaException, NoMetadataException, DownloadFailedException
-from common.utils import json_serial
+from common.utils import json_serial, remove_enclosed
 from .models import Source, Media, MediaServer
 from .utils import (get_remote_image, resize_image_to_height, delete_file,
                     write_text_file, filter_response)
@@ -238,29 +238,12 @@ def index_source_task(source_id):
     fields = lambda f, m: m.get_metadata_field(f)
     task = get_source_index_task(source_id)
     if task:
-        # TODO: clean up a leftover prefix from a repeating task that did not complete
-        def remove_enclosed(haystack, /, open='[', close=']', sep=' ', *, valid=None, start=None, end=None):
-            if not haystack:
-                return haystack
-            assert open and close, 'open and close are required to be non-empty strings'
-            o = haystack.find(open, start, end)
-            sep = sep or ''
-            n = close + sep
-            c = haystack.find(n, len(open)+o, end)
-            if -1 in {o, c}:
-                return haystack
-            content = haystack[len(open)+o:c]
-            if valid is not None:
-                found = set(content)
-                valid = set(valid)
-                invalid = found - valid
-                # assert not invalid, f'Invalid characters {invalid} found in: {content}'
-                if invalid:
-                    return haystack
-            return haystack[:o] + haystack[len(n)+c:]
-
-        verbose_name = remove_enclosed(task.verbose_name, valid='0123456789/')
-        tvn_format = '[{}' + f'/{num_videos}] {verbose_name}'
+        verbose_name = remove_enclosed(
+            task.verbose_name, '[', ']', ' ',
+            valid='0123456789/,',
+            end=task.verbose_name.find('Index'),
+        )
+        tvn_format = '[{}' + f'/{num_videos:,}] {verbose_name}'
     for vn, video in enumerate(videos, start=1):
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
