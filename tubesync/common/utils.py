@@ -201,3 +201,24 @@ def profile_func(func):
         return (result, (s.getvalue(), ps, s,),)
     return wrapper
 
+
+def remove_enclosed(haystack, /, open='[', close=']', sep=' ', *, valid=None, start=None, end=None):
+    if not haystack:
+        return haystack
+    assert open and close, 'open and close are required to be non-empty strings'
+    o = haystack.find(open, start, end)
+    sep = sep or ''
+    n = close + sep
+    c = haystack.find(n, len(open)+o, end)
+    if -1 in {o, c}:
+        return haystack
+    if valid is not None:
+        content = haystack[len(open)+o:c]
+        found = set(content)
+        valid = set(valid)
+        invalid = found - valid
+        # assert not invalid, f'Invalid characters {invalid} found in: {content}'
+        if invalid:
+            return haystack
+    return haystack[:o] + haystack[len(n)+c:]
+
