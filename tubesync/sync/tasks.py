@@ -238,7 +238,28 @@ def index_source_task(source_id):
     fields = lambda f, m: m.get_metadata_field(f)
     task = get_source_index_task(source_id)
     if task:
-        verbose_name = task.verbose_name
+        # TODO: clean up a leftover prefix from a repeating task that did not complete
+        def remove_enclosed(haystack, /, open='[', close=']', sep=' ', *, valid=None, start=None, end=None):
+            if not haystack:
+                return haystack
+            assert open and close, 'open and close are required to be non-empty strings'
+            o = haystack.find(open, start, end)
+            sep = sep or ''
+            n = close + sep
+            c = haystack.find(n, len(open)+o, end)
+            if -1 in {o, c}:
+                return haystack
+            content = haystack[len(open)+o:c]
+            if valid is not None:
+                found = set(content)
+                valid = set(valid)
+                invalid = found - valid
+                # assert not invalid, f'Invalid characters {invalid} found in: {content}'
+                if invalid:
+                    return haystack
+            return haystack[:o] + haystack[len(n)+c:]
+
+        verbose_name = remove_enclosed(task.verbose_name, valid='0123456789/')
         tvn_format = '[{}' + f'/{num_videos}] {verbose_name}'
     for vn, video in enumerate(videos, start=1):
         # Create or update each video as a Media object
@@ -653,6 +674,7 @@ def save_all_media_for_source(source_id):
     )
     if task:
         verbose_name = task.verbose_name
+        # TODO: clean verbose_name if this task repeats
         tvn_format = '[{}' + f'/{refresh_qs.count()}] {verbose_name}'
     for mn, media in enumerate(refresh_qs, start=1):
         if task:
