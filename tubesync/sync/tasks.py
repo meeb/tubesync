@@ -243,7 +243,7 @@ def index_source_task(source_id):
             valid='0123456789/,',
             end=task.verbose_name.find('Index'),
         )
-        tvn_format = '[{}' + f'/{num_videos:,}] {verbose_name}'
+        tvn_format = '[{:,}' + f'/{num_videos:,}] {verbose_name}'
     for vn, video in enumerate(videos, start=1):
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
@@ -656,9 +656,12 @@ def save_all_media_for_source(source_id):
         metadata__isnull=False,
     )
     if task:
-        verbose_name = task.verbose_name
-        # TODO: clean verbose_name if this task repeats
-        tvn_format = '[{}' + f'/{refresh_qs.count()}] {verbose_name}'
+        verbose_name = remove_enclosed(
+            task.verbose_name, '[', ']', ' ',
+            valid='0123456789/,',
+            end=task.verbose_name.find('Check'),
+        )
+        tvn_format = '[{:,}' + f'/{refresh_qs.count():,}] {verbose_name}'
     for mn, media in enumerate(refresh_qs, start=1):
         if task:
             task.verbose_name = tvn_format.format(mn)
