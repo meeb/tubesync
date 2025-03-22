@@ -661,7 +661,7 @@ def save_all_media_for_source(source_id):
             valid='0123456789/,',
             end=task.verbose_name.find('Check'),
         )
-        tvn_format = '[{:,}' + f'/{refresh_qs.count():,}] {verbose_name}'
+        tvn_format = '[1/{:,}' + f'/{refresh_qs.count():,}] {verbose_name}'
     for mn, media in enumerate(refresh_qs, start=1):
         if task:
             task.verbose_name = tvn_format.format(mn)
@@ -680,15 +680,15 @@ def save_all_media_for_source(source_id):
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
     if task:
-        tvn_format = '[{}' + f'/{mqs.count()}] {verbose_name}'
+        tvn_format = '[2/{:,}' + f'/{mqs.count():,}] {verbose_name}'
     for mn, media in enumerate(mqs, start=1):
         if task:
             task.verbose_name = tvn_format.format(mn)
             with atomic():
                 task.save(update_fields={'verbose_name'})
-            if media.uuid not in already_saved:
-                with atomic():
-                    media.save()
+        if media.uuid not in already_saved:
+            with atomic():
+                media.save()
     if task:
         task.verbose_name = verbose_name
         with atomic():
