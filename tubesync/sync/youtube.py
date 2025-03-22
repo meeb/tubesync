@@ -169,8 +169,9 @@ def get_media_info(url, days=None):
         'extractor_args': {
             'youtube': {
                 'formats': ['missing_pot'],
-                'raise_incomplete_data': ['true'],
                 'max_comments': ['1,all,all,all'],
+                'player_client': ['default', 'web_safari'],
+                'raise_incomplete_data': ['true'],
             },
             'youtubetab': {'approximate_date': ['true']},
         },
