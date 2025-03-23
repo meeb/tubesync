@@ -16,9 +16,9 @@ from PIL import Image
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.utils import timezone
-from django.db.transaction import atomic
 from django.db import DatabaseError, IntegrityError
+from django.db.transaction import atomic
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from background_task import background
 from background_task.models import Task, CompletedTask
