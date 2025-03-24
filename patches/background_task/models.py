@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as tz
 from hashlib import sha1
+from pathlib import Path
 import json
 import logging
 import os
@@ -73,10 +74,17 @@ class TaskManager(models.Manager):
         return qs.filter(unlocked)
 
     def locked(self, now):
+        stats = None
+        kcore_path = Path('/proc/kcore')
+        boot_time = posix_epoch = datetime(1970, 1, 1, tzinfo=tz.utc)
+        if kcore_path.exists():
+            stats = kcore_path.stats()
+        if stats:
+            boot_time += timedelta(seconds=stats.st_mtime)
         max_run_time = app_settings.BACKGROUND_TASK_MAX_RUN_TIME
         qs = self.get_queryset()
         expires_at = now - timedelta(seconds=max_run_time)
-        locked = Q(locked_by__isnull=False) & Q(locked_at__gt=expires_at)
+        locked = Q(locked_by__isnull=False) & Q(locked_at__gt=expires_at) & Q(locked_at__gt=boot_time)
         return qs.filter(locked)
 
     def failed(self):
@@ -194,7 +202,7 @@ class Task(models.Model):
         """
         Check if the locked_by process is still running.
         """
-        if self.locked_by:
+        if self in objects.locked(timezone.now()) and self.locked_by:
             pid, node = self.locked_by.split('/', 1)
             # locked by a process on this node?
             if os.uname().nodename[:(64-10)] != node:
