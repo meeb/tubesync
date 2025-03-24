@@ -170,6 +170,7 @@ def get_media_info(url, days=None):
             'youtubetab': {'approximate_date': ['true']},
         },
         'paths': paths,
+        'skip_unavailable_fragments': False,
         'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
         'verbose': True if settings.DEBUG else False,
     })
