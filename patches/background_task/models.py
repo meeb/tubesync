@@ -208,14 +208,18 @@ class Task(models.Model):
 
     objects = TaskManager()
 
+    @property
+    def nodename(self):
+        return os.uname().nodename[:(64-10)]
+ 
     def locked_by_pid_running(self):
         """
         Check if the locked_by process is still running.
         """
         if self in objects.locked(timezone.now()) and self.locked_by:
-            pid, node = self.locked_by.split('/', 1)
+            pid, nodename = self.locked_by.split('/', 1)
             # locked by a process on this node?
-            if os.uname().nodename[:(64-10)] != node:
+            if nodename != self.nodename:
                 return False
             # is the process still running?
             try:
@@ -243,7 +247,7 @@ class Task(models.Model):
 
     def lock(self, locked_by):
         now = timezone.now()
-        owner = f'{locked_by[:8]}/{os.uname().nodename[:(64-10)}'
+        owner = f'{locked_by[:8]}/{self.nodename}'
         unlocked = Task.objects.unlocked(now).filter(pk=self.pk)
         updated = unlocked.update(locked_by=owner, locked_at=now)
         if updated:
