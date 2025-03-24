@@ -39,6 +39,23 @@ class TaskQuerySet(models.QuerySet):
 
 class TaskManager(models.Manager):
 
+    _boot_time = posix_epoch = datetime(1970, 1, 1, tzinfo=tz.utc)
+
+    @property
+    def boot_time(self):
+        if self._boot_time > self.posix_epoch:
+            return self._boot_time
+        stats = None
+        boot_time = self.posix_epoch
+        kcore_path = Path('/proc/kcore')
+        if kcore_path.exists():
+            stats = kcore_path.stats()
+        if stats:
+            boot_time += timedelta(seconds=stats.st_mtime)
+        if boot_time > self._boot_time:
+            self._boot_time = boot_time
+        return self._boot_time
+
     def get_queryset(self):
         return TaskQuerySet(self.model, using=self._db)
 
@@ -70,21 +87,14 @@ class TaskManager(models.Manager):
         max_run_time = app_settings.BACKGROUND_TASK_MAX_RUN_TIME
         qs = self.get_queryset()
         expires_at = now - timedelta(seconds=max_run_time)
-        unlocked = Q(locked_by=None) | Q(locked_at__lt=expires_at)
+        unlocked = Q(locked_by=None) | Q(locked_at__lt=expires_at) | Q(locked_at__lt=self.boot_time)
         return qs.filter(unlocked)
 
     def locked(self, now):
-        stats = None
-        kcore_path = Path('/proc/kcore')
-        boot_time = posix_epoch = datetime(1970, 1, 1, tzinfo=tz.utc)
-        if kcore_path.exists():
-            stats = kcore_path.stats()
-        if stats:
-            boot_time += timedelta(seconds=stats.st_mtime)
         max_run_time = app_settings.BACKGROUND_TASK_MAX_RUN_TIME
         qs = self.get_queryset()
         expires_at = now - timedelta(seconds=max_run_time)
-        locked = Q(locked_by__isnull=False) & Q(locked_at__gt=expires_at) & Q(locked_at__gt=boot_time)
+        locked = Q(locked_by__isnull=False) & Q(locked_at__gt=expires_at) & Q(locked_at__gt=self.boot_time)
         return qs.filter(locked)
 
     def failed(self):
