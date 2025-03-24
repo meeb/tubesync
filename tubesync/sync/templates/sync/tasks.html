@@ -25,7 +25,7 @@
       {% for task in running %}
         <a href="{% url task.url pk=task.instance.pk %}" class="collection-item">
           <i class="fas fa-running"></i> <strong>{{ task }}</strong><br>
-          <i class="far fa-clock"></i> Task started at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+          <i class="far fa-clock"></i> Task started at <strong>{{ task.locked_at|date:'Y-m-d H:i:s' }}</strong>
         </a>
       {% empty %}
         <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no running tasks.</span>
