@@ -296,7 +296,10 @@ def download_media(
         temp_dir_parent = ytopts['paths']['temp']
         temp_dir_prefix = f'{temp_dir_prefix}{v_key}-'
     temp_dir_obj = TemporaryDirectory(prefix=temp_dir_prefix,dir=temp_dir_parent)
-    temp_dir_path = Path(temp_dir_obj.name)
+    if temp_dir_obj and (Path(temp_dir_parent) / '.clean').exists():
+        temp_dir_path = Path(temp_dir_obj.name)
+    else:
+        temp_dir_path = Path(temp_dir_parent)
     (temp_dir_path / '.ignore').touch(exist_ok=True)
     ytopts['paths'].update({
         'home': str(output_dir),
