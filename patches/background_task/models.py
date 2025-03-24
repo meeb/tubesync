@@ -195,9 +195,14 @@ class Task(models.Model):
         Check if the locked_by process is still running.
         """
         if self.locked_by:
+            pid, node = self.locked_by.split('/', 1)
+            # locked by a process on this node?
+            if os.uname().nodename[:(64-10)] != node:
+                return False
+            # is the process still running?
             try:
-                # won't kill the process. kill is a bad named system call
-                os.kill(int(self.locked_by), 0)
+                # Signal number zero won't kill the process.
+                os.kill(int(pid), 0)
                 return True
             except:
                 return False
@@ -220,8 +225,9 @@ class Task(models.Model):
 
     def lock(self, locked_by):
         now = timezone.now()
+        owner = f'{locked_by[:8]}/{os.uname().nodename[:(64-10)}'
         unlocked = Task.objects.unlocked(now).filter(pk=self.pk)
-        updated = unlocked.update(locked_by=locked_by, locked_at=now)
+        updated = unlocked.update(locked_by=owner, locked_at=now)
         if updated:
             return Task.objects.get(pk=self.pk)
         return None
@@ -423,9 +429,14 @@ class CompletedTask(models.Model):
         Check if the locked_by process is still running.
         """
         if self.locked_by:
+            pid, node = self.locked_by.split('/', 1)
+            # locked by a process on this node?
+            if os.uname().nodename[:(64-10)] != node:
+                return False
+            # is the process still running?
             try:
                 # won't kill the process. kill is a bad named system call
-                os.kill(int(self.locked_by), 0)
+                os.kill(int(pid), 0)
                 return True
             except:
                 return False
