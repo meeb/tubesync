@@ -49,7 +49,7 @@ class TaskManager(models.Manager):
         boot_time = self.posix_epoch
         kcore_path = Path('/proc/kcore')
         if kcore_path.exists():
-            stats = kcore_path.stats()
+            stats = kcore_path.stat()
         if stats:
             boot_time += timedelta(seconds=stats.st_mtime)
         if boot_time > self._boot_time:
