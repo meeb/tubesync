@@ -288,7 +288,7 @@ def index_source_task(source_id):
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
         else:
-            log.debug(f'Indexed media: {source} / {media}')
+            log.debug(f'Indexed media: {vn}: {source} / {media}')
             # log the new media instances
             new_media_instance = (
                 media.created and
