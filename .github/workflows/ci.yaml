@@ -30,6 +30,7 @@ jobs:
       - name: Set up Django environment
         run: |
           cp -v -p tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
+          cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/background_task/ patches/background_task/*
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/yt_dlp/ patches/yt_dlp/*
       - name: Run Django tests
         run: cd tubesync && python3 manage.py test --verbosity=2
