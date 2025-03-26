@@ -74,7 +74,7 @@ jobs:
               -F releases="${GH_API_GQL_RELEASES}" \
               -f query="${gql_query}" --jq "${gql_jq}" ;
             printf -- '%s\n' "${delim}" ;
-            jq_arg='map(select(.isLatest))' ;
+            jq_arg='map(select(.isLatest))[0]' ;
             var='latest-release' ;
             delim="$(mk_delim "${var}")" ;
             printf -- '%s<<%s\n' "${var}" "${delim}" ;
@@ -97,7 +97,10 @@ jobs:
         run: |
           cat <<'EOF'
           ${{ toJSON(fromJSON(steps.yt-dlp.outputs.latest-release)) }}
-          'EOF'
+          EOF
+          cat <<'EOF'
+          ${{ fromJSON(steps.yt-dlp.outputs.latest-release).tag.name }}
+          EOF
           printf -- '%s=%s\n' >> "${GITHUB_OUTPUT}" \
            'ytdlp_tag' "$(< tag-yt-dlp)"
 
