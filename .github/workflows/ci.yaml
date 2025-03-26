@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
+      lowercase-variables-actor: ${{ steps.lowercase-variables.outputs.actor }}
+      lowercase-variables-repository_owner: ${{ steps.lowercase-variables.outputs.repository_owner }}
       string-lowercase: ${{ steps.string.outputs.lowercase }}
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
       ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
@@ -32,6 +34,20 @@ jobs:
         uses: ASzc/change-string-case-action@v6
         with:
           string: ${{ github.actor }}
+      - name: Lowercase GitHub variables
+        id: lowercase-variables
+        shell: bash
+        run: |
+          for var in \
+            actor='${{ github.actor }}' \
+            repository_owner='${{ github.repository_owner }}'
+          do
+            k="$(cut -d '=' -f 1)"
+            v="${var#${k}=}"
+            printf -- '%s=%s\n' -- >> "${GITHUB_OUTPUT}" \
+              "${k}" "${v,,}"
+          done
+          unset -v k v var
       - name: Retrieve yt-dlp/FFmpeg-Builds releases with GitHub CLI
         id: ffmpeg
         env:
