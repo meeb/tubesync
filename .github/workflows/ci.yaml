@@ -16,7 +16,7 @@ jobs:
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
       string-lowercase: ${{ steps.string.outputs.lowercase }}
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
-      ytdlp_tag: ${{ steps.set.outputs.ytdlp_tag }}
+      ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
     steps:
       - name: Lowercase github username for ghcr
         id: string
@@ -32,11 +32,12 @@ jobs:
           GH_API_GQL_OWNER: yt-dlp
           GH_API_GQL_REPO: FFmpeg-Builds
         run: |
-          gql_query='query($repo: String!, $owner: String!, $releases: Int!, $assets: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC}) { nodes { tagName, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } }, releaseAssets(first: $assets) { totalCount, nodes { name, size, downloadUrl } } } } } }' ;
+          gql_query='query($repo: String!, $owner: String!, $releases: Int!, $assets: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { tagName, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } }, releaseAssets(first: $assets) { totalCount, nodes { name, size, downloadUrl } } } } } }' ;
           gql_jq='[ .data.repository.releases.nodes[] | select((.isLatest or .isDraft or .isPrerelease) | not) | { "tag": .tag.name, "commit": .tag.target.oid, "date": .tag.name[1+(.tag.name|index("-")):], "assets": { "limit": '"${GH_API_GQL_ASSETS}"', "totalCount": .releaseAssets.totalCount }, "files": .releaseAssets.nodes, "versions": [ .releaseAssets.nodes[].name | select(contains("-linux64-"))[1+index("-"):index("-linux64-")] ] } ]' ;
+          mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
           {
             var='releases' ;
-            delim='"'"${var}"'_EOF"' ;
+            delim="$(mk_delim "${var}")" ;
             printf -- '%s<<%s\n' "${var}" "${delim}" ;
             gh api graphql --cache 12h \
               -F assets="${GH_API_GQL_ASSETS}" \
@@ -46,13 +47,14 @@ jobs:
               -f query="${gql_query}" --jq "${gql_jq}" ;
             printf -- '%s\n' "${delim}" ;
             unset -v delim jq_arg var ;
-          } >> "${GITHUB_OUTPUT}"
-            gh api graphql --cache 12h \
-              -F assets="${GH_API_GQL_ASSETS}" \
-              -F owner="${GH_API_GQL_OWNER}" \
-              -F repo="${GH_API_GQL_REPO}" \
-              -F releases="${GH_API_GQL_RELEASES}" \
-              -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
+          } >> "${GITHUB_OUTPUT}" ;
+          # Log the human version
+          gh api graphql --cache 12h \
+            -F assets="${GH_API_GQL_ASSETS}" \
+            -F owner="${GH_API_GQL_OWNER}" \
+            -F repo="${GH_API_GQL_REPO}" \
+            -F releases="${GH_API_GQL_RELEASES}" \
+            -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
       - name: Retrieve yt-dlp/yt-dlp releases with GitHub CLI
         id: yt-dlp
         env:
@@ -61,9 +63,9 @@ jobs:
           GH_API_GQL_OWNER: yt-dlp
           GH_API_GQL_REPO: yt-dlp
         run: |
-          mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
-          gql_query='query($repo: String!, $owner: String!, $releases: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { name, createdAt, publishedAt, updatedAt, url, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } } } } } }' ;
+          gql_query='query($repo: String!, $owner: String!, $releases: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { name, createdAt, publishedAt, updatedAt, tagName, url, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } } } } } }' ;
           gql_jq='[ .data.repository.releases.nodes[] | select((.isDraft or .isPrerelease) | not) | del(.isDraft, .isPrerelease) ]' ;
+          mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
           {
             var='releases' ;
             delim="$(mk_delim "${var}")" ;
@@ -85,24 +87,13 @@ jobs:
               -f query="${gql_query}" --jq "${gql_jq}" | jq -c "${jq_arg}" -- ;
             printf -- '%s\n' "${delim}" ;
             unset -v delim jq_arg var ;
-          } >> "${GITHUB_OUTPUT}"
-            gh api graphql --cache 12h \
-              -F owner="${GH_API_GQL_OWNER}" \
-              -F repo="${GH_API_GQL_REPO}" \
-              -F releases="${GH_API_GQL_RELEASES}" \
-              -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
-      - uses: actions/checkout@v4
-      - name: Set outputs
-        id: set
-        run: |
-          cat <<'EOF'
-          ${{ toJSON(fromJSON(steps.yt-dlp.outputs.latest-release)) }}
-          EOF
-          cat <<'EOF'
-          ${{ fromJSON(steps.yt-dlp.outputs.latest-release).tag.name }}
-          EOF
-          printf -- '%s=%s\n' >> "${GITHUB_OUTPUT}" \
-           'ytdlp_tag' "$(< tag-yt-dlp)"
+          } >> "${GITHUB_OUTPUT}" ;
+          # Log the human version
+          gh api graphql --cache 12h \
+            -F owner="${GH_API_GQL_OWNER}" \
+            -F repo="${GH_API_GQL_REPO}" \
+            -F releases="${GH_API_GQL_RELEASES}" \
+            -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
 
   test:
     runs-on: ubuntu-22.04
@@ -182,4 +173,4 @@ jobs:
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             FFMPEG_DATE=${{ env.FFMPEG_DATE }}
             FFMPEG_VERSION=${{ env.FFMPEG_VERSION }}
-            YTDLP_DATE=${{ needs.info.outputs.ytdlp_tag }}
+            YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
