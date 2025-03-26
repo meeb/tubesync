@@ -19,7 +19,7 @@ on:
 
 jobs:
   info:
-    if: ${{ !cancelled() && 'pull_request' != github.event_name }}
+    #if: ${{ !cancelled() && 'pull_request' != github.event_name }}
     runs-on: ubuntu-latest
     outputs:
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
@@ -175,7 +175,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           platforms: linux/amd64,linux/arm64
-          push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'true' || 'false' }}
+          push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
           tags: ghcr.io/${{ needs.info.outputs.string-lowercase }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=registry,ref=ghcr.io/${{ needs.info.outputs.string-lowercase }}/${{ env.IMAGE_NAME }}:latest
           cache-to: type=inline
