@@ -8,9 +8,18 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
 
 jobs:
   info:
+    if: ${{ !cancelled() && 'pull_request' != github.event_name }}
     runs-on: ubuntu-latest
     outputs:
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
@@ -96,6 +105,7 @@ jobs:
             -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
 
   test:
+    if: ${{ !cancelled() && ( 'pull_request' != github.event_name || (! github.event.pull_request.draft) ) }}
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -121,7 +131,7 @@ jobs:
         run: cd tubesync && python3 manage.py test --verbosity=2
 
   containerise:
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && 'success' == needs.info.result }}
     needs: ['info', 'test']
     runs-on: ubuntu-latest
     timeout-minutes: 120
