@@ -216,7 +216,7 @@ class Task(models.Model):
         """
         Check if the locked_by process is still running.
         """
-        if self in objects.locked(timezone.now()) and self.locked_by:
+        if self in self.objects.locked(timezone.now()) and self.locked_by:
             pid, nodename = self.locked_by.split('/', 1)
             # locked by a process on this node?
             if nodename != self.nodename:
