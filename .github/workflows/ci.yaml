@@ -15,6 +15,7 @@ jobs:
     outputs:
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
       string-lowercase: ${{ steps.string.outputs.lowercase }}
+      ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
       ytdlp_tag: ${{ steps.set.outputs.ytdlp_tag }}
     steps:
       - name: Lowercase github username for ghcr
@@ -60,17 +61,28 @@ jobs:
           GH_API_GQL_OWNER: yt-dlp
           GH_API_GQL_REPO: yt-dlp
         run: |
-          gql_query='query($repo: String!, $owner: String!, $releases: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { name, createdAt, publishedAt, updatedAt, description, url, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } } } } } }' ;
+          mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
+          gql_query='query($repo: String!, $owner: String!, $releases: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { name, createdAt, publishedAt, updatedAt, url, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } } } } } }' ;
           gql_jq='[ .data.repository.releases.nodes[] | select((.isDraft or .isPrerelease) | not) | del(.isDraft, .isPrerelease) ]' ;
           {
             var='releases' ;
-            delim='"'"${var}"'_EOF"' ;
+            delim="$(mk_delim "${var}")" ;
             printf -- '%s<<%s\n' "${var}" "${delim}" ;
             gh api graphql --cache 12h \
               -F owner="${GH_API_GQL_OWNER}" \
               -F repo="${GH_API_GQL_REPO}" \
               -F releases="${GH_API_GQL_RELEASES}" \
               -f query="${gql_query}" --jq "${gql_jq}" ;
+            printf -- '%s\n' "${delim}" ;
+            jq_arg='map(select(.isLatest))' ;
+            var='latest-release' ;
+            delim="$(mk_delim "${var}")" ;
+            printf -- '%s<<%s\n' "${var}" "${delim}" ;
+            gh api graphql --cache 12h \
+              -F owner="${GH_API_GQL_OWNER}" \
+              -F repo="${GH_API_GQL_REPO}" \
+              -F releases="${GH_API_GQL_RELEASES}" \
+              -f query="${gql_query}" --jq "${gql_jq}" | jq -c "${jq_arg}" -- ;
             printf -- '%s\n' "${delim}" ;
             unset -v delim jq_arg var ;
           } >> "${GITHUB_OUTPUT}"
@@ -83,6 +95,9 @@ jobs:
       - name: Set outputs
         id: set
         run: |
+          cat <<'EOF'
+          ${{ toJSON(fromJSON(steps.yt-dlp.outputs.latest-release)) }}
+          'EOF'
           printf -- '%s=%s\n' >> "${GITHUB_OUTPUT}" \
            'ytdlp_tag' "$(< tag-yt-dlp)"
 
