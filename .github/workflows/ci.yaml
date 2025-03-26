@@ -10,6 +10,18 @@ on:
       - main
 
 jobs:
+  info:
+    runs-on: ubuntu-latest
+    outputs:
+      ytdlp_tag: ${{ steps.set.outputs.ytdlp_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set outputs
+        id: set
+        run: |
+          printf -- '%s=%s\n' >> "${GITHUB_OUTPUT}" \
+           'ytdlp_tag' "$(< tag-yt-dlp)"
+
   test:
     runs-on: ubuntu-22.04
     strategy:
@@ -34,9 +46,10 @@ jobs:
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/yt_dlp/ patches/yt_dlp/*
       - name: Run Django tests
         run: cd tubesync && python3 manage.py test --verbosity=2
+
   containerise:
     if: ${{ !cancelled() }}
-    needs: test
+    needs: ['info', 'test']
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -122,3 +135,5 @@ jobs:
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             FFMPEG_DATE=${{ env.FFMPEG_DATE }}
             FFMPEG_VERSION=${{ env.FFMPEG_VERSION }}
+            YTDLP_DATE=${{ needs.info.outputs.ytdlp_tag }}
+
