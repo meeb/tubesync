@@ -60,8 +60,8 @@ jobs:
           GH_API_GQL_OWNER: yt-dlp
           GH_API_GQL_REPO: yt-dlp
         run: |
-          gql_query='query($repo: String!, $owner: String!, $releases: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC}) { nodes { tagName, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } } } } } }' ;
-          gql_jq='[ .data.repository.releases.nodes[] | select((.isDraft or .isPrerelease) | not) | { "tag": .tag, "date": .tag.name } ]' ;
+          gql_query='query($repo: String!, $owner: String!, $releases: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { name, createdAt, url, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } } } } } }' ;
+          gql_jq='[ .data.repository.releases.nodes[] | select((.isDraft or .isPrerelease) | not) ]' ;
           {
             var='releases' ;
             delim='"'"${var}"'_EOF"' ;
