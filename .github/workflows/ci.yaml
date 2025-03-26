@@ -52,6 +52,33 @@ jobs:
               -F repo="${GH_API_GQL_REPO}" \
               -F releases="${GH_API_GQL_RELEASES}" \
               -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
+      - name: Retrieve yt-dlp/yt-dlp releases with GitHub CLI
+        id: yt-dlp
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_API_GQL_RELEASES: 25
+          GH_API_GQL_OWNER: yt-dlp
+          GH_API_GQL_REPO: yt-dlp
+        run: |
+          gql_query='query($repo: String!, $owner: String!, $releases: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC}) { nodes { tagName, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } } } } } }' ;
+          gql_jq='[ .data.repository.releases.nodes[] | select((.isDraft or .isPrerelease) | not) | { "tag": .tag, "date": .tag.name } ]' ;
+          {
+            var='releases' ;
+            delim='"'"${var}"'_EOF"' ;
+            printf -- '%s<<%s\n' "${var}" "${delim}" ;
+            gh api graphql --cache 12h \
+              -F owner="${GH_API_GQL_OWNER}" \
+              -F repo="${GH_API_GQL_REPO}" \
+              -F releases="${GH_API_GQL_RELEASES}" \
+              -f query="${gql_query}" --jq "${gql_jq}" ;
+            printf -- '%s\n' "${delim}" ;
+            unset -v delim jq_arg var ;
+          } >> "${GITHUB_OUTPUT}"
+            gh api graphql --cache 12h \
+              -F owner="${GH_API_GQL_OWNER}" \
+              -F repo="${GH_API_GQL_REPO}" \
+              -F releases="${GH_API_GQL_RELEASES}" \
+              -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
       - uses: actions/checkout@v4
       - name: Set outputs
         id: set
