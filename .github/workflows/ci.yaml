@@ -1,4 +1,4 @@
-name: Run Django tests for TubeSync
+name: CI
 
 env:
   IMAGE_NAME: tubesync
