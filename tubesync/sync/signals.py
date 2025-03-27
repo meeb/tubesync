@@ -31,6 +31,7 @@ def source_pre_save(sender, instance, **kwargs):
         log.debug(f'source_pre_save signal: no existing source: {sender} - {instance}')
         return
 
+    mkdir_p(existing_source.directory_path.resolve(strict=False))
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
     new_dirpath = instance.directory_path.resolve(strict=False)
     if existing_dirpath != new_dirpath:
