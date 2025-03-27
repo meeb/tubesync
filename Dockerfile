@@ -315,6 +315,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 # Switch workdir to the the app
 WORKDIR /app
 
+ARG YTDLP_DATE
+
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
