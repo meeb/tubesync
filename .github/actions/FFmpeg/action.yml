@@ -1,0 +1,27 @@
+name: 'FFmpeg Builds'
+description: 'Use GitHub CLI & API to retrieve information about FFmpeg Build releases.'
+
+inputs:
+  who-to-greet:  # id of input
+    description: 'Who to greet'
+    required: false
+    default: 'World'
+
+outputs:
+  random-number:
+    description: "Random number"
+    value: ${{ steps.first.outputs.random-number }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: First step
+      id: 'first'
+      env:
+        INPUT_WHO_TO_GREET: ${{ inputs.who-to-greet }}
+      shell: 'bash'
+      run: |
+        echo 'It worked!'
+        echo "random-number=${RANDOM}" >> "${GITHUB_OUTPUT}"
+        ls -al '${{ github.action_path }}'
+        echo "Hello ${INPUT_WHO_TO_GREET}."
