@@ -23,33 +23,22 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
-      lowercase-variables-actor: ${{ steps.lowercase-variables.outputs.actor }}
-      lowercase-variables-repository_owner: ${{ steps.lowercase-variables.outputs.repository_owner }}
-      string-lowercase: ${{ steps.string.outputs.lowercase }}
+      lowercase-github-actor: ${{ steps.github-actor.outputs.lowercase }}
+      lowercase-github-repository_owner: ${{ steps.github-repository_owner.outputs.lowercase }}
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
       ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
     steps:
-      - name: Lowercase github username for ghcr
-        id: string
-        uses: ASzc/change-string-case-action@v6
+      - uses: actions/checkout@v4
+      - name: Lowercase github username
+        id: github-actor
+        uses: ./.github/actions/string-case
         with:
           string: ${{ github.actor }}
-      - name: Lowercase GitHub variables
-        id: lowercase-variables
-        shell: bash
-        run: |
-          set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
-          for var in \
-            actor='${{ github.actor }}' \
-            repository_owner='${{ github.repository_owner }}'
-          do
-            k="$( cut -d '=' -f 1 <<<"${var}" )" ;
-            v="${var#${k}=}" ;
-            set_sl_var >> "${GITHUB_OUTPUT}" \
-              "${k}" "${v,,}" ;
-          done ;
-          unset -v k v var ;
-      - uses: actions/checkout@v4
+      - name: Lowercase github repository owner
+        id: github-repository_owner
+        uses: ./.github/actions/string-case
+        with:
+          string: ${{ github.repository_owner }}
       - name: Retrieve yt-dlp/FFmpeg-Builds releases with GitHub CLI
         id: ffmpeg
         uses: ./.github/actions/FFmpeg
@@ -132,10 +121,10 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
-          tags: ghcr.io/${{ needs.info.outputs.string-lowercase }}/${{ env.IMAGE_NAME }}:latest
+          tags: ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:latest
           cache-from: |
-            type=registry,ref=ghcr.io/${{ needs.info.outputs.string-lowercase }}/${{ env.IMAGE_NAME }}:latest
-            type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+            type=registry,ref=ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:latest
+            type=registry,ref=ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:latest
             type=gha
           cache-to: |
             type=gha,mode=max
