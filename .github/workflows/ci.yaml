@@ -38,17 +38,18 @@ jobs:
         id: lowercase-variables
         shell: bash
         run: |
+          set -x ;
           set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
           for var in \
             actor='${{ github.actor }}' \
             repository_owner='${{ github.repository_owner }}'
           do
-            k="$(cut -d '=' -f 1)"
-            v="${var#${k}=}"
+            k="$(cut -d '=' -f 1)" ;
+            v="${var#${k}=}" ;
             set_sl_var >> "${GITHUB_OUTPUT}" \
-              "${k}" "${v,,}"
-          done
-          unset -v k v var
+              "${k}" "${v,,}" ;
+          done ;
+          unset -v k v var ;
       - uses: actions/checkout@v4
       - name: Retrieve yt-dlp/FFmpeg-Builds releases with GitHub CLI
         id: ffmpeg
