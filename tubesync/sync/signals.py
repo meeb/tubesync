@@ -159,7 +159,7 @@ def source_pre_delete(sender, instance, **kwargs):
         delete_all_media_for_source,
         str(source.pk),
         str(source.name),
-        source.directory_path,
+        str(source.directory_path),
         priority=1,
         verbose_name=verbose_name.format(source.name),
     ))
