@@ -38,13 +38,12 @@ jobs:
         id: lowercase-variables
         shell: bash
         run: |
-          set -x ;
           set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
-          for var in \
+          set -x ; for var in \
             actor='${{ github.actor }}' \
             repository_owner='${{ github.repository_owner }}'
           do
-            k="$(cut -d '=' -f 1)" ;
+            k="$( cut -d '=' -f 1 <<<"${var}" )" ;
             v="${var#${k}=}" ;
             set_sl_var >> "${GITHUB_OUTPUT}" \
               "${k}" "${v,,}" ;
