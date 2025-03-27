@@ -26,6 +26,7 @@ runs:
         INPUT_STRING: '${{ inputs.string }}'
       shell: 'bash'
       run: |
+        printf -- 'Manipulating string: %s\n' "${INPUT_STRING}"
         set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
         mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
         open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
@@ -51,3 +52,6 @@ runs:
           close_ml_var "${delim}" "${var}" ;
 
         } >> "${GITHUB_OUTPUT}"
+        printf -- '%s: %s\n' 'lowercase' "${INPUT_STRING,,}"
+        printf -- '%s: %s\n' 'uppercase' "${INPUT_STRING^^}"
+        printf -- '%s: %s\n' 'capitalized' "${INPUT_STRING^}"
