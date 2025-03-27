@@ -800,6 +800,7 @@ class Media(models.Model):
         if self.created and self.downloaded and not self.media_file_exists:
             fp_list = list((self.filepath,))
             if self.media_file:
+                # Try the new computed directory + the file base name from the database
                 fp_list.append(self.filepath.parent / Path(self.media_file.path).name)
             for filepath in fp_list:
                 if filepath.exists():
@@ -813,8 +814,9 @@ class Media(models.Model):
                         update_fields = {'media_file', 'skip'}.union(update_fields)
 
         # Trigger an update of derived fields from metadata
-        if self.metadata:
+        if update_fields is None or 'metadata' in update_fields:
             setattr(self, '_cached_metadata_dict', None)
+        if self.metadata:
             self.title = self.metadata_title[:200]
             self.duration = self.metadata_duration
         if update_fields is not None and "metadata" in update_fields:
@@ -1077,6 +1079,17 @@ class Media(models.Model):
         return self.metadata is not None
 
 
+    def save_to_metadata(self, key, value, /):
+        data = self.loaded_metadata
+        data[key] = value
+        from common.utils import json_serial
+        compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
+        self.metadata = compact_json
+        self.save(update_fields={'metadata'})
+        from common.logger import log
+        log.debug(f'Saved to metadata: {self.key} / {self.uuid}: {key=}: {value}')
+
+
     @property
     def reduce_data(self):
         now = timezone.now()
@@ -1084,7 +1097,8 @@ class Media(models.Model):
             data = json.loads(self.metadata or "{}")
             if '_reduce_data_ran_at' in data.keys():
                 total_seconds = data['_reduce_data_ran_at']
-                ran_at = self.posix_epoch + timedelta(seconds=total_seconds)
+                assert isinstance(total_seconds, int), type(total_seconds)
+                ran_at = self.metadata_published(total_seconds)
                 if (now - ran_at) < timedelta(hours=1):
                     return data
 
@@ -1136,18 +1150,32 @@ class Media(models.Model):
 
     @property
     def refresh_formats(self):
+        if not self.has_metadata:
+            return
         data = self.loaded_metadata
         metadata_seconds = data.get('epoch', None)
         if not metadata_seconds:
             self.metadata = None
+            self.save(update_fields={'metadata'})
             return False
 
         now = timezone.now()
-        formats_seconds = data.get('formats_epoch', metadata_seconds)
+        attempted_key = '_refresh_formats_attempted'
+        attempted_seconds = data.get(attempted_key)
+        if attempted_seconds:
+            # skip for recent unsuccessful refresh attempts also
+            attempted_dt = self.metadata_published(attempted_seconds)
+            if (now - attempted_dt) < timedelta(seconds=self.source.index_schedule):
+                return False
+        # skip for recent successful formats refresh
+        refreshed_key = 'formats_epoch'
+        formats_seconds = data.get(refreshed_key, metadata_seconds)
         metadata_dt = self.metadata_published(formats_seconds)
         if (now - metadata_dt) < timedelta(seconds=self.source.index_schedule):
             return False
 
+        last_attempt = round((now - self.posix_epoch).total_seconds())
+        self.save_to_metadata(attempted_key, last_attempt)
         self.skip = False
         metadata = self.index_metadata()
         if self.skip:
@@ -1158,14 +1186,10 @@ class Media(models.Model):
             response = filter_response(metadata, True)
 
         field = self.get_metadata_field('formats')
-        data[field] = response.get(field, [])
+        self.save_to_metadata(field, response.get(field, []))
+        self.save_to_metadata(refreshed_key, response.get('epoch', formats_seconds))
         if data.get('availability', 'public') != response.get('availability', 'public'):
-            data['availability'] = response.get('availability', 'public')
-        data['formats_epoch'] = response.get('epoch', formats_seconds)
-
-        from common.utils import json_serial
-        compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
-        self.metadata = compact_json
+            self.save_to_metadata('availability', response.get('availability', 'public'))
         return True
 
 

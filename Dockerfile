@@ -315,6 +315,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 # Switch workdir to the the app
 WORKDIR /app
 
+ARG YTDLP_DATE
+
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
@@ -362,9 +364,8 @@ RUN --mount=type=tmpfs,target=/cache \
   apt-get -y autoclean && \
   rm -v -rf /tmp/*
 
-# Copy app
-COPY tubesync /app
-COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
+# Copy root
+COPY config/root /
 
 # patch background_task
 COPY patches/background_task/ \
@@ -373,6 +374,10 @@ COPY patches/background_task/ \
 # patch yt_dlp
 COPY patches/yt_dlp/ \
     /usr/local/lib/python3/dist-packages/yt_dlp/
+
+# Copy app
+COPY tubesync /app
+COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
 
 # Build app
 RUN set -x && \
@@ -387,16 +392,12 @@ RUN set -x && \
   mkdir -v -p /config/cache/pycache && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video && \
+  # Check nginx configuration copied from config/root/etc
+  nginx -t && \
   # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
   printf -- "ffmpeg_version = '%s'\n" "${ffmpeg_version}" >> /app/common/third_party_versions.py
-
-# Copy root
-COPY config/root /
-
-# Check nginx configuration copied from config/root/etc
-RUN set -x && nginx -t
 
 # Create a healthcheck
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]

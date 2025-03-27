@@ -1,0 +1,57 @@
+name: Change String Case
+description: Make a string lowercase, uppercase, or capitalized
+
+inputs:
+  string:
+    description: The input string
+    required: true
+
+outputs:
+  lowercase:
+    value: ${{ steps.set.outputs.lowercase }}
+    description: The input string, with any uppercase characters replaced with lowercase ones
+  uppercase:
+    value: ${{ steps.set.outputs.uppercase }}
+    description: The input string, with any lowercase characters replaced with uppercase ones
+  capitalized:
+    value: ${{ steps.set.outputs.capitalized }}
+    description: The input string, with any alphabetical characters lowercase, except for the first character, which is uppercased
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Retrieve releases
+      id: 'set'
+      env:
+        INPUT_STRING: '${{ inputs.string }}'
+      shell: 'bash'
+      run: |
+        printf -- 'Manipulating string: %s\n' "${INPUT_STRING}"
+        set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
+        mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
+        open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
+        close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
+        {
+
+          var='lowercase' ;
+          delim="$(mk_delim "${var}")" ;
+          open_ml_var "${delim}" "${var}" ;
+          printf -- '%s\n' "${INPUT_STRING,,}" ;
+          close_ml_var "${delim}" "${var}" ;
+
+          var='capitalized' ;
+          delim="$(mk_delim "${var}")" ;
+          open_ml_var "${delim}" "${var}" ;
+          printf -- '%s\n' "${INPUT_STRING^}" ;
+          close_ml_var "${delim}" "${var}" ;
+
+          var='uppercase' ;
+          delim="$(mk_delim "${var}")" ;
+          open_ml_var "${delim}" "${var}" ;
+          printf -- '%s\n' "${INPUT_STRING^^}" ;
+          close_ml_var "${delim}" "${var}" ;
+
+        } >> "${GITHUB_OUTPUT}"
+        printf -- '%s: %s\n' 'lowercase' "${INPUT_STRING,,}"
+        printf -- '%s: %s\n' 'uppercase' "${INPUT_STRING^^}"
+        printf -- '%s: %s\n' 'capitalized' "${INPUT_STRING^}"

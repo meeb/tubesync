@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as tz
 from hashlib import sha1
+from pathlib import Path
 import json
 import logging
 import os
@@ -38,6 +39,23 @@ class TaskQuerySet(models.QuerySet):
 
 class TaskManager(models.Manager):
 
+    _boot_time = posix_epoch = datetime(1970, 1, 1, tzinfo=tz.utc)
+
+    @property
+    def boot_time(self):
+        if self._boot_time > self.posix_epoch:
+            return self._boot_time
+        stats = None
+        boot_time = self.posix_epoch
+        kcore_path = Path('/proc/kcore')
+        if kcore_path.exists():
+            stats = kcore_path.stat()
+        if stats:
+            boot_time += timedelta(seconds=stats.st_mtime)
+        if boot_time > self._boot_time:
+            self._boot_time = boot_time
+        return self._boot_time
+
     def get_queryset(self):
         return TaskQuerySet(self.model, using=self._db)
 
@@ -69,14 +87,14 @@ class TaskManager(models.Manager):
         max_run_time = app_settings.BACKGROUND_TASK_MAX_RUN_TIME
         qs = self.get_queryset()
         expires_at = now - timedelta(seconds=max_run_time)
-        unlocked = Q(locked_by=None) | Q(locked_at__lt=expires_at)
+        unlocked = Q(locked_by=None) | Q(locked_at__lt=expires_at) | Q(locked_at__lt=self.boot_time)
         return qs.filter(unlocked)
 
     def locked(self, now):
         max_run_time = app_settings.BACKGROUND_TASK_MAX_RUN_TIME
         qs = self.get_queryset()
         expires_at = now - timedelta(seconds=max_run_time)
-        locked = Q(locked_by__isnull=False) & Q(locked_at__gt=expires_at)
+        locked = Q(locked_by__isnull=False) & Q(locked_at__gt=expires_at) & Q(locked_at__gt=self.boot_time)
         return qs.filter(locked)
 
     def failed(self):
@@ -190,14 +208,23 @@ class Task(models.Model):
 
     objects = TaskManager()
 
+    @property
+    def nodename(self):
+        return os.uname().nodename[:(64-10)]
+ 
     def locked_by_pid_running(self):
         """
         Check if the locked_by process is still running.
         """
-        if self.locked_by:
+        if self in self.__class__.objects.locked(timezone.now()) and self.locked_by:
+            pid, nodename = self.locked_by.split('/', 1)
+            # locked by a process on this node?
+            if nodename != self.nodename:
+                return False
+            # is the process still running?
             try:
-                # won't kill the process. kill is a bad named system call
-                os.kill(int(self.locked_by), 0)
+                # Signal number zero won't kill the process.
+                os.kill(int(pid), 0)
                 return True
             except:
                 return False
@@ -220,8 +247,9 @@ class Task(models.Model):
 
     def lock(self, locked_by):
         now = timezone.now()
+        owner = f'{locked_by[:8]}/{self.nodename}'
         unlocked = Task.objects.unlocked(now).filter(pk=self.pk)
-        updated = unlocked.update(locked_by=locked_by, locked_at=now)
+        updated = unlocked.update(locked_by=owner, locked_at=now)
         if updated:
             return Task.objects.get(pk=self.pk)
         return None
@@ -423,9 +451,14 @@ class CompletedTask(models.Model):
         Check if the locked_by process is still running.
         """
         if self.locked_by:
+            pid, node = self.locked_by.split('/', 1)
+            # locked by a process on this node?
+            if os.uname().nodename[:(64-10)] != node:
+                return False
+            # is the process still running?
             try:
                 # won't kill the process. kill is a bad named system call
-                os.kill(int(self.locked_by), 0)
+                os.kill(int(pid), 0)
                 return True
             except:
                 return False

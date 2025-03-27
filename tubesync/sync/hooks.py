@@ -2,6 +2,7 @@ import os
 import yt_dlp
 
 from common.logger import log
+from common.utils import remove_enclosed
 from django.conf import settings
 
 
@@ -81,9 +82,9 @@ class BaseStatus:
             if self.task_verbose_name is None:
                 # clean up any previously prepended task_status
                 # this happened because of duplicated tasks on my test system
-                s = task.verbose_name
-                cleaned = s[1+s.find(' Downloading '):]
-                self.task_verbose_name = cleaned
+                self.task_verbose_name = remove_enclosed(
+                    task.verbose_name, '[', ']', ' ',
+                )
             task.verbose_name = f'{self.task_status} {self.task_verbose_name}'
             task.save()
 

@@ -16,15 +16,15 @@ from PIL import Image
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.utils import timezone
+from django.db import DatabaseError, IntegrityError
 from django.db.transaction import atomic
-from django.db.utils import IntegrityError
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from background_task import background
 from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import NoMediaException, NoMetadataException, DownloadFailedException
-from common.utils import json_serial
+from common.utils import json_serial, remove_enclosed
 from .models import Source, Media, MediaServer
 from .utils import (get_remote_image, resize_image_to_height, delete_file,
                     write_text_file, filter_response)
@@ -104,6 +104,27 @@ def get_error_message(task):
     if ':' not in error_message:
         return ''
     return error_message.split(':', 1)[1].strip()
+
+
+def update_task_status(task, status):
+    if not task:
+        return False
+    if not task._verbose_name:
+        task._verbose_name = remove_enclosed(
+            task.verbose_name, '[', ']', ' ',
+        )
+    if status is None:
+        task.verbose_name = task._verbose_name
+    else:
+        task.verbose_name = f'[{status}] {task._verbose_name}'
+    try:
+        with atomic():
+            task.save(update_fields={'verbose_name'})
+    except DatabaseError as e:
+        if 'Save with update_fields did not affect any rows.' == str(e):
+            pass
+        raise
+    return True
 
 
 def get_source_completed_tasks(source_id, only_errors=False):
@@ -238,14 +259,19 @@ def index_source_task(source_id):
     fields = lambda f, m: m.get_metadata_field(f)
     task = get_source_index_task(source_id)
     if task:
-        verbose_name = task.verbose_name
-        tvn_format = '[{}' + f'/{num_videos}] {verbose_name}'
+        task._verbose_name = remove_enclosed(
+            task.verbose_name, '[', ']', ' ',
+            valid='0123456789/,',
+            end=task.verbose_name.find('Index'),
+        )
+    tvn_format = '{:,}' + f'/{num_videos:,}'
     for vn, video in enumerate(videos, start=1):
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
         if not key:
             # Video has no unique key (ID), it can't be indexed
             continue
+        update_task_status(task, tvn_format.format(vn))
         try:
             media = Media.objects.get(key=key, source=source)
         except Media.DoesNotExist:
@@ -257,16 +283,12 @@ def index_source_task(source_id):
         published_dt = media.metadata_published(timestamp)
         if published_dt is not None:
             media.published = published_dt
-        if task:
-            task.verbose_name = tvn_format.format(vn)
-            with atomic():
-                task.save(update_fields={'verbose_name'})
         try:
             media.save()
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
         else:
-            log.debug(f'Indexed media: {source} / {media}')
+            log.debug(f'Indexed media: {vn}: {source} / {media}')
             # log the new media instances
             new_media_instance = (
                 media.created and
@@ -282,10 +304,8 @@ def index_source_task(source_id):
                     priority=20,
                     verbose_name=verbose_name.format(media.pk),
                 )
-    if task:
-        task.verbose_name = verbose_name
-        with atomic():
-            task.save(update_fields={'verbose_name'})
+    # Reset task.verbose_name to the saved value
+    update_task_status(task, None)
     # Cleanup of media no longer available from the source
     cleanup_removed_media(source, videos)
 
@@ -604,7 +624,8 @@ def download_media(media_id):
                f'expected outfile does not exist: {filepath}')
         log.error(err)
         # Try refreshing formats
-        media.refresh_formats
+        if media.has_metadata:
+            media.refresh_formats
         # Raising an error here triggers the task to be re-attempted (or fail)
         raise DownloadFailedException(err)
 
@@ -651,13 +672,14 @@ def save_all_media_for_source(source_id):
         metadata__isnull=False,
     )
     if task:
-        verbose_name = task.verbose_name
-        tvn_format = '[{}' + f'/{refresh_qs.count()}] {verbose_name}'
+        task._verbose_name = remove_enclosed(
+            task.verbose_name, '[', ']', ' ',
+            valid='0123456789/,',
+            end=task.verbose_name.find('Check'),
+        )
+    tvn_format = '1/{:,}' + f'/{refresh_qs.count():,}'
     for mn, media in enumerate(refresh_qs, start=1):
-        if task:
-            task.verbose_name = tvn_format.format(mn)
-            with atomic():
-                task.save(update_fields={'verbose_name'})
+        update_task_status(task, tvn_format.format(mn))
         try:
             media.refresh_formats
         except YouTubeError as e:
@@ -670,20 +692,14 @@ def save_all_media_for_source(source_id):
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
-    if task:
-        tvn_format = '[{}' + f'/{mqs.count()}] {verbose_name}'
+    tvn_format = '2/{:,}' + f'/{mqs.count():,}'
     for mn, media in enumerate(mqs, start=1):
-        if task:
-            task.verbose_name = tvn_format.format(mn)
+        update_task_status(task, tvn_format.format(mn))
+        if media.uuid not in already_saved:
             with atomic():
-                task.save(update_fields={'verbose_name'})
-            if media.uuid not in already_saved:
-                with atomic():
-                    media.save()
-    if task:
-        task.verbose_name = verbose_name
-        with atomic():
-            task.save(update_fields={'verbose_name'})
+                media.save()
+    # Reset task.verbose_name to the saved value
+    update_task_status(task, None)
 
 
 @background(schedule=60, remove_existing_tasks=True)
