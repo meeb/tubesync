@@ -1,0 +1,84 @@
+name: 'yt-dlp Releases'
+description: 'Use GitHub CLI & API to retrieve information about `yt-dlp` releases.'
+
+inputs:
+  token:
+    required: true
+    default: ${{ github.token }}
+    description: |
+      GH_TOKEN for GitHub CLI to use.
+      Default: `\$\{\{ github.token \}\}`
+  num-releases:
+    required: true
+    default: '25'
+    description: |
+      The number of releases to retrieve from the repository.
+      Default: 25
+  repository_owner:
+    required: true
+    default: 'yt-dlp'
+    description: |
+      The name of the user or organization that owns the repository.
+      Default: 'yt-dlp'
+  repository_name:
+    required: true
+    default: 'yt-dlp'
+    description: |
+      Which repository from the owner to search for releases.
+      Default: 'yt-dlp'
+
+outputs:
+  latest-release:
+    value: ${{ steps.set.outputs.latest-release }}
+    description: 'The JSON API response for the latest release.'
+  releases:
+    value: ${{ steps.set.outputs.releases }}
+    description: 'Retrieved JSON from the API describing the releases.'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Retrieve releases
+      id: 'set'
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        GH_API_GQL_RELEASES: '${{ inputs.num-releases }}'
+        GH_API_GQL_OWNER: '${{ inputs.repository_owner }}'
+        GH_API_GQL_REPO: '${{ inputs.repository_name }}'
+      shell: 'bash'
+      run: |
+        command -v gh > /dev/null ;
+        command -v jq > /dev/null ;
+        gql_query='query($repo: String!, $owner: String!, $releases: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { name, createdAt, publishedAt, updatedAt, tagName, url, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } } } } } }' ;
+        gql_jq='[ .data.repository.releases.nodes[] | select((.isDraft or .isPrerelease) | not) | del(.isDraft, .isPrerelease) ]' ;
+        mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
+        open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
+        close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
+        {
+          var='releases' ;
+          delim="$(mk_delim "${var}")" ;
+          open_ml_var "${delim}" "${var}" ;
+          gh api graphql --cache 12h \
+            -F owner="${GH_API_GQL_OWNER}" \
+            -F repo="${GH_API_GQL_REPO}" \
+            -F releases="${GH_API_GQL_RELEASES}" \
+            -f query="${gql_query}" --jq "${gql_jq}" ;
+          close_ml_var "${delim}" "${var}" ;
+          jq_arg='map(select(.isLatest))[0]' ;
+          var='latest-release' ;
+          delim="$(mk_delim "${var}")" ;
+          open_ml_var "${delim}" "${var}" ;
+          gh api graphql --cache 12h \
+            -F owner="${GH_API_GQL_OWNER}" \
+            -F repo="${GH_API_GQL_REPO}" \
+            -F releases="${GH_API_GQL_RELEASES}" \
+            -f query="${gql_query}" --jq "${gql_jq}" | jq -c "${jq_arg}" -- ;
+          close_ml_var "${delim}" "${var}" ;
+          unset -v delim jq_arg var ;
+        } >> "${GITHUB_OUTPUT}" ;
+        # Log the human version
+        gh api graphql --cache 12h \
+          -F owner="${GH_API_GQL_OWNER}" \
+          -F repo="${GH_API_GQL_REPO}" \
+          -F releases="${GH_API_GQL_RELEASES}" \
+          -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
