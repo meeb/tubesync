@@ -19,7 +19,7 @@ on:
 
 jobs:
   info:
-    if: ${{ !cancelled() && 'pull_request' != github.event_name }}
+    #if: ${{ !cancelled() && 'pull_request' != github.event_name }}
     runs-on: ubuntu-latest
     outputs:
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
@@ -49,40 +49,10 @@ jobs:
               "${k}" "${v,,}"
           done
           unset -v k v var
+      - uses: actions/checkout@v4
       - name: Retrieve yt-dlp/FFmpeg-Builds releases with GitHub CLI
         id: ffmpeg
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_API_GQL_ASSETS: 25
-          GH_API_GQL_RELEASES: 35
-          GH_API_GQL_OWNER: yt-dlp
-          GH_API_GQL_REPO: FFmpeg-Builds
-        run: |
-          gql_query='query($repo: String!, $owner: String!, $releases: Int!, $assets: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { tagName, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } }, releaseAssets(first: $assets) { totalCount, nodes { name, size, downloadUrl } } } } } }' ;
-          gql_jq='[ .data.repository.releases.nodes[] | select((.isLatest or .isDraft or .isPrerelease) | not) | { "tag": .tag.name, "commit": .tag.target.oid, "date": .tag.name[1+(.tag.name|index("-")):], "assets": { "limit": '"${GH_API_GQL_ASSETS}"', "totalCount": .releaseAssets.totalCount }, "files": .releaseAssets.nodes, "versions": [ .releaseAssets.nodes[].name | select(contains("-linux64-"))[1+index("-"):index("-linux64-")] ] } ]' ;
-          mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
-          open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
-          close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
-          {
-            var='releases' ;
-            delim="$(mk_delim "${var}")" ;
-            open_ml_var "${delim}" "${var}" ;
-            gh api graphql --cache 12h \
-              -F assets="${GH_API_GQL_ASSETS}" \
-              -F owner="${GH_API_GQL_OWNER}" \
-              -F repo="${GH_API_GQL_REPO}" \
-              -F releases="${GH_API_GQL_RELEASES}" \
-              -f query="${gql_query}" --jq "${gql_jq}" ;
-            close_ml_var "${delim}" "${var}" ;
-            unset -v delim jq_arg var ;
-          } >> "${GITHUB_OUTPUT}" ;
-          # Log the human version
-          gh api graphql --cache 12h \
-            -F assets="${GH_API_GQL_ASSETS}" \
-            -F owner="${GH_API_GQL_OWNER}" \
-            -F repo="${GH_API_GQL_REPO}" \
-            -F releases="${GH_API_GQL_RELEASES}" \
-            -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
+        uses: ./.github/actions/FFmpeg
       - name: Retrieve yt-dlp/yt-dlp releases with GitHub CLI
         id: yt-dlp
         env:
