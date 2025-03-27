@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - 'test-*'
   pull_request:
     branches:
-      - main
+      - 'test-*'
     types:
       - opened
       - reopened
@@ -91,13 +91,29 @@ jobs:
     steps:
       - name: Set environment variables with jq
         run: |
+          # jq
           cat >| .ffmpeg.releases.json <<'EOF'
           ${{ needs.info.outputs.ffmpeg-releases }}
           EOF
+
+          FFMPEG_DATE='[foreach .[] as $release ([{}, []]; [ .[0] + { ($release.commit): ([ $release.date ] + (.[0][($release.commit)] // [])) }, [ .[1][0] // $release.commit ] ] ; .[0][(.[1][0])] )][-1][0]' ;
+          FFMPEG_VERSION='.[]|select(.date == $previous)|.versions[]|select(startswith("N-"))' ;
+
           mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
           open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
           close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
           {
+            for var in FFMPEG_DATE FFMPEG_VERSION
+            do
+              # jq_arg="$( eval printf -- "'%s\n'" "$(printf -- '"${%s}"' "${var}")" )" ;
+              jq_arg="$( eval printf -- "'%s\n'" '"${'"${var}"'}"' )" ;
+              delim='"'"${var}"'_EOF"' ;
+              printf -- '%s<<%s\n' "${var}" "${delim}" ;
+              jq -r --arg previous "${previous_value-}" "${jq_arg}" -- .ffmpeg.releases.json ;
+              printf -- '%s\n' "${delim}" ;
+              previous_value="$( jq -r --arg previous "${previous_value-}" "${jq_arg}" -- .ffmpeg.releases.json )" ;
+            done ;
+
             var='FFMPEG_DATE' ;
             delim="$(mk_delim "${var}")" ;
             open_ml_var "${delim}" "${var}" ;
@@ -113,8 +129,56 @@ jobs:
             jq_arg='.[]|select(.date == $date)|.versions[]|select(startswith("N-"))' ;
             jq -r --arg date "${ffmpeg_date}" "${jq_arg}" -- .ffmpeg.releases.json ;
             close_ml_var "${delim}" "${var}" ;
+  
+            unset -v delim jq_arg previous_value var ;
+          } >> "${GITHUB_ENV}"
+          rm -v -f .ffmpeg.releases.json
+      - name: Set environment variables with GitHub CLI
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # gh api
+          GH_UPSTREAM_OWNER='.parent.owner.login' ;
+          GH_UPSTREAM_REPO='.parent.name' ;
+          GH_UPSTREAM_SLUG='.parent.full_name' ;
+
+          mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
+          open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
+          close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
+          {
+            for var in GH_UPSTREAM_OWNER # GH_UPSTREAM_REPO GH_UPSTREAM_SLUG
+            do
+              # jq_arg="$( eval printf -- "'%s\n'" "$(printf -- '"${%s}"' "${var}")" )" ;
+              jq_arg="$( eval printf -- "'%s\n'" '"${'"${var}"'}"' )" ;
+              delim='"'"${var}"'_EOF"' ;
+              printf -- '%s<<%s\n' "${var}" "${delim}" ;
+              gh api "repos/${GITHUB_REPOSITORY}" --cache 1h --jq "${jq_arg}" ;
+              printf -- '%s\n' "${delim}" ;
+            done ;
             unset -v delim jq_arg var ;
           } >> "${GITHUB_ENV}"
+
+          # Delete the oldest unused cache entries
+          printf -- '%s\n' 'Deleting unused cache entries' ;
+          gh cache list --sort last_accessed_at --order asc --ref "${GITHUB_REF}" | \
+            awk '$NF == $(NF-1) {print $1}' | \
+            xargs -r -t -n 1 gh cache delete 2>&1 | \
+            tee /dev/stderr | wc -l | xargs -n 1 printf -- 'Total deleted: %d\n' ;
+      - name: Upstream registry ref
+        id: upstream
+        run: |
+          user_lowercase="$(printf -- '%s\n' "${GH_UPSTREAM_OWNER}" | awk '{print tolower($0);}')" ;
+          printf >> "$GITHUB_OUTPUT" -- '%s=ghcr.io/%s/%s:latest\n' \
+            ref "${user_lowercase}" "${IMAGE_NAME}" \
+            tag "${user_lowercase}" "${IMAGE_NAME}" ;
+      - name: Registry ref
+        id: origin
+        run: |
+          user_lowercase="$(printf -- '%s\n' "${GITHUB_ACTOR}" | awk '{print tolower($0);}')" ;
+          printf >> "$GITHUB_OUTPUT" -- '%s=ghcr.io/%s/%s:%s\n' \
+            'ref' "${user_lowercase}" "${IMAGE_NAME}" 'cache' \
+            'tag' "${user_lowercase}" "${IMAGE_NAME}" 'latest' ;
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -126,22 +190,116 @@ jobs:
           DOCKER_USERNAME: ${{ github.actor }}
           DOCKER_TOKEN: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
         run: echo "${DOCKER_TOKEN}" | docker login --password-stdin --username "${DOCKER_USERNAME}" "${DOCKER_REGISTRY}"
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Create cache directory on the runner
+        run: |
+          mkdir -v -p .cache
+          : >> .cache/reset
+          mkdir -v .cache/saved .cache/removed .cache/runner
+      - name: Cache from tubesync stage
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/saved
+            .cache/runner
+          key: docker-cache-tubesync-${{ hashFiles('.cache/reset') }}-${{ hashFiles('*file', '.github/workflows/ci.yaml') }}
+          restore-keys: |
+            docker-cache-tubesync-${{ hashFiles('.cache/reset') }}-
+      - name: List cache directory on the runner
+        run: |
+          # limited listing when the cache was restored
+          ls -al .cache &&
+          ls -al .cache/* &&
+          ls -al .cache/*/* &&
+          ls -al .cache/*/*/* ||
+          ls -alR .cache
+      - name: Start magic-wormhole services on the runner
+        if: ${{ 'true' != steps.cache.outputs.cache-hit }}
+        id: wormhole
+        run: |
+          rm -rf .cache/runner/wormhole
+          sudo apt-get install python3-venv
+          venv_dir=".cache/runner/${RUNNER_ARCH}/wormhole" &&
+              python3 -m venv --upgrade-deps "${venv_dir}" &&
+              . "${venv_dir}"/bin/activate || exit
+          pip install magic-wormhole
+          # port 4000
+          docker run --pull always --rm -dt -p 4000:4000 \
+              ghcr.io/tcely/docker-magic-wormhole-mailbox-server:main \
+              --usage-db=/data/usage.sqlite --motd=TubeSync
+          # port 4001
+          docker run --pull always --rm -dt -p 4001:4001 \
+              ghcr.io/tcely/docker-magic-wormhole-transit-relay:main
+          # determine the runner IP address
+          _awk_prog='$0 !~ /scope host/ && "inet" == $1 {split($2, P, "/"); print P[1]; exit;}'
+          runner_ip="$( ip addr sh | awk "${_awk_prog}" )"
+          # set variables
+          relay_arg="ws://${runner_ip}:4000/v1"
+          transit_arg="tcp:[${runner_ip}]:4001"
+          # generate the code and receive the first transfer
+          ( wormhole \
+              --appid TubeSync \
+              --relay-url "${relay_arg}" \
+              --transit-helper "${transit_arg}" \
+              receive -a -c 3 \
+              --accept-file -o .cache/incoming >| .cache/receive.out 2>&1 && \
+              mv --backup=numbered -f .cache/incoming/* .cache/saved/ || : ; \
+              mv --backup=numbered -f .cache/saved/*.~[0-9]~ .cache/removed/ || : ; ) &
+          _pid=$!; sleep 1 && grep -e '^Allocated code:' .cache/receive.out | cut -d ' ' -f 3- >| .cache/.wormhole-code
+          cat -v -n .cache/receive.out
+          rm -v -f .cache/receive.out
+          code="$(< .cache/.wormhole-code)"
+          rm -v -f .cache/.wormhole-code
+          # create output variables
+          printf -- '%s=%s\n' >> "$GITHUB_OUTPUT" \
+              code "${code}" \
+              relay "${relay_arg}" \
+              runner_ip "${runner_ip}" \
+              transit "${transit_arg}" ;
+          # receive the saved directories
+          ( cd .cache &&
+              while test -d /proc/"${_pid}" ; do sleep 5 ; done &&
+              while { \
+                wormhole \
+                  --appid TubeSync \
+                  --relay-url "${relay_arg}" \
+                  --transit-helper "${transit_arg}" \
+                  receive \
+                  --accept-file -o incoming "${code}" || : ; \
+              }
+              do
+                  mv --backup=numbered -f incoming/* saved/ || : ;
+                  mv --backup=numbered -f saved/*.~[0-9]~ removed/ || : ;
+                  rm -rf removed/* || : ;
+              done &)
       - name: Build and push
-        timeout-minutes: 60
+        timeout-minutes: 90
         uses: docker/build-push-action@v6
+        env:
+          WORMHOLE_CODE: ${{ steps.wormhole.outputs.code }}
+          WORMHOLE_RELAY: ${{ steps.wormhole.outputs.relay }}
+          WORMHOLE_TRANSIT: ${{ steps.wormhole.outputs.transit }}
         with:
           platforms: linux/amd64,linux/arm64
-          push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
-          tags: ghcr.io/${{ needs.info.outputs.string-lowercase }}/${{ env.IMAGE_NAME }}:latest
+          push: ${{ 'success' == needs.test.result && 'pull_request' != github.event_name && 'true' || 'false' }}
+          provenance: false
+          tags: ${{ steps.origin.outputs.tag }}
           cache-from: |
-            type=registry,ref=ghcr.io/${{ needs.info.outputs.string-lowercase }}/${{ env.IMAGE_NAME }}:latest
-            type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
             type=gha
+            type=registry,ref=${{ steps.origin.outputs.ref }}
+            type=registry,ref=${{ steps.upstream.outputs.ref }}
           cache-to: |
             type=gha,mode=max
-            ${{ 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'type=inline' || '' }}
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             FFMPEG_DATE=${{ env.FFMPEG_DATE }}
             FFMPEG_VERSION=${{ env.FFMPEG_VERSION }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
+          build-contexts: |
+            cache-tubesync=.cache/saved
+          secret-envs: |
+            WORMHOLE_CODE=WORMHOLE_CODE
+            WORMHOLE_RELAY=WORMHOLE_RELAY
+            WORMHOLE_TRANSIT=WORMHOLE_TRANSIT
