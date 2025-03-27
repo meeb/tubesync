@@ -55,45 +55,7 @@ jobs:
         uses: ./.github/actions/FFmpeg
       - name: Retrieve yt-dlp/yt-dlp releases with GitHub CLI
         id: yt-dlp
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_API_GQL_RELEASES: 25
-          GH_API_GQL_OWNER: yt-dlp
-          GH_API_GQL_REPO: yt-dlp
-        run: |
-          gql_query='query($repo: String!, $owner: String!, $releases: Int!) { repository(owner: $owner, name: $repo) { releases(first: $releases, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { name, createdAt, publishedAt, updatedAt, tagName, url, isDraft, isPrerelease, isLatest, tag { name, target { oid, commitUrl } } } } } }' ;
-          gql_jq='[ .data.repository.releases.nodes[] | select((.isDraft or .isPrerelease) | not) | del(.isDraft, .isPrerelease) ]' ;
-          mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
-          open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
-          close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
-          {
-            var='releases' ;
-            delim="$(mk_delim "${var}")" ;
-            open_ml_var "${delim}" "${var}" ;
-            gh api graphql --cache 12h \
-              -F owner="${GH_API_GQL_OWNER}" \
-              -F repo="${GH_API_GQL_REPO}" \
-              -F releases="${GH_API_GQL_RELEASES}" \
-              -f query="${gql_query}" --jq "${gql_jq}" ;
-            close_ml_var "${delim}" "${var}" ;
-            jq_arg='map(select(.isLatest))[0]' ;
-            var='latest-release' ;
-            delim="$(mk_delim "${var}")" ;
-            open_ml_var "${delim}" "${var}" ;
-            gh api graphql --cache 12h \
-              -F owner="${GH_API_GQL_OWNER}" \
-              -F repo="${GH_API_GQL_REPO}" \
-              -F releases="${GH_API_GQL_RELEASES}" \
-              -f query="${gql_query}" --jq "${gql_jq}" | jq -c "${jq_arg}" -- ;
-            close_ml_var "${delim}" "${var}" ;
-            unset -v delim jq_arg var ;
-          } >> "${GITHUB_OUTPUT}" ;
-          # Log the human version
-          gh api graphql --cache 12h \
-            -F owner="${GH_API_GQL_OWNER}" \
-            -F repo="${GH_API_GQL_REPO}" \
-            -F releases="${GH_API_GQL_RELEASES}" \
-            -f query="${gql_query}" --jq "${gql_jq}" | jq '.[]' -- ;
+        uses: ./.github/actions/yt-dlp
 
   test:
     if: ${{ !cancelled() && ( 'pull_request' != github.event_name || (! github.event.pull_request.draft) ) }}
