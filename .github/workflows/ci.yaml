@@ -104,6 +104,8 @@ jobs:
             close_ml_var "${delim}" "${var}" ;
             unset -v delim jq_arg var ;
           } >> "${GITHUB_ENV}"
+          cat -v "${GITHUB_ENV}"
+          rm -v -f .ffmpeg.releases.json
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
