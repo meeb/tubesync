@@ -4,10 +4,10 @@ description: 'Use GitHub CLI & API to retrieve information about FFmpeg Build re
 inputs:
   token:
     required: true
-    default: ${{ secrets.GITHUB_TOKEN }}
+    default: ${{ github.token }}
     description: |
       GH_TOKEN for GitHub CLI to use.
-      Default: $${{ secrets.GITHUB_TOKEN }}
+      Default: $${{ github.token }}
   num-assets:
     required: true
     default: '25'
@@ -44,7 +44,7 @@ runs:
     - name: Retrieve releases
       id: 'set'
       env:
-        GH_TOKEN: '${{ inputs.token }}'
+        GH_TOKEN: ${{ inputs.token }}
         GH_API_GQL_ASSETS: '${{ inputs.num-assets }}'
         GH_API_GQL_RELEASES: '${{ inputs.num-releases }}'
         GH_API_GQL_OWNER: '${{ inputs.repository_owner }}'
