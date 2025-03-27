@@ -26,7 +26,7 @@ from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm,
                     ConfirmDeleteMediaServerForm)
-from .utils import validate_url, delete_file, multi_key_sort
+from .utils import validate_url, delete_file, multi_key_sort, mkdir_p
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
                     delete_task_by_media, index_source_task)
@@ -415,6 +415,7 @@ class DeleteSourceView(DeleteView, FormMixin):
         if delete_media:
             source = self.get_object()
             directory_path = pathlib.Path(source.directory_path)
+            mkdir_p(directory_path)
             (directory_path / '.to_be_removed').touch(exist_ok=True)
         return super().post(request, *args, **kwargs)
 
