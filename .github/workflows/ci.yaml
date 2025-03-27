@@ -83,8 +83,8 @@ jobs:
           cat >| .ffmpeg.releases.json <<'EOF'
           ${{ needs.info.outputs.ffmpeg-releases }}
           EOF
-          mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
-          open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
+          mk_delim() { local f='%s_EOF_%d_' ; printf -- "${f}" "$1" "${RANDOM}" ; } ;
+          open_ml_var() { local f=''\%'s<<"'\%'s"\n' ; printf -- "${f}" "$2" "$1" ; } ;
           close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
           {
             var='FFMPEG_DATE' ;
