@@ -39,7 +39,7 @@ jobs:
         shell: bash
         run: |
           set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
-          set -x ; for var in \
+          for var in \
             actor='${{ github.actor }}' \
             repository_owner='${{ github.repository_owner }}'
           do
