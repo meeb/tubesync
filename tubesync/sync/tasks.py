@@ -10,6 +10,7 @@ import math
 import uuid
 from io import BytesIO
 from hashlib import sha1
+from pathlib import Path
 from datetime import datetime, timedelta
 from shutil import copyfile, rmtree
 from PIL import Image
