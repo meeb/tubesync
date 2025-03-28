@@ -20,7 +20,7 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - name: Retrieve releases
+    - name: Set outputs
       id: 'set'
       env:
         INPUT_STRING: '${{ inputs.string }}'
