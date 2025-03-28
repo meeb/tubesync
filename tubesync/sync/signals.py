@@ -21,6 +21,20 @@ from .filtering import filter_media
 from .choices import Val, YouTube_SourceType
 
 
+def is_relative_to(self, *other):
+        """Return True if the path is relative to another path or False.
+        """
+        try:
+            self.relative_to(*other)
+            return True
+        except ValueError:
+            return False
+
+# patch Path for Python 3.8
+if not hasatrr(Path, 'is_relative_to'):
+    Path.is_relative_to = is_relative_to
+
+
 @receiver(pre_save, sender=Source)
 def source_pre_save(sender, instance, **kwargs):
     # Triggered before a source is saved, if the schedule has been updated recreate
