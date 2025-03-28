@@ -792,6 +792,8 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
         (source and source.delete_removed_media) or
         (directory_path / '.to_be_removed').is_file()
     )
+    with atomic(durable=True):
+        source.delete()
     if remove:
         log.info(f'Deleting directory for: {source_name}: {directory_path}')
         rmtree(directory_path, True)
