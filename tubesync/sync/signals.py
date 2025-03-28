@@ -152,16 +152,19 @@ def source_pre_delete(sender, instance, **kwargs):
     delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
+
+    # Fetch the media source
+    media_source = Source.objects.filter(filter_text=str(source.pk))[0]
     # Schedule deletion of media
-    delete_task_by_source('sync.tasks.delete_all_media_for_source', instance.pk)
+    delete_task_by_source('sync.tasks.delete_all_media_for_source', media_source.pk)
     verbose_name = _('Deleting all media for source "{}"')
     on_commit(partial(
         delete_all_media_for_source,
-        str(source.pk),
-        str(source.name),
-        str(source.directory_path),
+        str(media_source.pk),
+        str(media_source.name),
+        str(media_source.directory_path),
         priority=1,
-        verbose_name=verbose_name.format(source.name),
+        verbose_name=verbose_name.format(media_source.name),
     ))
 
 
