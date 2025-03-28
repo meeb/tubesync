@@ -31,7 +31,7 @@ def is_relative_to(self, *other):
             return False
 
 # patch Path for Python 3.8
-if not hasatrr(Path, 'is_relative_to'):
+if not hasattr(Path, 'is_relative_to'):
     Path.is_relative_to = is_relative_to
 
 
