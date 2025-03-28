@@ -83,7 +83,7 @@ jobs:
           cat >| .ffmpeg.releases.json <<'EOF'
           ${{ needs.info.outputs.ffmpeg-releases }}
           EOF
-          mk_delim() { printf -- '"%s_EOF_%d_"' "$1" "${RANDOM}" ; } ;
+          mk_delim() { local f='%s_EOF_%d_' ; printf -- "${f}" "$1" "${RANDOM}" ; } ;
           open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
           close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
           {
@@ -104,6 +104,8 @@ jobs:
             close_ml_var "${delim}" "${var}" ;
             unset -v delim jq_arg var ;
           } >> "${GITHUB_ENV}"
+          cat -v "${GITHUB_ENV}"
+          rm -v -f .ffmpeg.releases.json
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
