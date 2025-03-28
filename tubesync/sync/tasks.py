@@ -787,7 +787,11 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
                 media.delete()
     # Remove the directory, if the user requested that
     directory_path = Path(source_directory)
-    if (directory_path / '.to_be_removed').is_file():
+    remove = (
+        (source and source.delete_removed_media) or
+        (directory_path / '.to_be_removed').is_file()
+    )
+    if remove:
         log.info(f'Deleting directory for: {source_name}: {directory_path}')
         rmtree(directory_path, True)
 
