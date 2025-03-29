@@ -281,6 +281,7 @@ def download_media(
         'writethumbnail': embed_thumbnail,
         'check_formats': None,
         'overwrites': None,
+        'skip_unavailable_fragments': False,
         'sleep_interval': 10 + int(settings.DOWNLOAD_MEDIA_DELAY / 20),
         'max_sleep_interval': settings.DOWNLOAD_MEDIA_DELAY,
         'sleep_interval_requests': 1 + (2 * settings.BACKGROUND_TASK_ASYNC_THREADS),
