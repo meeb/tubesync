@@ -157,7 +157,7 @@ def get_media_info(url, days=None):
         paths.update({
             'temp': str(temp_dir_path),
         })
-    postprocessors = opts.get('postprocessors', default_opts.get('postprocessors', list()))
+    postprocessors = opts.get('postprocessors', default_opts.__dict__.get('postprocessors', list()))
     postprocessors.extend((dict(
         key='Exec',
         when='playlist',
