@@ -148,6 +148,7 @@ def get_media_info(url, days=None):
             f'yesterday-{days!s}days' if days else None
         )
     opts = get_yt_opts()
+    default_opts = yt_dlp.parse_options([]).options
     paths = opts.get('paths', dict())
     if 'temp' in paths:
         temp_dir_obj = TemporaryDirectory(prefix='.yt_dlp-', dir=paths['temp'])
@@ -156,6 +157,12 @@ def get_media_info(url, days=None):
         paths.update({
             'temp': str(temp_dir_path),
         })
+    postprocessors = opts.get('postprocessors', default_opts.get('postprocessors', list()))
+    postprocessors.extend(dict(
+        key='Exec',
+        when='playlist',
+        exec_cmd='/usr/bin/env sh /app/full_playlist.sh %(playlist_count)d %(n_entries)d',
+    ))
     opts.update({
         'ignoreerrors': False, # explicitly set this to catch exceptions
         'ignore_no_formats_error': False, # we must fail first to try again with this enabled
@@ -170,6 +177,7 @@ def get_media_info(url, days=None):
             'youtubetab': {'approximate_date': ['true']},
         },
         'paths': paths,
+        'postprocessors': postprocessors,
         'skip_unavailable_fragments': False,
         'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
         'verbose': True if settings.DEBUG else False,
