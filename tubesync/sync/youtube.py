@@ -19,7 +19,7 @@ from .utils import mkdir_p
 import yt_dlp
 import yt_dlp.patch.check_thumbnails
 import yt_dlp.patch.fatal_http_errors
-from yt_dlp.utils import remove_end
+from yt_dlp.utils import remove_end, OUTTMPL_TYPES
 
 
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
@@ -161,26 +161,39 @@ def get_media_info(url, days=None):
     postprocessors.extend((dict(
         key='Exec',
         when='playlist',
-        exec_cmd='/usr/bin/env sh /app/full_playlist.sh %(playlist_count)d %(n_entries)d',
+        exec_cmd="/usr/bin/env sh /app/full_playlist.sh '%(id)s' '%(playlist_count)d'",
     ),))
+    infojson_directory_path = Path(opts.get('cachedir', '/dev/shm')) / 'infojson',
+    playlist_infojson = 'postprocessor_[%(id)s]_%(n_entries)d_%(playlist_count)d_temp'
+    outtmpl = dict(
+        default='',
+        pl_infojson=f'{infojson_directory_path!s}/playlist/{playlist_infojson}.info.json',
+    )
+    for k in OUTTMPL_TYPES.keys():
+        outtmpl.setdefault(k, '')
     opts.update({
         'ignoreerrors': False, # explicitly set this to catch exceptions
         'ignore_no_formats_error': False, # we must fail first to try again with this enabled
         'skip_download': True,
-        'simulate': True,
+        'simulate': False,
         'logger': log,
         'extract_flat': True,
+        'allow_playlist_files': True,
         'check_formats': True,
         'check_thumbnails': False,
+        'clean_infojson': False,
         'daterange': yt_dlp.utils.DateRange(start=start),
         'extractor_args': {
             'youtubetab': {'approximate_date': ['true']},
         },
+        'outtmpl': outtmpl,
+        'overwrites': True,
         'paths': paths,
         'postprocessors': postprocessors,
         'skip_unavailable_fragments': False,
         'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
         'verbose': True if settings.DEBUG else False,
+        'writeinfojson': True,
     })
     if start:
         log.debug(f'get_media_info: used date range: {opts["daterange"]} for URL: {url}')
