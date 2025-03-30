@@ -158,11 +158,11 @@ def get_media_info(url, days=None):
             'temp': str(temp_dir_path),
         })
     postprocessors = opts.get('postprocessors', default_opts.get('postprocessors', list()))
-    postprocessors.extend(dict(
+    postprocessors.extend((dict(
         key='Exec',
         when='playlist',
         exec_cmd='/usr/bin/env sh /app/full_playlist.sh %(playlist_count)d %(n_entries)d',
-    ))
+    ),))
     opts.update({
         'ignoreerrors': False, # explicitly set this to catch exceptions
         'ignore_no_formats_error': False, # we must fail first to try again with this enabled
