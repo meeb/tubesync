@@ -162,11 +162,11 @@ def get_media_info(url, /, *, days=None, info_json=None):
         })
     try:
         info_json_path = Path(info_json).resolve(strict=False)
-    except:
+    except (RuntimeError, TypeError):
         pass
     else:
-        opts['paths'].update({
-            'infojson': user_set('infojson', opts['paths'], str(info_json_path))
+        paths.update({
+            'infojson': user_set('infojson', paths, str(info_json_path))
         })
     default_postprocessors = user_set('postprocessors', default_opts.__dict__, list())
     postprocessors = user_set('postprocessors', opts, default_postprocessors)
@@ -179,6 +179,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
     playlist_infojson = 'postprocessor_[%(id)s]_%(n_entries)d_%(playlist_count)d_temp'
     outtmpl = dict(
         default='',
+        infojson='%(id)s.%(ext)s' if paths['infojson'] else '',
         pl_infojson=f'{cache_directory_path}/infojson/playlist/{playlist_infojson}.%(ext)s',
     )
     for k in OUTTMPL_TYPES.keys():
