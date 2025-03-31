@@ -132,7 +132,7 @@ def _subscriber_only(msg='', response=None):
     return False
 
 
-def get_media_info(url, days=None):
+def get_media_info(url, /, *, days=None, info_json=None):
     '''
         Extracts information from a YouTube URL and returns it as a dict. For a channel
         or playlist this returns a dict of all the videos on the channel or playlist
@@ -149,7 +149,10 @@ def get_media_info(url, days=None):
         )
     opts = get_yt_opts()
     default_opts = yt_dlp.parse_options([]).options
-    paths = opts.get('paths', dict())
+    class NoDefaultValue: pass # a unique Singleton, that may be checked for later
+    user_set = lambda k, d, default=NoDefaultValue: d[k] if k in d.keys() else default
+    default_paths = user_set('paths', default_opts.__dict__, dict())
+    paths = user_set('paths', opts, default_paths)
     if 'temp' in paths:
         temp_dir_obj = TemporaryDirectory(prefix='.yt_dlp-', dir=paths['temp'])
         temp_dir_path = Path(temp_dir_obj.name)
@@ -157,13 +160,22 @@ def get_media_info(url, days=None):
         paths.update({
             'temp': str(temp_dir_path),
         })
-    postprocessors = opts.get('postprocessors', default_opts.__dict__.get('postprocessors', list()))
+    try:
+        info_json_path = Path(info_json).resolve(strict=False)
+    except:
+        pass
+    else:
+        opts['paths'].update({
+            'infojson': user_set('infojson', opts['paths'], str(info_json_path))
+        })
+    default_postprocessors = user_set('postprocessors', default_opts.__dict__, list())
+    postprocessors = user_set('postprocessors', opts, default_postprocessors)
     postprocessors.extend((dict(
         key='Exec',
         when='playlist',
         exec_cmd="/usr/bin/env bash /app/full_playlist.sh '%(id)s' '%(playlist_count)d'",
     ),))
-    cache_directory_path = Path(opts.get('cachedir', '/dev/shm'))
+    cache_directory_path = Path(user_set('cachedir', opts, '/dev/shm'))
     playlist_infojson = 'postprocessor_[%(id)s]_%(n_entries)d_%(playlist_count)d_temp'
     outtmpl = dict(
         default='',
