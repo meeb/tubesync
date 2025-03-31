@@ -163,11 +163,11 @@ def get_media_info(url, days=None):
         when='playlist',
         exec_cmd="/usr/bin/env bash /app/full_playlist.sh '%(id)s' '%(playlist_count)d'",
     ),))
-    infojson_directory_path = Path(opts.get('cachedir', '/dev/shm')) / 'infojson'
+    cache_directory_path = Path(opts.get('cachedir', '/dev/shm'))
     playlist_infojson = 'postprocessor_[%(id)s]_%(n_entries)d_%(playlist_count)d_temp'
     outtmpl = dict(
         default='',
-        pl_infojson=f'{infojson_directory_path}/playlist/{playlist_infojson}.%(ext)s',
+        pl_infojson=f'{cache_directory_path}/infojson/playlist/{playlist_infojson}.%(ext)s',
     )
     for k in OUTTMPL_TYPES.keys():
         outtmpl.setdefault(k, '')
