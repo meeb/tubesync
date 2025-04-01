@@ -138,7 +138,7 @@ jobs:
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            ghcr.io/wagoodman/dive \
+            'ghcr.io/wagoodman/dive' \
             'ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:dive' \
             --ci \
             --highestUserWastedPercent '0.03' \
@@ -163,28 +163,3 @@ jobs:
             FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
             FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
-  dive:
-    if: ${{ !cancelled() && 'success' == needs.info.result }}
-    needs: ['info']
-    runs-on: ubuntu-latest
-    steps:
-      - uses: docker/setup-buildx-action@v3
-      - uses: actions/checkout@v4
-      - name: Build `${{ env.IMAGE_NAME }}` image
-        run: |
-          docker buildx build \
-            --build-arg IMAGE_NAME=${{ env.IMAGE_NAME }} \
-            --build-arg FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }} \
-            --build-arg FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }} \
-            --build-arg YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }} \
-            --cache-from type=gha --load \
-            -t ${{ env.IMAGE_NAME }} .
-      - name: Analysis with `dive`
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            ghcr.io/wagoodman/dive \
-            '${{ env.IMAGE_NAME }}' \
-            --ci \
-            --highestUserWastedPercent '0.03' \
-            --highestWastedBytes '10M'
