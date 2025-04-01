@@ -22,7 +22,9 @@ jobs:
     #if: ${{ !cancelled() && 'pull_request' != github.event_name }}
     runs-on: ubuntu-latest
     outputs:
+      ffmpeg-date: ${{ steps.jq.outputs.FFMPEG_DATE }}
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
+      ffmpeg-version: ${{ steps.jq.outputs.FFMPEG_VERSION }}
       lowercase-github-actor: ${{ steps.github-actor.outputs.lowercase }}
       lowercase-github-repository_owner: ${{ steps.github-repository_owner.outputs.lowercase }}
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
@@ -45,6 +47,35 @@ jobs:
       - name: Retrieve yt-dlp/yt-dlp releases with GitHub CLI
         id: yt-dlp
         uses: ./.github/actions/yt-dlp
+      - name: Set outputs with jq
+        id: jq
+        run: |
+          cat >| .ffmpeg.releases.json <<'EOF'
+          ${{ steps.ffmpeg.outputs.releases }}
+          EOF
+          mk_delim() { local f='%s_EOF_%d_' ; printf -- "${f}" "$1" "${RANDOM}" ; } ;
+          open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
+          close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
+          {
+            var='FFMPEG_DATE' ;
+            delim="$(mk_delim "${var}")" ;
+            open_ml_var "${delim}" "${var}" ;
+            jq_arg='[foreach .[] as $release ([{}, []]; [ .[0] + {($release.commit): ([ $release.date ] + (.[0][($release.commit)] // []) ) }, [ .[1][0] // $release.commit ] ] ; .[0][(.[1][0])] ) ][-1][0]' ;
+            jq -r "${jq_arg}" -- .ffmpeg.releases.json ;
+            close_ml_var "${delim}" "${var}" ;
+
+            ffmpeg_date="$( jq -r "${jq_arg}" -- .ffmpeg.releases.json )"
+            
+            var='FFMPEG_VERSION' ;
+            delim="$(mk_delim "${var}")" ;
+            open_ml_var "${delim}" "${var}" ;
+            jq_arg='.[]|select(.date == $date)|.versions[]|select(startswith("N-"))' ;
+            jq -r --arg date "${ffmpeg_date}" "${jq_arg}" -- .ffmpeg.releases.json ;
+            close_ml_var "${delim}" "${var}" ;
+            unset -v delim jq_arg var ;
+          } >> "${GITHUB_OUTPUT}"
+          cat -v "${GITHUB_OUTPUT}"
+          rm -v -f .ffmpeg.releases.json
 
   test:
     if: ${{ !cancelled() && ( 'pull_request' != github.event_name || (! github.event.pull_request.draft) ) }}
@@ -78,34 +109,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - name: Set environment variables with jq
-        run: |
-          cat >| .ffmpeg.releases.json <<'EOF'
-          ${{ needs.info.outputs.ffmpeg-releases }}
-          EOF
-          mk_delim() { local f='%s_EOF_%d_' ; printf -- "${f}" "$1" "${RANDOM}" ; } ;
-          open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
-          close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
-          {
-            var='FFMPEG_DATE' ;
-            delim="$(mk_delim "${var}")" ;
-            open_ml_var "${delim}" "${var}" ;
-            jq_arg='[foreach .[] as $release ([{}, []]; [ .[0] + {($release.commit): ([ $release.date ] + (.[0][($release.commit)] // []) ) }, [ .[1][0] // $release.commit ] ] ; .[0][(.[1][0])] ) ][-1][0]' ;
-            jq -r "${jq_arg}" -- .ffmpeg.releases.json ;
-            close_ml_var "${delim}" "${var}" ;
-
-            ffmpeg_date="$( jq -r "${jq_arg}" -- .ffmpeg.releases.json )"
-            
-            var='FFMPEG_VERSION' ;
-            delim="$(mk_delim "${var}")" ;
-            open_ml_var "${delim}" "${var}" ;
-            jq_arg='.[]|select(.date == $date)|.versions[]|select(startswith("N-"))' ;
-            jq -r --arg date "${ffmpeg_date}" "${jq_arg}" -- .ffmpeg.releases.json ;
-            close_ml_var "${delim}" "${var}" ;
-            unset -v delim jq_arg var ;
-          } >> "${GITHUB_ENV}"
-          cat -v "${GITHUB_ENV}"
-          rm -v -f .ffmpeg.releases.json
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -134,49 +137,22 @@ jobs:
             ${{ 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'type=inline' || '' }}
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
-            FFMPEG_DATE=${{ env.FFMPEG_DATE }}
-            FFMPEG_VERSION=${{ env.FFMPEG_VERSION }}
+            FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
+            FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
   dive:
-    runs-on: ubuntu-latest
+    if: ${{ !cancelled() && 'success' == needs.info.result }}
     needs: ['info']
+    runs-on: ubuntu-latest
     steps:
-      - name: Set environment variables with jq
-        run: |
-          cat >| .ffmpeg.releases.json <<'EOF'
-          ${{ needs.info.outputs.ffmpeg-releases }}
-          EOF
-          mk_delim() { local f='%s_EOF_%d_' ; printf -- "${f}" "$1" "${RANDOM}" ; } ;
-          open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
-          close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
-          {
-            var='FFMPEG_DATE' ;
-            delim="$(mk_delim "${var}")" ;
-            open_ml_var "${delim}" "${var}" ;
-            jq_arg='[foreach .[] as $release ([{}, []]; [ .[0] + {($release.commit): ([ $release.date ] + (.[0][($release.commit)] // []) ) }, [ .[1][0] // $release.commit ] ] ; .[0][(.[1][0])] ) ][-1][0]' ;
-            jq -r "${jq_arg}" -- .ffmpeg.releases.json ;
-            close_ml_var "${delim}" "${var}" ;
-
-            ffmpeg_date="$( jq -r "${jq_arg}" -- .ffmpeg.releases.json )"
-            
-            var='FFMPEG_VERSION' ;
-            delim="$(mk_delim "${var}")" ;
-            open_ml_var "${delim}" "${var}" ;
-            jq_arg='.[]|select(.date == $date)|.versions[]|select(startswith("N-"))' ;
-            jq -r --arg date "${ffmpeg_date}" "${jq_arg}" -- .ffmpeg.releases.json ;
-            close_ml_var "${delim}" "${var}" ;
-            unset -v delim jq_arg var ;
-          } >> "${GITHUB_ENV}"
-          cat -v "${GITHUB_ENV}"
-          rm -v -f .ffmpeg.releases.json
       - uses: docker/setup-buildx-action@v3
       - uses: actions/checkout@v4
       - name: Build `${{ env.IMAGE_NAME }}` image
         run: |
           docker buildx build \
             --build-arg IMAGE_NAME=${{ env.IMAGE_NAME }} \
-            --build-arg FFMPEG_DATE=${{ env.FFMPEG_DATE }} \
-            --build-arg FFMPEG_VERSION=${{ env.FFMPEG_VERSION }} \
+            --build-arg FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }} \
+            --build-arg FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }} \
             --build-arg YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }} \
             --cache-from type=gha --load \
             -t ${{ env.IMAGE_NAME }} .
