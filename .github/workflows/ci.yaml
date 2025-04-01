@@ -175,7 +175,7 @@ jobs:
           docker buildx build \
             --build-arg IMAGE_NAME=${{ env.IMAGE_NAME }} \
             --build-arg FFMPEG_DATE=${{ env.FFMPEG_DATE }} \
-            --build-arg FFMPEG_VERSION=${{ env.FFMPEG_VERSION }} }
+            --build-arg FFMPEG_VERSION=${{ env.FFMPEG_VERSION }} \
             --build-arg YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }} \
             --cache-from type=gha --load \
             -t ${{ env.IMAGE_NAME }} .
