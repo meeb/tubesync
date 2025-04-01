@@ -118,10 +118,12 @@ jobs:
           DOCKER_TOKEN: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
         run: echo "${DOCKER_TOKEN}" | docker login --password-stdin --username "${DOCKER_USERNAME}" "${DOCKER_REGISTRY}"
       - name: Build and push
+        id: build-push
         timeout-minutes: 60
         uses: docker/build-push-action@v6
         with:
           platforms: linux/amd64,linux/arm64
+          load: true
           push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
           tags: ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:latest
           cache-from: |
@@ -136,3 +138,12 @@ jobs:
             FFMPEG_DATE=${{ env.FFMPEG_DATE }}
             FFMPEG_VERSION=${{ env.FFMPEG_VERSION }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
+      - name: Analysis with `dive`
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            ghcr.io/wagoodman/dive \
+            'docker://${{ steps.build-push.outputs.imageid }}' \
+            --ci \
+            --highestUserWastedPercent '0.03' \
+            --highestWastedBytes '10M'
