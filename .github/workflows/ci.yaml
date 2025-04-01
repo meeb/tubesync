@@ -123,7 +123,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           platforms: linux/amd64,linux/arm64
-          load: true
           push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
           tags: ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:latest
           cache-from: |
@@ -143,7 +142,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             ghcr.io/wagoodman/dive \
-            'docker://${{ steps.build-push.outputs.imageid }}' \
+            build -t ${{ env.IMAGE_NAME }} . \
             --ci \
             --highestUserWastedPercent '0.03' \
             --highestWastedBytes '10M'
