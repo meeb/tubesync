@@ -120,6 +120,29 @@ jobs:
           DOCKER_USERNAME: ${{ github.actor }}
           DOCKER_TOKEN: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
         run: echo "${DOCKER_TOKEN}" | docker login --password-stdin --username "${DOCKER_USERNAME}" "${DOCKER_REGISTRY}"
+      - name: Build image for `dive`
+        id: build-dive-image
+        uses: docker/build-push-action@v6
+        with:
+          build-args: |
+            IMAGE_NAME=${{ env.IMAGE_NAME }}
+            FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
+            FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
+            YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
+          cache-from: type=gha
+          load: true
+          platforms: linux/amd64
+          push: false
+          tags: ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:dive
+      - name: Analysis with `dive`
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            ghcr.io/wagoodman/dive \
+            'ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:dive' \
+            --ci \
+            --highestUserWastedPercent '0.03' \
+            --highestWastedBytes '10M'
       - name: Build and push
         id: build-push
         timeout-minutes: 60
