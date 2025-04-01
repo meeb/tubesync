@@ -19,7 +19,7 @@ on:
 
 jobs:
   info:
-    if: ${{ !cancelled() && 'pull_request' != github.event_name }}
+    #if: ${{ !cancelled() && 'pull_request' != github.event_name }}
     runs-on: ubuntu-latest
     outputs:
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
