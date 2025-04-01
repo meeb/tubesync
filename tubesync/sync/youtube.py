@@ -179,7 +179,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
     playlist_infojson = 'postprocessor_[%(id)s]_%(n_entries)d_%(playlist_count)d_temp'
     outtmpl = dict(
         default='',
-        infojson='%(id)s.%(ext)s' if paths.get('infojson') else '',
+        infojson='%(extractor)s/%(id)s.%(ext)s' if paths.get('infojson') else '',
         pl_infojson=f'{cache_directory_path}/infojson/playlist/{playlist_infojson}.%(ext)s',
     )
     for k in OUTTMPL_TYPES.keys():
