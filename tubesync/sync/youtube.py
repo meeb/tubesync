@@ -187,6 +187,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
     opts.update({
         'ignoreerrors': False, # explicitly set this to catch exceptions
         'ignore_no_formats_error': False, # we must fail first to try again with this enabled
+        'overwrites': False,
         'skip_download': True,
         'simulate': False,
         'logger': log,
@@ -208,6 +209,16 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'verbose': True if settings.DEBUG else False,
         'writeinfojson': True,
     })
+    try:
+        info_json_path = Path(info_json).resolve(strict=False)
+    except:
+        pass
+    else:
+        opts['paths'].update({
+            'infojson': user_set('infojson', opts['paths'], str(info_json_path))
+        })
+    if 'infojson' not in opts['paths'].keys():
+        opts.update({'writeinfojson': False})
     if start:
         log.debug(f'get_media_info: used date range: {opts["daterange"]} for URL: {url}')
     response = {}
