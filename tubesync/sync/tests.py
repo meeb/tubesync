@@ -138,7 +138,7 @@ class FrontEndTestCase(TestCase):
                     else:
                         # Invalid source tests should reload the page with an error
                         self.assertEqual(response.status_code, 200)
-                        self.assertIn('<ul class="errorlist">',
+                        self.assertIn('<ul class="errorlist"',
                                       response.content.decode())
 
     def test_add_source_prepopulation(self):
