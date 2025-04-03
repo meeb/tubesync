@@ -145,6 +145,9 @@ class CommaSepChoiceField(models.CharField):
             # The data was lost; we can regenerate it.
             args_dict = {key: self.__dict__[key] for key in CommaSepChoice._fields}
             args_dict['selected_choices'] = list(value)
+            # setting a string manually should not result in characters
+            if isinstance(value, str) and len(value) > 0:
+                args_dict['selected_choices'] = value.split(self.separator)
             data = CommaSepChoice(**args_dict)
         value = data.selected_choices
         s_value = super().get_prep_value(value)

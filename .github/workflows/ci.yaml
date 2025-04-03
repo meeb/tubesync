@@ -22,40 +22,60 @@ jobs:
     if: ${{ !cancelled() && 'pull_request' != github.event_name }}
     runs-on: ubuntu-latest
     outputs:
+      ffmpeg-date: ${{ steps.jq.outputs.FFMPEG_DATE }}
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
-      lowercase-variables-actor: ${{ steps.lowercase-variables.outputs.actor }}
-      lowercase-variables-repository_owner: ${{ steps.lowercase-variables.outputs.repository_owner }}
-      string-lowercase: ${{ steps.string.outputs.lowercase }}
+      ffmpeg-version: ${{ steps.jq.outputs.FFMPEG_VERSION }}
+      lowercase-github-actor: ${{ steps.github-actor.outputs.lowercase }}
+      lowercase-github-repository_owner: ${{ steps.github-repository_owner.outputs.lowercase }}
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
       ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
     steps:
-      - name: Lowercase github username for ghcr
-        id: string
-        uses: ASzc/change-string-case-action@v6
+      - uses: actions/checkout@v4
+      - name: Lowercase github username
+        id: github-actor
+        uses: ./.github/actions/string-case
         with:
           string: ${{ github.actor }}
-      - name: Lowercase GitHub variables
-        id: lowercase-variables
-        shell: bash
-        run: |
-          set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
-          for var in \
-            actor='${{ github.actor }}' \
-            repository_owner='${{ github.repository_owner }}'
-          do
-            k="$( cut -d '=' -f 1 <<<"${var}" )" ;
-            v="${var#${k}=}" ;
-            set_sl_var >> "${GITHUB_OUTPUT}" \
-              "${k}" "${v,,}" ;
-          done ;
-          unset -v k v var ;
-      - uses: actions/checkout@v4
+      - name: Lowercase github repository owner
+        id: github-repository_owner
+        uses: ./.github/actions/string-case
+        with:
+          string: ${{ github.repository_owner }}
       - name: Retrieve yt-dlp/FFmpeg-Builds releases with GitHub CLI
         id: ffmpeg
         uses: ./.github/actions/FFmpeg
       - name: Retrieve yt-dlp/yt-dlp releases with GitHub CLI
         id: yt-dlp
         uses: ./.github/actions/yt-dlp
+      - name: Set outputs with jq
+        id: jq
+        run: |
+          cat >| .ffmpeg.releases.json <<'EOF'
+          ${{ steps.ffmpeg.outputs.releases }}
+          EOF
+          mk_delim() { local f='%s_EOF_%d_' ; printf -- "${f}" "$1" "${RANDOM}" ; } ;
+          open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
+          close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
+          {
+            var='FFMPEG_DATE' ;
+            delim="$(mk_delim "${var}")" ;
+            open_ml_var "${delim}" "${var}" ;
+            jq_arg='[foreach .[] as $release ([{}, []]; [ .[0] + {($release.commit): ([ $release.date ] + (.[0][($release.commit)] // []) ) }, [ .[1][0] // $release.commit ] ] ; .[0][(.[1][0])] ) ][-1][0]' ;
+            jq -r "${jq_arg}" -- .ffmpeg.releases.json ;
+            close_ml_var "${delim}" "${var}" ;
+
+            ffmpeg_date="$( jq -r "${jq_arg}" -- .ffmpeg.releases.json )"
+            
+            var='FFMPEG_VERSION' ;
+            delim="$(mk_delim "${var}")" ;
+            open_ml_var "${delim}" "${var}" ;
+            jq_arg='.[]|select(.date == $date)|.versions[]|select(startswith("N-"))' ;
+            jq -r --arg date "${ffmpeg_date}" "${jq_arg}" -- .ffmpeg.releases.json ;
+            close_ml_var "${delim}" "${var}" ;
+            unset -v delim jq_arg var ;
+          } >> "${GITHUB_OUTPUT}"
+          cat -v "${GITHUB_OUTPUT}"
+          rm -v -f .ffmpeg.releases.json
 
   test:
     if: ${{ !cancelled() && ( 'pull_request' != github.event_name || (! github.event.pull_request.draft) ) }}
@@ -74,7 +94,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pipenv
-          pipenv install --system --skip-lock
+          PIPENV_VERBOSITY=64 pipenv install --system --skip-lock
       - name: Set up Django environment
         run: |
           cp -v -p tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
@@ -274,7 +294,33 @@ jobs:
                   mv --backup=numbered -f saved/*.~[0-9]~ removed/ || : ;
                   rm -rf removed/* || : ;
               done &)
+      - name: Build image for `dive`
+        id: build-dive-image
+        uses: docker/build-push-action@v6
+        with:
+          build-args: |
+            IMAGE_NAME=${{ env.IMAGE_NAME }}
+            FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
+            FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
+            YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
+          build-contexts: |
+            cache-tubesync=.cache/saved
+          cache-from: type=gha
+          load: true
+          platforms: linux/amd64
+          push: false
+          tags: ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:dive
+      - name: Analysis with `dive`
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            'ghcr.io/wagoodman/dive' \
+            'ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:dive' \
+            --ci \
+            --highestUserWastedPercent '0.03' \
+            --highestWastedBytes '10M'
       - name: Build and push
+        id: build-push
         timeout-minutes: 90
         uses: docker/build-push-action@v6
         env:
@@ -294,8 +340,8 @@ jobs:
             type=gha,mode=max
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
-            FFMPEG_DATE=${{ env.FFMPEG_DATE }}
-            FFMPEG_VERSION=${{ env.FFMPEG_VERSION }}
+            FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
+            FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
           build-contexts: |
             cache-tubesync=.cache/saved
