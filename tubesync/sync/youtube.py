@@ -197,6 +197,12 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'clean_infojson': False,
         'daterange': yt_dlp.utils.DateRange(start=start),
         'extractor_args': {
+            'youtube': {
+                'formats': ['missing_pot'],
+                'max_comments': ['1,all,all,all'],
+                'player_client': ['default', 'web_safari'],
+                'raise_incomplete_data': ['true'],
+            },
             'youtubetab': {'approximate_date': ['true']},
         },
         'outtmpl': outtmpl,
