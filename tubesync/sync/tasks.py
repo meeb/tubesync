@@ -385,7 +385,7 @@ def download_source_images(source_id):
     log.info(f'Thumbnail downloaded for source with ID: {source_id} / {source}')
 
 
-@background(schedule=dict(run_at=60), remove_existing_tasks=True)
+@background(schedule=dict(priority=20, run_at=60), remove_existing_tasks=True)
 def download_media_metadata(media_id):
     '''
         Downloads the metadata for a media item.
