@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as tz
 from hashlib import sha1
+from pathlib import Path
 import json
 import logging
 import os
 import traceback
 
-from compat import StringIO
-from compat.models import GenericForeignKey
+from io import StringIO
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import Q
@@ -38,6 +39,23 @@ class TaskQuerySet(models.QuerySet):
 
 class TaskManager(models.Manager):
 
+    _boot_time = posix_epoch = datetime(1970, 1, 1, tzinfo=tz.utc)
+
+    @property
+    def boot_time(self):
+        if self._boot_time > self.posix_epoch:
+            return self._boot_time
+        stats = None
+        boot_time = self.posix_epoch
+        kcore_path = Path('/proc/kcore')
+        if kcore_path.exists():
+            stats = kcore_path.stat()
+        if stats:
+            boot_time += timedelta(seconds=stats.st_mtime)
+        if boot_time > self._boot_time:
+            self._boot_time = boot_time
+        return self._boot_time
+
     def get_queryset(self):
         return TaskQuerySet(self.model, using=self._db)
 
@@ -50,14 +68,15 @@ class TaskManager(models.Manager):
         if queue:
             qs = qs.filter(queue=queue)
         ready = qs.filter(run_at__lte=now, failed_at=None)
-        _priority_ordering = '{}priority'.format(app_settings.BACKGROUND_TASK_PRIORITY_ORDERING)
+        _priority_ordering = '{}priority'.format(
+            app_settings.BACKGROUND_TASK_PRIORITY_ORDERING)
         ready = ready.order_by(_priority_ordering, 'run_at')
 
         if app_settings.BACKGROUND_TASK_RUN_ASYNC:
             currently_failed = self.failed().count()
             currently_locked = self.locked(now).count()
             count = app_settings.BACKGROUND_TASK_ASYNC_THREADS - \
-                                    (currently_locked - currently_failed)
+                (currently_locked - currently_failed)
             if count > 0:
                 ready = ready[:count]
             else:
@@ -68,14 +87,14 @@ class TaskManager(models.Manager):
         max_run_time = app_settings.BACKGROUND_TASK_MAX_RUN_TIME
         qs = self.get_queryset()
         expires_at = now - timedelta(seconds=max_run_time)
-        unlocked = Q(locked_by=None) | Q(locked_at__lt=expires_at)
+        unlocked = Q(locked_by=None) | Q(locked_at__lt=expires_at) | Q(locked_at__lt=self.boot_time)
         return qs.filter(unlocked)
 
     def locked(self, now):
         max_run_time = app_settings.BACKGROUND_TASK_MAX_RUN_TIME
         qs = self.get_queryset()
         expires_at = now - timedelta(seconds=max_run_time)
-        locked = Q(locked_by__isnull=False) & Q(locked_at__gt=expires_at)
+        locked = Q(locked_by__isnull=False) & Q(locked_at__gt=expires_at) & Q(locked_at__gt=self.boot_time)
         return qs.filter(locked)
 
     def failed(self):
@@ -102,7 +121,8 @@ class TaskManager(models.Manager):
         s = "%s%s" % (task_name, task_params)
         task_hash = sha1(s.encode('utf-8')).hexdigest()
         if remove_existing_tasks:
-            Task.objects.filter(task_hash=task_hash, locked_at__isnull=True).delete()
+            Task.objects.filter(task_hash=task_hash,
+                                locked_at__isnull=True).delete()
         return Task(task_name=task_name,
                     task_params=task_params,
                     task_hash=task_hash,
@@ -188,14 +208,23 @@ class Task(models.Model):
 
     objects = TaskManager()
 
+    @property
+    def nodename(self):
+        return os.uname().nodename[:(64-10)]
+ 
     def locked_by_pid_running(self):
         """
         Check if the locked_by process is still running.
         """
-        if self.locked_by:
+        if self in self.__class__.objects.locked(timezone.now()) and self.locked_by:
+            pid, nodename = self.locked_by.split('/', 1)
+            # locked by a process on this node?
+            if nodename != self.nodename:
+                return False
+            # is the process still running?
             try:
-                # won't kill the process. kill is a bad named system call
-                os.kill(int(self.locked_by), 0)
+                # Signal number zero won't kill the process.
+                os.kill(int(pid), 0)
                 return True
             except:
                 return False
@@ -218,8 +247,9 @@ class Task(models.Model):
 
     def lock(self, locked_by):
         now = timezone.now()
+        owner = f'{locked_by[:8]}/{self.nodename}'
         unlocked = Task.objects.unlocked(now).filter(pk=self.pk)
-        updated = unlocked.update(locked_by=locked_by, locked_at=now)
+        updated = unlocked.update(locked_by=owner, locked_at=now)
         if updated:
             return Task.objects.get(pk=self.pk)
         return None
@@ -251,13 +281,14 @@ class Task(models.Model):
             self.failed_at = timezone.now()
             logger.warning('Marking task %s as failed', self)
             completed = self.create_completed_task()
-            task_failed.send(sender=self.__class__, task_id=self.id, completed_task=completed)
+            task_failed.send(sender=self.__class__,
+                             task_id=self.id, completed_task=completed)
             self.delete()
         else:
             backoff = timedelta(seconds=(self.attempts ** 4) + 5)
             self.run_at = timezone.now() + backoff
             logger.warning('Rescheduling task %s for %s later at %s', self,
-                backoff, self.run_at)
+                           backoff, self.run_at)
             task_rescheduled.send(sender=self.__class__, task=self)
             self.locked_by = None
             self.locked_at = None
@@ -330,9 +361,6 @@ class Task(models.Model):
         db_table = 'background_task'
 
 
-
-
-
 class CompletedTaskQuerySet(models.QuerySet):
 
     def created_by(self, creator):
@@ -389,7 +417,8 @@ class CompletedTask(models.Model):
     # when the task should be run
     run_at = models.DateTimeField(db_index=True)
 
-    repeat = models.BigIntegerField(choices=Task.REPEAT_CHOICES, default=Task.NEVER)
+    repeat = models.BigIntegerField(
+        choices=Task.REPEAT_CHOICES, default=Task.NEVER)
     repeat_until = models.DateTimeField(null=True, blank=True)
 
     # the "name" of the queue this is to be run on
@@ -422,9 +451,14 @@ class CompletedTask(models.Model):
         Check if the locked_by process is still running.
         """
         if self.locked_by:
+            pid, node = self.locked_by.split('/', 1)
+            # locked by a process on this node?
+            if os.uname().nodename[:(64-10)] != node:
+                return False
+            # is the process still running?
             try:
                 # won't kill the process. kill is a bad named system call
-                os.kill(int(self.locked_by), 0)
+                os.kill(int(pid), 0)
                 return True
             except:
                 return False

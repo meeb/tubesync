@@ -65,7 +65,54 @@ class IndexSchedule(models.IntegerChoices):
 
 
 class MediaServerType(models.TextChoices):
+    JELLYFIN = 'j', _('Jellyfin')
     PLEX = 'p', _('Plex')
+
+    @classmethod
+    def forms_dict(cls):
+        from .forms import (
+            JellyfinMediaServerForm,
+            PlexMediaServerForm,
+        )
+        return dict(zip(
+            cls.values,
+            (
+                JellyfinMediaServerForm,
+                PlexMediaServerForm,
+            ),
+        ))
+
+    @classmethod
+    def handlers_dict(cls):
+        from .mediaservers import (
+            JellyfinMediaServer,
+            PlexMediaServer,
+        )
+        return dict(zip(
+            cls.values,
+            (
+                JellyfinMediaServer,
+                PlexMediaServer,
+            ),
+        ))
+
+    @property
+    def long_type(self):
+        return self.long_types().get(self.value)
+
+    @classmethod
+    def long_types(cls):
+        d = dict(zip(
+            list(map(cls.lower, cls.names)),
+            cls.values,
+        ))
+        rd = dict(zip( d.values(), d.keys() ))
+        rd.update(d)
+        return rd
+
+    @classmethod
+    def members_list(cls):
+        return list(cls.__members__.values())
 
 
 class MediaState(models.TextChoices):
@@ -85,7 +132,7 @@ class SourceResolution(models.TextChoices):
     VIDEO_720P = '720p', _('720p (HD)')
     VIDEO_1080P = '1080p', _('1080p (Full HD)')
     VIDEO_1440P = '1440p', _('1440p (2K)')
-    VIDEO_2160P = '2160p', _('4320p (8K)')
+    VIDEO_2160P = '2160p', _('2160p (4K)')
     VIDEO_4320P = '4320p', _('4320p (8K)')
 
     @classmethod

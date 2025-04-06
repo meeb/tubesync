@@ -14,7 +14,7 @@
   </div>
 </div>
 <div class="row">
-  <form method="post" action="{% url 'sync:add-mediaserver' server_type='plex' %}" class="col s12 simpleform">
+  <form method="post" action="{% url 'sync:add-mediaserver' server_type=server_type_long %}" class="col s12 simpleform">
     {% csrf_token %}
     {% include 'simpleform.html' with form=form %}
     <div class="row no-margin-bottom padding-top">

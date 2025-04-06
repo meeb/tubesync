@@ -18,6 +18,8 @@ import requests
 TIMEOUT = 5  # Seconds
 HTTP_USER = os.getenv('HTTP_USER')
 HTTP_PASS = os.getenv('HTTP_PASS')
+# never use proxy for healthcheck requests
+os.environ['no_proxy'] = '*'
 
 
 def do_heatlhcheck(url):
@@ -30,6 +32,9 @@ def do_heatlhcheck(url):
 
 
 if __name__ == '__main__':
+    # if it is marked as intentionally down, nothing else matters
+    if os.path.exists('/run/service/gunicorn/down'):
+        sys.exit(0)
     try:
         url = sys.argv[1]
     except IndexError:

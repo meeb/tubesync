@@ -138,7 +138,7 @@ class FrontEndTestCase(TestCase):
                     else:
                         # Invalid source tests should reload the page with an error
                         self.assertEqual(response.status_code, 200)
-                        self.assertIn('<ul class="errorlist">',
+                        self.assertIn('<ul class="errorlist"',
                                       response.content.decode())
 
     def test_add_source_prepopulation(self):
@@ -1767,7 +1767,7 @@ class ResponseFilteringTestCase(TestCase):
         self.media.save()
 
         unfiltered = self.media.loaded_metadata
-        filtered = filter_response(self.media.loaded_metadata)
+        filtered = filter_response(self.media.loaded_metadata, True)
         self.assertIn('formats', unfiltered.keys())
         self.assertIn('formats', filtered.keys())
         # filtered 'downloader_options'

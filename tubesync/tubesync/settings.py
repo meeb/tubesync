@@ -1,5 +1,5 @@
-import os
 from pathlib import Path
+from common.utils import getenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -97,7 +97,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = os.getenv('TZ', 'UTC')
+TIME_ZONE = getenv('TZ', 'UTC')
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
@@ -119,6 +119,8 @@ Disallow: /
 '''.strip()
 
 
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 
@@ -133,7 +135,7 @@ HEALTHCHECK_ALLOWED_IPS = ('127.0.0.1',)
 
 
 MAX_ATTEMPTS = 15                           # Number of times tasks will be retried
-MAX_RUN_TIME = 1800                         # Maximum amount of time in seconds a task can run
+MAX_RUN_TIME = 1*(24*60*60)                 # Maximum amount of time in seconds a task can run
 BACKGROUND_TASK_RUN_ASYNC = True            # Run tasks async in the background
 BACKGROUND_TASK_ASYNC_THREADS = 1           # Number of async tasks to run at once
 MAX_BACKGROUND_TASK_ASYNC_THREADS = 8       # For sanity reasons
@@ -170,6 +172,7 @@ YOUTUBE_DEFAULTS = {
     'ignoreerrors': True,   # Skip on errors (such as unavailable videos in playlists)
     'cachedir': False,      # Disable on-disk caching
     'addmetadata': True,    # Embed metadata during postprocessing where available
+    'geo_verification_proxy': getenv('geo_verification_proxy').strip() or None,
 }
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 
@@ -207,7 +210,7 @@ except:
 if MAX_RUN_TIME < 600:
     MAX_RUN_TIME = 600
 
-DOWNLOAD_MEDIA_DELAY = 60 + (MAX_RUN_TIME / 20)
+DOWNLOAD_MEDIA_DELAY = 60 + (MAX_RUN_TIME / 50)
 
 if RENAME_SOURCES or RENAME_ALL_SOURCES:
     BACKGROUND_TASK_ASYNC_THREADS += 1
