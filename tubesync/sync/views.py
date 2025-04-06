@@ -123,8 +123,6 @@ class SourcesView(ListView):
                 str(sobj.pk),
                 queue=str(sobj.pk),
                 repeat=0,
-                priority=10,
-                schedule=30,
                 remove_existing_tasks=False,
                 verbose_name=verbose_name.format(sobj.name))
             url = reverse_lazy('sync:sources')
@@ -932,9 +930,8 @@ class ResetTasks(FormView):
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(source.pk),
-                repeat=source.index_schedule,
                 queue=str(source.pk),
-                priority=10,
+                repeat=source.index_schedule,
                 verbose_name=verbose_name.format(source.name)
             )
             # This also chains down to call each Media objects .save() as well
