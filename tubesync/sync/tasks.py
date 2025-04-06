@@ -335,7 +335,7 @@ def check_source_directory_exists(source_id):
         source.make_directory()
 
 
-@background(schedule=dict(run_at=0))
+@background(schedule=dict(priority=5, run_at=0))
 def download_source_images(source_id):
     '''
         Downloads an image and save it as a local thumbnail attached to a
