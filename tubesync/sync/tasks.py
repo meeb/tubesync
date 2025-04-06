@@ -229,7 +229,7 @@ def cleanup_removed_media(source, videos):
     schedule_media_servers_update()
 
 
-@background(schedule=dict(run_at=300), remove_existing_tasks=True)
+@background(schedule=dict(priority=10, run_at=30), remove_existing_tasks=True)
 def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
