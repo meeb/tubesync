@@ -420,8 +420,7 @@ class FrontEndTestCase(TestCase):
         found_download_task1 = False
         found_download_task2 = False
         found_download_task3 = False
-        q = {'queue': str(test_source.pk),
-             'task_name': 'sync.tasks.download_media_thumbnail'}
+        q = {'task_name': 'sync.tasks.download_media_thumbnail'}
         for task in Task.objects.filter(**q):
             if test_media1_pk in task.task_params:
                 found_thumbnail_task1 = True
@@ -429,8 +428,7 @@ class FrontEndTestCase(TestCase):
                 found_thumbnail_task2 = True
             if test_media3_pk in task.task_params:
                 found_thumbnail_task3 = True
-        q = {'queue': str(test_source.pk),
-             'task_name': 'sync.tasks.download_media'}
+        q = {'task_name': 'sync.tasks.download_media'}
         for task in Task.objects.filter(**q):
             if test_media1_pk in task.task_params:
                 found_download_task1 = True
