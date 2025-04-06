@@ -510,7 +510,7 @@ def download_media_thumbnail(media_id, url):
     return True
 
 
-@background(schedule=dict(run_at=60), remove_existing_tasks=True)
+@background(schedule=dict(priority=15, run_at=60), remove_existing_tasks=True)
 def download_media(media_id):
     '''
         Downloads the media to disk and attaches it to the Media instance.
