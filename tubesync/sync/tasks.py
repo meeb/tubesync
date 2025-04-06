@@ -770,7 +770,7 @@ def wait_for_media_premiere(media_id):
         if task:
             update_task_status(task, f'available in {hours(media.published - now)} hours')
 
-@background(schedule=dict(run_at=300), remove_existing_tasks=False)
+@background(schedule=dict(priority=1, run_at=300), remove_existing_tasks=False)
 def delete_all_media_for_source(source_id, source_name):
     source = None
     try:
