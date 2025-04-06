@@ -316,7 +316,7 @@ def index_source_task(source_id):
     cleanup_removed_media(source, videos)
 
 
-@background(schedule=dict(run_at=0))
+@background(schedule=dict(priority=0, run_at=0))
 def check_source_directory_exists(source_id):
     '''
         Checks the output directory for a source exists and is writable, if it does
@@ -335,7 +335,7 @@ def check_source_directory_exists(source_id):
         source.make_directory()
 
 
-@background(schedule=dict(priority=5, run_at=0))
+@background(schedule=dict(priority=5, run_at=10))
 def download_source_images(source_id):
     '''
         Downloads an image and save it as a local thumbnail attached to a
@@ -472,7 +472,7 @@ def download_media_metadata(media_id):
              f'{source} / {media}: {media_id}')
 
 
-@background(schedule=dict(priority=15, run_at=60), remove_existing_tasks=True)
+@background(schedule=dict(priority=15, run_at=10), remove_existing_tasks=True)
 def download_media_thumbnail(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
@@ -632,7 +632,7 @@ def download_media(media_id):
         raise DownloadFailedException(err)
 
 
-@background(schedule=dict(run_at=300), remove_existing_tasks=True)
+@background(schedule=dict(priority=0, run_at=30), remove_existing_tasks=True)
 def rescan_media_server(mediaserver_id):
     '''
         Attempts to request a media rescan on a remote media server.
@@ -647,7 +647,7 @@ def rescan_media_server(mediaserver_id):
     mediaserver.update()
 
 
-@background(schedule=dict(priority=25, run_at=300), remove_existing_tasks=True)
+@background(schedule=dict(priority=25, run_at=600), remove_existing_tasks=True)
 def save_all_media_for_source(source_id):
     '''
         Iterates all media items linked to a source and saves them to
@@ -746,7 +746,7 @@ def rename_all_media_for_source(source_id):
             media.rename_files()
 
 
-@background(schedule=dict(run_at=60), remove_existing_tasks=True)
+@background(schedule=dict(priority=0, run_at=60), remove_existing_tasks=True)
 def wait_for_media_premiere(media_id):
     hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
 
