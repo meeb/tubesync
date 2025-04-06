@@ -118,13 +118,16 @@ class SourcesView(ListView):
             if sobj is None:
                 return HttpResponseNotFound()
 
+            source = sobj
             verbose_name = _('Index media from source "{}" once')
             index_source_task(
-                str(sobj.pk),
-                queue=str(sobj.pk),
-                repeat=0,
+                str(source.pk),
+                queue=str(source.pk),
                 remove_existing_tasks=False,
-                verbose_name=verbose_name.format(sobj.name))
+                repeat=0,
+                schedule=30,
+                verbose_name=verbose_name.format(source.name),
+            )
             url = reverse_lazy('sync:sources')
             url = append_uri_params(url, {'message': 'source-refreshed'})
             return HttpResponseRedirect(url)
