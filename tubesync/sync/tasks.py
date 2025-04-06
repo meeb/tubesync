@@ -472,7 +472,7 @@ def download_media_metadata(media_id):
              f'{source} / {media}: {media_id}')
 
 
-@background(schedule=dict(run_at=60), remove_existing_tasks=True)
+@background(schedule=dict(priority=15, run_at=60), remove_existing_tasks=True)
 def download_media_thumbnail(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
