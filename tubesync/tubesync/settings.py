@@ -136,7 +136,7 @@ HEALTHCHECK_ALLOWED_IPS = ('127.0.0.1',)
 
 MAX_ATTEMPTS = 15                           # Number of times tasks will be retried
 MAX_RUN_TIME = 1*(24*60*60)                 # Maximum amount of time in seconds a task can run
-BACKGROUND_TASK_RUN_ASYNC = True            # Run tasks async in the background
+BACKGROUND_TASK_RUN_ASYNC = False           # Run tasks async in the background
 BACKGROUND_TASK_ASYNC_THREADS = 1           # Number of async tasks to run at once
 MAX_BACKGROUND_TASK_ASYNC_THREADS = 8       # For sanity reasons
 BACKGROUND_TASK_PRIORITY_ORDERING = 'ASC'   # Use 'niceness' task priority ordering
