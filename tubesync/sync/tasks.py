@@ -704,7 +704,7 @@ def save_all_media_for_source(source_id):
     update_task_status(task, None)
 
 
-@background(schedule=dict(run_at=60), remove_existing_tasks=True)
+@background(schedule=dict(priority=20, run_at=60), remove_existing_tasks=True)
 def rename_media(media_id):
     try:
         media = Media.objects.defer('metadata', 'thumb').get(pk=media_id)
@@ -713,7 +713,7 @@ def rename_media(media_id):
     media.rename_files()
 
 
-@background(schedule=dict(run_at=300), remove_existing_tasks=True)
+@background(schedule=dict(priority=20, run_at=300), remove_existing_tasks=True)
 @atomic(durable=True)
 def rename_all_media_for_source(source_id):
     try:
