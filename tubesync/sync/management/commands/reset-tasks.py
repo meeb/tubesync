@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand, CommandError
+from django.db.transaction import atomic
 from django.utils.translation import gettext_lazy as _
 from background_task.models import Task
 from sync.models import Source
@@ -12,6 +13,7 @@ class Command(BaseCommand):
 
     help = 'Resets all tasks'
 
+    @atomic(durable=True)
     def handle(self, *args, **options):
         log.info('Resettings all tasks...')
         # Delete all tasks
@@ -23,9 +25,8 @@ class Command(BaseCommand):
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(source.pk),
-                repeat=source.index_schedule,
                 queue=str(source.pk),
-                priority=10,
+                repeat=source.index_schedule,
                 verbose_name=verbose_name.format(source.name)
             )
             # This also chains down to call each Media objects .save() as well
