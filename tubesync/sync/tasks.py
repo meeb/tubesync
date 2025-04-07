@@ -434,12 +434,9 @@ def download_media_metadata(media_id):
                 verbose_name = _('Waiting for the premiere of "{}" at: {}')
                 wait_for_media_premiere(
                     str(media.pk),
-                    priority=0,
-                    queue=str(media.pk),
                     repeat=Task.HOURLY,
                     repeat_until = published_datetime + timedelta(hours=1),
                     verbose_name=verbose_name.format(media.key, published_datetime.isoformat(' ', 'seconds')),
-                    remove_existing_tasks=True,
                 )
                 raise_exception = False
         if raise_exception:
