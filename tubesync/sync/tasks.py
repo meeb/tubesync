@@ -54,6 +54,7 @@ def map_task_to_instance(task):
         'sync.tasks.download_media': Media,
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
+        'sync.tasks.refesh_formats': Media,
         'sync.tasks.rename_media': Media,
         'sync.tasks.rename_all_media_for_source': Source,
         'sync.tasks.wait_for_media_premiere': Media,
@@ -656,7 +657,7 @@ def rescan_media_server(mediaserver_id):
     mediaserver.update()
 
 
-@background(schedule=dict(priority=25, run_at=600), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+@background(schedule=dict(priority=25, run_at=600), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
 def save_all_media_for_source(source_id):
     '''
         Iterates all media items linked to a source and saves them to
@@ -672,7 +673,7 @@ def save_all_media_for_source(source_id):
                   f'source exists with ID: {source_id}')
         raise InvalidTaskError(_('no such source')) from e
 
-    already_saved = set()
+    saved_later = set()
     mqs = Media.objects.filter(source=source)
     task = get_source_check_task(source_id)
     refresh_qs = mqs.filter(
@@ -691,26 +692,35 @@ def save_all_media_for_source(source_id):
     tvn_format = '1/{:,}' + f'/{refresh_qs.count():,}'
     for mn, media in enumerate(refresh_qs, start=1):
         update_task_status(task, tvn_format.format(mn))
-        try:
-            media.refresh_formats
-        except YouTubeError as e:
-            log.debug(f'Failed to refresh formats for: {source} / {media.key}: {e!s}')
-            pass
-        else:
-            with atomic():
-                media.save()
-            already_saved.add(media.uuid)
+        refesh_formats(str(media.pk))
+        saved_later.add(media.uuid)
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
     tvn_format = '2/{:,}' + f'/{mqs.count():,}'
     for mn, media in enumerate(mqs, start=1):
-        if media.uuid not in already_saved:
+        if media.uuid not in saved_later:
             update_task_status(task, tvn_format.format(mn))
             with atomic():
                 media.save()
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
+
+
+@background(schedule=dict(priority=10, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+def refesh_formats(media_id):
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist as e:
+        raise InvalidTaskError(_('no such media')) from e
+    try:
+        media.refresh_formats
+    except YouTubeError as e:
+        log.debug(f'Failed to refresh formats for: {media.source} / {media.key}: {e!s}')
+        pass
+    else:
+        with atomic():
+            media.save()
 
 
 @background(schedule=dict(priority=20, run_at=60), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
