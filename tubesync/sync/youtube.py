@@ -316,7 +316,7 @@ def download_media(
         'check_formats': None,
         'overwrites': None,
         'skip_unavailable_fragments': False,
-        'sleep_interval': min(10*60, max(10, int(settings.DOWNLOAD_MEDIA_DELAY / 20))),
+        'sleep_interval': 10,
         'max_sleep_interval': min(20*60, max(60, settings.DOWNLOAD_MEDIA_DELAY)),
         'sleep_interval_requests': 1 + (2 * settings.BACKGROUND_TASK_ASYNC_THREADS),
         'paths': opts.get('paths', dict()),
