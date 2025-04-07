@@ -29,7 +29,7 @@ from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMedia
 from .utils import validate_url, delete_file, multi_key_sort
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
-                    delete_task_by_media, index_source_task)
+                    delete_task_by_media, index_source_task, migrate_queues)
 from .choices import (Val, MediaServerType, SourceResolution,
                         YouTube_SourceType, youtube_long_source_types,
                         youtube_help, youtube_validation_urls)
@@ -797,6 +797,7 @@ class TasksView(ListView):
         data['total_errors'] = errors_qs.count()
         data['scheduled'] = list()
         data['total_scheduled'] = scheduled_qs.count()
+        data['migrated'] = migrate_queues()
 
         def add_to_task(task):
             obj, url = map_task_to_instance(task)
