@@ -118,15 +118,16 @@ class SourcesView(ListView):
             if sobj is None:
                 return HttpResponseNotFound()
 
+            source = sobj
             verbose_name = _('Index media from source "{}" once')
             index_source_task(
-                str(sobj.pk),
-                queue=str(sobj.pk),
-                repeat=0,
-                priority=10,
-                schedule=30,
+                str(source.pk),
+                queue=str(source.pk),
                 remove_existing_tasks=False,
-                verbose_name=verbose_name.format(sobj.name))
+                repeat=0,
+                schedule=30,
+                verbose_name=verbose_name.format(source.name),
+            )
             url = reverse_lazy('sync:sources')
             url = append_uri_params(url, {'message': 'source-refreshed'})
             return HttpResponseRedirect(url)
@@ -932,9 +933,8 @@ class ResetTasks(FormView):
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(source.pk),
-                repeat=source.index_schedule,
                 queue=str(source.pk),
-                priority=10,
+                repeat=source.index_schedule,
                 verbose_name=verbose_name.format(source.name)
             )
             # This also chains down to call each Media objects .save() as well
