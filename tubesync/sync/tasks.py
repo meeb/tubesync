@@ -133,7 +133,7 @@ def get_source_completed_tasks(source_id, only_errors=False):
     '''
         Returns a queryset of CompletedTask objects for a source by source ID.
     '''
-    q = {'queue': source_id}
+    q = {'task_params__istartswith': f'[["{source_id}"'}
     if only_errors:
         q['failed_at__isnull'] = False
     return CompletedTask.objects.filter(**q).order_by('-failed_at')
@@ -167,7 +167,11 @@ def get_source_index_task(source_id):
 def delete_task_by_source(task_name, source_id):
     now = timezone.now()
     unlocked = Task.objects.unlocked(now)
-    return unlocked.filter(task_name=task_name, queue=str(source_id)).delete()
+    qs = unlocked.filter(
+        task_name=task_name,
+        task_params__istartswith=f'[["{source_id}"',
+    )
+    return qs.delete()
 
 
 def delete_task_by_media(task_name, args):

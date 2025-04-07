@@ -768,7 +768,8 @@ class TasksView(ListView):
     def get_queryset(self):
         qs = Task.objects.all()
         if self.filter_source:
-            qs = qs.filter(queue=str(self.filter_source.pk))
+            params_prefix=f'[["{self.filter_source.pk}"'
+            qs = qs.filter(task_params__istartswith=params_prefix)
         order = getattr(settings,
             'BACKGROUND_TASK_PRIORITY_ORDERING',
             'DESC'
@@ -896,7 +897,8 @@ class CompletedTasksView(ListView):
     def get_queryset(self):
         qs = CompletedTask.objects.all()
         if self.filter_source:
-            qs = qs.filter(queue=str(self.filter_source.pk))
+            params_prefix=f'[["{self.filter_source.pk}"'
+            qs = qs.filter(task_params__istartswith=params_prefix)
         return qs.order_by('-run_at')
 
     def get_context_data(self, *args, **kwargs):
