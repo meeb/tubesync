@@ -20,7 +20,7 @@ from .tasks import cleanup_old_media, check_source_directory_exists
 from .filtering import filter_media
 from .utils import filter_response
 from .choices import (Val, Fallback, IndexSchedule, SourceResolution,
-                        YouTube_AudioCodec, YouTube_VideoCodec,
+                        TaskQueue, YouTube_AudioCodec, YouTube_VideoCodec,
                         YouTube_SourceType, youtube_long_source_types)
 
 
@@ -138,7 +138,7 @@ class FrontEndTestCase(TestCase):
                     else:
                         # Invalid source tests should reload the page with an error
                         self.assertEqual(response.status_code, 200)
-                        self.assertIn('<ul class="errorlist">',
+                        self.assertIn('<ul class="errorlist"',
                                       response.content.decode())
 
     def test_add_source_prepopulation(self):
@@ -211,7 +211,7 @@ class FrontEndTestCase(TestCase):
         source_uuid = str(source.pk)
         task = Task.objects.get_task('sync.tasks.index_source_task',
                                      args=(source_uuid,))[0]
-        self.assertEqual(task.queue, source_uuid)
+        self.assertEqual(task.queue, Val(TaskQueue.NET))
         # Run the check_source_directory_exists task
         check_source_directory_exists.now(source_uuid)
         # Check the source is now on the source overview page
@@ -420,8 +420,7 @@ class FrontEndTestCase(TestCase):
         found_download_task1 = False
         found_download_task2 = False
         found_download_task3 = False
-        q = {'queue': str(test_source.pk),
-             'task_name': 'sync.tasks.download_media_thumbnail'}
+        q = {'task_name': 'sync.tasks.download_media_thumbnail'}
         for task in Task.objects.filter(**q):
             if test_media1_pk in task.task_params:
                 found_thumbnail_task1 = True
@@ -429,8 +428,7 @@ class FrontEndTestCase(TestCase):
                 found_thumbnail_task2 = True
             if test_media3_pk in task.task_params:
                 found_thumbnail_task3 = True
-        q = {'queue': str(test_source.pk),
-             'task_name': 'sync.tasks.download_media'}
+        q = {'task_name': 'sync.tasks.download_media'}
         for task in Task.objects.filter(**q):
             if test_media1_pk in task.task_params:
                 found_download_task1 = True

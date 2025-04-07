@@ -236,7 +236,7 @@ def get_best_video_format(media):
                         break
             if not best_match:
                 for fmt in video_formats:
-                    # Check for codec and resolution match bot drop 60fps
+                    # Check for codec and resolution match but drop 60fps
                     if (source_resolution == fmt['format'] and
                         source_vcodec == fmt['vcodec'] and
                         not fmt['is_hdr']):
@@ -294,7 +294,7 @@ def get_best_video_format(media):
                         break
             if not best_match:
                 for fmt in video_formats:
-                    # Check for codec and resolution match bot drop hdr
+                    # Check for codec and resolution match but drop hdr
                     if (source_resolution == fmt['format'] and
                         source_vcodec == fmt['vcodec'] and
                         not fmt['is_60fps']):

@@ -47,7 +47,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     locale-gen en_US.UTF-8 && \
     # Clean up
     apt-get -y autopurge && \
-    apt-get -y autoclean
+    apt-get -y autoclean && \
+    rm -f /var/cache/debconf/*.dat-old
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -289,7 +290,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   useradd -M -d /app -s /bin/false -g app app && \
   # Clean up
   apt-get -y autopurge && \
-  apt-get -y autoclean
+  apt-get -y autoclean && \
+  rm -v -f /var/cache/debconf/*.dat-old
 
 # Install third party software
 COPY --from=s6-overlay / /
@@ -310,7 +312,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y autoremove --purge file && \
     # Clean up
     apt-get -y autopurge && \
-    apt-get -y autoclean
+    apt-get -y autoclean && \
+    rm -v -f /var/cache/debconf/*.dat-old
 
 # Switch workdir to the the app
 WORKDIR /app
@@ -362,6 +365,7 @@ RUN --mount=type=tmpfs,target=/cache \
   && \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
+  rm -v -f /var/cache/debconf/*.dat-old && \
   rm -v -rf /tmp/*
 
 # Copy root

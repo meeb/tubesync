@@ -170,16 +170,16 @@ def get_media_info(url, /, *, days=None, info_json=None):
         })
     default_postprocessors = user_set('postprocessors', default_opts.__dict__, list())
     postprocessors = user_set('postprocessors', opts, default_postprocessors)
-    postprocessors.extend((dict(
+    postprocessors.append(dict(
         key='Exec',
         when='playlist',
         exec_cmd="/usr/bin/env bash /app/full_playlist.sh '%(id)s' '%(playlist_count)d'",
-    ),))
+    ))
     cache_directory_path = Path(user_set('cachedir', opts, '/dev/shm'))
     playlist_infojson = 'postprocessor_[%(id)s]_%(n_entries)d_%(playlist_count)d_temp'
     outtmpl = dict(
         default='',
-        infojson='%(id)s.%(ext)s' if paths.get('infojson') else '',
+        infojson='%(extractor)s/%(id)s.%(ext)s' if paths.get('infojson') else '',
         pl_infojson=f'{cache_directory_path}/infojson/playlist/{playlist_infojson}.%(ext)s',
     )
     for k in OUTTMPL_TYPES.keys():
