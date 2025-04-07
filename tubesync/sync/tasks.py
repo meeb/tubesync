@@ -192,6 +192,13 @@ def cleanup_completed_tasks():
     CompletedTask.objects.filter(run_at__lt=delta).delete()
 
 
+@atomic(durable=False)
+def migrate_queues():
+    tqs = Task.objects.all()
+    qs = tqs.exclude(queue__in=TaskQueue.values)
+    return qs.update(queue=Val(TaskQueue.NET))
+
+
 def schedule_media_servers_update():
     with atomic():
         # Schedule a task to update media servers
