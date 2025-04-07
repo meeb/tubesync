@@ -122,7 +122,6 @@ class SourcesView(ListView):
             verbose_name = _('Index media from source "{}" once')
             index_source_task(
                 str(source.pk),
-                queue=str(source.pk),
                 remove_existing_tasks=False,
                 repeat=0,
                 schedule=30,
@@ -933,7 +932,6 @@ class ResetTasks(FormView):
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(source.pk),
-                queue=str(source.pk),
                 repeat=source.index_schedule,
                 verbose_name=verbose_name.format(source.name)
             )

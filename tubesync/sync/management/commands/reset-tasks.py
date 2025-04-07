@@ -25,7 +25,6 @@ class Command(BaseCommand):
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(source.pk),
-                queue=str(source.pk),
                 repeat=source.index_schedule,
                 verbose_name=verbose_name.format(source.name)
             )

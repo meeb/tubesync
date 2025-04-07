@@ -92,7 +92,6 @@ def source_pre_save(sender, instance, **kwargs):
         verbose_name = _('Index media from source "{}"')
         index_source_task(
             str(instance.pk),
-            queue=str(instance.pk),
             repeat=instance.index_schedule,
             schedule=instance.index_schedule,
             verbose_name=verbose_name.format(instance.name),
@@ -106,13 +105,11 @@ def source_post_save(sender, instance, created, **kwargs):
         verbose_name = _('Check download directory exists for source "{}"')
         check_source_directory_exists(
             str(instance.pk),
-            queue=str(instance.pk),
             verbose_name=verbose_name.format(instance.name),
         )
         if instance.source_type != Val(YouTube_SourceType.PLAYLIST) and instance.copy_channel_images:
             download_source_images(
                 str(instance.pk),
-                queue=str(instance.pk),
                 verbose_name=verbose_name.format(instance.name),
             )
         if instance.index_schedule > 0:
@@ -121,7 +118,6 @@ def source_post_save(sender, instance, created, **kwargs):
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(instance.pk),
-                queue=str(instance.pk),
                 repeat=instance.index_schedule,
                 schedule=600,
                 verbose_name=verbose_name.format(instance.name),
@@ -130,7 +126,6 @@ def source_post_save(sender, instance, created, **kwargs):
     verbose_name = _('Checking all media for source "{}"')
     save_all_media_for_source(
         str(instance.pk),
-        queue=str(instance.pk),
         verbose_name=verbose_name.format(instance.name),
     )
 
@@ -238,7 +233,6 @@ def media_post_save(sender, instance, created, **kwargs):
             verbose_name = _('Renaming media for: {}: "{}"')
             rename_media(
                 str(media.pk),
-                queue=str(media.pk),
                 verbose_name=verbose_name.format(media.key, media.name),
             )
 
@@ -248,7 +242,6 @@ def media_post_save(sender, instance, created, **kwargs):
         verbose_name = _('Downloading metadata for "{}"')
         download_media_metadata(
             str(instance.pk),
-            queue=str(media.pk),
             verbose_name=verbose_name.format(instance.pk),
         )
     # If the media is missing a thumbnail schedule it to be downloaded (unless we are skipping this media)
@@ -263,7 +256,6 @@ def media_post_save(sender, instance, created, **kwargs):
             download_media_thumbnail(
                 str(instance.pk),
                 thumbnail_url,
-                queue=str(instance.pk),
                 verbose_name=verbose_name.format(instance.name),
             )
     # If the media has not yet been downloaded schedule it to be downloaded
@@ -278,7 +270,6 @@ def media_post_save(sender, instance, created, **kwargs):
         verbose_name = _('Downloading media for "{}"')
         download_media(
             str(instance.pk),
-            queue=str(instance.pk),
             verbose_name=verbose_name.format(instance.name),
         )
     # Save the instance if any changes were required
