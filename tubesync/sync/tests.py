@@ -20,7 +20,7 @@ from .tasks import cleanup_old_media, check_source_directory_exists
 from .filtering import filter_media
 from .utils import filter_response
 from .choices import (Val, Fallback, IndexSchedule, SourceResolution,
-                        YouTube_AudioCodec, YouTube_VideoCodec,
+                        TaskQueue, YouTube_AudioCodec, YouTube_VideoCodec,
                         YouTube_SourceType, youtube_long_source_types)
 
 
@@ -211,7 +211,7 @@ class FrontEndTestCase(TestCase):
         source_uuid = str(source.pk)
         task = Task.objects.get_task('sync.tasks.index_source_task',
                                      args=(source_uuid,))[0]
-        self.assertEqual(task.queue, source_uuid)
+        self.assertEqual(task.queue, Val(TaskQueue.NET))
         # Run the check_source_directory_exists task
         check_source_directory_exists.now(source_uuid)
         # Check the source is now on the source overview page

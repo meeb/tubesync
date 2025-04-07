@@ -29,7 +29,7 @@ from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMedia
 from .utils import validate_url, delete_file, multi_key_sort
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
-                    delete_task_by_media, index_source_task)
+                    delete_task_by_media, index_source_task, migrate_queues)
 from .choices import (Val, MediaServerType, SourceResolution,
                         YouTube_SourceType, youtube_long_source_types,
                         youtube_help, youtube_validation_urls)
@@ -122,7 +122,6 @@ class SourcesView(ListView):
             verbose_name = _('Index media from source "{}" once')
             index_source_task(
                 str(source.pk),
-                queue=str(source.pk),
                 remove_existing_tasks=False,
                 repeat=0,
                 schedule=30,
@@ -769,7 +768,8 @@ class TasksView(ListView):
     def get_queryset(self):
         qs = Task.objects.all()
         if self.filter_source:
-            qs = qs.filter(queue=str(self.filter_source.pk))
+            params_prefix=f'[["{self.filter_source.pk}"'
+            qs = qs.filter(task_params__istartswith=params_prefix)
         order = getattr(settings,
             'BACKGROUND_TASK_PRIORITY_ORDERING',
             'DESC'
@@ -797,6 +797,7 @@ class TasksView(ListView):
         data['total_errors'] = errors_qs.count()
         data['scheduled'] = list()
         data['total_scheduled'] = scheduled_qs.count()
+        data['migrated'] = migrate_queues()
 
         def add_to_task(task):
             obj, url = map_task_to_instance(task)
@@ -897,7 +898,8 @@ class CompletedTasksView(ListView):
     def get_queryset(self):
         qs = CompletedTask.objects.all()
         if self.filter_source:
-            qs = qs.filter(queue=str(self.filter_source.pk))
+            params_prefix=f'[["{self.filter_source.pk}"'
+            qs = qs.filter(task_params__istartswith=params_prefix)
         return qs.order_by('-run_at')
 
     def get_context_data(self, *args, **kwargs):
@@ -933,7 +935,6 @@ class ResetTasks(FormView):
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(source.pk),
-                queue=str(source.pk),
                 repeat=source.index_schedule,
                 verbose_name=verbose_name.format(source.name)
             )
