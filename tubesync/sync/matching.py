@@ -95,6 +95,8 @@ def get_best_video_format(media):
             continue
         if not fmt['vcodec']:
             continue
+        if any(key[0] not in fmt for key in sort_keys):
+            continue
         if media.source.source_resolution.strip().upper() == fmt['format']:
             video_formats.append(fmt)
         elif media.source.source_resolution_height == fmt['height']:
