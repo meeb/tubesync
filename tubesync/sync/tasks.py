@@ -733,7 +733,7 @@ def rename_all_media_for_source(source_id):
                   f'source exists with ID: {source_id}')
         raise InvalidTaskError(_('no such source')) from e
     # Check that the settings allow renaming
-    rename_sources_setting = getattr(settings, 'RENAME_SOURCES', list())
+    rename_sources_setting = getattr(settings, 'RENAME_SOURCES') or list()
     create_rename_tasks = (
         (
             source.directory and
