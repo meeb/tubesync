@@ -2,4 +2,5 @@
 
 exec nice -n "${TUBESYNC_NICE:-1}" s6-setuidgid app \
     /usr/bin/python3 /app/manage.py process_tasks \
-    --queue database --duration 86400 --sleep 30
+    --queue database --duration 86400 \
+    --sleep "30.${RANDOM}"
