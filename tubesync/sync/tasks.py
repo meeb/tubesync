@@ -692,7 +692,10 @@ def save_all_media_for_source(source_id):
     tvn_format = '1/{:,}' + f'/{refresh_qs.count():,}'
     for mn, media in enumerate(refresh_qs, start=1):
         update_task_status(task, tvn_format.format(mn))
-        refesh_formats(str(media.pk))
+        refesh_formats(
+            str(media.pk),
+            verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
+        )
         saved_later.add(media.uuid)
 
     # Trigger the post_save signal for each media item linked to this source as various
