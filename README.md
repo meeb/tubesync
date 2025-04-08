@@ -63,7 +63,7 @@ directory will be a `video` and `audio` subdirectories. All media which only has
 audio stream (such as music) will download to the `audio` directory. All media with a
 video stream will be downloaded to the `video` directory. All administration of
 TubeSync is performed via a web interface. You can optionally add a media server,
-currently just Plex, to complete the PVR experience.
+currently only Jellyfin or Plex, to complete the PVR experience.
 
 
 # Installation
@@ -221,7 +221,7 @@ As media is indexed and downloaded it will appear in the "media" tab.
 
 ### 3. Media Server updating
 
-Currently TubeSync supports Plex as a media server. You can add your local Plex server
+Currently TubeSync supports Plex and Jellyfin as media servers. You can add your local Jellyfin or Plex server
 under the "media servers" tab.
 
 
@@ -232,6 +232,13 @@ view these with:
 
 ```bash
 $ docker logs --follow tubesync
+```
+
+To include logs with an issue report, please exteact a file and attach it to the issue.
+The command below creates the `TubeSync.logs.txt` file with the logs from the `tubesync` container:
+
+```bash
+docker logs -t tubesync > TubeSync.logs.txt 2>&1
 ```
 
 
@@ -371,22 +378,26 @@ There are a number of other environment variables you can set. These are, mostly
 **NOT** required to be set in the default container installation, they are really only
 useful if you are manually installing TubeSync in some other environment. These are:
 
-| Name                         | What                                                          | Example                              |
-| ---------------------------- | ------------------------------------------------------------- |--------------------------------------|
-| DJANGO_SECRET_KEY            | Django's SECRET_KEY                                           | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l     |
-| DJANGO_URL_PREFIX            | Run TubeSync in a sub-URL on the web server                   | /somepath/                           |
-| TUBESYNC_DEBUG               | Enable debugging                                              | True                                 |
-| TUBESYNC_WORKERS             | Number of background workers, default is 2, max allowed is 8  | 2                                    |
-| TUBESYNC_HOSTS               | Django's ALLOWED_HOSTS, defaults to `*`                       | tubesync.example.com,otherhost.com   |
-| TUBESYNC_RESET_DOWNLOAD_DIR  | Toggle resetting `/downloads` permissions, defaults to True   | True                                 |
-| TUBESYNC_VIDEO_HEIGHT_CUTOFF | Smallest video height in pixels permitted to download         | 240                                  |
-| TUBESYNC_DIRECTORY_PREFIX    | Enable `video` and `audio` directory prefixes in `/downloads` | True                                 |
-| GUNICORN_WORKERS             | Number of gunicorn workers to spawn                           | 3                                    |
-| LISTEN_HOST                  | IP address for gunicorn to listen on                          | 127.0.0.1                            |
-| LISTEN_PORT                  | Port number for gunicorn to listen on                         | 8080                                 |
-| HTTP_USER                    | Sets the username for HTTP basic authentication               | some-username                        |
-| HTTP_PASS                    | Sets the password for HTTP basic authentication               | some-secure-password                 |
-| DATABASE_CONNECTION          | Optional external database connection details                 | mysql://user:pass@host:port/database |
+| Name                         | What                                                          | Example                                                                       |
+| ---------------------------- | ------------------------------------------------------------- |-------------------------------------------------------------------------------|
+| DJANGO_SECRET_KEY            | Django's SECRET_KEY                                           | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l                   |
+| DJANGO_URL_PREFIX            | Run TubeSync in a sub-URL on the web server                   | /somepath/                                                                    |
+| TUBESYNC_DEBUG               | Enable debugging                                              | True                                                                          |
+| TUBESYNC_HOSTS               | Django's ALLOWED_HOSTS, defaults to `*`                       | tubesync.example.com,otherhost.com                 |
+| TUBESYNC_RESET_DOWNLOAD_DIR  | Toggle resetting `/downloads` permissions, defaults to True   | True                                                                          |
+| TUBESYNC_VIDEO_HEIGHT_CUTOFF | Smallest video height in pixels permitted to download         | 240                                                                           |
+| TUBESYNC_RENAME_SOURCES      | Rename media files from selected sources                      | Source1_directory,Source2_directory                |
+| TUBESYNC_RENAME_ALL_SOURCES  | Rename media files from all sources                           | True                                                                          |
+| TUBESYNC_DIRECTORY_PREFIX    | Enable `video` and `audio` directory prefixes in `/downloads` | True                                                                          |
+| TUBESYNC_SHRINK_NEW          | Filter unneeded information from newly retrieved metadata     | True                                                                          |
+| TUBESYNC_SHRINK_OLD          | Filter unneeded information from metadata loaded from the database | True                                                                     |
+| TUBESYNC_WORKERS             | Number of background threads per (task runner) process. Default is 1. Max allowed is 8. | 2                                                  |
+| GUNICORN_WORKERS             | Number of `gunicorn` (web request) workers to spawn           | 3                                                                             |
+| LISTEN_HOST                  | IP address for `gunicorn` to listen on                        | 127.0.0.1                                                                     |
+| LISTEN_PORT                  | Port number for `gunicorn` to listen on                       | 8080                                                                          |
+| HTTP_USER                    | Sets the username for HTTP basic authentication               | some-username                                                                 |
+| HTTP_PASS                    | Sets the password for HTTP basic authentication               | some-secure-password                                                          |
+| DATABASE_CONNECTION          | Optional external database connection details                 | postgresql://user:pass@host:port/database          |
 
 
 # Manual, non-containerised, installation
@@ -396,7 +407,7 @@ following this rough guide, you are on your own and should be knowledgeable abou
 installing and running WSGI-based Python web applications before attempting this.
 
 1. Clone or download this repo
-2. Make sure you're running a modern version of Python (>=3.6) and have Pipenv
+2. Make sure you're running a modern version of Python (>=3.8) and have Pipenv
    installed
 3. Set up the environment with `pipenv install`
 4. Copy `tubesync/tubesync/local_settings.py.example` to
