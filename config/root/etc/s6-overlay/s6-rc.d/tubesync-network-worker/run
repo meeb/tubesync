@@ -2,4 +2,4 @@
 
 exec nice -n "${TUBESYNC_NICE:-1}" s6-setuidgid app \
     /usr/bin/python3 /app/manage.py process_tasks \
-    --queue network
+    --queue network --duration 43200
