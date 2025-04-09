@@ -208,9 +208,7 @@ def schedule_media_servers_update():
         for mediaserver in MediaServer.objects.all():
             rescan_media_server(
                 str(mediaserver.pk),
-                priority=10,
                 verbose_name=verbose_name.format(mediaserver),
-                remove_existing_tasks=True,
             )
 
 
@@ -320,7 +318,6 @@ def index_source_task(source_id):
                 verbose_name = _('Downloading metadata for "{}"')
                 download_media_metadata(
                     str(media.pk),
-                    priority=20,
                     verbose_name=verbose_name.format(media.pk),
                 )
     # Reset task.verbose_name to the saved value
