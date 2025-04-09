@@ -5,7 +5,6 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import signals
 from common.logger import log
 from sync.models import Source, Media, MediaServer
-from sync.signals import media_post_delete
 from sync.tasks import schedule_media_servers_update
 
 
