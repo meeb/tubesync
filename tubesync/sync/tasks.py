@@ -479,7 +479,7 @@ def download_media_metadata(media_id):
              f'{source} / {media}: {media_id}')
 
 
-@background(schedule=dict(priority=15, run_at=10), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
 def download_media_thumbnail(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
@@ -654,7 +654,7 @@ def rescan_media_server(mediaserver_id):
     mediaserver.update()
 
 
-@background(schedule=dict(priority=25, run_at=600), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
+@background(schedule=dict(priority=30, run_at=600), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
 def save_all_media_for_source(source_id):
     '''
         Iterates all media items linked to a source and saves them to
