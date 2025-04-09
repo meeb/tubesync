@@ -303,10 +303,10 @@ def download_media(
         pp_opts.sponsorblock_remove.update(sponsor_categories or {})
 
     # Enable audio extraction for audio-only extensions
-    audio_exts = {
-        Val(FileExtension.M4A),
-        Val(FileExtension.OGG),
-    }
+    audio_exts = set(Val(
+        FileExtension.M4A,
+        FileExtension.OGG,
+    ))
     if extension in audio_exts:
         pp_opts.extractaudio = True
         pp_opts.nopostoverwrites = False
