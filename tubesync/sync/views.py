@@ -3,7 +3,6 @@ import os
 import json
 from base64 import b64decode
 import pathlib
-import shutil
 import sys
 from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponseNotFound, HttpResponseRedirect
@@ -27,10 +26,10 @@ from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm,
                     ConfirmDeleteMediaServerForm)
-from .utils import validate_url, delete_file
+from .utils import validate_url, delete_file, multi_key_sort
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
-                    delete_task_by_media, index_source_task)
+                    delete_task_by_media, index_source_task, migrate_queues)
 from .choices import (Val, MediaServerType, SourceResolution,
                         YouTube_SourceType, youtube_long_source_types,
                         youtube_help, youtube_validation_urls)
@@ -75,7 +74,9 @@ class DashboardView(TemplateView):
             data['average_bytes_per_media'] = 0
         # Latest downloads
         data['latest_downloads'] = Media.objects.filter(
-            downloaded=True, downloaded_filesize__isnull=False
+            downloaded=True,
+            download_date__isnull=False,
+            downloaded_filesize__isnull=False,
         ).defer('metadata').order_by('-download_date')[:10]
         # Largest downloads
         data['largest_downloads'] = Media.objects.filter(
@@ -90,10 +91,11 @@ class DashboardView(TemplateView):
         data['database_connection'] = settings.DATABASE_CONNECTION_STR
         # Add the database filesize when using db.sqlite3
         data['database_filesize'] = None
-        db_name = str(connection.get_connection_params()['database'])
-        db_path = pathlib.Path(db_name) if '/' == db_name[0] else None
-        if db_path and 'sqlite' == connection.vendor:
-            data['database_filesize'] = db_path.stat().st_size
+        if 'sqlite' == connection.vendor:
+            db_name = str(connection.get_connection_params().get('database', ''))
+            db_path = pathlib.Path(db_name) if '/' == db_name[0] else None
+            if db_path:
+                data['database_filesize'] = db_path.stat().st_size
         return data
 
 
@@ -116,12 +118,15 @@ class SourcesView(ListView):
             if sobj is None:
                 return HttpResponseNotFound()
 
+            source = sobj
             verbose_name = _('Index media from source "{}" once')
             index_source_task(
-                str(sobj.pk),
-                queue=str(sobj.pk),
+                str(source.pk),
+                remove_existing_tasks=False,
                 repeat=0,
-                verbose_name=verbose_name.format(sobj.name))
+                schedule=30,
+                verbose_name=verbose_name.format(source.name),
+            )
             url = reverse_lazy('sync:sources')
             url = append_uri_params(url, {'message': 'source-refreshed'})
             return HttpResponseRedirect(url)
@@ -409,15 +414,8 @@ class DeleteSourceView(DeleteView, FormMixin):
         delete_media = True if delete_media_val is not False else False
         if delete_media:
             source = self.get_object()
-            for media in Media.objects.filter(source=source):
-                if media.media_file:
-                    file_path = media.media_file.path
-                    matching_files = glob.glob(os.path.splitext(file_path)[0] + '.*')
-                    for file in matching_files:
-                        delete_file(file)
-            directory_path = source.directory_path
-            if os.path.exists(directory_path):
-                shutil.rmtree(directory_path, True)
+            directory_path = pathlib.Path(source.directory_path)
+            (directory_path / '.to_be_removed').touch(exist_ok=True)
         return super().post(request, *args, **kwargs)
 
     def get_success_url(self):
@@ -495,8 +493,9 @@ class MediaThumbView(DetailView):
 
     def get(self, request, *args, **kwargs):
         media = self.get_object()
-        if media.thumb:
-            thumb = open(media.thumb.path, 'rb').read()
+        if media.thumb_file_exists:
+            thumb_path = pathlib.Path(media.thumb.path)
+            thumb = thumb_path.read_bytes()
             content_type = 'image/jpeg' 
         else:
             # No thumbnail on disk, return a blank 1x1 gif
@@ -738,31 +737,82 @@ class TasksView(ListView):
 
     template_name = 'sync/tasks.html'
     context_object_name = 'tasks'
+    paginate_by = settings.TASKS_PER_PAGE
     messages = {
+        'filter': _('Viewing tasks filtered for source: <strong>{name}</strong>'),
         'reset': _('All tasks have been reset'),
     }
 
     def __init__(self, *args, **kwargs):
+        self.filter_source = None
         self.message = None
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
         message_key = request.GET.get('message', '')
         self.message = self.messages.get(message_key, '')
+        filter_by = request.GET.get('filter', '')
+        if filter_by:
+            try:
+                self.filter_source = Source.objects.get(pk=filter_by)
+            except Source.DoesNotExist:
+                self.filter_source = None
+            if not message_key or 'filter' == message_key:
+                message = self.messages.get('filter', '')
+                self.message = message.format(
+                    name=self.filter_source.name
+                )
+
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        return Task.objects.all().order_by('run_at')
+        qs = Task.objects.all()
+        if self.filter_source:
+            params_prefix=f'[["{self.filter_source.pk}"'
+            qs = qs.filter(task_params__istartswith=params_prefix)
+        order = getattr(settings,
+            'BACKGROUND_TASK_PRIORITY_ORDERING',
+            'DESC'
+        )
+        prefix = '-' if 'ASC' != order else ''
+        _priority = f'{prefix}priority'
+        return qs.order_by(
+            _priority,
+            'run_at',
+        )
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        data['message'] = self.message
-        data['running'] = []
-        data['errors'] = []
-        data['scheduled'] = []
-        queryset = self.get_queryset()
         now = timezone.now()
-        for task in queryset:
+        qs = Task.objects.all()
+        errors_qs = qs.filter(attempts__gt=0, locked_by__isnull=True)
+        running_qs = qs.filter(locked_by__isnull=False)
+        scheduled_qs = qs.filter(locked_by__isnull=True)
+
+        # Add to context data from ListView
+        data['message'] = self.message
+        data['source'] = self.filter_source
+        data['running'] = list()
+        data['errors'] = list()
+        data['total_errors'] = errors_qs.count()
+        data['scheduled'] = list()
+        data['total_scheduled'] = scheduled_qs.count()
+        data['migrated'] = migrate_queues()
+
+        def add_to_task(task):
+            obj, url = map_task_to_instance(task)
+            if not obj:
+                return False
+            setattr(task, 'instance', obj)
+            setattr(task, 'url', url)
+            setattr(task, 'run_now', task.run_at < now)
+            if task.has_error():
+                error_message = get_error_message(task)
+                setattr(task, 'error_message', error_message)
+                return 'error'
+            return True
+                    
+        for task in running_qs:
             # There was broken logic in `Task.objects.locked()`, work around it.
             # With that broken logic, the tasks never resume properly.
             # This check unlocks the tasks without a running process.
@@ -770,26 +820,53 @@ class TasksView(ListView):
             # - `True`: locked and PID exists
             # - `False`: locked and PID does not exist
             # - `None`: not `locked_by`, so there was no PID to check
-            if task.locked_by_pid_running() is False:
+            locked_by_pid_running = task.locked_by_pid_running()
+            if locked_by_pid_running is False:
                 task.locked_by = None
                 # do not wait for the task to expire
                 task.locked_at = None
                 task.save()
-            obj, url = map_task_to_instance(task)
-            if not obj:
-                # Orphaned task, ignore it (it will be deleted when it fires)
-                continue
-            setattr(task, 'instance', obj)
-            setattr(task, 'url', url)
-            setattr(task, 'run_now', task.run_at < now)
-            if task.locked_by_pid_running():
+            if locked_by_pid_running and add_to_task(task):
                 data['running'].append(task)
-            elif task.has_error():
-                error_message = get_error_message(task)
-                setattr(task, 'error_message', error_message)
+
+        # show all the errors when they fit on one page
+        if (data['total_errors'] + len(data['running'])) < self.paginate_by:
+            for task in errors_qs:
+                if task in data['running']:
+                    continue
+                mapped = add_to_task(task)
+                if 'error' == mapped:
+                    data['errors'].append(task)
+                elif mapped:
+                    data['scheduled'].append(task)
+
+        for task in data['tasks']:
+            already_added = (
+                task in data['running'] or
+                task in data['errors'] or
+                task in data['scheduled']
+            )
+            if already_added:
+                continue
+            mapped = add_to_task(task)
+            if 'error' == mapped:
                 data['errors'].append(task)
-            else:
+            elif mapped:
                 data['scheduled'].append(task)
+
+        order = getattr(settings,
+            'BACKGROUND_TASK_PRIORITY_ORDERING',
+            'DESC'
+        )
+        sort_keys = (
+            # key, reverse
+            ('run_at', False),
+            ('priority', 'ASC' != order),
+            ('run_now', True),
+        )
+        data['errors'] = multi_key_sort(data['errors'], sort_keys, attr=True)
+        data['scheduled'] = multi_key_sort(data['scheduled'], sort_keys, attr=True)
+
         return data
 
 
@@ -819,10 +896,11 @@ class CompletedTasksView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        q = CompletedTask.objects.all()
+        qs = CompletedTask.objects.all()
         if self.filter_source:
-            q = q.filter(queue=str(self.filter_source.pk))
-        return q.order_by('-run_at')
+            params_prefix=f'[["{self.filter_source.pk}"'
+            qs = qs.filter(task_params__istartswith=params_prefix)
+        return qs.order_by('-run_at')
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
@@ -831,11 +909,10 @@ class CompletedTasksView(ListView):
                 error_message = get_error_message(task)
                 setattr(task, 'error_message', error_message)
         data['message'] = ''
-        data['source'] = None
+        data['source'] = self.filter_source
         if self.filter_source:
             message = str(self.messages.get('filter', ''))
             data['message'] = message.format(name=self.filter_source.name)
-            data['source'] = self.filter_source
         return data
 
 
@@ -854,13 +931,16 @@ class ResetTasks(FormView):
         Task.objects.all().delete()
         # Iter all tasks
         for source in Source.objects.all():
+            verbose_name = _('Check download directory exists for source "{}"')
+            check_source_directory_exists(
+                str(source.pk),
+                verbose_name=verbose_name.format(source.name),
+            )
             # Recreate the initial indexing task
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(source.pk),
                 repeat=source.index_schedule,
-                queue=str(source.pk),
-                priority=5,
                 verbose_name=verbose_name.format(source.name)
             )
             # This also chains down to call each Media objects .save() as well

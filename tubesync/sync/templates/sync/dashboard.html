@@ -24,9 +24,9 @@
     <div class="card dashcard">
       <a href="{% url 'sync:sources' %}">
         <div class="card-content">
-          <h3 class="truncate">{{ num_sources }}</h3>
+          <h3 class="truncate">{{ num_sources|intcomma }}</h3>
           <div class="desc truncate">source{{ num_sources|pluralize }}</div>
-          <div class="truncate"><strong>{{ num_video_sources }}</strong> video, <strong>{{ num_audio_sources }}</strong> audio</div>
+          <div class="truncate"><strong>{{ num_video_sources|intcomma }}</strong> video, <strong>{{ num_audio_sources|intcomma }}</strong> audio</div>
         </div>
       </a>
     </div>
@@ -35,9 +35,9 @@
     <div class="card dashcard">
       <a href="{% url 'sync:media' %}">
         <div class="card-content">
-          <h3 class="truncate">{{ num_media }}</h3>
+          <h3 class="truncate">{{ num_media|intcomma }}</h3>
           <div class="desc truncate">media item{{ num_media|pluralize }}</div>
-          <div class="truncate"><strong>{{ num_downloaded_media }}</strong> downloaded</div>
+          <div class="truncate"><strong>{{ num_downloaded_media|intcomma }}</strong> downloaded</div>
         </div>
       </a>
     </div>
@@ -46,9 +46,9 @@
     <div class="card dashcard">
       <a href="{% url 'sync:tasks' %}">
         <div class="card-content">
-          <h3 class="truncate">{{ num_tasks }}</h3>
+          <h3 class="truncate">{{ num_tasks|intcomma }}</h3>
           <div class="desc truncate">scheduled task{{ num_tasks|pluralize }}</div>
-          <div class="truncate"><strong>{{ num_completed_tasks }}</strong> completed</div>
+          <div class="truncate"><strong>{{ num_completed_tasks|intcomma }}</strong> completed</div>
         </div>
       </a>
     </div>
@@ -96,6 +96,18 @@
           {% endfor %}
           </div>
       </div>
+    </div>
+  </div>
+</div>
+<div class="row">
+  <div class="col s12">
+    <h2 class="truncate">Warnings</h2>
+    <div class="collection-item">
+      An upcoming release, after <b>2025-006-01</b>, will introduce automated file renaming.<br>
+      To prevent this change from taking effect, you can set an environment variable before that date.<br>
+      See the <a href="https://github.com/meeb/tubesync#warnings" rel="external noreferrer">GitHub README</a>
+      for more details or ask questions using
+      issue <a href="https://github.com/meeb/tubesync/issues/785" rel="external noreferrer">#785</a>.<br>
     </div>
   </div>
 </div>
