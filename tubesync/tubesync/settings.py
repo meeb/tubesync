@@ -180,8 +180,8 @@ COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'
 
 
-RENAME_ALL_SOURCES = False
-RENAME_SOURCES = None
+RENAME_ALL_SOURCES = True
+RENAME_SOURCES = list()
 
 
 # WARNING WARNING WARNING
