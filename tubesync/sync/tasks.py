@@ -634,7 +634,7 @@ def download_media(media_id):
         log.error(err)
         # Try refreshing formats
         if media.has_metadata:
-            refesh_formats(
+            refresh_formats(
                 str(media.pk),
                 verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
             )
