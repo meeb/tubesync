@@ -302,7 +302,12 @@ def download_media(
         ).options.sponsorblock_mark
         pp_opts.sponsorblock_remove.update(sponsor_categories or {})
 
-    if Val(FileExtension.OGG) == extension:
+    # Enable audio extraction for audio-only extensions
+    audio_exts = {
+        Val(FileExtension.M4A),
+        Val(FileExtension.OGG),
+    }
+    if extension in audio_exts:
         pp_opts.extractaudio = True
         pp_opts.nopostoverwrites = False
 
