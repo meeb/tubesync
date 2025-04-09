@@ -221,7 +221,7 @@ def media_post_save(sender, instance, created, **kwargs):
     else:
         # Downloaded media might need to be renamed
         # Check settings before any rename tasks are scheduled
-        rename_sources_setting = settings.RENAME_SOURCES or list()
+        rename_sources_setting = getattr(settings, 'RENAME_SOURCES') or list()
         create_rename_task = (
             (
                 media.source.directory and
