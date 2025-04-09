@@ -54,7 +54,7 @@ def map_task_to_instance(task):
         'sync.tasks.download_media': Media,
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
-        'sync.tasks.refesh_formats': Media,
+        'sync.tasks.refresh_formats': Media,
         'sync.tasks.rename_media': Media,
         'sync.tasks.rename_all_media_for_source': Source,
         'sync.tasks.wait_for_media_premiere': Media,
@@ -692,7 +692,7 @@ def save_all_media_for_source(source_id):
     tvn_format = '1/{:,}' + f'/{refresh_qs.count():,}'
     for mn, media in enumerate(refresh_qs, start=1):
         update_task_status(task, tvn_format.format(mn))
-        refesh_formats(
+        refresh_formats(
             str(media.pk),
             verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
         )
@@ -711,7 +711,7 @@ def save_all_media_for_source(source_id):
 
 
 @background(schedule=dict(priority=50, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def refesh_formats(media_id):
+def refresh_formats(media_id):
     try:
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
