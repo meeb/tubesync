@@ -14,6 +14,7 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit, parse_qs
 
 from django.conf import settings
+from .choices import Val, FileExtension
 from .hooks import postprocessor_hook, progress_hook
 from .utils import mkdir_p
 import yt_dlp
@@ -300,6 +301,10 @@ def download_media(
             ['--sponsorblock-mark=all,-chapter']
         ).options.sponsorblock_mark
         pp_opts.sponsorblock_remove.update(sponsor_categories or {})
+
+    if Val(FileExtension.OGG) == extension:
+        pp_opts.extractaudio = True
+        pp_opts.nopostoverwrites = False
 
     ytopts = {
         'format': media_format,
