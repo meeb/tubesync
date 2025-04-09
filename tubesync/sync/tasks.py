@@ -634,7 +634,10 @@ def download_media(media_id):
         log.error(err)
         # Try refreshing formats
         if media.has_metadata:
-            media.refresh_formats
+            refesh_formats(
+                str(media.pk),
+                verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
+            )
         # Raising an error here triggers the task to be re-attempted (or fail)
         raise DownloadFailedException(err)
 
