@@ -90,15 +90,14 @@ class PlexMediaServer(MediaServer):
     def make_request(self, uri='/', /, *, headers={}, params={}):
         url, kwargs = self.make_request_args(uri=uri, headers=headers, token_param='X-Plex-Token', params=params)
         log.debug(f'[plex media server] Making HTTP GET request to: {url}')
-        if kwargs['verify']:
-            return requests.get(url, **kwargs)
-        else:
+        if self.object.use_https and not kwargs['verify']:
             # If not validating SSL, given this is likely going to be for an internal
             # or private network, that Plex issues certs *.hash.plex.direct and that
             # the warning won't ever been sensibly seen in the HTTPS logs, hide it
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 return requests.get(url, **kwargs)
+        return requests.get(url, **kwargs)
 
     def validate(self):
         '''
@@ -229,6 +228,16 @@ class JellyfinMediaServer(MediaServer):
             })
 
         log.debug(f'[jellyfin media server] Making HTTP {method} request to: {url}')
+        if self.object.use_https and not kwargs['verify']:
+            # not verifying certificates
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                return requests.request(
+                    method, url,
+                    data=data,
+                    json=json,
+                    **kwargs,
+                )
         return requests.request(
             method, url,
             data=data,
