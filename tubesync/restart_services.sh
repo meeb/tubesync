@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
 dir='/run/service'
 svc_path() (
@@ -17,10 +17,10 @@ fi
 for service in $( svc_path "$@" )
 do
     printf -- 'Restarting %s...' "${service#${dir}/}"
-    _began="$(date '+%s')"
+    _began="$( date '+%s' )"
     /command/s6-svc -wr -r "${service}"
-    _ended="$(date '+%s')"
+    _ended="$( date '+%s' )"
     printf -- '\tcompleted (in %d seconds).\n' \
-        "$(( "${_ended}" - "${_began}" ))"
+        "$( expr "${_ended}" - "${_began}" )"
 done
 unset -v _began _ended service
