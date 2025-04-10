@@ -175,16 +175,25 @@ class JellyfinMediaServer(MediaServer):
              '<p>The <strong>token</strong> is required for API access. You can generate a token in your Jellyfin user profile settings.</p>'
              '<p>The <strong>libraries</strong> is a comma-separated list of library IDs in Jellyfin.</p>')
 
-    def make_request(self, uri='/', params={}):
+    def make_request(self, uri='/', params={}, *, data={}, json=None, method='GET'):
         headers = {
             'User-Agent': 'TubeSync',
             'X-Emby-Token': self.object.loaded_options['token']  # Jellyfin uses the same `X-Emby-Token` header as Emby
         }
 
+        assert method in {'GET', 'POST'}, f'Unimplemented method: {method}'
         url = f'{self.object.url}{uri}'
-        log.debug(f'[jellyfin media server] Making HTTP GET request to: {url}')
+        log.debug(f'[jellyfin media server] Making HTTP {method} request to: {url}')
 
-        return requests.get(url, headers=headers, verify=self.object.verify_https, timeout=self.TIMEOUT)
+        return requests.request(
+            method, url,
+            headers=headers,
+            params=params,
+            data=data,
+            json=json,
+            verify=self.object.verify_https,
+            timeout=self.TIMEOUT,
+        )
 
     def validate(self):
         if not self.object.host:
@@ -245,8 +254,8 @@ class JellyfinMediaServer(MediaServer):
     def update(self):
         libraries = self.object.loaded_options.get('libraries', '').split(',')
         for library_id in map(str.strip, libraries):
-            uri = f'/Library/{library_id}/Refresh'
-            response = self.make_request(uri)
+            uri = f'/Items/{library_id}/Refresh'
+            response = self.make_request(uri, method='POST')
             if response.status_code != 204:  # 204 No Content is expected for successful refresh
                 raise MediaServerError(f'Failed to refresh Jellyfin library "{library_id}", status code: {response.status_code}')
         return True
