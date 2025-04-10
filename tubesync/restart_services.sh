@@ -1,17 +1,23 @@
 #!/usr/bin/env sh
 
+dir='/run/service'
+svc_path() (
+    cd "${dir}"
+    realpath -e -s "$@"
+)
+
 if [ 0 -eq $# ]
 then
     set -- \
-        /run/service/tubesync*-worker \
-        /run/service/gunicorn \
-        /run/service/nginx
+        $( cd "${dir}" && svc_path tubesync*-worker ) \
+        "$( svc_path gunicorn )" \
+        "$( svc_path nginx )"
 fi
 
-for service in "$@"
+for service in $( svc_path "$@" )
 do
-    printf 1>&2 -- 'Restarting %s... ' "${service}"
+    printf -- 'Restarting %s...' "${service#${dir}/}"
     /command/s6-svc -wr -r "${service}"
-    printf 1>&2 -- 'completed.\n'
+    printf -- '\tcompleted.\n'
 done
 unset -v service
