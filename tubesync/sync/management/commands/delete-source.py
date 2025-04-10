@@ -5,8 +5,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import signals
 from common.logger import log
 from sync.models import Source, Media, MediaServer
-from sync.signals import media_post_delete
-from sync.tasks import rescan_media_server
+from sync.tasks import schedule_media_servers_update
 
 
 class Command(BaseCommand):
@@ -37,15 +36,6 @@ class Command(BaseCommand):
         log.info(f'Source directory: {source.directory_path}')
         source.delete()
         # Update any media servers
-        for mediaserver in MediaServer.objects.all():
-            log.info(f'Scheduling media server updates')
-            verbose_name = _('Request media server rescan for "{}"')
-            rescan_media_server(
-                str(mediaserver.pk),
-                priority=0,
-                schedule=30,
-                verbose_name=verbose_name.format(mediaserver),
-                remove_existing_tasks=True
-            )
+        schedule_media_servers_update()
         # All done
         log.info('Done')

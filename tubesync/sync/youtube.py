@@ -14,6 +14,7 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit, parse_qs
 
 from django.conf import settings
+from .choices import Val, FileExtension
 from .hooks import postprocessor_hook, progress_hook
 from .utils import mkdir_p
 import yt_dlp
@@ -312,6 +313,15 @@ def download_media(
         ).options.sponsorblock_mark
         pp_opts.sponsorblock_remove.update(sponsor_categories or {})
 
+    # Enable audio extraction for audio-only extensions
+    audio_exts = set(Val(
+        FileExtension.M4A,
+        FileExtension.OGG,
+    ))
+    if extension in audio_exts:
+        pp_opts.extractaudio = True
+        pp_opts.nopostoverwrites = False
+
     ytopts = {
         'format': media_format,
         'merge_output_format': extension,
@@ -327,8 +337,8 @@ def download_media(
         'check_formats': None,
         'overwrites': None,
         'skip_unavailable_fragments': False,
-        'sleep_interval': 10 + int(settings.DOWNLOAD_MEDIA_DELAY / 20),
-        'max_sleep_interval': settings.DOWNLOAD_MEDIA_DELAY,
+        'sleep_interval': 10,
+        'max_sleep_interval': min(20*60, max(60, settings.DOWNLOAD_MEDIA_DELAY)),
         'sleep_interval_requests': 1 + (2 * settings.BACKGROUND_TASK_ASYNC_THREADS),
         'paths': opts.get('paths', dict()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),
