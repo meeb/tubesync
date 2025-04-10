@@ -16,11 +16,11 @@ fi
 
 for service in $( svc_path "$@" )
 do
-    printf -- 'Restarting %s...' "${service#${dir}/}"
+    printf -- 'Restarting %-28s' "${service#${dir}/}..."
     _began="$( date '+%s' )"
     /command/s6-svc -wr -r "${service}"
     _ended="$( date '+%s' )"
-    printf -- '\tcompleted (in %d seconds).\n' \
+    printf -- '\tcompleted (in %2.1d seconds).\n' \
         "$( expr "${_ended}" - "${_began}" )"
 done
 unset -v _began _ended service
