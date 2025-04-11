@@ -2,7 +2,7 @@ import os
 import uuid
 from django.utils.translation import gettext_lazy as _
 from django.core.management.base import BaseCommand, CommandError
-from django.db.models import signals
+from django.db.transaction import atomic
 from common.logger import log
 from sync.models import Source, Media, MediaServer
 from sync.tasks import schedule_media_servers_update
@@ -10,10 +10,10 @@ from sync.tasks import schedule_media_servers_update
 
 class Command(BaseCommand):
 
-    help = ('Deletes a source by UUID')
+    help = _('Deletes a source by UUID')
 
     def add_arguments(self, parser):
-        parser.add_argument('--source', action='store', required=True, help='Source UUID')
+        parser.add_argument('--source', action='store', required=True, help=_('Source UUID'))
 
     def handle(self, *args, **options):
         source_uuid_str = options.get('source', '')
@@ -29,13 +29,15 @@ class Command(BaseCommand):
             raise CommandError(f'Source does not exist with '
                                f'UUID: {source_uuid}')
         # Reconfigure the source to not update the disk or media servers
-        source.deactivate()
+        with atomic(durable=True):
+            source.deactivate()
         # Delete the source, triggering pre-delete signals for each media item
         log.info(f'Found source with UUID "{source.uuid}" with name '
                  f'"{source.name}" and deleting it, this may take some time!')
         log.info(f'Source directory: {source.directory_path}')
-        source.delete()
-        # Update any media servers
-        schedule_media_servers_update()
+        with atomic(durable=True):
+            source.delete()
+            # Update any media servers
+            schedule_media_servers_update()
         # All done
         log.info('Done')
