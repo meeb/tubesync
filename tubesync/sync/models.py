@@ -1584,49 +1584,139 @@ class Media(models.Model):
 
 class Metadata(models.Model):
     '''
-        CREATE TABLE IF NOT EXISTS "sync_metadata" AS
-            SELECT
-                "uuid" AS "media_id",
-                "metadata" ->> '$.extractor_key' AS "site",
-                "metadata" ->> '$.id' AS "key",
-                datetime("metadata" ->> '$.timestamp', 'unixepoch') AS "uploaded",
-                datetime("metadata" ->> '$.epoch', 'unixepoch') AS "retrieved",
-                "metadata" AS "value"
-            FROM "sync_media" ;
+        Metadata for an indexed `Media` item.
     '''
     class Meta:
-        pass
-    pass
+        verbose_name = _('Metadata about a Media item')
+        verbose_name_plural = _('Metadata about a Media item')
+        unique_together = (
+            ('media', 'site', 'key'),
+        )
+
     uuid = models.UUIDField(
         _('uuid'),
         primary_key=True,
         editable=False,
         default=uuid.uuid4,
-        help_text=_('UUID of the metadata')
+        help_text=_('UUID of the metadata'),
     )
     media = models.ForeignKey(
         Media,
         # on_delete=models.DO_NOTHING,
+        on_delete=models.CASCADE,
         related_name='metadata_media',
-        help_text=_('Media the metadata belongs to')
+        help_text=_('Media the metadata belongs to'),
+        null=False,
+    )
+    site = models.CharField(
+        _('site'),
+        max_length=256,
+        blank=True,
+        null=False,
+        default='Youtube',
+        help_text=_('Site from which the metadata was retrieved'),
+    )
+    key = models.CharField(
+        _('key'),
+        max_length=256,
+        blank=True,
+        null=False,
+        default='',
+        help_text=_('Media identifier at the site from which the metadata was retrieved'),
+    )
+    created = models.DateTimeField(
+        _('created'),
+        auto_now_add=True,
+        db_index=True,
+        help_text=_('Date and time the metadata was created'),
+    )
+    retrieved = models.DateTimeField(
+        _('retrieved'),
+        auto_now_add=True,
+        db_index=True,
+        help_text=_('Date and time the metadata was retrieved'),
+    )
+    uploaded = models.DateTimeField(
+        _('uploaded'),
+        null=True,
+        help_text=_('Date and time the media was uploaded'),
+    )
+    published = models.DateTimeField(
+        _('published'),
+        null=True,
+        help_text=_('Date and time the media was published'),
+    )
+    value = models.JSONField(
+        _('value'),
+        null=False,
+        default=dict,
+        help_text=_('JSON metadata object'),
     )
 
 
 class MetadataFormat(models.Model):
     '''
-        CREATE TABLE IF NOT EXISTS "sync_metadata_formats" (
-            "metadata_id" REFERENCES "sync_metadata" ("rowid") ON DELETE CASCADE,
-            "key" char(12) NOT NULL,
-            "num" INTEGER NOT NULL,
-            "format_id" varchar(20) NOT NULL,
-            "value" json not null,
-            UNIQUE("key", "num"),
-            UNIQUE("key", "format_id")
-        ); 
+        A format from the Metadata for an indexed `Media` item.
     '''
     class Meta:
-        pass
-    pass
+        verbose_name = _('Format from the Metadata about a Media item')
+        verbose_name_plural = _('Formats from the Metadata about a Media item')
+        unique_together = (
+            ('metadata', 'site', 'key', 'number'),
+            ('metadata', 'site', 'key', 'code'),
+        )
+
+    uuid = models.UUIDField(
+        _('uuid'),
+        primary_key=True,
+        editable=False,
+        default=uuid.uuid4,
+        help_text=_('UUID of the format'),
+    )
+    metadata = models.ForeignKey(
+        Metadata,
+        # on_delete=models.DO_NOTHING,
+        on_delete=models.CASCADE,
+        related_name='metadataformat_metadata',
+        help_text=_('Metadata the format belongs to'),
+        null=False,
+    )
+    site = models.CharField(
+        _('site'),
+        max_length=256,
+        blank=True,
+        null=False,
+        default='Youtube',
+        help_text=_('Site from which the format is available'),
+    )
+    key = models.CharField(
+        _('key'),
+        max_length=256,
+        blank=True,
+        null=False,
+        default='',
+        help_text=_('Media identifier at the site for which this format is available'),
+    )
+    number = models.PositiveIntegerField(
+        _('number'),
+        blank=False,
+        null=False,
+        help_text=_('Ordering number for this format')
+    )
+    code = models.CharField(
+        _('code'),
+        max_length=64,
+        blank=True,
+        null=False,
+        default='',
+        help_text=_('Format identification code'),
+    )
+    value = models.JSONField(
+        _('value'),
+        null=False,
+        default=dict,
+        help_text=_('JSON metadata format object'),
+    )
 
 
 class MediaServer(models.Model):
