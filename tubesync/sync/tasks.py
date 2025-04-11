@@ -54,7 +54,7 @@ def map_task_to_instance(task):
         'sync.tasks.download_media': Media,
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
-        'sync.tasks.refesh_formats': Media,
+        'sync.tasks.refresh_formats': Media,
         'sync.tasks.rename_media': Media,
         'sync.tasks.rename_all_media_for_source': Source,
         'sync.tasks.wait_for_media_premiere': Media,
@@ -208,9 +208,7 @@ def schedule_media_servers_update():
         for mediaserver in MediaServer.objects.all():
             rescan_media_server(
                 str(mediaserver.pk),
-                priority=10,
                 verbose_name=verbose_name.format(mediaserver),
-                remove_existing_tasks=True,
             )
 
 
@@ -242,7 +240,7 @@ def cleanup_removed_media(source, videos):
     schedule_media_servers_update()
 
 
-@background(schedule=dict(priority=10, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+@background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
@@ -320,7 +318,6 @@ def index_source_task(source_id):
                 verbose_name = _('Downloading metadata for "{}"')
                 download_media_metadata(
                     str(media.pk),
-                    priority=20,
                     verbose_name=verbose_name.format(media.pk),
                 )
     # Reset task.verbose_name to the saved value
@@ -348,7 +345,7 @@ def check_source_directory_exists(source_id):
         source.make_directory()
 
 
-@background(schedule=dict(priority=5, run_at=10), queue=Val(TaskQueue.NET))
+@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.NET))
 def download_source_images(source_id):
     '''
         Downloads an image and save it as a local thumbnail attached to a
@@ -398,7 +395,7 @@ def download_source_images(source_id):
     log.info(f'Thumbnail downloaded for source with ID: {source_id} / {source}')
 
 
-@background(schedule=dict(priority=20, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+@background(schedule=dict(priority=40, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def download_media_metadata(media_id):
     '''
         Downloads the metadata for a media item.
@@ -482,7 +479,7 @@ def download_media_metadata(media_id):
              f'{source} / {media}: {media_id}')
 
 
-@background(schedule=dict(priority=15, run_at=10), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
 def download_media_thumbnail(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
@@ -520,7 +517,7 @@ def download_media_thumbnail(media_id, url):
     return True
 
 
-@background(schedule=dict(priority=15, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+@background(schedule=dict(priority=30, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def download_media(media_id):
     '''
         Downloads the media to disk and attaches it to the Media instance.
@@ -637,7 +634,10 @@ def download_media(media_id):
         log.error(err)
         # Try refreshing formats
         if media.has_metadata:
-            media.refresh_formats
+            refresh_formats(
+                str(media.pk),
+                verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
+            )
         # Raising an error here triggers the task to be re-attempted (or fail)
         raise DownloadFailedException(err)
 
@@ -657,7 +657,7 @@ def rescan_media_server(mediaserver_id):
     mediaserver.update()
 
 
-@background(schedule=dict(priority=25, run_at=600), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
+@background(schedule=dict(priority=30, run_at=600), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
 def save_all_media_for_source(source_id):
     '''
         Iterates all media items linked to a source and saves them to
@@ -692,7 +692,7 @@ def save_all_media_for_source(source_id):
     tvn_format = '1/{:,}' + f'/{refresh_qs.count():,}'
     for mn, media in enumerate(refresh_qs, start=1):
         update_task_status(task, tvn_format.format(mn))
-        refesh_formats(
+        refresh_formats(
             str(media.pk),
             verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
         )
@@ -710,8 +710,8 @@ def save_all_media_for_source(source_id):
     update_task_status(task, None)
 
 
-@background(schedule=dict(priority=10, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def refesh_formats(media_id):
+@background(schedule=dict(priority=50, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+def refresh_formats(media_id):
     try:
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
