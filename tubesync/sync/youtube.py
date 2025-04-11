@@ -14,12 +14,13 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit, parse_qs
 
 from django.conf import settings
+from .choices import Val, FileExtension
 from .hooks import postprocessor_hook, progress_hook
 from .utils import mkdir_p
 import yt_dlp
 import yt_dlp.patch.check_thumbnails
 import yt_dlp.patch.fatal_http_errors
-from yt_dlp.utils import remove_end
+from yt_dlp.utils import remove_end, OUTTMPL_TYPES
 
 
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
@@ -132,7 +133,7 @@ def _subscriber_only(msg='', response=None):
     return False
 
 
-def get_media_info(url, days=None):
+def get_media_info(url, /, *, days=None, info_json=None):
     '''
         Extracts information from a YouTube URL and returns it as a dict. For a channel
         or playlist this returns a dict of all the videos on the channel or playlist
@@ -148,7 +149,11 @@ def get_media_info(url, days=None):
             f'yesterday-{days!s}days' if days else None
         )
     opts = get_yt_opts()
-    paths = opts.get('paths', dict())
+    default_opts = yt_dlp.parse_options([]).options
+    class NoDefaultValue: pass # a unique Singleton, that may be checked for later
+    user_set = lambda k, d, default=NoDefaultValue: d[k] if k in d.keys() else default
+    default_paths = user_set('paths', default_opts.__dict__, dict())
+    paths = user_set('paths', opts, default_paths)
     if 'temp' in paths:
         temp_dir_obj = TemporaryDirectory(prefix='.yt_dlp-', dir=paths['temp'])
         temp_dir_path = Path(temp_dir_obj.name)
@@ -156,23 +161,53 @@ def get_media_info(url, days=None):
         paths.update({
             'temp': str(temp_dir_path),
         })
+    try:
+        info_json_path = Path(info_json).resolve(strict=False)
+    except (RuntimeError, TypeError):
+        pass
+    else:
+        paths.update({
+            'infojson': user_set('infojson', paths, str(info_json_path))
+        })
+    default_postprocessors = user_set('postprocessors', default_opts.__dict__, list())
+    postprocessors = user_set('postprocessors', opts, default_postprocessors)
+    postprocessors.append(dict(
+        key='Exec',
+        when='playlist',
+        exec_cmd="/usr/bin/env bash /app/full_playlist.sh '%(id)s' '%(playlist_count)d'",
+    ))
+    cache_directory_path = Path(user_set('cachedir', opts, '/dev/shm'))
+    playlist_infojson = 'postprocessor_[%(id)s]_%(n_entries)d_%(playlist_count)d_temp'
+    outtmpl = dict(
+        default='',
+        infojson='%(extractor)s/%(id)s.%(ext)s' if paths.get('infojson') else '',
+        pl_infojson=f'{cache_directory_path}/infojson/playlist/{playlist_infojson}.%(ext)s',
+    )
+    for k in OUTTMPL_TYPES.keys():
+        outtmpl.setdefault(k, '')
     opts.update({
         'ignoreerrors': False, # explicitly set this to catch exceptions
         'ignore_no_formats_error': False, # we must fail first to try again with this enabled
         'skip_download': True,
-        'simulate': True,
+        'simulate': False,
         'logger': log,
         'extract_flat': True,
+        'allow_playlist_files': True,
         'check_formats': True,
         'check_thumbnails': False,
+        'clean_infojson': False,
         'daterange': yt_dlp.utils.DateRange(start=start),
         'extractor_args': {
             'youtubetab': {'approximate_date': ['true']},
         },
+        'outtmpl': outtmpl,
+        'overwrites': True,
         'paths': paths,
+        'postprocessors': postprocessors,
         'skip_unavailable_fragments': False,
         'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
         'verbose': True if settings.DEBUG else False,
+        'writeinfojson': True,
     })
     if start:
         log.debug(f'get_media_info: used date range: {opts["daterange"]} for URL: {url}')
@@ -267,6 +302,15 @@ def download_media(
         ).options.sponsorblock_mark
         pp_opts.sponsorblock_remove.update(sponsor_categories or {})
 
+    # Enable audio extraction for audio-only extensions
+    audio_exts = set(Val(
+        FileExtension.M4A,
+        FileExtension.OGG,
+    ))
+    if extension in audio_exts:
+        pp_opts.extractaudio = True
+        pp_opts.nopostoverwrites = False
+
     ytopts = {
         'format': media_format,
         'merge_output_format': extension,
@@ -281,8 +325,9 @@ def download_media(
         'writethumbnail': embed_thumbnail,
         'check_formats': None,
         'overwrites': None,
-        'sleep_interval': 10 + int(settings.DOWNLOAD_MEDIA_DELAY / 20),
-        'max_sleep_interval': settings.DOWNLOAD_MEDIA_DELAY,
+        'skip_unavailable_fragments': False,
+        'sleep_interval': 10,
+        'max_sleep_interval': min(20*60, max(60, settings.DOWNLOAD_MEDIA_DELAY)),
         'sleep_interval_requests': 1 + (2 * settings.BACKGROUND_TASK_ASYNC_THREADS),
         'paths': opts.get('paths', dict()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),

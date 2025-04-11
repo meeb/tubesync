@@ -37,6 +37,7 @@ class Command(BaseCommand):
         log.info(f'Source directory: {source.directory_path}')
         with atomic(durable=True):
             source.delete()
+            # Update any media servers
             schedule_media_servers_update()
         # All done
         log.info('Done')
