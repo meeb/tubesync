@@ -11,6 +11,7 @@ from django.conf import settings
 from django.db import models
 from django.core.exceptions import SuspiciousOperation
 from django.core.files.storage import FileSystemStorage
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import RegexValidator
 from django.utils.text import slugify
 from django.utils import timezone
@@ -34,6 +35,20 @@ from .choices import (Val, CapChoices, Fallback, FileExtension,
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 _srctype_dict = lambda n: dict(zip( YouTube_SourceType.values, (n,) * len(YouTube_SourceType.values) ))
+
+class JSONEncoder(DjangoJSONEncoder):
+    item_separator = ','
+    key_separator = ':'
+
+    def default(self, obj):
+        try:
+            iterable = iter(obj)
+        except TypeError:
+            pass
+        else:
+            return list(iterable)
+        return super().default(obj)
+
 
 class Source(models.Model):
     '''
@@ -1747,6 +1762,7 @@ class Metadata(models.Model):
     )
     value = models.JSONField(
         _('value'),
+        encoder=JSONEncoder,
         null=False,
         default=dict,
         help_text=_('JSON metadata object'),
@@ -1812,6 +1828,7 @@ class MetadataFormat(models.Model):
     )
     value = models.JSONField(
         _('value'),
+        encoder=JSONEncoder,
         null=False,
         default=dict,
         help_text=_('JSON metadata format object'),
