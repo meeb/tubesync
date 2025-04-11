@@ -11,6 +11,7 @@ from django.conf import settings
 from django.db import models
 from django.core.exceptions import SuspiciousOperation
 from django.core.files.storage import FileSystemStorage
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import RegexValidator
 from django.utils.text import slugify
 from django.utils import timezone
@@ -34,6 +35,20 @@ from .choices import (Val, CapChoices, Fallback, FileExtension,
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 _srctype_dict = lambda n: dict(zip( YouTube_SourceType.values, (n,) * len(YouTube_SourceType.values) ))
+
+class JSONEncoder(DjangoJSONEncoder):
+    item_separator = ','
+    key_separator = ':'
+
+    def default(self, obj):
+        try:
+            iterable = iter(obj)
+        except TypeError:
+            pass
+        else:
+            return list(iterable)
+        return super().default(obj)
+
 
 class Source(models.Model):
     '''
@@ -1679,6 +1694,145 @@ class Media(models.Model):
                             parent_dir = parent_dir.parent
                     except OSError as e:
                         pass
+
+
+class Metadata(models.Model):
+    '''
+        Metadata for an indexed `Media` item.
+    '''
+    class Meta:
+        verbose_name = _('Metadata about a Media item')
+        verbose_name_plural = _('Metadata about a Media item')
+        unique_together = (
+            ('media', 'site', 'key'),
+        )
+
+    uuid = models.UUIDField(
+        _('uuid'),
+        primary_key=True,
+        editable=False,
+        default=uuid.uuid4,
+        help_text=_('UUID of the metadata'),
+    )
+    media = models.ForeignKey(
+        Media,
+        # on_delete=models.DO_NOTHING,
+        on_delete=models.CASCADE,
+        related_name='metadata_media',
+        help_text=_('Media the metadata belongs to'),
+        null=False,
+    )
+    site = models.CharField(
+        _('site'),
+        max_length=256,
+        blank=True,
+        null=False,
+        default='Youtube',
+        help_text=_('Site from which the metadata was retrieved'),
+    )
+    key = models.CharField(
+        _('key'),
+        max_length=256,
+        blank=True,
+        null=False,
+        default='',
+        help_text=_('Media identifier at the site from which the metadata was retrieved'),
+    )
+    created = models.DateTimeField(
+        _('created'),
+        auto_now_add=True,
+        db_index=True,
+        help_text=_('Date and time the metadata was created'),
+    )
+    retrieved = models.DateTimeField(
+        _('retrieved'),
+        auto_now_add=True,
+        db_index=True,
+        help_text=_('Date and time the metadata was retrieved'),
+    )
+    uploaded = models.DateTimeField(
+        _('uploaded'),
+        null=True,
+        help_text=_('Date and time the media was uploaded'),
+    )
+    published = models.DateTimeField(
+        _('published'),
+        null=True,
+        help_text=_('Date and time the media was published'),
+    )
+    value = models.JSONField(
+        _('value'),
+        encoder=JSONEncoder,
+        null=False,
+        default=dict,
+        help_text=_('JSON metadata object'),
+    )
+
+
+class MetadataFormat(models.Model):
+    '''
+        A format from the Metadata for an indexed `Media` item.
+    '''
+    class Meta:
+        verbose_name = _('Format from the Metadata about a Media item')
+        verbose_name_plural = _('Formats from the Metadata about a Media item')
+        unique_together = (
+            ('metadata', 'site', 'key', 'number'),
+            ('metadata', 'site', 'key', 'code'),
+        )
+
+    uuid = models.UUIDField(
+        _('uuid'),
+        primary_key=True,
+        editable=False,
+        default=uuid.uuid4,
+        help_text=_('UUID of the format'),
+    )
+    metadata = models.ForeignKey(
+        Metadata,
+        # on_delete=models.DO_NOTHING,
+        on_delete=models.CASCADE,
+        related_name='metadataformat_metadata',
+        help_text=_('Metadata the format belongs to'),
+        null=False,
+    )
+    site = models.CharField(
+        _('site'),
+        max_length=256,
+        blank=True,
+        null=False,
+        default='Youtube',
+        help_text=_('Site from which the format is available'),
+    )
+    key = models.CharField(
+        _('key'),
+        max_length=256,
+        blank=True,
+        null=False,
+        default='',
+        help_text=_('Media identifier at the site for which this format is available'),
+    )
+    number = models.PositiveIntegerField(
+        _('number'),
+        blank=False,
+        null=False,
+        help_text=_('Ordering number for this format')
+    )
+    code = models.CharField(
+        _('code'),
+        max_length=64,
+        blank=True,
+        null=False,
+        default='',
+        help_text=_('Format identification code'),
+    )
+    value = models.JSONField(
+        _('value'),
+        encoder=JSONEncoder,
+        null=False,
+        default=dict,
+        help_text=_('JSON metadata format object'),
+    )
 
 
 class MediaServer(models.Model):
