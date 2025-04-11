@@ -14,6 +14,14 @@ class NoFormatException(Exception):
     pass
 
 
+class NoMetadataException(Exception):
+    '''
+        Raised when a media item is attempted to be downloaded but it has no valid
+        metadata.
+    '''
+    pass
+
+
 class DownloadFailedException(Exception):
     '''
         Raised when a downloaded media file is expected to be present, but doesn't

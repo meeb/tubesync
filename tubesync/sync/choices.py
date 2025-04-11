@@ -132,7 +132,7 @@ class SourceResolution(models.TextChoices):
     VIDEO_720P = '720p', _('720p (HD)')
     VIDEO_1080P = '1080p', _('1080p (Full HD)')
     VIDEO_1440P = '1440p', _('1440p (2K)')
-    VIDEO_2160P = '2160p', _('4320p (8K)')
+    VIDEO_2160P = '2160p', _('2160p (4K)')
     VIDEO_4320P = '4320p', _('4320p (8K)')
 
     @classmethod
@@ -158,6 +158,12 @@ class SponsorBlock_Category(models.TextChoices):
     FILLER = 'filler', _( 'Filler Tangent' )
     INTERACTION = 'interaction', _( 'Interaction Reminder' )
     MUSIC_OFFTOPIC = 'music_offtopic', _( 'Non-Music Section' )
+
+
+class TaskQueue(models.TextChoices):
+    DB = 'database', _('Database')
+    FS = 'filesystem', _('Filesystem')
+    NET = 'network', _('Networking')
 
 
 class YouTube_SourceType(models.TextChoices):
