@@ -5,8 +5,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import signals
 from common.logger import log
 from sync.models import Source, Media, MediaServer
-from sync.signals import media_post_delete
-from sync.tasks import rescan_media_server
+from sync.tasks import schedule_media_servers_update
 
 
 class Command(BaseCommand):
@@ -29,23 +28,14 @@ class Command(BaseCommand):
         except Source.DoesNotExist:
             raise CommandError(f'Source does not exist with '
                                f'UUID: {source_uuid}')
-        # Detach post-delete signal for Media so we don't spam media servers
-        signals.post_delete.disconnect(media_post_delete, sender=Media)
+        # Reconfigure the source to not update the disk or media servers
+        source.deactivate()
         # Delete the source, triggering pre-delete signals for each media item
         log.info(f'Found source with UUID "{source.uuid}" with name '
                  f'"{source.name}" and deleting it, this may take some time!')
+        log.info(f'Source directory: {source.directory_path}')
         source.delete()
         # Update any media servers
-        for mediaserver in MediaServer.objects.all():
-            log.info(f'Scheduling media server updates')
-            verbose_name = _('Request media server rescan for "{}"')
-            rescan_media_server(
-                str(mediaserver.pk),
-                priority=0,
-                verbose_name=verbose_name.format(mediaserver),
-                remove_existing_tasks=True
-            )
-        # Re-attach signals
-        signals.post_delete.connect(media_post_delete, sender=Media)
+        schedule_media_servers_update()
         # All done
         log.info('Done')

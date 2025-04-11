@@ -17,14 +17,14 @@
       {% if task.has_error %}
       <span class="collection-item">
         <i class="fas fa-exclamation-triangle"></i> <strong>{{ task.verbose_name }}</strong><br>
-        Source: &quot;{{ task.queue }}&quot;<br>
+        Queue: &quot;{{ task.queue }}&quot;<br>
         Error: &quot;{{ task.error_message }}&quot;<br>
         <i class="far fa-clock"></i> Task ran at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
       </span>
       {% else %}
       <span class="collection-item">
         <i class="fas fa-check"></i> <strong>{{ task.verbose_name }}</strong><br>
-        Source: &quot;{{ task.queue }}&quot;<br>
+        Queue: &quot;{{ task.queue }}&quot;<br>
         <i class="far fa-clock"></i> Task ran at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
       </span>
       {% endif %}

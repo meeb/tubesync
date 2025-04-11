@@ -3,7 +3,6 @@ import os
 import json
 from base64 import b64decode
 import pathlib
-import shutil
 import sys
 from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponseNotFound, HttpResponseRedirect
@@ -30,7 +29,8 @@ from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMedia
 from .utils import validate_url, delete_file, multi_key_sort
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
-                    delete_task_by_media, index_source_task)
+                    delete_task_by_media, index_source_task,
+                    check_source_directory_exists, migrate_queues)
 from .choices import (Val, MediaServerType, SourceResolution,
                         YouTube_SourceType, youtube_long_source_types,
                         youtube_help, youtube_validation_urls)
@@ -119,15 +119,15 @@ class SourcesView(ListView):
             if sobj is None:
                 return HttpResponseNotFound()
 
+            source = sobj
             verbose_name = _('Index media from source "{}" once')
             index_source_task(
-                str(sobj.pk),
-                queue=str(sobj.pk),
-                repeat=0,
-                priority=10,
-                schedule=30,
+                str(source.pk),
                 remove_existing_tasks=False,
-                verbose_name=verbose_name.format(sobj.name))
+                repeat=0,
+                schedule=30,
+                verbose_name=verbose_name.format(source.name),
+            )
             url = reverse_lazy('sync:sources')
             url = append_uri_params(url, {'message': 'source-refreshed'})
             return HttpResponseRedirect(url)
@@ -415,15 +415,8 @@ class DeleteSourceView(DeleteView, FormMixin):
         delete_media = True if delete_media_val is not False else False
         if delete_media:
             source = self.get_object()
-            for media in Media.objects.filter(source=source):
-                if media.media_file:
-                    file_path = media.media_file.path
-                    matching_files = glob.glob(os.path.splitext(file_path)[0] + '.*')
-                    for file in matching_files:
-                        delete_file(file)
-            directory_path = source.directory_path
-            if os.path.exists(directory_path):
-                shutil.rmtree(directory_path, True)
+            directory_path = pathlib.Path(source.directory_path)
+            (directory_path / '.to_be_removed').touch(exist_ok=True)
         return super().post(request, *args, **kwargs)
 
     def get_success_url(self):
@@ -776,7 +769,8 @@ class TasksView(ListView):
     def get_queryset(self):
         qs = Task.objects.all()
         if self.filter_source:
-            qs = qs.filter(queue=str(self.filter_source.pk))
+            params_prefix=f'[["{self.filter_source.pk}"'
+            qs = qs.filter(task_params__istartswith=params_prefix)
         order = getattr(settings,
             'BACKGROUND_TASK_PRIORITY_ORDERING',
             'DESC'
@@ -804,6 +798,7 @@ class TasksView(ListView):
         data['total_errors'] = errors_qs.count()
         data['scheduled'] = list()
         data['total_scheduled'] = scheduled_qs.count()
+        data['migrated'] = migrate_queues()
 
         def add_to_task(task):
             obj, url = map_task_to_instance(task)
@@ -866,9 +861,9 @@ class TasksView(ListView):
         )
         sort_keys = (
             # key, reverse
-            ('run_now', True),
-            ('priority', 'ASC' != order),
             ('run_at', False),
+            ('priority', 'ASC' != order),
+            ('run_now', True),
         )
         data['errors'] = multi_key_sort(data['errors'], sort_keys, attr=True)
         data['scheduled'] = multi_key_sort(data['scheduled'], sort_keys, attr=True)
@@ -904,7 +899,8 @@ class CompletedTasksView(ListView):
     def get_queryset(self):
         qs = CompletedTask.objects.all()
         if self.filter_source:
-            qs = qs.filter(queue=str(self.filter_source.pk))
+            params_prefix=f'[["{self.filter_source.pk}"'
+            qs = qs.filter(task_params__istartswith=params_prefix)
         return qs.order_by('-run_at')
 
     def get_context_data(self, *args, **kwargs):
@@ -936,13 +932,16 @@ class ResetTasks(FormView):
         Task.objects.all().delete()
         # Iter all tasks
         for source in Source.objects.all():
+            verbose_name = _('Check download directory exists for source "{}"')
+            check_source_directory_exists(
+                str(source.pk),
+                verbose_name=verbose_name.format(source.name),
+            )
             # Recreate the initial indexing task
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(source.pk),
                 repeat=source.index_schedule,
-                queue=str(source.pk),
-                priority=10,
                 verbose_name=verbose_name.format(source.name)
             )
             # This also chains down to call each Media objects .save() as well

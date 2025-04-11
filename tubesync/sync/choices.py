@@ -160,6 +160,12 @@ class SponsorBlock_Category(models.TextChoices):
     MUSIC_OFFTOPIC = 'music_offtopic', _( 'Non-Music Section' )
 
 
+class TaskQueue(models.TextChoices):
+    DB = 'database', _('Database')
+    FS = 'filesystem', _('Filesystem')
+    NET = 'network', _('Networking')
+
+
 class YouTube_SourceType(models.TextChoices):
     CHANNEL = 'c', _('YouTube channel')
     CHANNEL_ID = 'i', _('YouTube channel by ID')

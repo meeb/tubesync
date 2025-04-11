@@ -1,8 +1,12 @@
+import cProfile
+import emoji
+import io
 import os
+import pstats
 import string
+import time
 from datetime import datetime
 from urllib.parse import urlunsplit, urlencode, urlparse
-import emoji
 from yt_dlp.utils import LazyList
 from .errors import DatabaseConnectionError
 
@@ -172,3 +176,49 @@ def json_serial(obj):
     if isinstance(obj, LazyList):
         return list(obj)
     raise TypeError(f'Type {type(obj)} is not json_serial()-able')
+
+
+def time_func(func):
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        end = time.perf_counter()
+        return (result, (end - start, start, end,),)
+    return wrapper
+
+
+def profile_func(func):
+    def wrapper(*args, **kwargs):
+        s = io.StringIO()
+        with cProfile.Profile() as pr:
+            pr.enable()
+            result = func(*args, **kwargs)
+            pr.disable()
+            ps = pstats.Stats(pr, stream=s)
+            ps.sort_stats(
+                pstats.SortKey.CUMULATIVE
+            ).print_stats()
+        return (result, (s.getvalue(), ps, s,),)
+    return wrapper
+
+
+def remove_enclosed(haystack, /, open='[', close=']', sep=' ', *, valid=None, start=None, end=None):
+    if not haystack:
+        return haystack
+    assert open and close, 'open and close are required to be non-empty strings'
+    o = haystack.find(open, start, end)
+    sep = sep or ''
+    n = close + sep
+    c = haystack.find(n, len(open)+o, end)
+    if -1 in {o, c}:
+        return haystack
+    if valid is not None:
+        content = haystack[len(open)+o:c]
+        found = set(content)
+        valid = set(valid)
+        invalid = found - valid
+        # assert not invalid, f'Invalid characters {invalid} found in: {content}'
+        if invalid:
+            return haystack
+    return haystack[:o] + haystack[len(n)+c:]
+

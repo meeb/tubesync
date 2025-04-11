@@ -7,7 +7,7 @@ verify_ssl = true
 autopep8 = "*"
 
 [packages]
-django = "*"
+django = "<5.2"
 django-sass-processor = {extras = ["management-command"], version = "*"}
 pillow = "*"
 whitenoise = "*"
@@ -15,12 +15,12 @@ gunicorn = "*"
 httptools = "*"
 django-background-tasks = ">=1.2.8"
 django-basicauth = "*"
-psycopg2-binary = "*"
+psycopg = {extras = ["binary", "pool"], version = "*"}
 mysqlclient = "*"
 PySocks = "*"
 urllib3 = {extras = ["socks"], version = "*"}
 requests = {extras = ["socks"], version = "*"}
-yt-dlp = "*"
+yt-dlp = {extras = ["default", "curl-cffi"], version = "*"}
 emoji = "*"
 brotli = "*"
 html5lib = "*"
