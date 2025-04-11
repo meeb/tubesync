@@ -3,7 +3,7 @@ from django.db.transaction import atomic
 from django.utils.translation import gettext_lazy as _
 from background_task.models import Task
 from sync.models import Source
-from sync.tasks import index_source_task
+from sync.tasks import index_source_task, check_source_directory_exists
 
 
 from common.logger import log
