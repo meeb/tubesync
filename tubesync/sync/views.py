@@ -29,7 +29,8 @@ from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMedia
 from .utils import validate_url, delete_file, multi_key_sort
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
-                    delete_task_by_media, index_source_task, migrate_queues)
+                    delete_task_by_media, index_source_task,
+                    check_source_directory_exists, migrate_queues)
 from .choices import (Val, MediaServerType, SourceResolution,
                         YouTube_SourceType, youtube_long_source_types,
                         youtube_help, youtube_validation_urls)
@@ -931,6 +932,11 @@ class ResetTasks(FormView):
         Task.objects.all().delete()
         # Iter all tasks
         for source in Source.objects.all():
+            verbose_name = _('Check download directory exists for source "{}"')
+            check_source_directory_exists(
+                str(source.pk),
+                verbose_name=verbose_name.format(source.name),
+            )
             # Recreate the initial indexing task
             verbose_name = _('Index media from source "{}"')
             index_source_task(
