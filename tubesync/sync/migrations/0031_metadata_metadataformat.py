@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
                 ('retrieved', models.DateTimeField(auto_now_add=True, db_index=True, help_text='Date and time the metadata was retrieved', verbose_name='retrieved')),
                 ('uploaded', models.DateTimeField(help_text='Date and time the media was uploaded', null=True, verbose_name='uploaded')),
                 ('published', models.DateTimeField(help_text='Date and time the media was published', null=True, verbose_name='published')),
-                ('value', models.JSONField(default=dict, help_text='JSON metadata object', verbose_name='value')),
+                ('value', models.JSONField(default=dict, encoder=sync.models.JSONEncoder, help_text='JSON metadata object', verbose_name='value')),
                 ('media', models.ForeignKey(help_text='Media the metadata belongs to', on_delete=django.db.models.deletion.CASCADE, related_name='metadata_media', to='sync.media')),
             ],
             options={
@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
                 ('key', models.CharField(blank=True, default='', help_text='Media identifier at the site for which this format is available', max_length=256, verbose_name='key')),
                 ('number', models.PositiveIntegerField(help_text='Ordering number for this format', verbose_name='number')),
                 ('code', models.CharField(blank=True, default='', help_text='Format identification code', max_length=64, verbose_name='code')),
-                ('value', models.JSONField(default=dict, help_text='JSON metadata format object', verbose_name='value')),
+                ('value', models.JSONField(default=dict, encoder=sync.models.JSONEncoder, help_text='JSON metadata format object', verbose_name='value')),
                 ('metadata', models.ForeignKey(help_text='Metadata the format belongs to', on_delete=django.db.models.deletion.CASCADE, related_name='metadataformat_metadata', to='sync.metadata')),
             ],
             options={
