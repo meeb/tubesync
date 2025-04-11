@@ -407,7 +407,7 @@ following this rough guide, you are on your own and should be knowledgeable abou
 installing and running WSGI-based Python web applications before attempting this.
 
 1. Clone or download this repo
-2. Make sure you're running a modern version of Python (>=3.8) and have Pipenv
+2. Make sure you're running a modern version of Python (>=3.9) and have Pipenv
    installed
 3. Set up the environment with `pipenv install`
 4. Copy `tubesync/tubesync/local_settings.py.example` to
