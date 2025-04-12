@@ -1791,7 +1791,7 @@ class Metadata(models.Model):
     )
 
     @atomic(durable=False)
-    def ingest_formats(self, formats=list(), /, *):
+    def ingest_formats(self, formats=list(), /):
         for number, format in enumerate(formats, start=1):
             mdf = self.metadataformat_metadata.get_or_create(site=self.site, key=self.key, code=format.get('format_id'), number=number)[0]
             mdf.value = format
