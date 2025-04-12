@@ -749,8 +749,7 @@ def save_all_media_for_source(source_id):
                 log.exception(str(e))
                 pass
             else:
-                with atomic():
-                    save_model(media)
+                save_model(media)
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
 
