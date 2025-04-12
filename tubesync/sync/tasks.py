@@ -693,7 +693,7 @@ def save_all_media_for_source(source_id):
             end=task.verbose_name.find('Check'),
         )
     tvn_format = '1/{:,}' + f'/{refresh_qs.count():,}'
-    for mn, media in enumerate(refresh_qs, start=1):
+    for mn, media in enumerate(refresh_qs.iterator(chunk_size=1000), start=1):
         update_task_status(task, tvn_format.format(mn))
         refresh_formats(
             str(media.pk),
@@ -704,7 +704,7 @@ def save_all_media_for_source(source_id):
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
     tvn_format = '2/{:,}' + f'/{mqs.count():,}'
-    for mn, media_uuid in enumerate(mqs.values_list('uuid', flat=True), start=1):
+    for mn, media_uuid in enumerate(mqs.values_list('uuid', flat=True).iterator(chunk_size=1000), start=1):
         if media_uuid not in saved_later:
             update_task_status(task, tvn_format.format(mn))
             try:
