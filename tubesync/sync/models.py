@@ -13,6 +13,7 @@ from django.core.exceptions import SuspiciousOperation
 from django.core.files.storage import FileSystemStorage
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import RegexValidator
+from django.db.transaction import atomic
 from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -1097,24 +1098,22 @@ class Media(models.Model):
         return self.metadata is not None
 
 
+    @atomic(durable=False)
     def metadata_load(self, arg_str='{}'):
         data = json.loads(arg_str) or self.loaded_metadata
         site = self.get_metadata_first_value('extractor_key', arg_dict=data)
         epoch = self.get_metadata_first_value('epoch', arg_dict=data)
         epoch_dt = self.metadata_published( epoch )
-        release = self.get_metadata_first_value('release_timestamp', arg_dict=data)
+        release = self.get_metadata_first_value(('release_timestamp', 'timestamp',), arg_dict=data)
         release_dt = self.metadata_published( release )
         md = self.metadata_media.get_or_create(site=site, key=self.key)[0]
         md.value = data
-        formats = md.value.pop('formats', list())
+        formats = md.value.pop(self.get_metadata_field('formats'), list())
         md.retrieved = epoch_dt
         md.uploaded = self.published
         md.published = release_dt or self.published
         md.save()
-        for number, format in enumerate(formats, start=1):
-            mdf = md.metadataformat_metadata.get_or_create(site=md.site, key=md.key, code=format.get('format_id'), number=number)[0]
-            mdf.value = format
-            mdf.save()
+        md.ingest_formats(formats)
 
 
     def save_to_metadata(self, key, value, /):
@@ -1790,6 +1789,13 @@ class Metadata(models.Model):
         default=dict,
         help_text=_('JSON metadata object'),
     )
+
+    @atomic(durable=False)
+    def ingest_formats(self, formats=list(), /, *):
+        for number, format in enumerate(formats, start=1):
+            mdf = self.metadataformat_metadata.get_or_create(site=self.site, key=self.key, code=format.get('format_id'), number=number)[0]
+            mdf.value = format
+            mdf.save()
 
 
 class MetadataFormat(models.Model):
