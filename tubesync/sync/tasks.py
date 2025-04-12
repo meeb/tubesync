@@ -509,9 +509,10 @@ def download_media_thumbnail(media_id, url):
     width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
     height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
     i = get_remote_image(url)
-    log.info(f'Resizing {i.width}x{i.height} thumbnail to '
-             f'{width}x{height}: {url}')
-    i = resize_image_to_height(i, width, height)
+    if (i.width > width) and (i.height > height):
+        log.info(f'Resizing {i.width}x{i.height} thumbnail to '
+                 f'{width}x{height}: {url}')
+        i = resize_image_to_height(i, width, height)
     image_file = BytesIO()
     i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
     image_file.seek(0)
