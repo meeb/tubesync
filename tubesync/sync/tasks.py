@@ -674,7 +674,10 @@ def save_all_media_for_source(source_id):
         raise InvalidTaskError(_('no such source')) from e
 
     saved_later = set()
-    mqs = Media.objects.filter(source=source)
+    mqs = Media.objects.all().defer(
+        'metadata',
+        'thumb',
+    ).filter(source=source)
     task = get_source_check_task(source_id)
     refresh_qs = mqs.filter(
         can_download=False,
@@ -701,11 +704,17 @@ def save_all_media_for_source(source_id):
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
     tvn_format = '2/{:,}' + f'/{mqs.count():,}'
-    for mn, media in enumerate(mqs, start=1):
-        if media.uuid not in saved_later:
+    for mn, media_uuid in enumerate(mqs.values_list('uuid', flat=True), start=1):
+        if media_uuid not in saved_later:
             update_task_status(task, tvn_format.format(mn))
-            with atomic():
-                media.save()
+            try:
+                media = Media.objects.get(pk=str(media_uuid))
+            except Media.DoesNotExist as e:
+                log.exception(str(e))
+                pass
+            else:
+                with atomic():
+                    media.save()
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
 
