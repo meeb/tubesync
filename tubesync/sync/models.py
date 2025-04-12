@@ -848,11 +848,14 @@ class Media(models.Model):
         fields = self.METADATA_FIELDS.get(field, {})
         return fields.get(self.source.source_type, field)
 
-    def get_metadata_first_value(self, iterable, default=None, /):
+    def get_metadata_first_value(self, iterable, default=None, /, *, arg_dict=None):
         '''
             fetch the first key with a value from metadata
         '''
         
+        if arg_dict is None:
+            arg_dict = self.loaded_metadata
+        assert isinstance(arg_dict, dict), type(arg_dict)
         # str is an iterable of characters
         # we do not want to look for each character!
         if isinstance(iterable, str):
@@ -860,7 +863,7 @@ class Media(models.Model):
         for key in tuple(iterable):
             # reminder: unmapped fields return the key itself
             field = self.get_metadata_field(key)
-            value = self.loaded_metadata.get(field)
+            value = arg_dict.get(field)
             # value can be None because:
             #   - None was stored at the key
             #   - the key was not in the dictionary
@@ -1092,6 +1095,26 @@ class Media(models.Model):
     @property
     def has_metadata(self):
         return self.metadata is not None
+
+
+    def metadata_load(self, arg_str='{}'):
+        data = json.loads(arg_str) or self.loaded_metadata
+        site = self.get_metadata_first_value('extractor_key', arg_dict=data)
+        epoch = self.get_metadata_first_value('epoch', arg_dict=data)
+        epoch_dt = self.metadata_published( epoch )
+        release = self.get_metadata_first_value('release_timestamp', arg_dict=data)
+        release_dt = self.metadata_published( release )
+        md = self.metadata_media.get_or_create(site=site, key=self.key)[0]
+        md.value = data
+        formats = md.value.pop('formats', list())
+        md.retrieved = epoch_dt
+        md.uploaded = self.published
+        md.published = release_dt or self.published
+        md.save()
+        for number, format in enumerate(formats, start=1):
+            mdf = md.metadataformat_metadata.get_or_create(site=md.site, key=md.key, code=format.get('format_id'), number=number)[0]
+            mdf.value = format
+            mdf.save()
 
 
     def save_to_metadata(self, key, value, /):
