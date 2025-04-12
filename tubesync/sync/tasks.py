@@ -205,7 +205,7 @@ def schedule_media_servers_update():
         # Schedule a task to update media servers
         log.info(f'Scheduling media server updates')
         verbose_name = _('Request media server rescan for "{}"')
-        for mediaserver in MediaServer.objects.all():
+        for mediaserver in MediaServer.objects.all().iterator():
             rescan_media_server(
                 str(mediaserver.pk),
                 verbose_name=verbose_name.format(mediaserver),
@@ -214,9 +214,15 @@ def schedule_media_servers_update():
 
 def cleanup_old_media():
     with atomic():
-        for source in Source.objects.filter(delete_old_media=True, days_to_keep__gt=0):
+        for source in Source.objects.filter(delete_old_media=True, days_to_keep__gt=0).iterator(chunk_size=1000):
             delta = timezone.now() - timedelta(days=source.days_to_keep)
-            for media in source.media_source.filter(downloaded=True, download_date__lt=delta):
+            mqs = source.media_source.defer(
+                'metadata',
+            ).filter(
+                downloaded=True,
+                download_date__lt=delta,
+            )
+            for media in mqs.iterator(chunk_size=1000):
                 log.info(f'Deleting expired media: {source} / {media} '
                          f'(now older than {source.days_to_keep} days / '
                          f'download_date before {delta})')
@@ -230,8 +236,12 @@ def cleanup_removed_media(source, videos):
     if not source.delete_removed_media:
         return
     log.info(f'Cleaning up media no longer in source: {source}')
-    media_objects = Media.objects.filter(source=source)
-    for media in media_objects:
+    mqs = Media.objects.defer(
+        'metadata',
+    ).filter(
+        source=source,
+    )
+    for media in mqs.iterator(chunk_size=1000):
         matching_source_item = [video['id'] for video in videos if video['id'] == media.key]
         if not matching_source_item:
             log.info(f'{media.name} is no longer in source, removing')
@@ -766,13 +776,12 @@ def rename_all_media_for_source(source_id):
     if not create_rename_tasks:
         return
     mqs = Media.objects.all().defer(
-        'metadata',
         'thumb',
     ).filter(
         source=source,
         downloaded=True,
     )
-    for media in mqs:
+    for media in mqs.iterator(chunk_size=1000):
         with atomic():
             media.rename_files()
 
@@ -816,7 +825,7 @@ def delete_all_media_for_source(source_id, source_name):
     ).filter(
         source=source or source_id,
     )
-    for media in mqs:
+    for media in mqs.iterator(chunk_size=1000):
         log.info(f'Deleting media for source: {source_name} item: {media.name}')
         with atomic():
             media.delete()
