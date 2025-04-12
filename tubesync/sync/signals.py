@@ -9,12 +9,12 @@ from background_task.signals import task_failed
 from background_task.models import Task
 from common.logger import log
 from .models import Source, Media, MediaServer
-from .tasks import (  delete_task_by_source, delete_task_by_media, index_source_task,
-                      download_media_thumbnail, download_media_metadata,
-                      map_task_to_instance, check_source_directory_exists,
-                      download_media, rescan_media_server, download_source_images,
-                      delete_all_media_for_source, save_all_media_for_source,
-                      rename_media, get_media_metadata_task, get_media_download_task)
+from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
+                    download_media_thumbnail, download_media_metadata,
+                    map_task_to_instance, check_source_directory_exists,
+                    download_media, rescan_media_server, download_source_images,
+                    delete_all_media_for_source, save_all_media_for_source,
+                    rename_media, get_media_metadata_task, get_media_download_task)
 from .utils import delete_file, glob_quote, mkdir_p
 from .filtering import filter_media
 from .choices import Val, YouTube_SourceType
@@ -250,8 +250,10 @@ def media_post_save(sender, instance, created, **kwargs):
     if not instance.thumb and not instance.skip:
         thumbnail_url = instance.thumbnail
         if thumbnail_url:
-            log.info(f'Scheduling task to download thumbnail for: {instance.name} '
-                     f'from: {thumbnail_url}')
+            log.info(
+                'Scheduling task to download thumbnail'
+                f' for: {instance.name} from: {thumbnail_url}'
+            )
             verbose_name = _('Downloading thumbnail for "{}"')
             download_media_thumbnail(
                 str(instance.pk),
@@ -289,8 +291,10 @@ def media_pre_delete(sender, instance, **kwargs):
     delete_task_by_media('sync.tasks.wait_for_media_premiere', (str(instance.pk),))
     thumbnail_url = instance.thumbnail
     if thumbnail_url:
-        delete_task_by_media('sync.tasks.download_media_thumbnail',
-                             (str(instance.pk), thumbnail_url))
+        delete_task_by_media(
+            'sync.tasks.download_media_thumbnail',
+            (str(instance.pk), thumbnail_url,),
+        )
     # Remove thumbnail file for deleted media
     if instance.thumb:
         instance.thumb.delete(save=False)
