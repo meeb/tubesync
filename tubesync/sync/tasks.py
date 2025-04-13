@@ -17,7 +17,7 @@ from PIL import Image
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import reset_queries, DatabaseError, IntegrityError
+from django.db import connection, reset_queries, DatabaseError, IntegrityError
 from django.db.transaction import atomic
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -201,6 +201,16 @@ def migrate_queues():
     return qs.update(queue=Val(TaskQueue.NET))
 
 
+def save_model(instance):
+    if 'sqlite' == connection.vendor:
+        # a transaction here causes too many
+        # database is locked errors
+        instance.save()
+    else:
+        with atomic():
+            instance.save()
+
+
 @atomic(durable=False)
 def schedule_media_servers_update():
     # Schedule a task to update media servers
@@ -271,7 +281,7 @@ def index_source_task(source_id):
     # Reset any errors
     # TODO: determine if this affects anything
     source.has_failed = False
-    source.save()
+    save_model(source)
     # Index the source
     videos = source.index_media()
     if not videos:
@@ -282,7 +292,7 @@ def index_source_task(source_id):
                                f'is reachable')
     # Got some media, update the last crawl timestamp
     source.last_crawl = timezone.now()
-    source.save()
+    save_model(source)
     num_videos = len(videos)
     log.info(f'Found {num_videos} media items for source: {source}')
     fields = lambda f, m: m.get_metadata_field(f)
@@ -313,7 +323,7 @@ def index_source_task(source_id):
         if published_dt is not None:
             media.published = published_dt
         try:
-            media.save()
+            save_model(media)
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
         else:
@@ -486,7 +496,7 @@ def download_media_metadata(media_id):
         media.duration = media.metadata_duration
 
     # Don't filter media here, the post_save signal will handle that
-    media.save()
+    save_model(media)
     log.info(f'Saved {len(media.metadata)} bytes of metadata for: '
              f'{source} / {media}: {media_id}')
 
@@ -643,7 +653,7 @@ def download_media(media_id):
                 media.downloaded_hdr = cformat['is_hdr']
             else:
                 media.downloaded_format = 'audio'
-        media.save()
+        save_model(media)
         # If selected, copy the thumbnail over as well
         if media.source.copy_thumbnails:
             if not media.thumb_file_exists:
@@ -749,8 +759,7 @@ def save_all_media_for_source(source_id):
                 log.exception(str(e))
                 pass
             else:
-                with atomic():
-                    media.save()
+                save_model(media)
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
 
@@ -767,8 +776,7 @@ def refresh_formats(media_id):
         log.debug(f'Failed to refresh formats for: {media.source} / {media.key}: {e!s}')
         pass
     else:
-        with atomic():
-            media.save()
+        save_model(media)
 
 
 @background(schedule=dict(priority=20, run_at=60), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
@@ -824,17 +832,16 @@ def wait_for_media_premiere(media_id):
         return
     now = timezone.now()
     if media.published < now:
+        # the download tasks start after the media is saved
         media.manual_skip = False
         media.skip = False
-        # start the download tasks
-        media.save()
     else:
         media.manual_skip = True
         media.title = _(f'Premieres in {hours(media.published - now)} hours')
-        media.save()
         task = get_media_premiere_task(media_id)
         if task:
             update_task_status(task, f'available in {hours(media.published - now)} hours')
+    save_model(media)
 
 
 @background(schedule=dict(priority=1, run_at=90), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
