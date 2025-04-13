@@ -257,7 +257,15 @@ and less common features:
 
 # Warnings
 
-### 1. Index frequency
+### 1. Automated file renaming
+> [!IMPORTANT]
+> Currently, file renaming is not enabled by default.
+> Enabling this feature by default is planned in an upcoming release, after `2025-006-01`.
+> 
+> To prevent your installation from scheduling media file renaming tasks,
+> you must set `TUBESYNC_RENAME_ALL_SOURCES=False` in the environment variables.
+
+### 2. Index frequency
 
 It's a good idea to add sources with as long of an index frequency as possible. This is
 the duration between indexes of the source. An index is when TubeSync checks to see
@@ -265,7 +273,7 @@ what videos available on a channel or playlist to find new media. Try and keep t
 long as possible, up to 24 hours.
 
 
-### 2. Indexing massive channels
+### 3. Indexing massive channels
 
 If you add a massive (several thousand videos) channel to TubeSync and choose "index
 every hour" or similar short interval it's entirely possible your TubeSync install may
