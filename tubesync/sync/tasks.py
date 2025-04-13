@@ -10,8 +10,9 @@ import math
 import uuid
 from io import BytesIO
 from hashlib import sha1
+from pathlib import Path
 from datetime import datetime, timedelta
-from shutil import copyfile
+from shutil import copyfile, rmtree
 from PIL import Image
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -792,8 +793,9 @@ def wait_for_media_premiere(media_id):
         if task:
             update_task_status(task, f'available in {hours(media.published - now)} hours')
 
-@background(schedule=dict(priority=1, run_at=300), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
-def delete_all_media_for_source(source_id, source_name):
+
+@background(schedule=dict(priority=1, run_at=90), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
+def delete_all_media_for_source(source_id, source_name, source_directory):
     source = None
     try:
         source = Source.objects.get(pk=source_id)
@@ -807,8 +809,21 @@ def delete_all_media_for_source(source_id, source_name):
     ).filter(
         source=source or source_id,
     )
-    for media in mqs:
-        log.info(f'Deleting media for source: {source_name} item: {media.name}')
-        with atomic():
-            media.delete()
+    with atomic(durable=True):
+        for media in mqs:
+            log.info(f'Deleting media for source: {source_name} item: {media.name}')
+            with atomic():
+                media.delete()
+    # Remove the directory, if the user requested that
+    directory_path = Path(source_directory)
+    remove = (
+        (source and source.delete_removed_media) or
+        (directory_path / '.to_be_removed').is_file()
+    )
+    if source:
+        with atomic(durable=True):
+            source.delete()
+    if remove:
+        log.info(f'Deleting directory for: {source_name}: {directory_path}')
+        rmtree(directory_path, True)
 
