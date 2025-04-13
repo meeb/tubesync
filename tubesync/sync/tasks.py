@@ -10,13 +10,14 @@ import math
 import uuid
 from io import BytesIO
 from hashlib import sha1
+from pathlib import Path
 from datetime import datetime, timedelta
-from shutil import copyfile
+from shutil import copyfile, rmtree
 from PIL import Image
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import connection, DatabaseError, IntegrityError
+from django.db import connection, reset_queries, DatabaseError, IntegrityError
 from django.db.transaction import atomic
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -265,6 +266,7 @@ def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
     '''
+    reset_queries()
     cleanup_completed_tasks()
     # deleting expired media should happen any time an index task is requested
     cleanup_old_media()
@@ -700,6 +702,7 @@ def save_all_media_for_source(source_id):
         source has its parameters changed and all media needs to be
         checked to see if its download status has changed.
     '''
+    reset_queries()
     try:
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist as e:
@@ -840,8 +843,9 @@ def wait_for_media_premiere(media_id):
             update_task_status(task, f'available in {hours(media.published - now)} hours')
     save_model(media)
 
-@background(schedule=dict(priority=1, run_at=300), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
-def delete_all_media_for_source(source_id, source_name):
+
+@background(schedule=dict(priority=1, run_at=90), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
+def delete_all_media_for_source(source_id, source_name, source_directory):
     source = None
     try:
         source = Source.objects.get(pk=source_id)
@@ -855,8 +859,21 @@ def delete_all_media_for_source(source_id, source_name):
     ).filter(
         source=source or source_id,
     )
-    for media in mqs:
-        log.info(f'Deleting media for source: {source_name} item: {media.name}')
-        with atomic():
-            media.delete()
+    with atomic(durable=True):
+        for media in mqs:
+            log.info(f'Deleting media for source: {source_name} item: {media.name}')
+            with atomic():
+                media.delete()
+    # Remove the directory, if the user requested that
+    directory_path = Path(source_directory)
+    remove = (
+        (source and source.delete_removed_media) or
+        (directory_path / '.to_be_removed').is_file()
+    )
+    if source:
+        with atomic(durable=True):
+            source.delete()
+    if remove:
+        log.info(f'Deleting directory for: {source_name}: {directory_path}')
+        rmtree(directory_path, True)
 

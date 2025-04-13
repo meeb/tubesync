@@ -1,8 +1,9 @@
+from functools import partial
 from pathlib import Path
-from shutil import rmtree
 from tempfile import TemporaryDirectory
 from django.conf import settings
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
+from django.db.transaction import on_commit
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from background_task.signals import task_failed
@@ -18,6 +19,20 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
 from .utils import delete_file, glob_quote, mkdir_p
 from .filtering import filter_media
 from .choices import Val, YouTube_SourceType
+
+
+def is_relative_to(self, *other):
+        """Return True if the path is relative to another path or False.
+        """
+        try:
+            self.relative_to(*other)
+            return True
+        except ValueError:
+            return False
+
+# patch Path for Python 3.8
+if not hasattr(Path, 'is_relative_to'):
+    Path.is_relative_to = is_relative_to
 
 
 @receiver(pre_save, sender=Source)
@@ -134,6 +149,7 @@ def source_post_save(sender, instance, created, **kwargs):
 def source_pre_delete(sender, instance, **kwargs):
     # Triggered before a source is deleted, delete all media objects to trigger
     # the Media models post_delete signal
+    source = instance
     log.info(f'Deactivating source: {instance.name}')
     instance.deactivate()
     log.info(f'Deleting tasks for source: {instance.name}')
@@ -141,20 +157,22 @@ def source_pre_delete(sender, instance, **kwargs):
     delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
-    # Schedule deletion of media
-    delete_task_by_source('sync.tasks.delete_all_media_for_source', instance.pk)
-    verbose_name = _('Deleting all media for source "{}"')
-    delete_all_media_for_source(
-        str(instance.pk),
-        str(instance.name),
-        verbose_name=verbose_name.format(instance.name),
-    )
-    # Try to do it all immediately
-    # If this is killed, the scheduled task should do the work instead.
-    delete_all_media_for_source.now(
-        str(instance.pk),
-        str(instance.name),
-    )
+
+    # Fetch the media source
+    sqs = Source.objects.filter(filter_text=str(source.pk))
+    if sqs.count():
+        media_source = sqs[0]
+        # Schedule deletion of media
+        delete_task_by_source('sync.tasks.delete_all_media_for_source', media_source.pk)
+        verbose_name = _('Deleting all media for source "{}"')
+        on_commit(partial(
+            delete_all_media_for_source,
+            str(media_source.pk),
+            str(media_source.name),
+            str(media_source.directory_path),
+            priority=1,
+            verbose_name=verbose_name.format(media_source.name),
+        ))
 
 
 @receiver(post_delete, sender=Source)
@@ -164,14 +182,8 @@ def source_post_delete(sender, instance, **kwargs):
     log.info(f'Deleting tasks for removed source: {source.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
     delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
-    delete_task_by_source('sync.tasks.delete_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
-    # Remove the directory, if the user requested that
-    directory_path = Path(source.directory_path)
-    if (directory_path / '.to_be_removed').is_file():
-        log.info(f'Deleting directory for: {source.name}: {directory_path}')
-        rmtree(directory_path, True)
 
 
 @receiver(task_failed, sender=Task)
@@ -250,8 +262,10 @@ def media_post_save(sender, instance, created, **kwargs):
     if not instance.thumb and not instance.skip:
         thumbnail_url = instance.thumbnail
         if thumbnail_url:
-            log.info(f'Scheduling task to download thumbnail for: {instance.name} '
-                     f'from: {thumbnail_url}')
+            log.info(
+                'Scheduling task to download thumbnail'
+                f' for: {instance.name} from: {thumbnail_url}'
+            )
             verbose_name = _('Downloading thumbnail for "{}"')
             download_media_thumbnail(
                 str(instance.pk),
@@ -289,8 +303,10 @@ def media_pre_delete(sender, instance, **kwargs):
     delete_task_by_media('sync.tasks.wait_for_media_premiere', (str(instance.pk),))
     thumbnail_url = instance.thumbnail
     if thumbnail_url:
-        delete_task_by_media('sync.tasks.download_media_thumbnail',
-                             (str(instance.pk), thumbnail_url))
+        delete_task_by_media(
+            'sync.tasks.download_media_thumbnail',
+            (str(instance.pk), thumbnail_url,),
+        )
     # Remove thumbnail file for deleted media
     if instance.thumb:
         instance.thumb.delete(save=False)
