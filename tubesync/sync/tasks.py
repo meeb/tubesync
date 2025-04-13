@@ -27,7 +27,8 @@ from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import ( NoFormatException, NoMediaException,
                             NoMetadataException, DownloadFailedException, )
-from common.utils import json_serial, remove_enclosed
+from common.utils import (  django_queryset_generator as qa_gen,
+                            json_serial, remove_enclosed, )
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer
 from .utils import ( get_remote_image, resize_image_to_height, delete_file,
@@ -215,7 +216,7 @@ def schedule_media_servers_update():
 
 def cleanup_old_media():
     with atomic():
-        for source in Source.objects.filter(delete_old_media=True, days_to_keep__gt=0):
+        for source in qs_gen(Source.objects.filter(delete_old_media=True, days_to_keep__gt=0)):
             delta = timezone.now() - timedelta(days=source.days_to_keep)
             mqs = source.media_source.defer(
                 'metadata',
@@ -223,7 +224,7 @@ def cleanup_old_media():
                 downloaded=True,
                 download_date__lt=delta,
             )
-            for media in mqs:
+            for media in qs_gen(mqs):
                 log.info(f'Deleting expired media: {source} / {media} '
                          f'(now older than {source.days_to_keep} days / '
                          f'download_date before {delta})')
