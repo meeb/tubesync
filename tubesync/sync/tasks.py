@@ -27,7 +27,7 @@ from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import ( NoFormatException, NoMediaException,
                             NoMetadataException, DownloadFailedException, )
-from common.utils import (  django_queryset_generator as qa_gen,
+from common.utils import (  django_queryset_generator as qs_gen,
                             json_serial, remove_enclosed, )
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer
