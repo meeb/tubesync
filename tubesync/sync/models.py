@@ -11,7 +11,9 @@ from django.conf import settings
 from django.db import models
 from django.core.exceptions import SuspiciousOperation
 from django.core.files.storage import FileSystemStorage
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import RegexValidator
+from django.db.transaction import atomic
 from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -34,6 +36,20 @@ from .choices import (Val, CapChoices, Fallback, FileExtension,
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
 _srctype_dict = lambda n: dict(zip( YouTube_SourceType.values, (n,) * len(YouTube_SourceType.values) ))
+
+class JSONEncoder(DjangoJSONEncoder):
+    item_separator = ','
+    key_separator = ':'
+
+    def default(self, obj):
+        try:
+            iterable = iter(obj)
+        except TypeError:
+            pass
+        else:
+            return list(iterable)
+        return super().default(obj)
+
 
 class Source(models.Model):
     '''
@@ -833,11 +849,14 @@ class Media(models.Model):
         fields = self.METADATA_FIELDS.get(field, {})
         return fields.get(self.source.source_type, field)
 
-    def get_metadata_first_value(self, iterable, default=None, /):
+    def get_metadata_first_value(self, iterable, default=None, /, *, arg_dict=None):
         '''
             fetch the first key with a value from metadata
         '''
         
+        if arg_dict is None:
+            arg_dict = self.loaded_metadata
+        assert isinstance(arg_dict, dict), type(arg_dict)
         # str is an iterable of characters
         # we do not want to look for each character!
         if isinstance(iterable, str):
@@ -845,7 +864,7 @@ class Media(models.Model):
         for key in tuple(iterable):
             # reminder: unmapped fields return the key itself
             field = self.get_metadata_field(key)
-            value = self.loaded_metadata.get(field)
+            value = arg_dict.get(field)
             # value can be None because:
             #   - None was stored at the key
             #   - the key was not in the dictionary
@@ -1077,6 +1096,24 @@ class Media(models.Model):
     @property
     def has_metadata(self):
         return self.metadata is not None
+
+
+    @atomic(durable=False)
+    def metadata_load(self, arg_str='{}'):
+        data = json.loads(arg_str) or self.loaded_metadata
+        site = self.get_metadata_first_value('extractor_key', arg_dict=data)
+        epoch = self.get_metadata_first_value('epoch', arg_dict=data)
+        epoch_dt = self.metadata_published( epoch )
+        release = self.get_metadata_first_value(('release_timestamp', 'timestamp',), arg_dict=data)
+        release_dt = self.metadata_published( release )
+        md = self.metadata_media.get_or_create(site=site, key=self.key)[0]
+        md.value = data
+        formats = md.value.pop(self.get_metadata_field('formats'), list())
+        md.retrieved = epoch_dt
+        md.uploaded = self.published
+        md.published = release_dt or self.published
+        md.save()
+        md.ingest_formats(formats)
 
 
     def save_to_metadata(self, key, value, /):
@@ -1679,6 +1716,152 @@ class Media(models.Model):
                             parent_dir = parent_dir.parent
                     except OSError as e:
                         pass
+
+
+class Metadata(models.Model):
+    '''
+        Metadata for an indexed `Media` item.
+    '''
+    class Meta:
+        verbose_name = _('Metadata about a Media item')
+        verbose_name_plural = _('Metadata about a Media item')
+        unique_together = (
+            ('media', 'site', 'key'),
+        )
+
+    uuid = models.UUIDField(
+        _('uuid'),
+        primary_key=True,
+        editable=False,
+        default=uuid.uuid4,
+        help_text=_('UUID of the metadata'),
+    )
+    media = models.ForeignKey(
+        Media,
+        # on_delete=models.DO_NOTHING,
+        on_delete=models.CASCADE,
+        related_name='metadata_media',
+        help_text=_('Media the metadata belongs to'),
+        null=False,
+    )
+    site = models.CharField(
+        _('site'),
+        max_length=256,
+        blank=True,
+        null=False,
+        default='Youtube',
+        help_text=_('Site from which the metadata was retrieved'),
+    )
+    key = models.CharField(
+        _('key'),
+        max_length=256,
+        blank=True,
+        null=False,
+        default='',
+        help_text=_('Media identifier at the site from which the metadata was retrieved'),
+    )
+    created = models.DateTimeField(
+        _('created'),
+        auto_now_add=True,
+        db_index=True,
+        help_text=_('Date and time the metadata was created'),
+    )
+    retrieved = models.DateTimeField(
+        _('retrieved'),
+        auto_now_add=True,
+        db_index=True,
+        help_text=_('Date and time the metadata was retrieved'),
+    )
+    uploaded = models.DateTimeField(
+        _('uploaded'),
+        null=True,
+        help_text=_('Date and time the media was uploaded'),
+    )
+    published = models.DateTimeField(
+        _('published'),
+        null=True,
+        help_text=_('Date and time the media was published'),
+    )
+    value = models.JSONField(
+        _('value'),
+        encoder=JSONEncoder,
+        null=False,
+        default=dict,
+        help_text=_('JSON metadata object'),
+    )
+
+    @atomic(durable=False)
+    def ingest_formats(self, formats=list(), /):
+        for number, format in enumerate(formats, start=1):
+            mdf = self.metadataformat_metadata.get_or_create(site=self.site, key=self.key, code=format.get('format_id'), number=number)[0]
+            mdf.value = format
+            mdf.save()
+
+
+class MetadataFormat(models.Model):
+    '''
+        A format from the Metadata for an indexed `Media` item.
+    '''
+    class Meta:
+        verbose_name = _('Format from the Metadata about a Media item')
+        verbose_name_plural = _('Formats from the Metadata about a Media item')
+        unique_together = (
+            ('metadata', 'site', 'key', 'number'),
+            ('metadata', 'site', 'key', 'code'),
+        )
+
+    uuid = models.UUIDField(
+        _('uuid'),
+        primary_key=True,
+        editable=False,
+        default=uuid.uuid4,
+        help_text=_('UUID of the format'),
+    )
+    metadata = models.ForeignKey(
+        Metadata,
+        # on_delete=models.DO_NOTHING,
+        on_delete=models.CASCADE,
+        related_name='metadataformat_metadata',
+        help_text=_('Metadata the format belongs to'),
+        null=False,
+    )
+    site = models.CharField(
+        _('site'),
+        max_length=256,
+        blank=True,
+        null=False,
+        default='Youtube',
+        help_text=_('Site from which the format is available'),
+    )
+    key = models.CharField(
+        _('key'),
+        max_length=256,
+        blank=True,
+        null=False,
+        default='',
+        help_text=_('Media identifier at the site for which this format is available'),
+    )
+    number = models.PositiveIntegerField(
+        _('number'),
+        blank=False,
+        null=False,
+        help_text=_('Ordering number for this format')
+    )
+    code = models.CharField(
+        _('code'),
+        max_length=64,
+        blank=True,
+        null=False,
+        default='',
+        help_text=_('Format identification code'),
+    )
+    value = models.JSONField(
+        _('value'),
+        encoder=JSONEncoder,
+        null=False,
+        default=dict,
+        help_text=_('JSON metadata format object'),
+    )
 
 
 class MediaServer(models.Model):
