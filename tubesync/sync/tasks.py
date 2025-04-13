@@ -687,7 +687,7 @@ def save_all_media_for_source(source_id):
         'pk',
         'uuid',
         'key',
-        'name',
+        'title', # for name property
     ).filter(
         source=source,
         can_download=False,
