@@ -206,10 +206,14 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'paths': paths,
         'postprocessors': postprocessors,
         'skip_unavailable_fragments': False,
-        'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
+        'sleep_interval_requests': 1,
         'verbose': True if settings.DEBUG else False,
         'writeinfojson': True,
     })
+    if settings.BACKGROUND_TASK_RUN_ASYNC:
+        opts.update({
+            'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
+        })
     try:
         info_json_path = Path(info_json).resolve(strict=False)
     except:
