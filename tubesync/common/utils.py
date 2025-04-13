@@ -222,3 +222,7 @@ def remove_enclosed(haystack, /, open='[', close=']', sep=' ', *, valid=None, st
             return haystack
     return haystack[:o] + haystack[len(n)+c:]
 
+
+def django_queryset_generator(query_set, /):
+    pass
+
