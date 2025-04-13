@@ -224,10 +224,10 @@ def media_post_save(sender, instance, created, **kwargs):
                     if not instance.can_download:
                         instance.can_download = True
                         can_download_changed = True
-                    else:
-                        if instance.can_download:
-                            instance.can_download = False
-                            can_download_changed = True
+                else:
+                    if instance.can_download:
+                        instance.can_download = False
+                        can_download_changed = True
             # Recalculate the "skip_changed" flag
             skip_changed = filter_media(instance)
     else:
@@ -262,8 +262,10 @@ def media_post_save(sender, instance, created, **kwargs):
     if not instance.thumb and not instance.skip:
         thumbnail_url = instance.thumbnail
         if thumbnail_url:
-            log.info(f'Scheduling task to download thumbnail for: {instance.name} '
-                     f'from: {thumbnail_url}')
+            log.info(
+                'Scheduling task to download thumbnail'
+                f' for: {instance.name} from: {thumbnail_url}'
+            )
             verbose_name = _('Downloading thumbnail for "{}"')
             download_media_thumbnail(
                 str(instance.pk),
@@ -301,8 +303,10 @@ def media_pre_delete(sender, instance, **kwargs):
     delete_task_by_media('sync.tasks.wait_for_media_premiere', (str(instance.pk),))
     thumbnail_url = instance.thumbnail
     if thumbnail_url:
-        delete_task_by_media('sync.tasks.download_media_thumbnail',
-                             (str(instance.pk), thumbnail_url))
+        delete_task_by_media(
+            'sync.tasks.download_media_thumbnail',
+            (str(instance.pk), thumbnail_url,),
+        )
     # Remove thumbnail file for deleted media
     if instance.thumb:
         instance.thumb.delete(save=False)
