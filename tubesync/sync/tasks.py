@@ -122,8 +122,7 @@ def update_task_status(task, status):
     else:
         task.verbose_name = f'[{status}] {task._verbose_name}'
     try:
-        with atomic():
-            task.save(update_fields={'verbose_name'})
+        task.save(update_fields={'verbose_name'})
     except DatabaseError as e:
         if 'Save with update_fields did not affect any rows.' == str(e):
             pass
@@ -211,16 +210,16 @@ def save_model(instance):
             instance.save()
 
 
+@atomic(durable=False)
 def schedule_media_servers_update():
-    with atomic():
-        # Schedule a task to update media servers
-        log.info(f'Scheduling media server updates')
-        verbose_name = _('Request media server rescan for "{}"')
-        for mediaserver in MediaServer.objects.all().iterator():
-            rescan_media_server(
-                str(mediaserver.pk),
-                verbose_name=verbose_name.format(mediaserver),
-            )
+    # Schedule a task to update media servers
+    log.info(f'Scheduling media server updates')
+    verbose_name = _('Request media server rescan for "{}"')
+    for mediaserver in MediaServer.objects.all().iterator():
+        rescan_media_server(
+            str(mediaserver.pk),
+            verbose_name=verbose_name.format(mediaserver),
+        )
 
 
 def cleanup_old_media():
@@ -710,18 +709,26 @@ def save_all_media_for_source(source_id):
         raise InvalidTaskError(_('no such source')) from e
 
     saved_later = set()
-    mqs = Media.objects.all().defer(
-        'metadata',
-        'thumb',
-    ).filter(source=source)
-    task = get_source_check_task(source_id)
-    refresh_qs = mqs.filter(
+    refresh_qs = Media.objects.all().only(
+        'pk',
+        'uuid',
+        'key',
+        'name',
+    ).filter(
+        source=source,
         can_download=False,
         skip=False,
         manual_skip=False,
         downloaded=False,
         metadata__isnull=False,
     )
+    uuid_qs = Media.objects.all().only(
+        'pk',
+        'uuid',
+    ).filter(
+        source=source,
+    ).values_list('uuid', flat=True)
+    task = get_source_check_task(source_id)
     if task:
         task._verbose_name = remove_enclosed(
             task.verbose_name, '[', ']', ' ',
@@ -740,7 +747,7 @@ def save_all_media_for_source(source_id):
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
     tvn_format = '2/{:,}' + f'/{mqs.count():,}'
-    for mn, media_uuid in enumerate(mqs.values_list('uuid', flat=True).iterator(chunk_size=1000), start=1):
+    for mn, media_uuid in enumerate(uuid_qs.iterator(chunk_size=1000), start=1):
         if media_uuid not in saved_later:
             update_task_status(task, tvn_format.format(mn))
             try:
