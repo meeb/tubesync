@@ -720,7 +720,7 @@ def save_all_media_for_source(source_id):
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
-    tvn_format = '2/{:,}' + f'/{mqs.count():,}'
+    tvn_format = '2/{:,}' + f'/{uuid_qs.count():,}'
     for mn, media_uuid in enumerate(uuid_qs.iterator(chunk_size=1000), start=1):
         if media_uuid not in saved_later:
             update_task_status(task, tvn_format.format(mn))
