@@ -227,16 +227,22 @@ def remove_enclosed(haystack, /, open='[', close=']', sep=' ', *, valid=None, st
 
 def django_queryset_generator(query_set, /, *, page_size=100):
     collecting = gc.isenabled()
+    qs = query_set.values_list('pk', flat=True)
+    if not qs.ordered:
+        qs = qs.order_by('pk')
+    paginator = Paginator(qs, page_size)
     gc.disable()
-    paginator = Paginator(
-        query_set.values_list('pk', flat=True),
-        page_size,
-    )
     for page_num in paginator.page_range:
         page = paginator.page(page_num)
-        for key in page.object_list:
+        keys = list(page.object_list)
+        for key in keys:
             yield query_set.filter(pk=key)[0]
             gc.collect(generation=1)
+        page = None
+        keys = list()
+        gc.collect()
+    paginator = None
+    qs = None
     gc.collect()
     if collecting:
         gc.enable()
