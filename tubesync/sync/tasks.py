@@ -10,8 +10,9 @@ import math
 import uuid
 from io import BytesIO
 from hashlib import sha1
+from pathlib import Path
 from datetime import datetime, timedelta
-from shutil import copyfile
+from shutil import copyfile, rmtree
 from PIL import Image
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -24,12 +25,13 @@ from background_task import background
 from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from common.logger import log
-from common.errors import NoMediaException, NoMetadataException, DownloadFailedException
+from common.errors import ( NoFormatException, NoMediaException,
+                            NoMetadataException, DownloadFailedException, )
 from common.utils import json_serial, remove_enclosed
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer
-from .utils import (get_remote_image, resize_image_to_height, delete_file,
-                    write_text_file, filter_response)
+from .utils import ( get_remote_image, resize_image_to_height, delete_file,
+                    write_text_file, filter_response, )
 from .youtube import YouTubeError
 
 
@@ -573,9 +575,36 @@ def download_media(media_id):
                      f'not downloading')
             return
     filepath = media.filepath
+    container = format_str = None
     log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
-    format_str, container = media.download_media()
-    if os.path.exists(filepath):
+    try:
+        format_str, container = media.download_media()
+    except NoFormatException as e:
+        # Try refreshing formats
+        if media.has_metadata:
+            log.debug(f'Scheduling a task to refresh metadata for: {media.key}: "{media.name}"')
+            refresh_formats(
+                str(media.pk),
+                verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
+            )
+        log.exception(str(e))
+        raise
+    else:
+        if not os.path.exists(filepath):
+            # Try refreshing formats
+            if media.has_metadata:
+                log.debug(f'Scheduling a task to refresh metadata for: {media.key}: "{media.name}"')
+                refresh_formats(
+                    str(media.pk),
+                    verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
+                )
+            # Expected file doesn't exist on disk
+            err = (f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
+                   f'expected outfile does not exist: {filepath}')
+            log.error(err)
+            # Raising an error here triggers the task to be re-attempted (or fail)
+            raise DownloadFailedException(err)
+
         # Media has been downloaded successfully
         log.info(f'Successfully downloaded media: {media} (UUID: {media.pk}) to: '
                  f'"{filepath}"')
@@ -637,19 +666,6 @@ def download_media(media_id):
                 pass
         # Schedule a task to update media servers
         schedule_media_servers_update()
-    else:
-        # Expected file doesn't exist on disk
-        err = (f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
-               f'expected outfile does not exist: {filepath}')
-        log.error(err)
-        # Try refreshing formats
-        if media.has_metadata:
-            refresh_formats(
-                str(media.pk),
-                verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
-            )
-        # Raising an error here triggers the task to be re-attempted (or fail)
-        raise DownloadFailedException(err)
 
 
 @background(schedule=dict(priority=0, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
@@ -819,8 +835,9 @@ def wait_for_media_premiere(media_id):
         if task:
             update_task_status(task, f'available in {hours(media.published - now)} hours')
 
-@background(schedule=dict(priority=1, run_at=300), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
-def delete_all_media_for_source(source_id, source_name):
+
+@background(schedule=dict(priority=1, run_at=90), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
+def delete_all_media_for_source(source_id, source_name, source_directory):
     source = None
     try:
         source = Source.objects.get(pk=source_id)
@@ -834,8 +851,21 @@ def delete_all_media_for_source(source_id, source_name):
     ).filter(
         source=source or source_id,
     )
-    for media in mqs:
-        log.info(f'Deleting media for source: {source_name} item: {media.name}')
-        with atomic():
-            media.delete()
+    with atomic(durable=True):
+        for media in mqs:
+            log.info(f'Deleting media for source: {source_name} item: {media.name}')
+            with atomic():
+                media.delete()
+    # Remove the directory, if the user requested that
+    directory_path = Path(source_directory)
+    remove = (
+        (source and source.delete_removed_media) or
+        (directory_path / '.to_be_removed').is_file()
+    )
+    if source:
+        with atomic(durable=True):
+            source.delete()
+    if remove:
+        log.info(f'Deleting directory for: {source_name}: {directory_path}')
+        rmtree(directory_path, True)
 
