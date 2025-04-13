@@ -212,10 +212,10 @@ def media_post_save(sender, instance, created, **kwargs):
                     if not instance.can_download:
                         instance.can_download = True
                         can_download_changed = True
-                    else:
-                        if instance.can_download:
-                            instance.can_download = False
-                            can_download_changed = True
+                else:
+                    if instance.can_download:
+                        instance.can_download = False
+                        can_download_changed = True
             # Recalculate the "skip_changed" flag
             skip_changed = filter_media(instance)
     else:
