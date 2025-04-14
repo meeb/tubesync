@@ -1,11 +1,13 @@
 import cProfile
 import emoji
+import gc
 import io
 import os
 import pstats
 import string
 import time
 from datetime import datetime
+from django.core.paginator import Paginator
 from urllib.parse import urlunsplit, urlencode, urlparse
 from yt_dlp.utils import LazyList
 from .errors import DatabaseConnectionError
@@ -221,4 +223,27 @@ def remove_enclosed(haystack, /, open='[', close=']', sep=' ', *, valid=None, st
         if invalid:
             return haystack
     return haystack[:o] + haystack[len(n)+c:]
+
+
+def django_queryset_generator(query_set, /, *, page_size=100):
+    collecting = gc.isenabled()
+    qs = query_set.values_list('pk', flat=True)
+    if not qs.ordered:
+        qs = qs.order_by('pk')
+    paginator = Paginator(qs, page_size)
+    gc.disable()
+    for page_num in paginator.page_range:
+        page = paginator.page(page_num)
+        keys = list(page.object_list)
+        for key in keys:
+            yield query_set.filter(pk=key)[0]
+            gc.collect(generation=1)
+        page = None
+        keys = list()
+        gc.collect()
+    paginator = None
+    qs = None
+    gc.collect()
+    if collecting:
+        gc.enable()
 
