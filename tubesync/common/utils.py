@@ -225,23 +225,33 @@ def remove_enclosed(haystack, /, open='[', close=']', sep=' ', *, valid=None, st
     return haystack[:o] + haystack[len(n)+c:]
 
 
-def django_queryset_generator(query_set, /, *, page_size=100):
-    collecting = gc.isenabled()
+def django_queryset_generator(query_set, /, *,
+    page_size=100,
+    chunk_size=None,
+    use_chunked_fetch=False,
+):
     qs = query_set.values_list('pk', flat=True)
-    if not qs.ordered:
+    # Avoid the `UnorderedObjectListWarning`
+    if not query_set.ordered:
         qs = qs.order_by('pk')
-    paginator = Paginator(qs, page_size)
+    collecting = gc.isenabled()
     gc.disable()
-    for page_num in paginator.page_range:
-        page = paginator.page(page_num)
-        keys = list(page.object_list)
-        for key in keys:
+    if use_chunked_fetch:
+        for key in qs._iterator(use_chunked_fetch, chunk_size):
             yield query_set.filter(pk=key)[0]
+            key = None
             gc.collect(generation=1)
+        key = None
+    else:
+        for page in iter(Paginator(qs, page_size)):
+            for key in page.object_list:
+                yield query_set.filter(pk=key)[0]
+                key = None
+                gc.collect(generation=1)
+            key = None
+            page = None
+            gc.collect()
         page = None
-        keys = list()
-        gc.collect()
-    paginator = None
     qs = None
     gc.collect()
     if collecting:
