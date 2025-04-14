@@ -79,7 +79,7 @@ class CommaSepChoiceField(models.CharField):
         arg_was_none = True if value is None else False
         if isinstance(value, CommaSepChoice):
             return value.selected_choices
-        if isinstance(value, list) and value[0].startswith('CommaSepChoice('):
+        if isinstance(value, list) and len(value) and value[0].startswith('CommaSepChoice('):
             saved_value = value
             value = ''.join(value)
         if isinstance(value, str) and value.startswith('CommaSepChoice('):
