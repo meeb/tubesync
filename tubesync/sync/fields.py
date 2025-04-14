@@ -75,6 +75,7 @@ class CommaSepChoiceField(models.CharField):
 
     # Override these functions to prevent unwanted behaviors
     def to_python(self, value):
+        self.log.error(f'CommaSepChoiceField: to_python: was called with: {value!r}')
         return value
 
     def get_internal_type(self):
@@ -154,6 +155,13 @@ class CommaSepChoiceField(models.CharField):
         if set(s_value) != set(value):
             self.log.warn(f'CommaSepChoiceField:get_prep_value: values did not match. '
                           f'CommaSepChoiceField({value}) versus CharField({s_value})')
+        return self.__class__._tuple__str__(data)
+
+    
+    # extra functions not used by any parent classes
+    @staticmethod
+    def _tuple__str__(data):
+        value = data.selected_choices
         if not isinstance(value, list):
             return ''
         if data.all_choice in value:
@@ -161,7 +169,6 @@ class CommaSepChoiceField(models.CharField):
         ordered_unique = list(dict.fromkeys(value))
         return data.separator.join(ordered_unique)
 
-    # extra functions not used by any parent classes
     def get_all_choices(self):
         choice_list = list()
         if self.possible_choices is None:
@@ -173,4 +180,7 @@ class CommaSepChoiceField(models.CharField):
             choice_list.append(choice)
 
         return choice_list
+
+
+CommaSepChoice.__str__ = CommaSepChoiceField._tuple__str__
 
