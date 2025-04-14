@@ -129,8 +129,13 @@ class CommaSepChoiceField(models.CharField):
         '''
         Create a data structure to be used in Python code.
         '''
+        # possibly not useful?
+        if isinstance(value, CommaSepChoice):
+            value = value.selected_choices
+        # normally strings
         if isinstance(value, str) and len(value) > 0:
             value = value.split(self.separator)
+        # empty string and None, or whatever
         if not isinstance(value, list):
             value = list()
         self.selected_choices = value
@@ -161,6 +166,8 @@ class CommaSepChoiceField(models.CharField):
     # extra functions not used by any parent classes
     @staticmethod
     def _tuple__str__(data):
+        if not isinstance(data, CommaSepChoice):
+            return data
         value = data.selected_choices
         if not isinstance(value, list):
             return ''
