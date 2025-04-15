@@ -94,7 +94,7 @@ class CommaSepChoiceField(models.CharField):
             value = None
         elif saved_value is not None:
             value = saved_value
-        self.log.error(f'CommaSepChoiceField: to_python: was called with: {value!r}')
+        self.log.debug(f'CommaSepChoiceField: to_python: was called with: {value!r}')
         return value
 
     def get_internal_type(self):
