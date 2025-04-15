@@ -263,7 +263,7 @@ and less common features:
 > Enabling this feature by default is planned in an upcoming release, after `2025-006-01`.
 > 
 > To prevent your installation from scheduling media file renaming tasks,
-> you must set [`TUBESYNC_RENAME_ALL_SOURCES=False`](#advanced-configuration) in the environment variables.
+> you must set [`TUBESYNC_RENAME_ALL_SOURCES=False`](#advanced-configuration) in the environment variables or `RENAME_ALL_SOURCES = False` in `settings.py`.
 
 ### 2. Index frequency
 
