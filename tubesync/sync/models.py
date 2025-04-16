@@ -9,7 +9,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 from django.conf import settings
 from django.db import models
-from django.core.exceptions import SuspiciousOperation
+from django.core.exceptions import ObjectDoesNotExist, SuspiciousOperation 
 from django.core.files.storage import FileSystemStorage
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import RegexValidator
@@ -1179,9 +1179,10 @@ class Media(models.Model):
                 data = json.loads(self.metadata or "{}")
             if not isinstance(data, dict):
                 return {}
+            # if hasattr(self, 'new_metadata'):
             try:
                 data.update(self.new_metadata.with_formats)
-            except Metadata.DoesNotExist:
+            except ObjectDoesNotExist:
                 pass
             setattr(self, '_cached_metadata_dict', data)
             return data
