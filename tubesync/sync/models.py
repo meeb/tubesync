@@ -9,7 +9,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 from django.conf import settings
 from django.db import models
-from django.core.exceptions import ObjectDoesNotExist, SuspiciousOperation 
+from django.core.exceptions import ObjectDoesNotExist, SuspiciousOperation
 from django.core.files.storage import FileSystemStorage
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import RegexValidator
