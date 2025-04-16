@@ -1825,31 +1825,31 @@ class Metadata(models.Model):
     @atomic(durable=False)
     def ingest_metadata(self, data):
         assert isinstance(data, dict), type(data)
-        self.site = self.media.get_metadata_first_value(
-            'extractor_key',
-            arg_dict=data,
-        )
-        self.key = self.media.key
 
-        self.uploaded = self.media.published
-        self.retrieved = self.media.ts_to_dt(
-            self.media.get_metadata_first_value(
-                'epoch',
-                arg_dict=data,
-            )
-        )
-        self.published = (
-            self.media.ts_to_dt(
+        try:
+            self.retrieved = self.media.ts_to_dt(
+                self.media.get_metadata_first_value(
+                    'epoch',
+                    arg_dict=data,
+                )
+            ) or self.created
+        except AssertionError:
+            self.retrieved = self.created
+
+        try:
+            self.published = self.media.ts_to_dt(
                 self.media.get_metadata_first_value(
                     ('release_timestamp', 'timestamp',),
                     arg_dict=data,
                 )
             ) or self.media.published
-        )
+        except AssertionError:
+            self.published = self.media.published
 
         self.value = data.copy() # try not to have side-effects for the caller
         formats_key = self.media.get_metadata_field('formats')
         formats = self.value.pop(formats_key, list())
+        self.uploaded = self.media.published
         self.save()
         self.ingest_formats(formats)
 
