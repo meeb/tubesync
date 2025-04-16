@@ -645,7 +645,7 @@ class Media(models.Model):
         Source,
         on_delete=models.CASCADE,
         related_name='media_source',
-        help_text=_('Source the media belongs to')
+        help_text=_('Source the media belongs to'),
     )
     published = models.DateTimeField(
         _('published'),
@@ -1098,31 +1098,31 @@ class Media(models.Model):
         return self.metadata is not None
 
 
-    @atomic(durable=False)
-    def metadata_load(self, arg_str='{}'):
+    def metadata_loads(self, arg_str='{}'):
         data = json.loads(arg_str) or self.loaded_metadata
-        site = self.get_metadata_first_value('extractor_key', arg_dict=data)
-        epoch = self.get_metadata_first_value('epoch', arg_dict=data)
-        epoch_dt = self.metadata_published( epoch )
-        release = self.get_metadata_first_value(('release_timestamp', 'timestamp',), arg_dict=data)
-        release_dt = self.metadata_published( release )
-        md = self.metadata_media.get_or_create(site=site, key=self.key)[0]
-        md.value = data
-        formats = md.value.pop(self.get_metadata_field('formats'), list())
-        md.retrieved = epoch_dt
-        md.uploaded = self.published
-        md.published = release_dt or self.published
-        md.save()
-        md.ingest_formats(formats)
+        return self.ingest_metadata(data)
+
+
+    @atomic(durable=False)
+    def ingest_metadata(self, data):
+        assert isinstance(data, dict), type(data)
+        md, created = self.new_metadata.get_or_create(
+            site=self.get_metadata_first_value('extractor_key', arg_dict=data),
+            key=self.key,
+        )
+        return md.ingest_metadata(data)
 
 
     def save_to_metadata(self, key, value, /):
         data = self.loaded_metadata
         data[key] = value
+        self.ingest_metadata(data)
+        epoch = self.get_metadata_first_value('epoch', arg_dict=data)
+        migrated = dict(migrated=True, epoch=epoch)
         from common.utils import json_serial
-        compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
+        compact_json = json.dumps(migrated, separators=(',', ':'), default=json_serial)
         self.metadata = compact_json
-        self.save(update_fields={'metadata'})
+        self.save()
         from common.logger import log
         log.debug(f'Saved to metadata: {self.key} / {self.uuid}: {key=}: {value}')
 
@@ -1135,7 +1135,7 @@ class Media(models.Model):
             if '_reduce_data_ran_at' in data.keys():
                 total_seconds = data['_reduce_data_ran_at']
                 assert isinstance(total_seconds, int), type(total_seconds)
-                ran_at = self.metadata_published(total_seconds)
+                ran_at = self.ts_to_dt(total_seconds)
                 if (now - ran_at) < timedelta(hours=1):
                     return data
 
@@ -1179,6 +1179,12 @@ class Media(models.Model):
                 data = json.loads(self.metadata or "{}")
             if not isinstance(data, dict):
                 return {}
+            data.update(
+                self.new_metadata.get_or_create(
+                    site=self.get_metadata_first_value('extractor_key', arg_dict=data),
+                    key=self.key,
+                )[0].with_formats
+            )
             setattr(self, '_cached_metadata_dict', data)
             return data
         except Exception as e:
@@ -1201,13 +1207,13 @@ class Media(models.Model):
         attempted_seconds = data.get(attempted_key)
         if attempted_seconds:
             # skip for recent unsuccessful refresh attempts also
-            attempted_dt = self.metadata_published(attempted_seconds)
+            attempted_dt = self.ts_to_dt(attempted_seconds)
             if (now - attempted_dt) < timedelta(seconds=self.source.index_schedule):
                 return False
         # skip for recent successful formats refresh
         refreshed_key = 'formats_epoch'
         formats_seconds = data.get(refreshed_key, metadata_seconds)
-        metadata_dt = self.metadata_published(formats_seconds)
+        metadata_dt = self.ts_to_dt(formats_seconds)
         if (now - metadata_dt) < timedelta(seconds=self.source.index_schedule):
             return False
 
@@ -1243,18 +1249,21 @@ class Media(models.Model):
     def metadata_title(self):
         return self.get_metadata_first_value(('fulltitle', 'title',), '')
 
+    def ts_to_dt(self, /, timestamp):
+        assert timestamp is not None
+        try:
+            timestamp_float = float(timestamp)
+        except Exception as e:
+            log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
+            pass
+        else:
+            return self.posix_epoch + timedelta(seconds=timestamp_float)
+        return None
+
     def metadata_published(self, timestamp=None):
         if timestamp is None:
             timestamp = self.get_metadata_first_value('timestamp')
-        if timestamp is not None:
-            try:
-                timestamp_float = float(timestamp)
-            except Exception as e:
-                log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
-                pass
-            else:
-                return self.posix_epoch + timedelta(seconds=timestamp_float)
-        return None
+        return self.ts_to_dt(timestamp)
 
     @property
     def slugtitle(self):
@@ -1736,13 +1745,14 @@ class Metadata(models.Model):
         default=uuid.uuid4,
         help_text=_('UUID of the metadata'),
     )
-    media = models.ForeignKey(
+    media = models.OneToOneField(
         Media,
         # on_delete=models.DO_NOTHING,
         on_delete=models.CASCADE,
-        related_name='metadata_media',
+        related_name='new_metadata',
         help_text=_('Media the metadata belongs to'),
         null=False,
+        parent_link=True,
     )
     site = models.CharField(
         _('site'),
@@ -1790,12 +1800,54 @@ class Metadata(models.Model):
         help_text=_('JSON metadata object'),
     )
 
+
     @atomic(durable=False)
     def ingest_formats(self, formats=list(), /):
         for number, format in enumerate(formats, start=1):
-            mdf = self.metadataformat_metadata.get_or_create(site=self.site, key=self.key, code=format.get('format_id'), number=number)[0]
+            mdf = self.metadataformat.get_or_create(site=self.site, key=self.key, code=format.get('format_id'), number=number)[0]
             mdf.value = format
             mdf.save()
+
+    @property
+    def with_formats(self):
+        formats = self.metadataformat.all().order_by('number')
+        formats_list = [ f.value for f in formats ]
+        metadata = self.value.copy()
+        metadata.update(dict(formats=formats_list))
+        return metadata
+
+    @atomic(durable=False)
+    def ingest_metadata(self, data):
+        assert isinstance(data, dict), type(data)
+        self.site = self.media.get_metadata_first_value(
+            'extractor_key',
+            arg_dict=data,
+        )
+        self.key = self.media.key
+
+        self.uploaded = self.media.published
+        self.retrieved = self.media.ts_to_dt(
+            self.media.get_metadata_first_value(
+                'epoch',
+                arg_dict=data,
+            )
+        )
+        self.published = (
+            self.media.ts_to_dt(
+                self.media.get_metadata_first_value(
+                    ('release_timestamp', 'timestamp',),
+                    arg_dict=data,
+                )
+            ) or self.media.published
+        )
+
+        self.value = data.copy() # try not to have side-effects for the caller
+        formats_key = self.media.get_metadata_field('formats')
+        formats = self.value.pop(formats_key, list())
+        self.save()
+        self.ingest_formats(formats)
+
+        return self.with_formats
 
 
 class MetadataFormat(models.Model):
@@ -1821,7 +1873,7 @@ class MetadataFormat(models.Model):
         Metadata,
         # on_delete=models.DO_NOTHING,
         on_delete=models.CASCADE,
-        related_name='metadataformat_metadata',
+        related_name='metadataformat',
         help_text=_('Metadata the format belongs to'),
         null=False,
     )
