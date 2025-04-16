@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ('uploaded', models.DateTimeField(help_text='Date and time the media was uploaded', null=True, verbose_name='uploaded')),
                 ('published', models.DateTimeField(help_text='Date and time the media was published', null=True, verbose_name='published')),
                 ('value', models.JSONField(default=dict, encoder=sync.models.JSONEncoder, help_text='JSON metadata object', verbose_name='value')),
-                ('media', models.OneToOneField(help_text='Media the metadata belongs to', on_delete=django.db.models.deletion.CASCADE, parent_link=True, related_name='new_metadata', to='sync.media')),
+                ('media', models.OneToOneField(help_text='Media the metadata belongs to', on_delete=django.db.models.deletion.CASCADE, parent_link=False, related_name='new_metadata', to='sync.media')),
             ],
             options={
                 'verbose_name': 'Metadata about a Media item',
