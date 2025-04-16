@@ -1179,9 +1179,10 @@ class Media(models.Model):
                 data = json.loads(self.metadata or "{}")
             if not isinstance(data, dict):
                 return {}
-            data.update(
-                self.new_metadata.with_formats
-            )
+            try:
+                data.update(self.new_metadata.with_formats)
+            except self.new_metadata.DoesNotExist:
+                pass
             setattr(self, '_cached_metadata_dict', data)
             return data
         except Exception as e:
