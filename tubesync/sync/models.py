@@ -1765,6 +1765,7 @@ class Metadata(models.Model):
         _('site'),
         max_length=256,
         blank=True,
+        db_index=True,
         null=False,
         default='Youtube',
         help_text=_('Site from which the metadata was retrieved'),
@@ -1773,6 +1774,7 @@ class Metadata(models.Model):
         _('key'),
         max_length=256,
         blank=True,
+        db_index=True,
         null=False,
         default='',
         help_text=_('Media identifier at the site from which the metadata was retrieved'),
@@ -1791,11 +1793,13 @@ class Metadata(models.Model):
     )
     uploaded = models.DateTimeField(
         _('uploaded'),
+        db_index=True,
         null=True,
         help_text=_('Date and time the media was uploaded'),
     )
     published = models.DateTimeField(
         _('published'),
+        db_index=True,
         null=True,
         help_text=_('Date and time the media was published'),
     )
@@ -1888,6 +1892,7 @@ class MetadataFormat(models.Model):
         _('site'),
         max_length=256,
         blank=True,
+        db_index=True,
         null=False,
         default='Youtube',
         help_text=_('Site from which the format is available'),
@@ -1896,6 +1901,7 @@ class MetadataFormat(models.Model):
         _('key'),
         max_length=256,
         blank=True,
+        db_index=True,
         null=False,
         default='',
         help_text=_('Media identifier at the site for which this format is available'),
