@@ -742,6 +742,16 @@ def save_all_media_for_source(source_id):
         )
         saved_later.add(media.uuid)
 
+    # Keep out of the way of the index task!
+    # SQLite will be locked for a while if we start
+    # a large source, which reschedules a more costly task.
+    from django.db import connection
+    if 'sqlite' == connection.vendor:
+        index_task = get_source_index_task(source_id)
+        if index_task and index_task.locked_by_pid_running():
+            raise Exception(_('Indexing not completed'))
+        import random, time
+
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
     tvn_format = '2/{:,}' + f'/{save_qs.count():,}'
@@ -750,6 +760,8 @@ def save_all_media_for_source(source_id):
             update_task_status(task, tvn_format.format(mn))
             with atomic():
                 media.save()
+            if 'sqlite' == connection.vendor:
+                time.sleep(random.expovariate(1/3))
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
 
