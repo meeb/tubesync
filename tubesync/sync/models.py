@@ -1187,7 +1187,6 @@ class Media(models.Model):
             setattr(self, '_cached_metadata_dict', data)
             return data
         except Exception as e:
-            log.exception(str(e))
             return {}
 
 
