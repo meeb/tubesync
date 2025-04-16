@@ -1181,7 +1181,7 @@ class Media(models.Model):
                 return {}
             try:
                 data.update(self.new_metadata.with_formats)
-            except self.new_metadata.DoesNotExist:
+            except Metadata.DoesNotExist:
                 pass
             setattr(self, '_cached_metadata_dict', data)
             return data
