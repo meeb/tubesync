@@ -1117,6 +1117,7 @@ class Media(models.Model):
             site=site,
             key=self.key,
         )
+        setattr(self, '_cached_metadata_dict', None)
         return md.ingest_metadata(data)
 
 
