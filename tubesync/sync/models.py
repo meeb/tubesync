@@ -1106,10 +1106,15 @@ class Media(models.Model):
     @atomic(durable=False)
     def ingest_metadata(self, data):
         assert isinstance(data, dict), type(data)
+        site = self.get_metadata_first_value(
+            'extractor_key',
+            'Youtube',
+            arg_dict=data,
+        )
         md_model = self._meta.fields_map.get('new_metadata').related_model
         md, created = md_model.objects.get_or_create(
-            media=self,
-            site=self.get_metadata_first_value('extractor_key', arg_dict=data),
+            media_id=self.pk,
+            site=site,
             key=self.key,
         )
         return md.ingest_metadata(data)
