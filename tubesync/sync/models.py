@@ -1116,9 +1116,9 @@ class Media(models.Model):
     def save_to_metadata(self, key, value, /):
         data = self.loaded_metadata
         data[key] = value
-        self.ingest_metadata(data)
-        epoch = self.get_metadata_first_value('epoch', arg_dict=data)
-        migrated = dict(migrated=True, epoch=epoch)
+        #self.ingest_metadata(data)
+        #epoch = self.get_metadata_first_value('epoch', arg_dict=data)
+        #migrated = dict(migrated=True, epoch=epoch)
         from common.utils import json_serial
         compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
         self.metadata = compact_json
@@ -1179,6 +1179,7 @@ class Media(models.Model):
                 data = json.loads(self.metadata or "{}")
             if not isinstance(data, dict):
                 return {}
+            setattr(self, '_cached_metadata_dict', data)
             new_data = data.copy()
             new_data.update(
                 self.new_metadata.get_or_create(
@@ -1187,9 +1188,9 @@ class Media(models.Model):
                 )[0].with_formats
             )
             log.debug(new_data)
-            setattr(self, '_cached_metadata_dict', data)
             return data
         except Exception as e:
+            log.exception(str(e))
             return {}
 
 
