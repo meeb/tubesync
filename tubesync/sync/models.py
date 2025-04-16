@@ -1758,7 +1758,7 @@ class Metadata(models.Model):
         related_name='new_metadata',
         help_text=_('Media the metadata belongs to'),
         null=False,
-        parent_link=True,
+        parent_link=False,
     )
     site = models.CharField(
         _('site'),
