@@ -7,10 +7,11 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - 'main'
+      - 'test-*'
   pull_request:
     branches:
-      - main
+      - 'main'
     types:
       - opened
       - reopened
