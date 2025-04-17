@@ -16,11 +16,11 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from shutil import copyfile, rmtree
 from PIL import Image
+from django import db
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import reset_queries, DatabaseError, IntegrityError
-from django.db.connection import vendor as db_vendor
 from django.db.transaction import atomic
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -37,6 +37,8 @@ from .models import Source, Media, MediaServer
 from .utils import ( get_remote_image, resize_image_to_height, delete_file,
                     write_text_file, filter_response, )
 from .youtube import YouTubeError
+
+db_vendor = db.connection.vendor
 
 
 def get_hash(task_name, pk):
