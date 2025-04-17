@@ -761,7 +761,7 @@ def save_all_media_for_source(source_id):
             with atomic():
                 media.save()
             if 'sqlite' == connection.vendor:
-                time.sleep(random.expovariate(1/3))
+                time.sleep(random.expovariate(1.5))
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
 
