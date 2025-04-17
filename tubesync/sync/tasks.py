@@ -333,7 +333,7 @@ def index_source_task(source_id):
         if published_dt is not None:
             media.published = published_dt
         try:
-            media.save()
+            save_model(media)
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')
         else:
