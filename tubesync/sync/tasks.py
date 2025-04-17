@@ -209,13 +209,13 @@ def migrate_queues():
 
 def save_model(instance):
     if 'sqlite' != db_vendor:
-        with atomic():
+        with atomic(durable=False):
             instance.save()
         return
 
     # work around for SQLite and its many
     # "database is locked" errors
-    with atomic():
+    with atomic(durable=False):
         instance.save()
     time.sleep(random.expovariate(1.5))
 
