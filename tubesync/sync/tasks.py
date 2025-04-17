@@ -7,6 +7,8 @@
 import os
 import json
 import math
+import random
+import time
 import uuid
 from io import BytesIO
 from hashlib import sha1
@@ -14,10 +16,11 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from shutil import copyfile, rmtree
 from PIL import Image
+from django import db
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import connection, reset_queries, DatabaseError, IntegrityError
+from django.db import DatabaseError, IntegrityError
 from django.db.transaction import atomic
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -27,12 +30,15 @@ from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import ( NoFormatException, NoMediaException,
                             NoMetadataException, DownloadFailedException, )
-from common.utils import json_serial, remove_enclosed
+from common.utils import (  django_queryset_generator as qs_gen,
+                            json_serial, remove_enclosed, )
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer
 from .utils import ( get_remote_image, resize_image_to_height, delete_file,
                     write_text_file, filter_response, )
 from .youtube import YouTubeError
+
+db_vendor = db.connection.vendor
 
 
 def get_hash(task_name, pk):
@@ -202,13 +208,17 @@ def migrate_queues():
 
 
 def save_model(instance):
-    if 'sqlite' == connection.vendor:
-        # a transaction here causes too many
-        # database is locked errors
-        instance.save()
-    else:
-        with atomic():
+    if 'sqlite' != db_vendor:
+        with atomic(durable=False):
             instance.save()
+        return
+
+    # work around for SQLite and its many
+    # "database is locked" errors
+    with atomic(durable=False):
+        instance.save()
+    arg = getattr(settings, 'SQLITE_DELAY_FLOAT', 1.5)
+    time.sleep(random.expovariate(arg))
 
 
 @atomic(durable=False)
@@ -225,7 +235,7 @@ def schedule_media_servers_update():
 
 def cleanup_old_media():
     with atomic():
-        for source in Source.objects.filter(delete_old_media=True, days_to_keep__gt=0):
+        for source in qs_gen(Source.objects.filter(delete_old_media=True, days_to_keep__gt=0)):
             delta = timezone.now() - timedelta(days=source.days_to_keep)
             mqs = source.media_source.defer(
                 'metadata',
@@ -233,7 +243,7 @@ def cleanup_old_media():
                 downloaded=True,
                 download_date__lt=delta,
             )
-            for media in mqs:
+            for media in qs_gen(mqs):
                 log.info(f'Deleting expired media: {source} / {media} '
                          f'(now older than {source.days_to_keep} days / '
                          f'download_date before {delta})')
@@ -252,7 +262,7 @@ def cleanup_removed_media(source, videos):
     ).filter(
         source=source,
     )
-    for media in mqs:
+    for media in qs_gen(mqs):
         matching_source_item = [video['id'] for video in videos if video['id'] == media.key]
         if not matching_source_item:
             log.info(f'{media.name} is no longer in source, removing')
@@ -266,7 +276,7 @@ def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
     '''
-    reset_queries()
+    db.reset_queries()
     cleanup_completed_tasks()
     # deleting expired media should happen any time an index task is requested
     cleanup_old_media()
@@ -346,6 +356,7 @@ def index_source_task(source_id):
     update_task_status(task, None)
     # Cleanup of media no longer available from the source
     cleanup_removed_media(source, videos)
+    videos = video = None
 
 
 @background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.FS))
@@ -398,6 +409,7 @@ def download_source_images(source_id):
             file_path = source.directory_path / file_name
             with open(file_path, 'wb') as f:
                 f.write(django_file.read())
+        i = image_file = None
 
     if avatar != None:
         url = avatar
@@ -413,6 +425,7 @@ def download_source_images(source_id):
             file_path = source.directory_path / file_name
             with open(file_path, 'wb') as f:
                 f.write(django_file.read())
+        i = image_file = None
 
     log.info(f'Thumbnail downloaded for source with ID: {source_id} / {source}')
 
@@ -536,6 +549,7 @@ def download_media_thumbnail(media_id, url):
         ),
         save=True
     )
+    i = image_file = None
     log.info(f'Saved thumbnail for: {media} from: {url}')
     return True
 
@@ -702,7 +716,7 @@ def save_all_media_for_source(source_id):
         source has its parameters changed and all media needs to be
         checked to see if its download status has changed.
     '''
-    reset_queries()
+    db.reset_queries()
     try:
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist as e:
@@ -711,7 +725,6 @@ def save_all_media_for_source(source_id):
                   f'source exists with ID: {source_id}')
         raise InvalidTaskError(_('no such source')) from e
 
-    saved_later = set()
     refresh_qs = Media.objects.all().only(
         'pk',
         'uuid',
@@ -725,12 +738,13 @@ def save_all_media_for_source(source_id):
         downloaded=False,
         metadata__isnull=False,
     )
-    uuid_qs = Media.objects.all().only(
+    save_qs = Media.objects.all().only(
         'pk',
         'uuid',
     ).filter(
         source=source,
-    ).values_list('uuid', flat=True)
+    )
+    saved_later = set()
     task = get_source_check_task(source_id)
     if task:
         task._verbose_name = remove_enclosed(
@@ -739,7 +753,7 @@ def save_all_media_for_source(source_id):
             end=task.verbose_name.find('Check'),
         )
     tvn_format = '1/{:,}' + f'/{refresh_qs.count():,}'
-    for mn, media in enumerate(refresh_qs, start=1):
+    for mn, media in enumerate(qs_gen(refresh_qs), start=1):
         update_task_status(task, tvn_format.format(mn))
         refresh_formats(
             str(media.pk),
@@ -747,19 +761,21 @@ def save_all_media_for_source(source_id):
         )
         saved_later.add(media.uuid)
 
+    # Keep out of the way of the index task!
+    # SQLite will be locked for a while if we start
+    # a large source, which reschedules a more costly task.
+    if 'sqlite' == db_vendor:
+        index_task = get_source_index_task(source_id)
+        if index_task and index_task.locked_by_pid_running():
+            raise Exception(_('Indexing not completed'))
+
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
-    tvn_format = '2/{:,}' + f'/{uuid_qs.count():,}'
-    for mn, media_uuid in enumerate(uuid_qs, start=1):
-        if media_uuid not in saved_later:
+    tvn_format = '2/{:,}' + f'/{save_qs.count():,}'
+    for mn, media in enumerate(qs_gen(save_qs), start=1):
+        if media.uuid not in saved_later:
             update_task_status(task, tvn_format.format(mn))
-            try:
-                media = Media.objects.get(pk=str(media_uuid))
-            except Media.DoesNotExist as e:
-                log.exception(str(e))
-                pass
-            else:
-                save_model(media)
+            save_model(media)
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
 
@@ -782,10 +798,12 @@ def refresh_formats(media_id):
 @background(schedule=dict(priority=20, run_at=60), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
 def rename_media(media_id):
     try:
-        media = Media.objects.defer('metadata', 'thumb').get(pk=media_id)
+        media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
         raise InvalidTaskError(_('no such media')) from e
-    media.rename_files()
+    else:
+        with atomic():
+            media.rename_files()
 
 
 @background(schedule=dict(priority=20, run_at=300), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
@@ -809,13 +827,11 @@ def rename_all_media_for_source(source_id):
     )
     if not create_rename_tasks:
         return
-    mqs = Media.objects.all().defer(
-        'thumb',
-    ).filter(
+    mqs = Media.objects.all().filter(
         source=source,
         downloaded=True,
     )
-    for media in mqs:
+    for media in qs_gen(mqs):
         with atomic():
             media.rename_files()
 
@@ -828,39 +844,44 @@ def wait_for_media_premiere(media_id):
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
         raise InvalidTaskError(_('no such media')) from e
-    if media.has_metadata:
-        return
-    now = timezone.now()
-    if media.published < now:
-        # the download tasks start after the media is saved
-        media.manual_skip = False
-        media.skip = False
     else:
-        media.manual_skip = True
-        media.title = _(f'Premieres in {hours(media.published - now)} hours')
-        task = get_media_premiere_task(media_id)
-        if task:
-            update_task_status(task, f'available in {hours(media.published - now)} hours')
-    save_model(media)
+        if media.has_metadata:
+            return
+        now = timezone.now()
+        if media.published < now:
+            media.manual_skip = False
+            media.skip = False
+            # the download tasks start after the media is saved
+        else:
+            media.manual_skip = True
+            media.title = _(f'Premieres in {hours(media.published - now)} hours')
+            task = get_media_premiere_task(media_id)
+            if task:
+                update_task_status(task, f'available in {hours(media.published - now)} hours')
+        save_model(media)
 
 
 @background(schedule=dict(priority=1, run_at=90), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
 def delete_all_media_for_source(source_id, source_name, source_directory):
     source = None
+    assert source_id
+    assert source_name
+    assert source_directory
     try:
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist as e:
         # Task triggered but the source no longer exists, do nothing
-        log.error(f'Task delete_all_media_for_source(pk={source_id}) called but no '
+        log.warn(f'Task delete_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
-        raise InvalidTaskError(_('no such source')) from e
+        #raise InvalidTaskError(_('no such source')) from e
+        pass # this task can run after a source was deleted
     mqs = Media.objects.all().defer(
         'metadata',
     ).filter(
         source=source or source_id,
     )
     with atomic(durable=True):
-        for media in mqs:
+        for media in qs_gen(mqs):
             log.info(f'Deleting media for source: {source_name} item: {media.name}')
             with atomic():
                 media.delete()
