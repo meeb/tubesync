@@ -59,6 +59,12 @@ else:
     }
     DATABASE_CONNECTION_STR = f'sqlite at "{DATABASES["default"]["NAME"]}"'
 
+    # the argument to random.expovariate(),
+    # a larger value means less delay
+    # with too little delay, you may see
+    # more "database is locked" errors
+    SQLITE_DELAY_FLOAT = 5
+
 
 DEFAULT_THREADS = 1
 BACKGROUND_TASK_ASYNC_THREADS = getenv('TUBESYNC_WORKERS', DEFAULT_THREADS, integer=True)
