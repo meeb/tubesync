@@ -208,15 +208,16 @@ def migrate_queues():
 
 
 def save_model(instance):
-    if 'sqlite' == db_vendor:
-        # a transaction here causes too many
-        # database is locked errors
-        # with atomic():
-        instance.save()
-        time.sleep(random.expovariate(1.5))
-    else:
+    if 'sqlite' != db_vendor:
         with atomic():
             instance.save()
+        return
+
+    # work around for SQLite and its many
+    # "database is locked" errors
+    with atomic():
+        instance.save()
+    time.sleep(random.expovariate(1.5))
 
 
 @atomic(durable=False)
