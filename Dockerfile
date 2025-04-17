@@ -221,7 +221,7 @@ RUN set -eu ; \
       case "${arg1}" in \
         (amd64) printf -- 'x86_64' ;; \
         (arm64) printf -- 'aarch64' ;; \
-        (armv7l) printf -- 'arm' ;; \
+        (arm|armv7l) printf -- 'armhf' ;; \
         (*) printf -- '%s' "${arg1}" ;; \
       esac ; \
       unset -v arg1 ; \
