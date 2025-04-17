@@ -227,15 +227,16 @@ RUN set -eu ; \
       unset -v arg1 ; \
     } ; \
 \
+    file_ext="${CHECKSUM_ALGORITHM}" ; \
     apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" ; \
     mkdir -v /verified ; \
     cd /downloaded ; \
-    for f in *.sha256 ; \
+    for f in *."${file_ext}" ; \
     do \
       "${CHECKSUM_ALGORITHM}sum" --check --warn --strict "${f}" || exit ; \
-      ln -v "${f%.sha256}" /verified/ || exit ; \
+      ln -v "${f%.${file_ext}}" /verified/ || exit ; \
     done ; \
-    unset -v f ; \
+    unset -v f file_ext ; \
 \
     S6_ARCH="$(decide_arch "${TARGETARCH}")" ; \
     set -x ; \
