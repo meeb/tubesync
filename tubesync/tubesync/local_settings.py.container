@@ -63,7 +63,7 @@ else:
     # a larger value means less delay
     # with too little delay, you may see
     # more "database is locked" errors
-    SQLITE_DELAY_FLOAT = 1.5
+    SQLITE_DELAY_FLOAT = 5
 
 
 DEFAULT_THREADS = 1
