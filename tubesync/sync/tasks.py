@@ -217,7 +217,8 @@ def save_model(instance):
     # "database is locked" errors
     with atomic(durable=False):
         instance.save()
-    time.sleep(random.expovariate(1.5))
+    arg = getattr(settings, 'SQLITE_DELAY_FLOAT', 1.5)
+    time.sleep(random.expovariate(arg))
 
 
 @atomic(durable=False)
