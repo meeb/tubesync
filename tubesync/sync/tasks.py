@@ -7,6 +7,8 @@
 import os
 import json
 import math
+import random
+import time
 import uuid
 from io import BytesIO
 from hashlib import sha1
@@ -17,7 +19,8 @@ from PIL import Image
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import connection, reset_queries, DatabaseError, IntegrityError
+from django.db import reset_queries, DatabaseError, IntegrityError
+from django.db.connection import vendor as db_vendor
 from django.db.transaction import atomic
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -203,10 +206,12 @@ def migrate_queues():
 
 
 def save_model(instance):
-    if 'sqlite' == connection.vendor:
+    if 'sqlite' == db_vendor:
         # a transaction here causes too many
         # database is locked errors
+        # with atomic():
         instance.save()
+        time.sleep(random.expovariate(1.5))
     else:
         with atomic():
             instance.save()
@@ -751,6 +756,14 @@ def save_all_media_for_source(source_id):
             verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
         )
         saved_later.add(media.uuid)
+
+    # Keep out of the way of the index task!
+    # SQLite will be locked for a while if we start
+    # a large source, which reschedules a more costly task.
+    if 'sqlite' == db_vendor:
+        index_task = get_source_index_task(source_id)
+        if index_task and index_task.locked_by_pid_running():
+            raise Exception(_('Indexing not completed'))
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
