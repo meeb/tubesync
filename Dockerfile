@@ -24,6 +24,7 @@ FROM debian:${DEBIAN_VERSION} AS tubesync-base
 ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND="noninteractive" \
+    APT_KEEP_ARCHIVES=1 \
     HOME="/root" \
     LANGUAGE="en_US.UTF-8" \
     LANG="en_US.UTF-8" \
@@ -39,6 +40,11 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     rm -f /var/cache/apt/*cache.bin ; \
     # Update from the network and keep cache
     rm -f /etc/apt/apt.conf.d/docker-clean ; \
+    # Do not generate more /var/cache/apt/*cache.bin files
+    # hopefully soon, this will be included in Debian images
+    printf -- >| /etc/apt/apt.conf.d/docker-disable-pkgcache \
+        'Dir::Cache::%spkgcache "";\n' '' src ; \
+	chmod a+r /etc/apt/apt.conf.d/docker-disable-pkgcache ; \
     set -x && \
     apt-get update && \
     # Install locales
