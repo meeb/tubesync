@@ -20,7 +20,7 @@ from django import db
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import reset_queries, DatabaseError, IntegrityError
+from django.db import DatabaseError, IntegrityError
 from django.db.transaction import atomic
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -276,7 +276,7 @@ def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
     '''
-    reset_queries()
+    db.reset_queries()
     cleanup_completed_tasks()
     # deleting expired media should happen any time an index task is requested
     cleanup_old_media()
@@ -716,7 +716,7 @@ def save_all_media_for_source(source_id):
         source has its parameters changed and all media needs to be
         checked to see if its download status has changed.
     '''
-    reset_queries()
+    db.reset_queries()
     try:
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist as e:
