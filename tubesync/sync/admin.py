@@ -30,19 +30,19 @@ class MediaAdmin(admin.ModelAdmin):
 @admin.register(Metadata)
 class MetadataAdmin(admin.ModelAdmin):
 
-    ordering = ('-created',)
-    list_display = ('uuid', 'media', 'site', 'key', 'created', 'retrieved', 'uploaded', 'published')
-    readonly_fields = ('uuid', 'created')
-    search_fields = ('uuid', 'site', 'key')
+    ordering = ('-retrieved', '-created', '-uploaded')
+    list_display = ('uuid', 'key', 'retrieved', 'uploaded', 'created', 'site')
+    readonly_fields = ('uuid', 'created', 'retrieved')
+    search_fields = ('uuid', 'media', 'key')
 
 
 @admin.register(MetadataFormat)
 class MetadataFormatAdmin(admin.ModelAdmin):
 
     ordering = ('site', 'key', 'number')
-    list_display = ('uuid', 'metadata', 'site', 'key', 'code')
-    readonly_fields = ('uuid', 'metadata')
-    search_fields = ('uuid', 'site', 'key', 'code')
+    list_display = ('uuid', 'key', 'site', 'code', 'number', 'metadata')
+    readonly_fields = ('uuid', 'metadata', 'site', 'key', 'number')
+    search_fields = ('uuid', 'key')
 
 
 @admin.register(MediaServer)
