@@ -33,7 +33,7 @@ class MetadataAdmin(admin.ModelAdmin):
     ordering = ('-retrieved', '-created', '-uploaded')
     list_display = ('uuid', 'key', 'retrieved', 'uploaded', 'created', 'site')
     readonly_fields = ('uuid', 'created', 'retrieved')
-    search_fields = ('uuid', 'media', 'key')
+    search_fields = ('uuid', 'media__uuid', 'key')
 
 
 @admin.register(MetadataFormat)
@@ -42,7 +42,7 @@ class MetadataFormatAdmin(admin.ModelAdmin):
     ordering = ('site', 'key', 'number')
     list_display = ('uuid', 'key', 'site', 'code', 'number', 'metadata')
     readonly_fields = ('uuid', 'metadata', 'site', 'key', 'number')
-    search_fields = ('uuid', 'key')
+    search_fields = ('uuid', 'metadata__uuid', 'metadata__media__uuid', 'key')
 
 
 @admin.register(MediaServer)
