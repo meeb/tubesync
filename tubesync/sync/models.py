@@ -1125,10 +1125,10 @@ class Media(models.Model):
         data = self.loaded_metadata
         data[key] = value
         self.ingest_metadata(data)
-        epoch = self.get_metadata_first_value('epoch', arg_dict=data)
-        migrated = dict(migrated=True, epoch=epoch)
+        #epoch = self.get_metadata_first_value('epoch', arg_dict=data)
+        #migrated = dict(migrated=True, epoch=epoch)
         from common.utils import json_serial
-        compact_json = json.dumps(migrated, separators=(',', ':'), default=json_serial)
+        compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
         self.metadata = compact_json
         self.save()
         from common.logger import log
