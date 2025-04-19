@@ -831,7 +831,6 @@ class Media(models.Model):
 
         # Trigger an update of derived fields from metadata
         update_md = (
-            self.created and
             self.has_metadata and
             (
                 update_fields is None or
