@@ -830,14 +830,20 @@ class Media(models.Model):
                         update_fields = {'media_file', 'skip'}.union(update_fields)
 
         # Trigger an update of derived fields from metadata
-        if update_fields is None or 'metadata' in update_fields:
+        update_md = (
+            self.has_metadata and
+            (
+                update_fields is None or
+                'metadata' in update_fields
+            )
+        )
+        if update_md:
             setattr(self, '_cached_metadata_dict', None)
-        if self.metadata:
             self.title = self.metadata_title[:200]
             self.duration = self.metadata_duration
-        if update_fields is not None and "metadata" in update_fields:
-            # If only some fields are being updated, make sure we update title and duration if metadata changes
-            update_fields = {"title", "duration"}.union(update_fields)
+            if update_fields is not None:
+                # If only some fields are being updated, make sure we update title and duration if metadata changes
+                update_fields = {"title", "duration"}.union(update_fields)
 
         super().save(
             force_insert=force_insert,
