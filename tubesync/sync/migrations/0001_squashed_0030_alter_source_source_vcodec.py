@@ -31,7 +31,7 @@ def fix_media_file(apps, schema_editor):
 # Function above has been copied/modified and RunPython operations adjusted.
 
 def media_file_location():
-    return str(settings.DOWNLOAD_ROOT))
+    return str(settings.DOWNLOAD_ROOT)
 
 # Used the above function for storage location.
 
