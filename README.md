@@ -275,19 +275,19 @@ long as possible, up to 24 hours.
 
 ### 3. Indexing massive channels
 
-If you add a massive (several thousand videos) channel to TubeSync and choose "index
-every hour" or similar short interval it's entirely possible your TubeSync install may
-spend its entire time just indexing the massive channel over and over again without
+If you add a massive channel (one with several thousand videos) to TubeSync and choose "index
+every hour" or a similarly short interval; it's entirely possible that your TubeSync install may
+spend its entire time indexing the channel, over and over again, without
 downloading any media. Check your tasks for the status of your TubeSync install.
 
-If you add a significant amount of "work" due to adding many large channels you may
-need to increase the number of background workers by setting the `TUBESYNC_WORKERS`
-environment variable. Try around ~4 at most, although the absolute maximum allowed is 8.
-
-**Be nice.** it's likely entirely possible your IP address could get throttled by the
-source if you try and crawl extremely large amounts very quickly. **Try and be polite
+**Be nice.** It's entirely possible that your IP address could get throttled and/or banned, by the
+source, if you try to crawl extremely large amounts quickly. **Try and be polite
 with the smallest amount of indexing and concurrent downloads possible for your needs.**
 
+Only, if you absolutely must, should you increase [`TUBESYNC_WORKERS`](#advanced-configuration) above its default value.
+The maximum the software accepts is `8` threads per queue worker process.
+By default, up to `3` tasks will be executing concurrently.
+The maximum is `24` concurrent tasks.
 
 # FAQ
 
