@@ -281,7 +281,7 @@ spend its entire time indexing the channel, over and over again, without
 downloading any media. Check your tasks for the status of your TubeSync install.
 
 **Be nice.** It's entirely possible that your IP address could get throttled and/or banned, by the
-source, if you try to crawl extremely large amounts quickly. **Try and be polite
+source, if you try to crawl extremely large amounts quickly. **Try to be polite
 with the smallest amount of indexing and concurrent downloads possible for your needs.**
 
 Only, if you absolutely must, should you increase [`TUBESYNC_WORKERS`](#advanced-configuration) above its default value.
