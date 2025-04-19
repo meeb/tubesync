@@ -216,7 +216,7 @@ class Migration(migrations.Migration):
                     db_index=True, default=False, help_text='Media has a matching format and can be downloaded', verbose_name='can download',
                 )),
                 ('media_file', models.FileField(
-                    blank=True, help_text='Media file', max_length=255, null=True, storage=django.core.files.storage.FileSystemStorage(location=media_file_location(), upload_to=sync.models.get_media_file_path, verbose_name='media file',
+                    blank=True, help_text='Media file', max_length=255, null=True, storage=django.core.files.storage.FileSystemStorage(location=media_file_location()), upload_to=sync.models.get_media_file_path, verbose_name='media file',
                 )),
                 ('skip', models.BooleanField(
                     db_index=True, default=False, help_text='Media will be skipped and not downloaded', verbose_name='skip',
@@ -267,7 +267,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='media',
             name='media_file',
-            field=models.FileField(blank=True, help_text='Media file', max_length=255, null=True, storage=django.core.files.storage.FileSystemStorage(base_url='/media-data/', location=media_file_location(), upload_to=sync.models.get_media_file_path, verbose_name='media file'),
+            field=models.FileField(blank=True, help_text='Media file', max_length=255, null=True, storage=django.core.files.storage.FileSystemStorage(base_url='/media-data/', location=media_file_location()), upload_to=sync.models.get_media_file_path, verbose_name='media file'),
         ),
         migrations.AlterField(
             model_name='media',
