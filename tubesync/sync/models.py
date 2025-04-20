@@ -1745,11 +1745,13 @@ class Metadata(models.Model):
         Metadata for an indexed `Media` item.
     '''
     class Meta:
+        db_table = 'sync_media_metadata'
         verbose_name = _('Metadata about a Media item')
         verbose_name_plural = _('Metadata about a Media item')
         unique_together = (
             ('media', 'site', 'key'),
         )
+        get_latest_by = ["-retrieved", "-created"]
 
     uuid = models.UUIDField(
         _('uuid'),
@@ -1872,12 +1874,14 @@ class MetadataFormat(models.Model):
         A format from the Metadata for an indexed `Media` item.
     '''
     class Meta:
+        db_table = f'{Metadata._meta.db_table}_format'
         verbose_name = _('Format from the Metadata about a Media item')
         verbose_name_plural = _('Formats from the Metadata about a Media item')
         unique_together = (
             ('metadata', 'site', 'key', 'number'),
             ('metadata', 'site', 'key', 'code'),
         )
+        ordering = ['site', 'key', 'number']
 
     uuid = models.UUIDField(
         _('uuid'),
