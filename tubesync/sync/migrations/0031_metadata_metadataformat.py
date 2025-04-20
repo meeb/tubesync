@@ -9,7 +9,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0030_alter_source_source_vcodec'),
+        ('sync', '0001_squashed_0030_alter_source_source_vcodec'),
     ]
 
     operations = [
