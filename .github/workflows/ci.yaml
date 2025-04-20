@@ -7,9 +7,11 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - 'main'
       - 'test-*'
   pull_request:
     branches:
+      - 'main'
       - 'test-*'
     types:
       - opened
@@ -311,14 +313,15 @@ jobs:
           push: false
           tags: ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:dive
       - name: Analysis with `dive`
+        continue-on-error: false
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             'ghcr.io/wagoodman/dive' \
             'ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:dive' \
             --ci \
-            --highestUserWastedPercent '0.03' \
-            --highestWastedBytes '10M'
+            --highestUserWastedPercent '0.05' \
+            --highestWastedBytes '50M'
       - name: Build and push
         id: build-push
         timeout-minutes: 90

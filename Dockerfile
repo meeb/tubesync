@@ -26,6 +26,7 @@ FROM debian:${DEBIAN_VERSION} AS tubesync-base
 ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND="noninteractive" \
+    APT_KEEP_ARCHIVES=1 \
     HOME="/root" \
     LANGUAGE="en_US.UTF-8" \
     LANG="en_US.UTF-8" \
@@ -41,6 +42,11 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     rm -f /var/cache/apt/*cache.bin ; \
     # Update from the network and keep cache
     rm -f /etc/apt/apt.conf.d/docker-clean ; \
+    # Do not generate more /var/cache/apt/*cache.bin files
+    # hopefully soon, this will be included in Debian images
+    printf -- >| /etc/apt/apt.conf.d/docker-disable-pkgcache \
+        'Dir::Cache::%spkgcache "";\n' '' src ; \
+	chmod a+r /etc/apt/apt.conf.d/docker-disable-pkgcache ; \
     set -x && \
     apt-get update && \
     # Install locales
@@ -217,21 +223,22 @@ RUN set -eu ; \
       case "${arg1}" in \
         (amd64) printf -- 'x86_64' ;; \
         (arm64) printf -- 'aarch64' ;; \
-        (armv7l) printf -- 'arm' ;; \
+        (arm|armv7l) printf -- 'armhf' ;; \
         (*) printf -- '%s' "${arg1}" ;; \
       esac ; \
       unset -v arg1 ; \
     } ; \
 \
+    file_ext="${CHECKSUM_ALGORITHM}" ; \
     apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" ; \
     mkdir -v /verified ; \
     cd /downloaded ; \
-    for f in *.sha256 ; \
+    for f in *."${file_ext}" ; \
     do \
       "${CHECKSUM_ALGORITHM}sum" --check --warn --strict "${f}" || exit ; \
-      ln -v "${f%.sha256}" /verified/ || exit ; \
+      ln -v "${f%.${file_ext}}" /verified/ || exit ; \
     done ; \
-    unset -v f ; \
+    unset -v f file_ext ; \
 \
     S6_ARCH="$(decide_arch "${TARGETARCH}")" ; \
     set -x ; \
