@@ -1104,6 +1104,11 @@ class Media(models.Model):
         return self.metadata is not None
 
 
+    def metadata_dumps(self, arg_dict=dict()):
+        data = arg_dict or self.new_metadata.with_formats
+        return json.dumps(data, separators=(',', ':'), default=json_serial)
+
+
     def metadata_loads(self, arg_str='{}'):
         data = json.loads(arg_str) or self.loaded_metadata
         return self.ingest_metadata(data)
