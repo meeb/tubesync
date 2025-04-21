@@ -18,17 +18,12 @@ def subtract_epoch(arg_dt, /):
 
     return utc_dt - epoch
 
-def datetime_to_timestamp(arg_dt, /):
+def datetime_to_timestamp(arg_dt, /, *, integer=True):
     timestamp = subtract_epoch(arg_dt).total_seconds()
 
-    try:
-        timestamp_int = int(timestamp)
-    except (TypeError, ValueError,):
-        pass
-    else:
-        return timestamp_int
-
-    return timestamp
+    if not integer:
+        return timestamp
+    return int(timestamp)
 
 def timestamp_to_datetime(seconds, /):
     return add_epoch(seconds=seconds).astimezone(utc_tz)
