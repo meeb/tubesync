@@ -1845,9 +1845,10 @@ class Metadata(models.Model):
     @atomic(durable=False)
     def ingest_metadata(self, data):
         assert isinstance(data, dict), type(data)
+        from common.timestamp import timestamp_to_datetime
 
         try:
-            self.retrieved = self.media.ts_to_dt(
+            self.retrieved = timestamp_to_datetime(
                 self.media.get_metadata_first_value(
                     'epoch',
                     arg_dict=data,
@@ -1857,7 +1858,7 @@ class Metadata(models.Model):
             self.retrieved = self.created
 
         try:
-            self.published = self.media.ts_to_dt(
+            self.published = timestamp_to_datetime(
                 self.media.get_metadata_first_value(
                     ('release_timestamp', 'timestamp',),
                     arg_dict=data,
