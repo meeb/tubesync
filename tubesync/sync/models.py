@@ -19,7 +19,8 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.logger import log
 from common.errors import NoFormatException
-from common.utils import clean_filename, clean_emoji
+from common.utils import (  clean_filename, clean_emoji,
+                            django_queryset_generator as qs_gen, )
 from .youtube import (get_media_info as get_youtube_media_info,
                         download_media as download_youtube_media,
                         get_channel_image_info as get_youtube_channel_image_info)
@@ -812,6 +813,7 @@ class Media(models.Model):
         )
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        setattr(self, '_cached_metadata_dict', None)
         # Correct the path after a source is renamed
         if self.created and self.downloaded and not self.media_file_exists:
             fp_list = list((self.filepath,))
@@ -838,9 +840,9 @@ class Media(models.Model):
             )
         )
         if update_md:
+            self.title = self.metadata_title[:200] or self.title
+            self.duration = self.metadata_duration or self.duration
             setattr(self, '_cached_metadata_dict', None)
-            self.title = self.metadata_title[:200]
-            self.duration = self.metadata_duration
             if update_fields is not None:
                 # If only some fields are being updated, make sure we update title and duration if metadata changes
                 update_fields = {"title", "duration"}.union(update_fields)
@@ -1105,6 +1107,7 @@ class Media(models.Model):
 
 
     def metadata_dumps(self, arg_dict=dict()):
+        from common.utils import json_serial
         data = arg_dict or self.new_metadata.with_formats
         return json.dumps(data, separators=(',', ':'), default=json_serial)
 
@@ -1135,13 +1138,11 @@ class Media(models.Model):
     def save_to_metadata(self, key, value, /):
         data = self.loaded_metadata
         data[key] = value
-        self.ingest_metadata(data)
         #epoch = self.get_metadata_first_value('epoch', arg_dict=data)
         #migrated = dict(migrated=True, epoch=epoch)
-        from common.utils import json_serial
-        compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
-        self.metadata = compact_json
+        self.metadata = self.metadata_dumps(arg_dict=data)
         self.save()
+        self.ingest_metadata(data)
         from common.logger import log
         log.debug(f'Saved to metadata: {self.key} / {self.uuid}: {key=}: {value}')
 
@@ -1158,12 +1159,11 @@ class Media(models.Model):
                 if (now - ran_at) < timedelta(hours=1):
                     return data
 
-            from common.utils import json_serial
-            compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
+            compact_json = self.metadata_dumps(arg_dict=data)
 
             filtered_data = filter_response(data, True)
             filtered_data['_reduce_data_ran_at'] = round((now - self.posix_epoch).total_seconds())
-            filtered_json = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
+            filtered_json = self.metadata_dumps(arg_dict=filtered_data)
         except Exception as e:
             from common.logger import log
             log.exception('reduce_data: %s', e)
@@ -1753,8 +1753,8 @@ class Metadata(models.Model):
     '''
     class Meta:
         db_table = 'sync_media_metadata'
-        verbose_name = _('Metadata about a Media item')
-        verbose_name_plural = _('Metadata about a Media item')
+        verbose_name = _('Metadata about Media')
+        verbose_name_plural = _('Metadata about Media')
         unique_together = (
             ('media', 'site', 'key'),
         )
@@ -1770,10 +1770,10 @@ class Metadata(models.Model):
     media = models.OneToOneField(
         Media,
         # on_delete=models.DO_NOTHING,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name='new_metadata',
         help_text=_('Media the metadata belongs to'),
-        null=False,
+        null=True,
         parent_link=False,
     )
     site = models.CharField(
@@ -1830,14 +1830,14 @@ class Metadata(models.Model):
     @atomic(durable=False)
     def ingest_formats(self, formats=list(), /):
         for number, format in enumerate(formats, start=1):
-            mdf = self.metadataformat.get_or_create(site=self.site, key=self.key, code=format.get('format_id'), number=number)[0]
+            mdf, created = self.format.get_or_create(site=self.site, key=self.key, number=number)
             mdf.value = format
             mdf.save()
 
     @property
     def with_formats(self):
-        formats = self.metadataformat.all().order_by('number')
-        formats_list = [ f.value for f in formats ]
+        formats = self.format.all().order_by('number')
+        formats_list = [ f.value for f in qs_gen(formats) ]
         metadata = self.value.copy()
         metadata.update(dict(formats=formats_list))
         return metadata
@@ -1869,7 +1869,11 @@ class Metadata(models.Model):
         self.value = data.copy() # try not to have side-effects for the caller
         formats_key = self.media.get_metadata_field('formats')
         formats = self.value.pop(formats_key, list())
-        self.uploaded = self.media.published
+        self.uploaded = min(
+            self.published,
+            self.retrieved,
+            self.media.created,
+        )
         self.save()
         self.ingest_formats(formats)
 
@@ -1882,11 +1886,10 @@ class MetadataFormat(models.Model):
     '''
     class Meta:
         db_table = f'{Metadata._meta.db_table}_format'
-        verbose_name = _('Format from the Metadata about a Media item')
-        verbose_name_plural = _('Formats from the Metadata about a Media item')
+        verbose_name = _('Format from Media Metadata')
+        verbose_name_plural = _('Formats from Media Metadata')
         unique_together = (
             ('metadata', 'site', 'key', 'number'),
-            ('metadata', 'site', 'key', 'code'),
         )
         ordering = ['site', 'key', 'number']
 
@@ -1901,7 +1904,7 @@ class MetadataFormat(models.Model):
         Metadata,
         # on_delete=models.DO_NOTHING,
         on_delete=models.CASCADE,
-        related_name='metadataformat',
+        related_name='format',
         help_text=_('Metadata the format belongs to'),
         null=False,
     )
@@ -1921,21 +1924,13 @@ class MetadataFormat(models.Model):
         db_index=True,
         null=False,
         default='',
-        help_text=_('Media identifier at the site for which this format is available'),
+        help_text=_('Media identifier at the site from which this format is available'),
     )
     number = models.PositiveIntegerField(
         _('number'),
         blank=False,
         null=False,
         help_text=_('Ordering number for this format')
-    )
-    code = models.CharField(
-        _('code'),
-        max_length=64,
-        blank=True,
-        null=False,
-        default='',
-        help_text=_('Format identification code'),
     )
     value = models.JSONField(
         _('value'),
