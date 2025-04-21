@@ -23,7 +23,7 @@ def datetime_to_timestamp(arg_dt, /, *, integer=True):
 
     if not integer:
         return timestamp
-    return int(timestamp)
+    return round(timestamp)
 
 def timestamp_to_datetime(seconds, /):
     return add_epoch(seconds=seconds).astimezone(utc_tz)
