@@ -40,7 +40,7 @@ class MetadataAdmin(admin.ModelAdmin):
 class MetadataFormatAdmin(admin.ModelAdmin):
 
     ordering = ('site', 'key', 'number')
-    list_display = ('uuid', 'key', 'site', 'code', 'number', 'metadata')
+    list_display = ('uuid', 'key', 'site', 'number', 'metadata')
     readonly_fields = ('uuid', 'metadata', 'site', 'key', 'number')
     search_fields = ('uuid', 'metadata__uuid', 'metadata__media__uuid', 'key')
 
