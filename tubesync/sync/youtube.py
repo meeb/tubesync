@@ -20,7 +20,7 @@ from .utils import mkdir_p
 import yt_dlp
 import yt_dlp.patch.check_thumbnails
 import yt_dlp.patch.fatal_http_errors
-from yt_dlp.utils import remove_end, OUTTMPL_TYPES
+from yt_dlp.utils import remove_end, shell_quote, OUTTMPL_TYPES
 
 
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
@@ -317,6 +317,7 @@ def download_media(
 
     ytopts = {
         'format': media_format,
+        'final_ext': extension,
         'merge_output_format': extension,
         'outtmpl': os.path.basename(output_file),
         'quiet': False if settings.DEBUG else True,
@@ -394,14 +395,21 @@ def download_media(
     # It already included user configured post processors as well.
     ytopts['postprocessors'] = list(yt_dlp.get_postprocessors(pp_opts))
 
+    final_path = Path(output_file)
+    try:
+        final_path = final_path.resolve(strict=True)
+    except FileNotFoundError:
+        # This is very likely the common case
+        final_path = Path(output_file).resolve(strict=False)
     if pp_opts.extractaudio:
+        expected_file = shell_quote(str(final_path))
         ytopts['postprocessors'].append(dict(
             key='Exec',
             when='after_move',
             exec_cmd=(
-                f'test -f {output_file} || '
-                'mv -f {} '
-                f'{output_file}'
+                f'test -f {expected_file} || '
+                'mv -T -u -- %(filepath,_filename|)q '
+                f'{expected_file}'
             ),
         ))
 
