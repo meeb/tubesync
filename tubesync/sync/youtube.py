@@ -381,9 +381,29 @@ def download_media(
             'modifychapters+ffmpeg': codec_options,
         })
 
+    # Provide the user control of 'overwrites' in the post processors.
+    pp_opts.overwrites = opts.get(
+        'overwrites',
+        ytopts.get(
+            'overwrites',
+            default_opts.overwrites,
+        ),
+    )
+
     # Create the post processors list.
     # It already included user configured post processors as well.
     ytopts['postprocessors'] = list(yt_dlp.get_postprocessors(pp_opts))
+
+    if pp_opts.extractaudio:
+        ytopts['postprocessors'].append(dict(
+            key='Exec',
+            when='after_move',
+            exec_cmd=(
+                f'test -f {output_file} || '
+                'mv -f {} '
+                f'{output_file}'
+            ),
+        ))
 
     opts.update(ytopts)
 
