@@ -20,15 +20,15 @@ from django.utils.translation import gettext_lazy as _
 from common.logger import log
 from common.errors import NoFormatException
 from common.utils import clean_filename, clean_emoji
-from .youtube import (get_media_info as get_youtube_media_info,
-                      download_media as download_youtube_media,
-                      get_channel_image_info as get_youtube_channel_image_info)
+from .youtube import (  get_media_info as get_youtube_media_info,
+                        download_media as download_youtube_media,
+                        get_channel_image_info as get_youtube_channel_image_info)
 from .utils import (seconds_to_timestr, parse_media_format, filter_response,
                     write_text_file, mkdir_p, directory_and_stem, glob_quote)
-from .matching import (get_best_combined_format, get_best_audio_format,
-                       get_best_video_format)
+from .matching import ( get_best_combined_format, get_best_audio_format,
+                        get_best_video_format)
 from .fields import CommaSepChoiceField
-from .choices import (Val, CapChoices, Fallback, FileExtension,
+from .choices import (  Val, CapChoices, Fallback, FileExtension,
                         FilterSeconds, IndexSchedule, MediaServerType,
                         MediaState, SourceResolution, SourceResolutionInteger,
                         SponsorBlock_Category, YouTube_AudioCodec,
