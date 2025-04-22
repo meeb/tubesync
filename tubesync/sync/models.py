@@ -1827,6 +1827,14 @@ class Metadata(models.Model):
     )
 
 
+    def __str__(self):
+        template = '"{}" from {} at: {}'
+        return template.format(
+            self.key,
+            self.site,
+            self.retrieved.isoformat(timespec='seconds'),
+        )
+
     @atomic(durable=False)
     def ingest_formats(self, formats=list(), /):
         for number, format in enumerate(formats, start=1):
