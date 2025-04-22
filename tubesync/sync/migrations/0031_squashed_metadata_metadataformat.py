@@ -8,7 +8,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
 
-    replaces = [('sync', '0031_metadata_metadataformat'), ('sync', '0032_alter_metadata_options_alter_metadataformat_options_and_more')]
+    replaces = [('sync', '0031_metadata_metadataformat')]
 
     dependencies = [
         ('sync', '0001_squashed_0030_alter_source_source_vcodec'),
