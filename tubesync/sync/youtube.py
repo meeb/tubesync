@@ -314,6 +314,27 @@ def download_media(
     if extension in audio_exts:
         pp_opts.extractaudio = True
         pp_opts.nopostoverwrites = False
+        # The ExtractAudio post processor can change the extension.
+        # This post processor is to change the final filename back
+        # to what we are expecting it to be.
+        final_path = Path(output_file)
+        try:
+            final_path = final_path.resolve(strict=True)
+        except FileNotFoundError:
+            # This is very likely the common case
+            final_path = Path(output_file).resolve(strict=False)
+        expected_file = shell_quote(str(final_path))
+        cmds = pp_opts.exec_cmd.get('after_move', list())
+        # It is important that we use a tuple for strings.
+        # Otherwise, list adds each character instead.
+        # That last comma is really necessary!
+        cmds += (
+            f'test -f {expected_file} || '
+            'mv -T -u -- %(filepath,_filename|)q '
+            f'{expected_file}',
+        )
+        # assignment is the quickest way to cover both 'get' cases
+        pp_opts.exec_cmd['after_move'] = cmds
 
     ytopts = {
         'format': media_format,
@@ -394,27 +415,6 @@ def download_media(
     # Create the post processors list.
     # It already included user configured post processors as well.
     ytopts['postprocessors'] = list(yt_dlp.get_postprocessors(pp_opts))
-
-    # The ExtractAudio post processor can change the extension.
-    # This post processor is to change the final filename back
-    # to what we are expecting it to be.
-    final_path = Path(output_file)
-    try:
-        final_path = final_path.resolve(strict=True)
-    except FileNotFoundError:
-        # This is very likely the common case
-        final_path = Path(output_file).resolve(strict=False)
-    if pp_opts.extractaudio:
-        expected_file = shell_quote(str(final_path))
-        ytopts['postprocessors'].append(dict(
-            key='Exec',
-            when='after_move',
-            exec_cmd=(
-                f'test -f {expected_file} || '
-                'mv -T -u -- %(filepath,_filename|)q '
-                f'{expected_file}'
-            ),
-        ))
 
     opts.update(ytopts)
 
