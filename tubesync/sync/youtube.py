@@ -395,6 +395,9 @@ def download_media(
     # It already included user configured post processors as well.
     ytopts['postprocessors'] = list(yt_dlp.get_postprocessors(pp_opts))
 
+    # The ExtractAudio post processor can change the extension.
+    # This post processor is to change the final filename back
+    # to what we are expecting it to be.
     final_path = Path(output_file)
     try:
         final_path = final_path.resolve(strict=True)
