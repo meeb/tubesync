@@ -9,7 +9,7 @@ def add_epoch(seconds):
     assert seconds is not None
     assert seconds >= 0, 'seconds must be a positive number'
 
-    return timedelta(seconds=seconds) + posix_epoch
+    return datetime.timedelta(seconds=seconds) + posix_epoch
 
 def subtract_epoch(arg_dt, /):
     assert isinstance(arg_dt, datetime.datetime)
