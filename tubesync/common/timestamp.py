@@ -1,5 +1,4 @@
 import datetime
-from django.utils import timezone
 
 
 posix_epoch = datetime.datetime.utcfromtimestamp(0)
@@ -13,6 +12,7 @@ def add_epoch(seconds):
     return timedelta(seconds=seconds) + posix_epoch
 
 def subtract_epoch(arg_dt, /):
+    assert isinstance(arg_dt, datetime.datetime)
     epoch = posix_epoch.astimezone(utc_tz)
     utc_dt = arg_dt.astimezone(utc_tz)
 
