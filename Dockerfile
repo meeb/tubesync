@@ -26,9 +26,9 @@ ARG TARGETARCH
 ENV DEBIAN_FRONTEND="noninteractive" \
     APT_KEEP_ARCHIVES=1 \
     HOME="/root" \
-    LANGUAGE="en_US.UTF-8" \
-    LANG="en_US.UTF-8" \
-    LC_ALL="en_US.UTF-8" \
+    LANGUAGE="en_US.utf8" \
+    LANG="en_US.utf8" \
+    LC_ALL="en_US.utf8" \
     TERM="xterm" \
     # Do not include compiled byte-code
     PIP_NO_COMPILE=1 \
@@ -51,7 +51,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     LC_ALL='C' LANG='C' LANGUAGE='C' \
     apt-get -y --no-install-recommends install locales && \
     # localedef -v -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8 && \
-    printf -- "${LC_ALL} UTF-8\n" > /etc/locale.gen && \
+    printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
     locale-gen && \
     # Clean up
     apt-get -y autopurge && \
