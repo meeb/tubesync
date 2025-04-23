@@ -1108,6 +1108,7 @@ class Media(models.Model):
 
     def metadata_clear(self, /, *, save=False):
         self.metadata = None
+        setattr(self, '_cached_metadata_dict', None)
         if save:
             self.save()
 
