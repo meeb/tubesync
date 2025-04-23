@@ -349,10 +349,10 @@ def index_source_task(source_id):
             if new_media_instance:
                 log.info(f'Indexed new media: {source} / {media}')
                 log.info(f'Scheduling task to download metadata for: {media.url}')
-                verbose_name = _('Downloading metadata for "{}"')
+                verbose_name = _('Downloading metadata for: {}: "{}"')
                 download_media_metadata(
                     str(media.pk),
-                    verbose_name=verbose_name.format(media.pk),
+                    verbose_name=verbose_name.format(media.key, media.name),
                 )
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
