@@ -494,7 +494,8 @@ def download_media_metadata(media_id):
     if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
         response = filter_response(metadata, True)
     media.ingest_metadata(response)
-    media.metadata = media.metadata_dumps(arg_dict=response)
+    pointer_dict = {'_using_table': True}
+    media.metadata = media.metadata_dumps(arg_dict=pointer_dict)
     upload_date = media.upload_date
     # Media must have a valid upload date
     if upload_date:
