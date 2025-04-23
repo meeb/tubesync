@@ -48,9 +48,11 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     set -x && \
     apt-get update && \
     # Install locales
+    LC_ALL='C' LANG='C' LANGUAGE='C' \
     apt-get -y --no-install-recommends install locales && \
-    printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
-    locale-gen en_US.UTF-8 && \
+    # localedef -v -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8 && \
+    printf -- "${LC_ALL} UTF-8\n" > /etc/locale.gen && \
+    locale-gen && \
     # Clean up
     apt-get -y autopurge && \
     apt-get -y autoclean && \
