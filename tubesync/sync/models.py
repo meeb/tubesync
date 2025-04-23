@@ -1144,11 +1144,18 @@ class Media(models.Model):
     def save_to_metadata(self, key, value, /):
         data = self.loaded_metadata
         data[key] = value
-        #epoch = self.get_metadata_first_value('epoch', arg_dict=data)
-        #migrated = dict(migrated=True, epoch=epoch)
-        self.metadata = self.metadata_dumps(arg_dict=data)
-        self.save()
         self.ingest_metadata(data)
+        using_new_metadata = self.get_metadata_first_value(
+            ('migrated', '_using_table',),
+            False,
+            arg_dict=data,
+        )
+        if not using_new_metadata:
+            epoch = self.get_metadata_first_value('epoch', arg_dict=data)
+            migrated = dict(migrated=True, epoch=epoch)
+            migrated['_using_table'] = True
+            self.metadata = self.metadata_dumps(arg_dict=migrated)
+            self.save()
         from common.logger import log
         log.debug(f'Saved to metadata: {self.key} / {self.uuid}: {key=}: {value}')
 
