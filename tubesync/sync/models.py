@@ -1851,12 +1851,12 @@ class Metadata(models.Model):
 
     @atomic(durable=False)
     def ingest_formats(self, formats=list(), /):
-        # delete anything we won't reach
-        self.format.filter(number__gte=len(formats)).delete()
         for number, format in enumerate(formats, start=1):
             mdf, created = self.format.get_or_create(site=self.site, key=self.key, number=number)
             mdf.value = format
             mdf.save()
+        # delete any numbers we did not overwrite or create
+        self.format.filter(number__gt=number).delete()
 
     @property
     def with_formats(self):
