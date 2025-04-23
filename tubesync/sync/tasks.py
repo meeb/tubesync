@@ -31,7 +31,7 @@ from common.logger import log
 from common.errors import ( NoFormatException, NoMediaException,
                             NoMetadataException, DownloadFailedException, )
 from common.utils import (  django_queryset_generator as qs_gen,
-                            json_serial, remove_enclosed, )
+                            remove_enclosed, )
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer
 from .utils import ( get_remote_image, resize_image_to_height, delete_file,
