@@ -502,7 +502,7 @@ def download_media_metadata(media_id):
         media.published = timezone.make_aware(upload_date)
     published = media.metadata_published()
     if published:
-        media.published = timezone.make_aware(published)
+        media.published = published
 
     # Store title in DB so it's fast to access
     if media.metadata_title:
