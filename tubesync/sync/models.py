@@ -1951,7 +1951,7 @@ class MetadataFormat(models.Model):
 
 
     def __str__(self):
-        template = '#{} "{}" from {}: {}'
+        template = '#{:n} "{}" from {}: {}'
         return template.format(
             self.number,
             self.key,
