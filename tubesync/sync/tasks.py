@@ -321,6 +321,7 @@ def index_source_task(source_id):
             # Video has no unique key (ID), it can't be indexed
             continue
         update_task_status(task, tvn_format.format(vn))
+        # media, new_media = Media.objects.get_or_create(key=key, source=source)
         try:
             media = Media.objects.get(key=key, source=source)
         except Media.DoesNotExist:
@@ -340,6 +341,7 @@ def index_source_task(source_id):
             log.debug(f'Indexed media: {vn}: {source} / {media}')
             # log the new media instances
             new_media_instance = (
+                # new_media or
                 media.created and
                 source.last_crawl and
                 media.created >= source.last_crawl
@@ -491,14 +493,15 @@ def download_media_metadata(media_id):
     response = metadata
     if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
         response = filter_response(metadata, True)
-    media.metadata = json.dumps(response, separators=(',', ':'), default=json_serial)
+    media.ingest_metadata(response)
+    media.metadata = media.metadata_dumps(arg_dict=response)
     upload_date = media.upload_date
     # Media must have a valid upload date
     if upload_date:
         media.published = timezone.make_aware(upload_date)
     published = media.metadata_published()
     if published:
-        media.published = published
+        media.published = timezone.make_aware(published)
 
     # Store title in DB so it's fast to access
     if media.metadata_title:
