@@ -1950,6 +1950,16 @@ class MetadataFormat(models.Model):
     )
 
 
+    def __str__(self):
+        template = '#{} "{}" from {}: {}'
+        return template.format(
+            self.number,
+            self.key,
+            self.site,
+            self.value.get('format') or self.value.get('format_id'),
+        )
+
+
 class MediaServer(models.Model):
     '''
         A remote media server, such as a Plex server.
