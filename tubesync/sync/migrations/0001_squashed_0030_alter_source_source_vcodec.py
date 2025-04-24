@@ -72,7 +72,7 @@ class Migration(migrations.Migration):
         ('sync', '0030_alter_source_source_vcodec'),
     ]
 
-    initial = True
+    initial = False
 
     dependencies = [
     ]
