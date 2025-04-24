@@ -11,6 +11,27 @@ from django.db import migrations, models
 # Move them and any dependencies into this file, then update the
 # RunPython operations to refer to the local versions:
 # sync.migrations.0013_fix_elative_media_file
+from django.conf import settings
+from pathlib import Path
+
+def fix_media_file(apps, schema_editor):
+    Media = apps.get_model('sync', 'Media')
+    download_dir = str(settings.DOWNLOAD_ROOT)
+    download_dir_path = Path(download_dir)
+    for media in Media.objects.filter(downloaded=True):
+        if media.media_file.path.startswith(download_dir):
+            media_path = Path(media.media_file.path)
+            relative_path = media_path.relative_to(download_dir_path)
+            media.media_file.name = str(relative_path)
+            media.save()
+
+# Function above has been copied/modified and RunPython operations adjusted.
+
+def media_file_location():
+    return str(settings.DOWNLOAD_ROOT)
+
+# Used the above function for storage location.
+
 
 class Migration(migrations.Migration):
 
@@ -32,12 +53,13 @@ class Migration(migrations.Migration):
             field=models.CharField(blank=True, help_text='Video format (resolution) of the downloaded media', max_length=30, null=True, verbose_name='downloaded format'),
         ),
         migrations.RunPython(
-            code=sync.migrations.0013_fix_elative_media_file.fix_media_file,
+            code=fix_media_file,
+            reverse_code=migrations.RunPython.noop,
         ),
         migrations.AlterField(
             model_name='media',
             name='media_file',
-            field=models.FileField(blank=True, help_text='Media file', max_length=255, null=True, storage=django.core.files.storage.FileSystemStorage(base_url='/media-data/', location='/downloads'), upload_to=sync.models.get_media_file_path, verbose_name='media file'),
+            field=models.FileField(blank=True, help_text='Media file', max_length=255, null=True, storage=django.core.files.storage.FileSystemStorage(base_url='/media-data/', location=media_file_location()), upload_to=sync.models.get_media_file_path, verbose_name='media file'),
         ),
         migrations.AddField(
             model_name='media',
