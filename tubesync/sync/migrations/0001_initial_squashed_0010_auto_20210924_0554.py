@@ -14,7 +14,7 @@ def media_file_location():
 
 class Migration(migrations.Migration):
 
-    replaces = [('sync', '0001_initial'), ('sync', '0002_auto_20201213_0817'), ('sync', '0003_source_copy_thumbnails'), ('sync', '0004_source_media_format'), ('sync', '0005_auto_20201219_0312'), ('sync', '0006_source_write_nfo'), ('sync', '0007_auto_20201219_0645'), ('sync', '0008_source_download_cap'), ('sync', '0009_auto_20210218_0442'), ('sync', '0010_auto_20210924_0554')]
+    # replaces = [('sync', '0001_initial'), ('sync', '0002_auto_20201213_0817'), ('sync', '0003_source_copy_thumbnails'), ('sync', '0004_source_media_format'), ('sync', '0005_auto_20201219_0312'), ('sync', '0006_source_write_nfo'), ('sync', '0007_auto_20201219_0645'), ('sync', '0008_source_download_cap'), ('sync', '0009_auto_20210218_0442'), ('sync', '0010_auto_20210924_0554')]
 
     initial = True
 
