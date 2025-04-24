@@ -4,7 +4,12 @@ import django.core.files.storage
 import django.db.models.deletion
 import sync.models
 import uuid
+from django.conf import settings
 from django.db import migrations, models
+
+
+def media_file_location():
+    return str(settings.DOWNLOAD_ROOT)
 
 
 class Migration(migrations.Migration):
@@ -75,7 +80,7 @@ class Migration(migrations.Migration):
                 ('thumb_height', models.PositiveSmallIntegerField(blank=True, help_text='Height (Y) of the thumbnail', null=True, verbose_name='thumb height')),
                 ('metadata', models.TextField(blank=True, help_text='JSON encoded metadata for the media', null=True, verbose_name='metadata')),
                 ('can_download', models.BooleanField(db_index=True, default=False, help_text='Media has a matching format and can be downloaded', verbose_name='can download')),
-                ('media_file', models.FileField(blank=True, help_text='Media file', max_length=255, null=True, storage=django.core.files.storage.FileSystemStorage(location='/home/meeb/Repos/github.com/meeb/tubesync/tubesync/downloads'), upload_to=sync.models.get_media_file_path, verbose_name='media file')),
+                ('media_file', models.FileField(blank=True, help_text='Media file', max_length=255, null=True, storage=django.core.files.storage.FileSystemStorage(location=media_file_location()), upload_to=sync.models.get_media_file_path, verbose_name='media file')),
                 ('skip', models.BooleanField(db_index=True, default=False, help_text='Media will be skipped and not downloaded', verbose_name='skip')),
                 ('downloaded', models.BooleanField(db_index=True, default=False, help_text='Media has been downloaded', verbose_name='downloaded')),
                 ('download_date', models.DateTimeField(blank=True, db_index=True, help_text='Date and time the download completed', null=True, verbose_name='download date')),
