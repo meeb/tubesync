@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0020_auto_20231024_1825'),
+        ('sync', '0011_auto_20220201_1654_squashed_0020_auto_20231024_1825'),
     ]
 
     operations = [
