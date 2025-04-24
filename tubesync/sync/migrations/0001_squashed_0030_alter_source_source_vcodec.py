@@ -39,7 +39,17 @@ class Migration(migrations.Migration):
 
     replaces = [
         ('sync', '0001_initial_squashed_0010_auto_20210924_0554'),
-        ('sync', '0011_auto_20220201_1654_squashed_0020_auto_20231024_1825'),
+        # ('sync', '0011_auto_20220201_1654_squashed_0020_auto_20231024_1825'),
+        ('sync', '0011_auto_20220201_1654'),
+        ('sync', '0012_alter_media_downloaded_format'),
+        ('sync', '0013_fix_elative_media_file'),
+        ('sync', '0014_alter_media_media_file'),
+        ('sync', '0015_auto_20230213_0603'),
+        ('sync', '0016_auto_20230214_2052'),
+        ('sync', '0017_alter_source_sponsorblock_categories'),
+        ('sync', '0018_source_subtitles'),
+        ('sync', '0019_add_delete_removed_media'),
+        ('sync', '0020_auto_20231024_1825'),
         ('sync', '0021_source_copy_channel_images'),
         ('sync', '0022_add_delete_files_on_disk'),
         ('sync', '0023_media_duration_filter'),
