@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
 
     replaces = [
         ('sync', '0001_initial_squashed_0010_auto_20210924_0554'),
-        # ('sync', '0011_auto_20220201_1654_squashed_0020_auto_20231024_1825'),
+        ('sync', '0011_auto_20220201_1654_squashed_0020_auto_20231024_1825'),
         ('sync', '0011_auto_20220201_1654'),
         ('sync', '0012_alter_media_downloaded_format'),
         ('sync', '0013_fix_elative_media_file'),
