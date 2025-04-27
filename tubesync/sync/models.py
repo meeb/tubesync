@@ -1144,13 +1144,13 @@ class Media(models.Model):
 
     def save_to_metadata(self, key, value, /):
         data = self.loaded_metadata
-        data[key] = value
-        self.ingest_metadata(data)
         using_new_metadata = self.get_metadata_first_value(
             ('migrated', '_using_table',),
             False,
             arg_dict=data,
         )
+        data[key] = value
+        self.ingest_metadata(data)
         if not using_new_metadata:
             epoch = self.get_metadata_first_value('epoch', arg_dict=data)
             migrated = dict(migrated=True, epoch=epoch)
@@ -1851,12 +1851,14 @@ class Metadata(models.Model):
 
     @atomic(durable=False)
     def ingest_formats(self, formats=list(), /):
+        number = 0
         for number, format in enumerate(formats, start=1):
             mdf, created = self.format.get_or_create(site=self.site, key=self.key, number=number)
             mdf.value = format
             mdf.save()
-        # delete any numbers we did not overwrite or create
-        self.format.filter(site=self.site, key=self.key, number__gt=number).delete()
+        if number > 0:
+            # delete any numbers we did not overwrite or create
+            self.format.filter(site=self.site, key=self.key, number__gt=number).delete()
 
     @property
     def with_formats(self):
