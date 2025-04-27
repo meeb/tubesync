@@ -1856,7 +1856,7 @@ class Metadata(models.Model):
             mdf.value = format
             mdf.save()
         # delete any numbers we did not overwrite or create
-        self.format.filter(number__gt=number).delete()
+        self.format.filter(site=self.site, key=self.key, number__gt=number).delete()
 
     @property
     def with_formats(self):
