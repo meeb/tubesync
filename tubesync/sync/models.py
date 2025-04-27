@@ -1144,13 +1144,13 @@ class Media(models.Model):
 
     def save_to_metadata(self, key, value, /):
         data = self.loaded_metadata
-        data[key] = value
-        self.ingest_metadata(data)
         using_new_metadata = self.get_metadata_first_value(
             ('migrated', '_using_table',),
             False,
             arg_dict=data,
         )
+        data[key] = value
+        self.ingest_metadata(data)
         if not using_new_metadata:
             epoch = self.get_metadata_first_value('epoch', arg_dict=data)
             migrated = dict(migrated=True, epoch=epoch)
