@@ -1121,7 +1121,7 @@ class Media(models.Model):
 
     def metadata_loads(self, arg_str='{}'):
         data = json.loads(arg_str) or self.loaded_metadata
-        return self.ingest_metadata(data)
+        return data
 
 
     @atomic(durable=False)
