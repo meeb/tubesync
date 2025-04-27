@@ -219,7 +219,7 @@ def media_post_save(sender, instance, created, **kwargs):
         if not existing_media_download_task:
             # Recalculate the "can_download" flag, this may
             # need to change if the source specifications have been changed
-            if instance.metadata:
+            if media.has_metadata:
                 if instance.get_format_str():
                     if not instance.can_download:
                         instance.can_download = True
@@ -249,12 +249,12 @@ def media_post_save(sender, instance, created, **kwargs):
             )
 
     # If the media is missing metadata schedule it to be downloaded
-    if not (instance.skip or instance.metadata or existing_media_metadata_task):
+    if not (media.skip or media.has_metadata or existing_media_metadata_task):
         log.info(f'Scheduling task to download metadata for: {instance.url}')
-        verbose_name = _('Downloading metadata for "{}"')
+        verbose_name = _('Downloading metadata for: {}: "{}"')
         download_media_metadata(
             str(instance.pk),
-            verbose_name=verbose_name.format(instance.pk),
+            verbose_name=verbose_name.format(media.key, media.name),
         )
     # If the media is missing a thumbnail schedule it to be downloaded (unless we are skipping this media)
     if not instance.thumb_file_exists:

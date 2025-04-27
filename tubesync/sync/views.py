@@ -664,7 +664,7 @@ class MediaSkipView(FormView, SingleObjectMixin):
             for file in all_related_files:
                 delete_file(file)
         # Reset all download data
-        self.object.metadata = None
+        self.object.metadata_clear()
         self.object.downloaded = False
         self.object.downloaded_audio_codec = None
         self.object.downloaded_video_codec = None
