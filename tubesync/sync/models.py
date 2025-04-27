@@ -1115,7 +1115,12 @@ class Media(models.Model):
 
     def metadata_dumps(self, arg_dict=dict()):
         from common.utils import json_serial
-        data = arg_dict or self.new_metadata.with_formats
+        fallback = dict()
+        try:
+            fallback.update(self.new_metadata.with_formats)
+        except ObjectDoesNotExist:
+            pass
+        data = arg_dict or fallback
         return json.dumps(data, separators=(',', ':'), default=json_serial)
 
 
