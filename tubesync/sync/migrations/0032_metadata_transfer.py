@@ -16,8 +16,14 @@ def restore_metadata_column(apps, schema_editor):
     qs = Media.objects.filter(metadata__isnull=False)
     for media in qs_gen(qs):
         metadata = media.loaded_metadata
-        del metadata['migrated']
-        del metadata['_using_table']
+        try:
+            del metadata['migrated']
+        except KeyError:
+            pass
+        try:
+            del metadata['_using_table']
+        except KeyError:
+            pass
         media.metadata = media.metadata_dumps(arg_dict=metadata)
         media.save()
 
