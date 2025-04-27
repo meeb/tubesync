@@ -11,7 +11,7 @@ class Command(BaseCommand):
     help = 'Resets all media item metadata'
 
     def handle(self, *args, **options):
-        log.info('Resettings all media metadata...')
+        log.info('Resetting all media metadata...')
         # Delete all metadata
         Metadata.objects.all().delete()
         # Trigger the save signal on each media item
