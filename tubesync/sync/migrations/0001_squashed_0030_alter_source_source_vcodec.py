@@ -38,6 +38,7 @@ def media_file_location():
 class Migration(migrations.Migration):
 
     replaces = [
+        # ('sync', '0001_initial_squashed_0010_auto_20210924_0554'),
         ('sync', '0001_initial'),
         ('sync', '0002_auto_20201213_0817'),
         ('sync', '0003_source_copy_thumbnails'),
@@ -48,6 +49,7 @@ class Migration(migrations.Migration):
         ('sync', '0008_source_download_cap'),
         ('sync', '0009_auto_20210218_0442'),
         ('sync', '0010_auto_20210924_0554'),
+        # ('sync', '0011_auto_20220201_1654_squashed_0020_auto_20231024_1825'),
         ('sync', '0011_auto_20220201_1654'),
         ('sync', '0012_alter_media_downloaded_format'),
         ('sync', '0013_fix_elative_media_file'),

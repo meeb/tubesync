@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from common.logger import log
+from common.timestamp import timestamp_to_datetime
 from sync.choices import FileExtension
 from sync.models import Source, Media
 
@@ -55,11 +56,11 @@ class Command(BaseCommand):
                 item.downloaded = True
                 item.downloaded_filesize = Path(filepath).stat().st_size
                 # set a reasonable download date
-                date = item.metadata_published(Path(filepath).stat().st_mtime)
+                date = timestamp_to_datetime(Path(filepath).stat().st_mtime)
                 if item.published and item.published > date:
                     date = item.published
                 if item.has_metadata:
-                    metadata_date = item.metadata_published(item.get_metadata_first_value('epoch', 0))
+                    metadata_date = timestamp_to_datetime(item.get_metadata_first_value('epoch', 0))
                     if metadata_date and metadata_date > date:
                         date = metadata_date
                 if item.download_date and item.download_date > date:

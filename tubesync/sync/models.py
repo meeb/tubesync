@@ -9,7 +9,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 from django.conf import settings
 from django.db import models
-from django.core.exceptions import SuspiciousOperation
+from django.core.exceptions import ObjectDoesNotExist, SuspiciousOperation
 from django.core.files.storage import FileSystemStorage
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import RegexValidator
@@ -19,16 +19,17 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.logger import log
 from common.errors import NoFormatException
-from common.utils import clean_filename, clean_emoji
-from .youtube import (get_media_info as get_youtube_media_info,
-                      download_media as download_youtube_media,
-                      get_channel_image_info as get_youtube_channel_image_info)
+from common.utils import (  clean_filename, clean_emoji,
+                            django_queryset_generator as qs_gen, )
+from .youtube import (  get_media_info as get_youtube_media_info,
+                        download_media as download_youtube_media,
+                        get_channel_image_info as get_youtube_channel_image_info)
 from .utils import (seconds_to_timestr, parse_media_format, filter_response,
                     write_text_file, mkdir_p, directory_and_stem, glob_quote)
-from .matching import (get_best_combined_format, get_best_audio_format,
-                       get_best_video_format)
+from .matching import ( get_best_combined_format, get_best_audio_format,
+                        get_best_video_format)
 from .fields import CommaSepChoiceField
-from .choices import (Val, CapChoices, Fallback, FileExtension,
+from .choices import (  Val, CapChoices, Fallback, FileExtension,
                         FilterSeconds, IndexSchedule, MediaServerType,
                         MediaState, SourceResolution, SourceResolutionInteger,
                         SponsorBlock_Category, YouTube_AudioCodec,
@@ -645,7 +646,7 @@ class Media(models.Model):
         Source,
         on_delete=models.CASCADE,
         related_name='media_source',
-        help_text=_('Source the media belongs to')
+        help_text=_('Source the media belongs to'),
     )
     published = models.DateTimeField(
         _('published'),
@@ -812,6 +813,7 @@ class Media(models.Model):
         )
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        setattr(self, '_cached_metadata_dict', None)
         # Correct the path after a source is renamed
         if self.created and self.downloaded and not self.media_file_exists:
             fp_list = list((self.filepath,))
@@ -838,9 +840,9 @@ class Media(models.Model):
             )
         )
         if update_md:
+            self.title = self.metadata_title[:200] or self.title
+            self.duration = self.metadata_duration or self.duration
             setattr(self, '_cached_metadata_dict', None)
-            self.title = self.metadata_title[:200]
-            self.duration = self.metadata_duration
             if update_fields is not None:
                 # If only some fields are being updated, make sure we update title and duration if metadata changes
                 update_fields = {"title", "duration"}.union(update_fields)
@@ -1104,31 +1106,62 @@ class Media(models.Model):
         return self.metadata is not None
 
 
-    @atomic(durable=False)
-    def metadata_load(self, arg_str='{}'):
+    def metadata_clear(self, /, *, save=False):
+        self.metadata = None
+        setattr(self, '_cached_metadata_dict', None)
+        if save:
+            self.save()
+
+
+    def metadata_dumps(self, arg_dict=dict()):
+        from common.utils import json_serial
+        fallback = dict()
+        try:
+            fallback.update(self.new_metadata.with_formats)
+        except ObjectDoesNotExist:
+            pass
+        data = arg_dict or fallback
+        return json.dumps(data, separators=(',', ':'), default=json_serial)
+
+
+    def metadata_loads(self, arg_str='{}'):
         data = json.loads(arg_str) or self.loaded_metadata
-        site = self.get_metadata_first_value('extractor_key', arg_dict=data)
-        epoch = self.get_metadata_first_value('epoch', arg_dict=data)
-        epoch_dt = self.metadata_published( epoch )
-        release = self.get_metadata_first_value(('release_timestamp', 'timestamp',), arg_dict=data)
-        release_dt = self.metadata_published( release )
-        md = self.metadata_media.get_or_create(site=site, key=self.key)[0]
-        md.value = data
-        formats = md.value.pop(self.get_metadata_field('formats'), list())
-        md.retrieved = epoch_dt
-        md.uploaded = self.published
-        md.published = release_dt or self.published
-        md.save()
-        md.ingest_formats(formats)
+        return data
+
+
+    @atomic(durable=False)
+    def ingest_metadata(self, data):
+        assert isinstance(data, dict), type(data)
+        site = self.get_metadata_first_value(
+            'extractor_key',
+            'Youtube',
+            arg_dict=data,
+        )
+        md_model = self._meta.fields_map.get('new_metadata').related_model
+        md, created = md_model.objects.get_or_create(
+            media_id=self.pk,
+            site=site,
+            key=self.key,
+        )
+        setattr(self, '_cached_metadata_dict', None)
+        return md.ingest_metadata(data)
 
 
     def save_to_metadata(self, key, value, /):
         data = self.loaded_metadata
+        using_new_metadata = self.get_metadata_first_value(
+            ('migrated', '_using_table',),
+            False,
+            arg_dict=data,
+        )
         data[key] = value
-        from common.utils import json_serial
-        compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
-        self.metadata = compact_json
-        self.save(update_fields={'metadata'})
+        self.ingest_metadata(data)
+        if not using_new_metadata:
+            epoch = self.get_metadata_first_value('epoch', arg_dict=data)
+            migrated = dict(migrated=True, epoch=epoch)
+            migrated['_using_table'] = True
+            self.metadata = self.metadata_dumps(arg_dict=migrated)
+            self.save()
         from common.logger import log
         log.debug(f'Saved to metadata: {self.key} / {self.uuid}: {key=}: {value}')
 
@@ -1141,16 +1174,15 @@ class Media(models.Model):
             if '_reduce_data_ran_at' in data.keys():
                 total_seconds = data['_reduce_data_ran_at']
                 assert isinstance(total_seconds, int), type(total_seconds)
-                ran_at = self.metadata_published(total_seconds)
+                ran_at = self.ts_to_dt(total_seconds)
                 if (now - ran_at) < timedelta(hours=1):
                     return data
 
-            from common.utils import json_serial
-            compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
+            compact_json = self.metadata_dumps(arg_dict=data)
 
             filtered_data = filter_response(data, True)
             filtered_data['_reduce_data_ran_at'] = round((now - self.posix_epoch).total_seconds())
-            filtered_json = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
+            filtered_json = self.metadata_dumps(arg_dict=filtered_data)
         except Exception as e:
             from common.logger import log
             log.exception('reduce_data: %s', e)
@@ -1185,6 +1217,11 @@ class Media(models.Model):
                 data = json.loads(self.metadata or "{}")
             if not isinstance(data, dict):
                 return {}
+            # if hasattr(self, 'new_metadata'):
+            try:
+                data.update(self.new_metadata.with_formats)
+            except ObjectDoesNotExist:
+                pass
             setattr(self, '_cached_metadata_dict', data)
             return data
         except Exception as e:
@@ -1207,13 +1244,13 @@ class Media(models.Model):
         attempted_seconds = data.get(attempted_key)
         if attempted_seconds:
             # skip for recent unsuccessful refresh attempts also
-            attempted_dt = self.metadata_published(attempted_seconds)
+            attempted_dt = self.ts_to_dt(attempted_seconds)
             if (now - attempted_dt) < timedelta(seconds=self.source.index_schedule):
                 return False
         # skip for recent successful formats refresh
         refreshed_key = 'formats_epoch'
         formats_seconds = data.get(refreshed_key, metadata_seconds)
-        metadata_dt = self.metadata_published(formats_seconds)
+        metadata_dt = self.ts_to_dt(formats_seconds)
         if (now - metadata_dt) < timedelta(seconds=self.source.index_schedule):
             return False
 
@@ -1249,18 +1286,23 @@ class Media(models.Model):
     def metadata_title(self):
         return self.get_metadata_first_value(('fulltitle', 'title',), '')
 
+    def ts_to_dt(self, /, timestamp):
+        assert timestamp is not None
+        try:
+            timestamp_float = float(timestamp)
+        except Exception as e:
+            log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
+            pass
+        else:
+            return self.posix_epoch + timedelta(seconds=timestamp_float)
+        return None
+
     def metadata_published(self, timestamp=None):
         if timestamp is None:
-            timestamp = self.get_metadata_first_value('timestamp')
-        if timestamp is not None:
-            try:
-                timestamp_float = float(timestamp)
-            except Exception as e:
-                log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
-                pass
-            else:
-                return self.posix_epoch + timedelta(seconds=timestamp_float)
-        return None
+            timestamp = self.get_metadata_first_value(
+                ('release_timestamp', 'timestamp',)
+            )
+        return self.ts_to_dt(timestamp)
 
     @property
     def slugtitle(self):
@@ -1729,11 +1771,13 @@ class Metadata(models.Model):
         Metadata for an indexed `Media` item.
     '''
     class Meta:
-        verbose_name = _('Metadata about a Media item')
-        verbose_name_plural = _('Metadata about a Media item')
+        db_table = 'sync_media_metadata'
+        verbose_name = _('Metadata about Media')
+        verbose_name_plural = _('Metadata about Media')
         unique_together = (
             ('media', 'site', 'key'),
         )
+        get_latest_by = ["-retrieved", "-created"]
 
     uuid = models.UUIDField(
         _('uuid'),
@@ -1742,18 +1786,20 @@ class Metadata(models.Model):
         default=uuid.uuid4,
         help_text=_('UUID of the metadata'),
     )
-    media = models.ForeignKey(
+    media = models.OneToOneField(
         Media,
         # on_delete=models.DO_NOTHING,
-        on_delete=models.CASCADE,
-        related_name='metadata_media',
+        on_delete=models.SET_NULL,
+        related_name='new_metadata',
         help_text=_('Media the metadata belongs to'),
-        null=False,
+        null=True,
+        parent_link=False,
     )
     site = models.CharField(
         _('site'),
         max_length=256,
         blank=True,
+        db_index=True,
         null=False,
         default='Youtube',
         help_text=_('Site from which the metadata was retrieved'),
@@ -1762,6 +1808,7 @@ class Metadata(models.Model):
         _('key'),
         max_length=256,
         blank=True,
+        db_index=True,
         null=False,
         default='',
         help_text=_('Media identifier at the site from which the metadata was retrieved'),
@@ -1780,11 +1827,13 @@ class Metadata(models.Model):
     )
     uploaded = models.DateTimeField(
         _('uploaded'),
+        db_index=True,
         null=True,
         help_text=_('Date and time the media was uploaded'),
     )
     published = models.DateTimeField(
         _('published'),
+        db_index=True,
         null=True,
         help_text=_('Date and time the media was published'),
     )
@@ -1796,12 +1845,71 @@ class Metadata(models.Model):
         help_text=_('JSON metadata object'),
     )
 
+
+    def __str__(self):
+        template = '"{}" from {} at: {}'
+        return template.format(
+            self.key,
+            self.site,
+            self.retrieved.isoformat(timespec='seconds'),
+        )
+
     @atomic(durable=False)
     def ingest_formats(self, formats=list(), /):
+        number = 0
         for number, format in enumerate(formats, start=1):
-            mdf = self.metadataformat_metadata.get_or_create(site=self.site, key=self.key, code=format.get('format_id'), number=number)[0]
+            mdf, created = self.format.get_or_create(site=self.site, key=self.key, number=number)
             mdf.value = format
             mdf.save()
+        if number > 0:
+            # delete any numbers we did not overwrite or create
+            self.format.filter(site=self.site, key=self.key, number__gt=number).delete()
+
+    @property
+    def with_formats(self):
+        formats = self.format.all().order_by('number')
+        formats_list = [ f.value for f in qs_gen(formats) ]
+        metadata = self.value.copy()
+        metadata.update(dict(formats=formats_list))
+        return metadata
+
+    @atomic(durable=False)
+    def ingest_metadata(self, data):
+        assert isinstance(data, dict), type(data)
+        from common.timestamp import timestamp_to_datetime
+
+        try:
+            self.retrieved = timestamp_to_datetime(
+                self.media.get_metadata_first_value(
+                    'epoch',
+                    arg_dict=data,
+                )
+            ) or self.created
+        except AssertionError:
+            self.retrieved = self.created
+
+        try:
+            self.published = timestamp_to_datetime(
+                self.media.get_metadata_first_value(
+                    ('release_timestamp', 'timestamp',),
+                    arg_dict=data,
+                )
+            ) or self.media.published
+        except AssertionError:
+            self.published = self.media.published
+
+        self.value = data.copy() # try not to have side-effects for the caller
+        formats_key = self.media.get_metadata_field('formats')
+        formats = self.value.pop(formats_key, list())
+        self.uploaded = min(
+            self.published,
+            self.retrieved,
+            self.media.created,
+        )
+        self.save()
+        self.ingest_formats(formats)
+
+        return self.with_formats
 
 
 class MetadataFormat(models.Model):
@@ -1809,12 +1917,13 @@ class MetadataFormat(models.Model):
         A format from the Metadata for an indexed `Media` item.
     '''
     class Meta:
-        verbose_name = _('Format from the Metadata about a Media item')
-        verbose_name_plural = _('Formats from the Metadata about a Media item')
+        db_table = f'{Metadata._meta.db_table}_format'
+        verbose_name = _('Format from Media Metadata')
+        verbose_name_plural = _('Formats from Media Metadata')
         unique_together = (
             ('metadata', 'site', 'key', 'number'),
-            ('metadata', 'site', 'key', 'code'),
         )
+        ordering = ['site', 'key', 'number']
 
     uuid = models.UUIDField(
         _('uuid'),
@@ -1827,7 +1936,7 @@ class MetadataFormat(models.Model):
         Metadata,
         # on_delete=models.DO_NOTHING,
         on_delete=models.CASCADE,
-        related_name='metadataformat_metadata',
+        related_name='format',
         help_text=_('Metadata the format belongs to'),
         null=False,
     )
@@ -1835,6 +1944,7 @@ class MetadataFormat(models.Model):
         _('site'),
         max_length=256,
         blank=True,
+        db_index=True,
         null=False,
         default='Youtube',
         help_text=_('Site from which the format is available'),
@@ -1843,23 +1953,16 @@ class MetadataFormat(models.Model):
         _('key'),
         max_length=256,
         blank=True,
+        db_index=True,
         null=False,
         default='',
-        help_text=_('Media identifier at the site for which this format is available'),
+        help_text=_('Media identifier at the site from which this format is available'),
     )
     number = models.PositiveIntegerField(
         _('number'),
         blank=False,
         null=False,
         help_text=_('Ordering number for this format')
-    )
-    code = models.CharField(
-        _('code'),
-        max_length=64,
-        blank=True,
-        null=False,
-        default='',
-        help_text=_('Format identification code'),
     )
     value = models.JSONField(
         _('value'),
@@ -1868,6 +1971,16 @@ class MetadataFormat(models.Model):
         default=dict,
         help_text=_('JSON metadata format object'),
     )
+
+
+    def __str__(self):
+        template = '#{:n} "{}" from {}: {}'
+        return template.format(
+            self.number,
+            self.key,
+            self.site,
+            self.value.get('format') or self.value.get('format_id'),
+        )
 
 
 class MediaServer(models.Model):

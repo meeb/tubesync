@@ -20,7 +20,7 @@ from .utils import mkdir_p
 import yt_dlp
 import yt_dlp.patch.check_thumbnails
 import yt_dlp.patch.fatal_http_errors
-from yt_dlp.utils import remove_end, OUTTMPL_TYPES
+from yt_dlp.utils import remove_end, shell_quote, OUTTMPL_TYPES
 
 
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
@@ -325,9 +325,31 @@ def download_media(
     if extension in audio_exts:
         pp_opts.extractaudio = True
         pp_opts.nopostoverwrites = False
+        # The ExtractAudio post processor can change the extension.
+        # This post processor is to change the final filename back
+        # to what we are expecting it to be.
+        final_path = Path(output_file)
+        try:
+            final_path = final_path.resolve(strict=True)
+        except FileNotFoundError:
+            # This is very likely the common case
+            final_path = Path(output_file).resolve(strict=False)
+        expected_file = shell_quote(str(final_path))
+        cmds = pp_opts.exec_cmd.get('after_move', list())
+        # It is important that we use a tuple for strings.
+        # Otherwise, list adds each character instead.
+        # That last comma is really necessary!
+        cmds += (
+            f'test -f {expected_file} || '
+            'mv -T -u -- %(filepath,_filename|)q '
+            f'{expected_file}',
+        )
+        # assignment is the quickest way to cover both 'get' cases
+        pp_opts.exec_cmd['after_move'] = cmds
 
     ytopts = {
         'format': media_format,
+        'final_ext': extension,
         'merge_output_format': extension,
         'outtmpl': os.path.basename(output_file),
         'quiet': False if settings.DEBUG else True,
@@ -391,6 +413,15 @@ def download_media(
         ytopts['postprocessor_args'].update({
             'modifychapters+ffmpeg': codec_options,
         })
+
+    # Provide the user control of 'overwrites' in the post processors.
+    pp_opts.overwrites = opts.get(
+        'overwrites',
+        ytopts.get(
+            'overwrites',
+            default_opts.overwrites,
+        ),
+    )
 
     # Create the post processors list.
     # It already included user configured post processors as well.

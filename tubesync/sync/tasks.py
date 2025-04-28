@@ -31,7 +31,7 @@ from common.logger import log
 from common.errors import ( NoFormatException, NoMediaException,
                             NoMetadataException, DownloadFailedException, )
 from common.utils import (  django_queryset_generator as qs_gen,
-                            json_serial, remove_enclosed, )
+                            remove_enclosed, )
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer
 from .utils import ( get_remote_image, resize_image_to_height, delete_file,
@@ -321,6 +321,7 @@ def index_source_task(source_id):
             # Video has no unique key (ID), it can't be indexed
             continue
         update_task_status(task, tvn_format.format(vn))
+        # media, new_media = Media.objects.get_or_create(key=key, source=source)
         try:
             media = Media.objects.get(key=key, source=source)
         except Media.DoesNotExist:
@@ -340,6 +341,7 @@ def index_source_task(source_id):
             log.debug(f'Indexed media: {vn}: {source} / {media}')
             # log the new media instances
             new_media_instance = (
+                # new_media or
                 media.created and
                 source.last_crawl and
                 media.created >= source.last_crawl
@@ -347,10 +349,10 @@ def index_source_task(source_id):
             if new_media_instance:
                 log.info(f'Indexed new media: {source} / {media}')
                 log.info(f'Scheduling task to download metadata for: {media.url}')
-                verbose_name = _('Downloading metadata for "{}"')
+                verbose_name = _('Downloading metadata for: {}: "{}"')
                 download_media_metadata(
                     str(media.pk),
-                    verbose_name=verbose_name.format(media.pk),
+                    verbose_name=verbose_name.format(media.key, media.name),
                 )
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
@@ -491,7 +493,9 @@ def download_media_metadata(media_id):
     response = metadata
     if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
         response = filter_response(metadata, True)
-    media.metadata = json.dumps(response, separators=(',', ':'), default=json_serial)
+    media.ingest_metadata(response)
+    pointer_dict = {'_using_table': True}
+    media.metadata = media.metadata_dumps(arg_dict=pointer_dict)
     upload_date = media.upload_date
     # Media must have a valid upload date
     if upload_date:
@@ -510,7 +514,7 @@ def download_media_metadata(media_id):
 
     # Don't filter media here, the post_save signal will handle that
     save_model(media)
-    log.info(f'Saved {len(media.metadata)} bytes of metadata for: '
+    log.info(f'Saved {len(media.metadata_dumps())} bytes of metadata for: '
              f'{source} / {media}: {media_id}')
 
 
