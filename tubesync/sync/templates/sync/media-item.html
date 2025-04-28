@@ -39,6 +39,9 @@
       <div class="card-image">
         <img src="{% if media.thumb %}{% url 'sync:media-thumb' pk=media.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}">
       </div>
+      <div>
+        <a href="{% url 'sync:redownload-thumb' pk=media.pk %}"><i class="fas fa-arrow-rotate-right"></i></a>
+      </div>
     </div>
   </div>
 </div>

@@ -546,6 +546,7 @@ class MediaItemView(DetailView):
     template_name = 'sync/media-item.html'
     model = Media
     messages = {
+        'thumbnail': _('Thumbnail has been scheduled to redownload'),
         'redownloading': _('Media file has been deleted and scheduled to redownload'),
         'skipped': _('Media file has been deleted and marked to never download'),
         'enabled': _('Media has been re-enabled and will be downloaded'),
@@ -580,6 +581,24 @@ class MediaItemView(DetailView):
         data['filename_path'] = pathlib.Path(self.object.filename)
         data['media_file_path'] = pathlib.Path(self.object.media_file.path) if self.object.media_file else None
         return data
+
+    def get(self, *args, **kwargs):
+        if args[0].path.startswith("/media-thumb-redownload/"):
+            media = Media.objects.get(pk=kwargs["pk"])
+            if media is None:
+                return HttpResponseNotFound()
+
+            verbose_name = _('Redownload thumbnail for "{}": {}')
+            download_media_thumbnail(
+                str(media.pk),
+                media.thumbnail,
+                verbose_name=verbose_name.format(media.key, media.name),
+            )
+            url = reverse_lazy('sync:media-item')
+            url = append_uri_params(url, {'message': 'thumbnail'})
+            return HttpResponseRedirect(url)
+        else:
+            return super().get(self, *args, **kwargs)
 
 
 class MediaRedownloadView(FormView, SingleObjectMixin):
