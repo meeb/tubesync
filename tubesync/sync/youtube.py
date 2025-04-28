@@ -188,7 +188,6 @@ def get_media_info(url, /, *, days=None, info_json=None):
     opts.update({
         'ignoreerrors': False, # explicitly set this to catch exceptions
         'ignore_no_formats_error': False, # we must fail first to try again with this enabled
-        'overwrites': False,
         'skip_download': True,
         'simulate': False,
         'logger': log,
