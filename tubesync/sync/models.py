@@ -572,8 +572,11 @@ class Source(models.Model):
         return entries
 
 def get_media_thumb_path(instance, filename):
-    fileid = str(instance.uuid)
-    filename = f'{fileid.lower()}.jpg'
+    # we don't want to use alternate names for thumb files
+    if instance.thumb:
+        instance.thumb.delete(save=False)
+    fileid = str(instance.uuid).lower()
+    filename = f'{fileid}.jpg'
     prefix = fileid[:2]
     return Path('thumbs') / prefix / filename
 
