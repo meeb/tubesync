@@ -25,7 +25,8 @@ from .youtube import (  get_media_info as get_youtube_media_info,
                         download_media as download_youtube_media,
                         get_channel_image_info as get_youtube_channel_image_info)
 from .utils import (seconds_to_timestr, parse_media_format, filter_response,
-                    write_text_file, mkdir_p, directory_and_stem, glob_quote)
+                    write_text_file, mkdir_p, directory_and_stem, glob_quote,
+                    multi_key_sort)
 from .matching import ( get_best_combined_format, get_best_audio_format,
                         get_best_video_format)
 from .fields import CommaSepChoiceField
@@ -1267,6 +1268,27 @@ class Media(models.Model):
         response = metadata
         if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
             response = filter_response(metadata, True)
+
+        # save the new list of thumbnails
+        thumbnails = self.get_metadata_first_value(
+            'thumbnails',
+            self.get_metadata_first_value('thumbnails', []),
+            arg_dict=response,
+        )
+        field = self.get_metadata_field('thumbnails')
+        self.save_to_metadata(field, thumbnails)
+
+        # select and save our best thumbnail url
+        try:
+            thumbnail = [ thumb.get('url') for thumb in multi_key_sort(
+                thumbnails,
+                [('preference', True,)],
+            ) if thumb.get('url', '').endswith('.jpg') ][0]
+        except IndexError:
+            pass
+        else:
+            field = self.get_metadata_field('thumbnail')
+            self.save_to_metadata(field, thumbnail)
 
         field = self.get_metadata_field('formats')
         self.save_to_metadata(field, response.get(field, []))
