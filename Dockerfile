@@ -58,6 +58,28 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y autoclean && \
     rm -f /var/cache/debconf/*.dat-old
 
+FROM alpine:${ALPINE_VERSION} AS openresty-debian
+ARG TARGETARCH
+ARG DEBIAN_VERSION
+ADD 'https://openresty.org/package/pubkey.gpg' '/downloaded/pubkey.gpg'
+RUN set -eu ; \
+    decide_arch() { \
+        case "${TARGETARCH}" in \
+            (amd64) printf -- '' ;; \
+            (arm64) printf -- 'arm64/' ;; \
+        esac ; \
+    } ; \
+    set -x ; \
+    mkdir -v -p '/etc/apt/trusted.gpg.d' && \
+    apk --no-cache --no-progress add cmd:gpg2 && \
+    gpg2 --dearmor \
+        -o '/etc/apt/trusted.gpg.d/openresty.gpg' \
+        < '/downloaded/pubkey.gpg' && \
+    mkdir -v -p '/etc/apt/sources.list.d' && \
+    printf -- >| '/etc/apt/sources.list.d/openresty.list' \
+        'deb http://openresty.org/package/%sdebian %s openresty' \
+        "$(decide_arch)" "${DEBIAN_VERSION%-slim}"
+
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
@@ -257,7 +279,36 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
-FROM tubesync-base AS tubesync
+FROM tubesync-base AS tubesync-openresty
+
+COPY --from=openresty-debian \
+    /etc/apt/trusted.gpg.d/openresty.gpg /etc/apt/trusted.gpg.d/openresty.gpg
+COPY --from=openresty-debian \
+    /etc/apt/sources.list.d/openresty.list /etc/apt/sources.list.d/openresty.list
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+  set -x && \
+  apt-get update && \
+  apt-get -y --no-install-recommends install nginx-light openresty && \
+  # Clean up
+  apt-get -y autopurge && \
+  apt-get -y autoclean && \
+  rm -v -f /var/cache/debconf/*.dat-old
+
+FROM tubesync-base AS tubesync-nginx
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+  set -x && \
+  apt-get update && \
+  apt-get -y --no-install-recommends install nginx-light && \
+  # Clean up
+  apt-get -y autopurge && \
+  apt-get -y autoclean && \
+  rm -v -f /var/cache/debconf/*.dat-old
+
+FROM tubesync-openresty AS tubesync
 
 ARG S6_VERSION
 
@@ -282,7 +333,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libmariadb3 \
   libpq5 \
   libwebp7 \
-  nginx-light \
   pipenv \
   pkgconf \
   python3 \
