@@ -330,9 +330,14 @@ def index_source_task(source_id):
         media.duration = float(video.get(fields('duration', media), None) or 0) or None
         media.title = str(video.get(fields('title', media), ''))[:200]
         timestamp = video.get(fields('timestamp', media), None)
-        published_dt = media.metadata_published(timestamp)
-        if published_dt is not None:
-            media.published = published_dt
+        if timestamp is not None:
+            try:
+                published_dt = media.metadata_published(timestamp)
+            except AssertionError:
+                pass
+            else:
+                if published_dt:
+                    media.published = published_dt
         try:
             media.save()
         except IntegrityError as e:
