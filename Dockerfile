@@ -456,8 +456,7 @@ RUN set -x && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video && \
   # Check nginx configuration copied from config/root/etc
-  openresty -c /etc/nginx/nginx.conf -e stderr
- -t && \
+  openresty -c /etc/nginx/nginx.conf -e stderr -t && \
   # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
