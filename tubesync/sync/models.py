@@ -1312,7 +1312,6 @@ class Media(models.Model):
         return self.get_metadata_first_value(('fulltitle', 'title',), '')
 
     def ts_to_dt(self, /, timestamp):
-        assert timestamp is not None
         try:
             timestamp_float = float(timestamp)
         except Exception as e:
