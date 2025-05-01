@@ -1321,13 +1321,6 @@ class Media(models.Model):
             return self.posix_epoch + timedelta(seconds=timestamp_float)
         return None
 
-    def metadata_published(self, timestamp=None):
-        if timestamp is None:
-            timestamp = self.get_metadata_first_value(
-                ('release_timestamp', 'timestamp',)
-            )
-        return self.ts_to_dt(timestamp)
-
     @property
     def slugtitle(self):
         replaced = self.title.replace('_', '-').replace('&', 'and').replace('+', 'and')
