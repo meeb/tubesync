@@ -330,9 +330,13 @@ def index_source_task(source_id):
         media.duration = float(video.get(fields('duration', media), None) or 0) or None
         media.title = str(video.get(fields('title', media), ''))[:200]
         timestamp = video.get(fields('timestamp', media), None)
-        published_dt = media.metadata_published(timestamp)
-        if published_dt is not None:
-            media.published = published_dt
+        try:
+            published_dt = media.ts_to_dt(timestamp)
+        except AssertionError:
+            pass
+        else:
+            if published_dt:
+                media.published = published_dt
         try:
             media.save()
         except IntegrityError as e:
@@ -500,9 +504,17 @@ def download_media_metadata(media_id):
     # Media must have a valid upload date
     if upload_date:
         media.published = timezone.make_aware(upload_date)
-    published = media.metadata_published()
-    if published:
-        media.published = published
+    timestamp = media.get_metadata_first_value(
+        ('release_timestamp', 'timestamp',),
+        arg_dict=response,
+    )
+    try:
+        published_dt = media.ts_to_dt(timestamp)
+    except AssertionError:
+        pass
+    else:
+        if published_dt:
+            media.published = published_dt
 
     # Store title in DB so it's fast to access
     if media.metadata_title:

@@ -1312,22 +1312,14 @@ class Media(models.Model):
         return self.get_metadata_first_value(('fulltitle', 'title',), '')
 
     def ts_to_dt(self, /, timestamp):
-        assert timestamp is not None
         try:
             timestamp_float = float(timestamp)
-        except Exception as e:
+        except (TypeError, ValueError,) as e:
             log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
             pass
         else:
             return self.posix_epoch + timedelta(seconds=timestamp_float)
         return None
-
-    def metadata_published(self, timestamp=None):
-        if timestamp is None:
-            timestamp = self.get_metadata_first_value(
-                ('release_timestamp', 'timestamp',)
-            )
-        return self.ts_to_dt(timestamp)
 
     @property
     def slugtitle(self):
