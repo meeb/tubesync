@@ -332,7 +332,7 @@ def index_source_task(source_id):
         timestamp = video.get(fields('timestamp', media), None)
         if timestamp is not None:
             try:
-                published_dt = media.metadata_published(timestamp)
+                published_dt = media.ts_to_dt(timestamp)
             except AssertionError:
                 pass
             else:
