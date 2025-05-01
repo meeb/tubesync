@@ -1314,7 +1314,7 @@ class Media(models.Model):
     def ts_to_dt(self, /, timestamp):
         try:
             timestamp_float = float(timestamp)
-        except Exception as e:
+        except (TypeError, ValueError,) as e:
             log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
             pass
         else:
