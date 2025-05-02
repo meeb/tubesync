@@ -1,6 +1,3 @@
-from django.http import Http404
-
-
 class NoMediaException(Exception):
     '''
         Raised when a source returns no media to be indexed. Could be an invalid
@@ -25,7 +22,7 @@ class NoMetadataException(Exception):
     pass
 
 
-class NoThumbnailException(Http404):
+class NoThumbnailException(Exception):
     '''
         Raised when a thumbnail was not found at the remote URL.
     '''
