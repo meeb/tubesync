@@ -65,6 +65,8 @@ def get_remote_image(url, force_rgb=True):
                        '(KHTML, like Gecko) Chrome/69.0.3497.64 Safari/537.36')
     }
     r = requests.get(url, headers=headers, stream=True, timeout=60)
+    if 200 != r.status_code:
+        r.raise_for_status()
     r.raw.decode_content = True
     i = Image.open(r.raw)
     if force_rgb:
