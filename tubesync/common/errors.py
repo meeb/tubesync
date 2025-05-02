@@ -1,3 +1,6 @@
+from django.http import Http404
+
+
 class NoMediaException(Exception):
     '''
         Raised when a source returns no media to be indexed. Could be an invalid
@@ -18,6 +21,13 @@ class NoMetadataException(Exception):
     '''
         Raised when a media item is attempted to be downloaded but it has no valid
         metadata.
+    '''
+    pass
+
+
+class NoThumbnailException(Http404):
+    '''
+        Raised when a thumbnail was not found at the remote URL.
     '''
     pass
 
