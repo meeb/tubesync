@@ -551,9 +551,14 @@ def download_media_thumbnail(media_id, url):
     width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
     height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
     try:
-        i = get_remote_image(url)
-    except requests.HTTPError as e:
-        raise NoThumbnailException(url) from e
+        try:
+            i = get_remote_image(url)
+        except requests.HTTPError as re:
+            if 404 != re.response.status_code:
+                raise
+            raise NoThumbnailException(re.response.reason) from re
+    except NoThumbnailException as e:
+        raise InvalidTaskError(str(e.__cause__)) from e
     if (i.width > width) and (i.height > height):
         log.info(f'Resizing {i.width}x{i.height} thumbnail to '
                  f'{width}x{height}: {url}')
