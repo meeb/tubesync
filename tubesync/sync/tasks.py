@@ -8,6 +8,7 @@ import os
 import json
 import math
 import random
+import requests
 import time
 import uuid
 from io import BytesIO
@@ -29,7 +30,8 @@ from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import ( NoFormatException, NoMediaException,
-                            NoMetadataException, DownloadFailedException, )
+                            NoMetadataException, NoThumbnailException,
+                            DownloadFailedException, )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, )
 from .choices import Val, TaskQueue
@@ -548,7 +550,10 @@ def download_media_thumbnail(media_id, url):
         return
     width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
     height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
-    i = get_remote_image(url)
+    try:
+        i = get_remote_image(url)
+    except requests.HTTPError as e:
+        raise NoThumbnailException(url) from e
     if (i.width > width) and (i.height > height):
         log.info(f'Resizing {i.width}x{i.height} thumbnail to '
                  f'{width}x{height}: {url}')
