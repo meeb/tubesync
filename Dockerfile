@@ -436,7 +436,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     python3 -m venv --clear --system-site-packages --upgrade-deps "${wormhole_venv}" ; \
     . "${wormhole_venv}/bin/activate" || exit ; \
     test -x "${wormhole_venv}/bin/wormhole" || \
-    pip install magic-wormhole ; \
+    pip install 'magic-wormhole==0.17.0' ; \
   ) && \
   apt-get update && \
   # Install required build packages
