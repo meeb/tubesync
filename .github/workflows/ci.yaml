@@ -110,6 +110,11 @@ jobs:
     needs: ['info', 'test']
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    services:
+      wormhole-transit:
+        image: 'ghcr.io/tcely/docker-magic-wormhole-transit-relay:main'
+        ports:
+          - '4001:4001'
     steps:
       - name: Set environment variables with jq
         run: |
@@ -241,24 +246,22 @@ jobs:
         if: ${{ 'true' != steps.cache.outputs.cache-hit }}
         id: wormhole
         run: |
+          # port 4000
+          docker run --pull always --rm -dt -p 4000:4000 \
+              ghcr.io/tcely/docker-magic-wormhole-mailbox-server:main \
+              --usage-db=/data/usage.sqlite --motd=TubeSync
           rm -rf .cache/runner/wormhole
           sudo apt-get install python3-venv
           venv_dir=".cache/runner/${RUNNER_ARCH}/wormhole" &&
               python3 -m venv --upgrade-deps "${venv_dir}" &&
               . "${venv_dir}"/bin/activate || exit
           pip install 'magic-wormhole==0.17.0'
-          # port 4000
-          docker run --pull always --rm -dt -p 4000:4000 \
-              ghcr.io/tcely/docker-magic-wormhole-mailbox-server:main \
-              --usage-db=/data/usage.sqlite --motd=TubeSync
-          # port 4001
-          docker run --pull always --rm -dt -p 4001:4001 \
-              ghcr.io/tcely/docker-magic-wormhole-transit-relay:main
           # determine the runner IP address
           _awk_prog='$0 !~ /scope host/ && "inet" == $1 {split($2, P, "/"); print P[1]; exit;}'
           runner_ip="$( ip addr sh | awk "${_awk_prog}" )"
           # set variables
           relay_arg="ws://${runner_ip}:4000/v1"
+          runner_ip='127.0.0.1'
           transit_arg="tcp:[${runner_ip}]:4001"
           # generate the code and receive the first transfer
           ( wormhole \
