@@ -354,8 +354,21 @@ def index_source_task(source_id):
             )
             if new_media_instance:
                 log.info(f'Indexed new media: {source} / {media}')
+                log.info(f'Scheduling tasks to download thumbnail for: {media.key}')
+                thumbnail_fmt = 'https://i.ytimg.com/vi/{}/{}default.jpg'
+                vn_fmt = _('Downloading {} thumbnail for: "{}": {}'
+                for prefix in ('hq', 'sd', 'maxres',):
+                    thumbnail_url = thumbnail_fmt.format(
+                        media.key,
+                        prefix,
+                    )
+                    download_media_thumbnail(
+                        str(media.pk),
+                        thumbnail_url,
+                        verbose_name=vn_fmt.format(prefix, media.key, media.name),
+                    )
                 log.info(f'Scheduling task to download metadata for: {media.url}')
-                verbose_name = _('Downloading metadata for: {}: "{}"')
+                verbose_name = _('Downloading metadata for: "{}": {}')
                 download_media_metadata(
                     str(media.pk),
                     verbose_name=verbose_name.format(media.key, media.name),
