@@ -356,7 +356,7 @@ def index_source_task(source_id):
                 log.info(f'Indexed new media: {source} / {media}')
                 log.info(f'Scheduling tasks to download thumbnail for: {media.key}')
                 thumbnail_fmt = 'https://i.ytimg.com/vi/{}/{}default.jpg'
-                vn_fmt = _('Downloading {} thumbnail for: "{}": {}'
+                vn_fmt = _('Downloading {} thumbnail for: "{}": {}')
                 for prefix in ('hq', 'sd', 'maxres',):
                     thumbnail_url = thumbnail_fmt.format(
                         media.key,
