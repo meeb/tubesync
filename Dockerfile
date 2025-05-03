@@ -21,6 +21,17 @@ ARG S6_CHECKSUM_ALGORITHM="sha256"
 ARG CACHE_PATH="/cache"
 
 
+FROM alpine:${ALPINE_VERSION} AS populate-apt-cache-dirs
+ARG TARGETARCH
+RUN --mount=type=bind,from=cache-tubesync,target=/restored \
+    set -ex ; \
+    mkdir -v -p /apt-cache-cache /apt-lib-cache ; \
+    # restore `apt` files
+    cp -at /apt-cache-cache/ /restored/apt-cache-cache/* || : ; \
+    # to be careful, ensure that these files aren't from a different architecture
+    rm -v -f /apt-cache-cache/*cache.bin ; \
+    cp -at /apt-lib-cache/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
+
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
 ARG TARGETARCH
@@ -36,8 +47,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_NO_COMPILE=1 \
     PIP_ROOT_USER_ACTION='ignore'
 
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
     # to be careful, ensure that these files aren't from a different architecture
     rm -f /var/cache/apt/*cache.bin ; \
     # Update from the network and keep cache
@@ -281,17 +292,6 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
-FROM alpine:${ALPINE_VERSION} AS populate-apt-cache-dirs
-ARG TARGETARCH
-RUN --mount=type=bind,from=cache-tubesync,target=/restored \
-    set -ex ; \
-    mkdir -v -p /apt-cache-cache /apt-lib-cache ; \
-    # restore `apt` files
-    cp -at /apt-cache-cache/ /restored/apt-cache-cache/* || : ; \
-    # to be careful, ensure that these files aren't from a different architecture
-    rm -v -f /apt-cache-cache/*cache.bin ; \
-    cp -at /apt-lib-cache/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
-
 FROM alpine:${ALPINE_VERSION} AS populate-pipenv-cache-dir
 RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     set -x ; \
@@ -312,8 +312,8 @@ COPY --from=openresty-debian \
 COPY --from=openresty-debian \
     /etc/apt/sources.list.d/openresty.list /etc/apt/sources.list.d/openresty.list
 
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
   set -x && \
   apt-get update && \
   apt-get -y --no-install-recommends install nginx-common openresty && \
@@ -324,8 +324,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 
 FROM tubesync-base AS tubesync-nginx
 
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
   set -x && \
   apt-get update && \
   apt-get -y --no-install-recommends install nginx-light && \
