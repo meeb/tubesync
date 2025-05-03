@@ -8,6 +8,7 @@ import os
 import json
 import math
 import random
+import requests
 import time
 import uuid
 from io import BytesIO
@@ -29,7 +30,8 @@ from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import ( NoFormatException, NoMediaException,
-                            NoMetadataException, DownloadFailedException, )
+                            NoMetadataException, NoThumbnailException,
+                            DownloadFailedException, )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, )
 from .choices import Val, TaskQueue
@@ -352,8 +354,21 @@ def index_source_task(source_id):
             )
             if new_media_instance:
                 log.info(f'Indexed new media: {source} / {media}')
+                log.info(f'Scheduling tasks to download thumbnail for: {media.key}')
+                thumbnail_fmt = 'https://i.ytimg.com/vi/{}/{}default.jpg'
+                vn_fmt = _('Downloading {} thumbnail for: "{}": {}')
+                for prefix in ('hq', 'sd', 'maxres',):
+                    thumbnail_url = thumbnail_fmt.format(
+                        media.key,
+                        prefix,
+                    )
+                    download_media_thumbnail(
+                        str(media.pk),
+                        thumbnail_url,
+                        verbose_name=vn_fmt.format(prefix, media.key, media.name),
+                    )
                 log.info(f'Scheduling task to download metadata for: {media.url}')
-                verbose_name = _('Downloading metadata for: {}: "{}"')
+                verbose_name = _('Downloading metadata for: "{}": {}')
                 download_media_metadata(
                     str(media.pk),
                     verbose_name=verbose_name.format(media.key, media.name),
@@ -548,7 +563,15 @@ def download_media_thumbnail(media_id, url):
         return
     width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
     height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
-    i = get_remote_image(url)
+    try:
+        try:
+            i = get_remote_image(url)
+        except requests.HTTPError as re:
+            if 404 != re.response.status_code:
+                raise
+            raise NoThumbnailException(re.response.reason) from re
+    except NoThumbnailException as e:
+        raise InvalidTaskError(str(e.__cause__)) from e
     if (i.width > width) and (i.height > height):
         log.info(f'Resizing {i.width}x{i.height} thumbnail to '
                  f'{width}x{height}: {url}')
