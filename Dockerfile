@@ -281,6 +281,30 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
+FROM alpine:${ALPINE_VERSION} AS populate-apt-cache-dirs
+ARG TARGETARCH
+RUN --mount=type=bind,from=cache-tubesync,target=/restored \
+    set -ex ; \
+    mkdir -v -p /apt-cache-cache /apt-lib-cache ; \
+    # restore `apt` files
+    cp -at /apt-cache-cache/ /restored/apt-cache-cache/* || : ; \
+    # to be careful, ensure that these files aren't from a different architecture
+    rm -v -f /apt-cache-cache/*cache.bin ; \
+    cp -at /apt-lib-cache/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
+
+FROM alpine:${ALPINE_VERSION} AS populate-pipenv-cache-dir
+RUN --mount=type=bind,from=cache-tubesync,target=/restored \
+    set -x ; \
+    cp -at / '/restored/pipenv-cache' || \
+        mkdir -v /pipenv-cache ;
+
+FROM alpine:${ALPINE_VERSION} AS populate-wormhole-dir
+ARG TARGETARCH
+RUN --mount=type=bind,from=cache-tubesync,target=/restored \
+    set -x ; \
+    cp -at / "/restored/${TARGETARCH}/wormhole" || \
+        mkdir -v /wormhole ;
+
 FROM tubesync-base AS tubesync-openresty
 
 COPY --from=openresty-debian \
@@ -311,30 +335,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   apt-get -y autopurge && \
   apt-get -y autoclean && \
   rm -v -f /var/cache/debconf/*.dat-old
-
-FROM alpine:${ALPINE_VERSION} AS populate-apt-cache-dirs
-ARG TARGETARCH
-RUN --mount=type=bind,from=cache-tubesync,target=/restored \
-    set -ex ; \
-    mkdir -v -p /apt-cache-cache /apt-lib-cache ; \
-    # restore `apt` files
-    cp -at /apt-cache-cache/ /restored/apt-cache-cache/* || : ; \
-    # to be careful, ensure that these files aren't from a different architecture
-    rm -v -f /apt-cache-cache/*cache.bin ; \
-    cp -at /apt-lib-cache/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
-
-FROM alpine:${ALPINE_VERSION} AS populate-pipenv-cache-dir
-RUN --mount=type=bind,from=cache-tubesync,target=/restored \
-    set -x ; \
-    cp -at / '/restored/pipenv-cache' || \
-        mkdir -v /pipenv-cache ;
-
-FROM alpine:${ALPINE_VERSION} AS populate-wormhole-dir
-ARG TARGETARCH
-RUN --mount=type=bind,from=cache-tubesync,target=/restored \
-    set -x ; \
-    cp -at / "/restored/${TARGETARCH}/wormhole" || \
-        mkdir -v /wormhole ;
 
 FROM tubesync-openresty AS tubesync
 
