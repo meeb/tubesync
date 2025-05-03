@@ -25,7 +25,8 @@ from .youtube import (  get_media_info as get_youtube_media_info,
                         download_media as download_youtube_media,
                         get_channel_image_info as get_youtube_channel_image_info)
 from .utils import (seconds_to_timestr, parse_media_format, filter_response,
-                    write_text_file, mkdir_p, directory_and_stem, glob_quote)
+                    write_text_file, mkdir_p, directory_and_stem, glob_quote,
+                    multi_key_sort)
 from .matching import ( get_best_combined_format, get_best_audio_format,
                         get_best_video_format)
 from .fields import CommaSepChoiceField
@@ -572,8 +573,11 @@ class Source(models.Model):
         return entries
 
 def get_media_thumb_path(instance, filename):
-    fileid = str(instance.uuid)
-    filename = f'{fileid.lower()}.jpg'
+    # we don't want to use alternate names for thumb files
+    if instance.thumb:
+        instance.thumb.delete(save=False)
+    fileid = str(instance.uuid).lower()
+    filename = f'{fileid}.jpg'
     prefix = fileid[:2]
     return Path('thumbs') / prefix / filename
 
@@ -1265,6 +1269,27 @@ class Media(models.Model):
         if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
             response = filter_response(metadata, True)
 
+        # save the new list of thumbnails
+        thumbnails = self.get_metadata_first_value(
+            'thumbnails',
+            self.get_metadata_first_value('thumbnails', []),
+            arg_dict=response,
+        )
+        field = self.get_metadata_field('thumbnails')
+        self.save_to_metadata(field, thumbnails)
+
+        # select and save our best thumbnail url
+        try:
+            thumbnail = [ thumb.get('url') for thumb in multi_key_sort(
+                thumbnails,
+                [('preference', True,)],
+            ) if thumb.get('url', '').endswith('.jpg') ][0]
+        except IndexError:
+            pass
+        else:
+            field = self.get_metadata_field('thumbnail')
+            self.save_to_metadata(field, thumbnail)
+
         field = self.get_metadata_field('formats')
         self.save_to_metadata(field, response.get(field, []))
         self.save_to_metadata(refreshed_key, response.get('epoch', formats_seconds))
@@ -1287,22 +1312,14 @@ class Media(models.Model):
         return self.get_metadata_first_value(('fulltitle', 'title',), '')
 
     def ts_to_dt(self, /, timestamp):
-        assert timestamp is not None
         try:
             timestamp_float = float(timestamp)
-        except Exception as e:
+        except (TypeError, ValueError,) as e:
             log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
             pass
         else:
             return self.posix_epoch + timedelta(seconds=timestamp_float)
         return None
-
-    def metadata_published(self, timestamp=None):
-        if timestamp is None:
-            timestamp = self.get_metadata_first_value(
-                ('release_timestamp', 'timestamp',)
-            )
-        return self.ts_to_dt(timestamp)
 
     @property
     def slugtitle(self):

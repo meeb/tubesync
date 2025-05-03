@@ -21,6 +21,17 @@ ARG S6_CHECKSUM_ALGORITHM="sha256"
 ARG CACHE_PATH="/cache"
 
 
+FROM alpine:${ALPINE_VERSION} AS populate-apt-cache-dirs
+ARG TARGETARCH
+RUN --mount=type=bind,from=cache-tubesync,target=/restored \
+    set -ex ; \
+    mkdir -v -p /apt-cache-cache /apt-lib-cache ; \
+    # restore `apt` files
+    cp -at /apt-cache-cache/ /restored/apt-cache-cache/* || : ; \
+    # to be careful, ensure that these files aren't from a different architecture
+    rm -v -f /apt-cache-cache/*cache.bin ; \
+    cp -at /apt-lib-cache/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
+
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
 ARG TARGETARCH
@@ -36,8 +47,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_NO_COMPILE=1 \
     PIP_ROOT_USER_ACTION='ignore'
 
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
     # to be careful, ensure that these files aren't from a different architecture
     rm -f /var/cache/apt/*cache.bin ; \
     # Update from the network and keep cache
@@ -59,6 +70,28 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y autopurge && \
     apt-get -y autoclean && \
     rm -f /var/cache/debconf/*.dat-old
+
+FROM alpine:${ALPINE_VERSION} AS openresty-debian
+ARG TARGETARCH
+ARG DEBIAN_VERSION
+ADD 'https://openresty.org/package/pubkey.gpg' '/downloaded/pubkey.gpg'
+RUN set -eu ; \
+    decide_arch() { \
+        case "${TARGETARCH}" in \
+            (amd64) printf -- '' ;; \
+            (arm64) printf -- 'arm64/' ;; \
+        esac ; \
+    } ; \
+    set -x ; \
+    mkdir -v -p '/etc/apt/trusted.gpg.d' && \
+    apk --no-cache --no-progress add cmd:gpg2 && \
+    gpg2 --dearmor \
+        -o '/etc/apt/trusted.gpg.d/openresty.gpg' \
+        < '/downloaded/pubkey.gpg' && \
+    mkdir -v -p '/etc/apt/sources.list.d' && \
+    printf -- >| '/etc/apt/sources.list.d/openresty.list' \
+        'deb http://openresty.org/package/%sdebian %s openresty' \
+        "$(decide_arch)" "${DEBIAN_VERSION%-slim}"
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -259,17 +292,6 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
-FROM alpine:${ALPINE_VERSION} AS populate-apt-cache-dirs
-ARG TARGETARCH
-RUN --mount=type=bind,from=cache-tubesync,target=/restored \
-    set -ex ; \
-    mkdir -v -p /apt-cache-cache /apt-lib-cache ; \
-    # restore `apt` files
-    cp -at /apt-cache-cache/ /restored/apt-cache-cache/* || : ; \
-    # to be careful, ensure that these files aren't from a different architecture
-    rm -v -f /apt-cache-cache/*cache.bin ; \
-    cp -at /apt-lib-cache/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
-
 FROM alpine:${ALPINE_VERSION} AS populate-pipenv-cache-dir
 RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     set -x ; \
@@ -283,7 +305,38 @@ RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     cp -at / "/restored/${TARGETARCH}/wormhole" || \
         mkdir -v /wormhole ;
 
-FROM tubesync-base AS tubesync
+FROM tubesync-base AS tubesync-openresty
+
+COPY --from=openresty-debian \
+    /etc/apt/trusted.gpg.d/openresty.gpg /etc/apt/trusted.gpg.d/openresty.gpg
+COPY --from=openresty-debian \
+    /etc/apt/sources.list.d/openresty.list /etc/apt/sources.list.d/openresty.list
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
+  set -x && \
+  apt-get update && \
+  apt-get -y --no-install-recommends install nginx-common openresty && \
+  # Clean up
+  apt-get -y autopurge && \
+  apt-get -y autoclean && \
+  rm -v -f /var/cache/debconf/*.dat-old
+
+FROM tubesync-base AS tubesync-nginx
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
+  set -x && \
+  apt-get update && \
+  apt-get -y --no-install-recommends install nginx-light && \
+  # openresty binary should still work
+  ln -v -s -T ../sbin/nginx /usr/bin/openresty && \
+  # Clean up
+  apt-get -y autopurge && \
+  apt-get -y autoclean && \
+  rm -v -f /var/cache/debconf/*.dat-old
+
+FROM tubesync-openresty AS tubesync
 
 ARG S6_VERSION
 
@@ -307,7 +360,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libmariadb3 \
   libpq5 \
   libwebp7 \
-  nginx-light \
   pipenv \
   pkgconf \
   python3 \
@@ -485,7 +537,7 @@ RUN set -x && \
   mkdir -v -p /config/log && \
   cp -a /var/log/nginx /config/log/ && \
   cp -v -p /config/log/nginx/access.log /config/log/nginx/access.log.gz && \
-  nginx -t && \
+  openresty -c /etc/nginx/nginx.conf -e stderr -t && \
   # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \

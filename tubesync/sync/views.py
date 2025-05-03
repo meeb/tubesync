@@ -523,6 +523,9 @@ class MediaThumbView(DetailView):
 
     def get(self, request, *args, **kwargs):
         media = self.get_object()
+        # Thumbnail media is never updated so we can ask the browser to cache it
+        # for ages, 604800 = 7 days
+        max_age = 604800
         if media.thumb_file_exists:
             thumb_path = pathlib.Path(media.thumb.path)
             thumb = thumb_path.read_bytes()
@@ -532,10 +535,10 @@ class MediaThumbView(DetailView):
             thumb = b64decode('R0lGODlhAQABAIABAP///wAAACH5BAEKAAEALAA'
                               'AAAABAAEAAAICTAEAOw==')
             content_type = 'image/gif'
+            max_age = 600
         response = HttpResponse(thumb, content_type=content_type)
-        # Thumbnail media is never updated so we can ask the browser to cache it
-        # for ages, 604800 = 7 days
-        response['Cache-Control'] = 'public, max-age=604800'
+        
+        response['Cache-Control'] = f'public, max-age={max_age}'
         return response
 
 
