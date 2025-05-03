@@ -246,7 +246,7 @@ jobs:
           venv_dir=".cache/runner/${RUNNER_ARCH}/wormhole" &&
               python3 -m venv --upgrade-deps "${venv_dir}" &&
               . "${venv_dir}"/bin/activate || exit
-          pip install magic-wormhole
+          pip install 'magic-wormhole==0.17.0'
           # port 4000
           docker run --pull always --rm -dt -p 4000:4000 \
               ghcr.io/tcely/docker-magic-wormhole-mailbox-server:main \
