@@ -1,6 +1,8 @@
 from django import db
+from io import BytesIO, TextIOWrapper
 from pprint import pp
 from django.utils.translation import gettext_lazy
+from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from common.logger import log
 
@@ -31,6 +33,32 @@ def SQLTable(arg_table):
     if not valid_table_name:
         raise ValueError(_('Invalid table name'))
     return str(arg_table)
+
+def _mk_wrapper():
+    return TextIOWrapper(
+        BytesIO(),
+        line_buffering=True,
+        write_through=True,
+    )
+
+def check_migration_status(migration_str, /):
+    needle = 'No planned migration operations.'
+    wrap_stderr, wrap_stdout = _mk_wrapper(), _mk_wrapper()
+    call_command(
+        'migrate', '-v', '3', '--plan', 'sync',
+        migration_str,
+        stderr=wrap_stderr,
+        stdout=wrap_stdout,
+    )
+    wrap_stderr.seek(0, 0)
+    stderr_lines = wrap_stderr.readlines()
+    wrap_stdout.seek(0, 0)
+    stdout_lines = wrap_stdout.readlines()
+    return (
+        bool([ line.decode() for line in stdout_lines if needle.encode() in line ]),
+        stderr_lines,
+        stdout_lines,
+    )
 
 
 class Command(BaseCommand):
