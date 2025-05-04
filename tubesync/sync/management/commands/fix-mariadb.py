@@ -31,6 +31,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--delete-table',
             action='append',
+            default=list(),
             metavar='TABLE',
             type=SQLTable,
             help=_('SQL table name'),
@@ -42,14 +43,20 @@ class Command(BaseCommand):
                 _('An invalid database vendor is configured')
                 + f': {db.connection.vendor}'
             )
-        if not db.connection.mysql_is_mariadb():
+        db_is_mariadb = (
+            hasattr(db.connection, 'mysql_is_mariadb') and
+            db.connection.mysql_is_mariadb()
+        )
+        if not db_is_mariadb:
             raise CommandError(_('Not conbected to a MariaDB database server.'))
 
-        table_names = options.get('delete_table', list())
+        table_names = options.get('delete_table')
 
+        log.info('Start')
         if options['uuid_columns']:
             self.stdout.write('Time to update the columns!')
 
+        self.stdout.write('Tables to drop:')
         pp( table_names )
 
         # All done
