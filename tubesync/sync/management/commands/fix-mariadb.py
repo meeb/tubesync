@@ -41,8 +41,9 @@ def _mk_wrapper():
         write_through=True,
     )
 
-def check_migration_status(migration_str, /):
-    needle = 'No planned migration operations.'
+def check_migration_status(migration_str, /, *, needle=None):
+    if needle is None:
+        needle = 'No planned migration operations.'
     wrap_stderr, wrap_stdout = _mk_wrapper(), _mk_wrapper()
     call_command(
         'migrate', '-v', '3', '--plan', 'sync',
@@ -55,7 +56,7 @@ def check_migration_status(migration_str, /):
     wrap_stdout.seek(0, 0)
     stdout_lines = wrap_stdout.readlines()
     return (
-        bool([ line.decode() for line in stdout_lines if needle in line ]),
+        bool([ line for line in stdout_lines if needle in line ]),
         stderr_lines,
         stdout_lines,
     )
@@ -120,6 +121,8 @@ class Command(BaseCommand):
 
         display_name = db.connection.display_name
         table_names = options.get('delete_table')
+        schema = db.connection.schema_editor(collect_sql=True)
+        quote_name = schema.quote_name
 
         log.info('Start')
         if options['uuid_columns']:
@@ -147,8 +150,6 @@ class Command(BaseCommand):
             else:
                 self.stdout.write('Time to update the columns!')
 
-                schema = db.connection.schema_editor(collect_sql=True)
-                quote_name = schema.quote_name
                 media_table_str = quote_name('sync_media')
                 source_table_str = quote_name('sync_source')
                 fk_name_str = quote_name('sync_media_source_id_36827e1d_fk_sync_source_uuid')
@@ -204,21 +205,34 @@ class Command(BaseCommand):
                 pp( schema.collected_sql )
 
         if table_names:
-            pp( check_migration_status( '0029', ) )
-            pp( check_migration_status(
+            # Check that the migration is at an appropriate step
+            at_30, err_30, out_30 = check_migration_status( '0030_alter_source_source_vcodec' )
+            at_31, err_31, out_31 = check_migration_status( '0031_metadata_metadataformat' )
+            at_31s, err_31s, out_31s = check_migration_status( '0031_squashed_metadata_metadataformat' )
+            after_31, err_31a, out_31a = check_migration_status(
                 '0030_alter_source_source_vcodec',
-            ))
-            pp( check_migration_status(
-                '0031_squashed_metadata_metadataformat',
-            ))
-            pp( check_migration_status( '0032_metadata_transfer', ))
-            if check_migration_status('0032_metadata_transfer')[0]:
+                needle='Undo Rename table for metadata to sync_media_metadata',
+            )
+
+            should_delete = (
+                not (at_31s or after_31) and
+                (at_30 or at_31)
+            )
+            if not should_delete:
                 raise CommandError(_(
-                    'Deleting tables that are in use is not safe!'
+                    'Deleting metadata tables that are in use is not safe!'
                 ))
             
             self.stdout.write('Tables to delete:')
             pp( table_names )
+            for table in table_names:
+                schema.execute(
+                    schema.sql_delete_table % dict(
+                        table=quote_name(table),
+                    ),
+                    None,
+                )
+            pp( schema.collected_sql )
 
         # All done
         log.info('Done')
