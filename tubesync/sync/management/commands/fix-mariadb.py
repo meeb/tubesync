@@ -119,7 +119,7 @@ class Command(BaseCommand):
             else:
                 self.stdout.write('Time to update the columns!')
 
-                schema = db.connection.schema_editor()
+                schema = db.connection.schema_editor(collect_sql=True)
                 quote_name = schema.quote_name
                 media_table_str = quote_name('sync_media')
                 source_table_str = quote_name('sync_source')
@@ -139,8 +139,9 @@ class Command(BaseCommand):
                     to_column=uuid_column_str,
                     deferrable='',
                 )
-                statement_list = [ f'{statement};' for statement in (
-                    remove_fk,
+
+                schema.execute(remove_fk, None)
+                schema.execute(
                     schema.sql_alter_column % dict(
                         table=media_table_str,
                         changes=schema.sql_alter_column_not_null % dict(
@@ -148,6 +149,9 @@ class Command(BaseCommand):
                             column=uuid_column_str,
                         ),
                     ),
+                    None,
+                )
+                schema.execute(
                     schema.sql_alter_column % dict(
                         table=media_table_str,
                         changes=schema.sql_alter_column_not_null % dict(
@@ -155,6 +159,9 @@ class Command(BaseCommand):
                             column=source_id_column_str,
                         ),
                     ),
+                    None,
+                )
+                schema.execute(
                     schema.sql_alter_column % dict(
                         table=source_table_str,
                         changes=schema.sql_alter_column_not_null % dict(
@@ -162,9 +169,11 @@ class Command(BaseCommand):
                             column=uuid_column_str,
                         ),
                     ),
-                    add_fk,
-                ) ]
-                pp( statement_list )
+                    None,
+                )
+                schema.execute(add_fk, None)
+
+                pp( schema.collected_sql )
 
         self.stdout.write('Tables to delete:')
         pp( table_names )
