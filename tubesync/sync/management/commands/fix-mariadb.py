@@ -5,16 +5,25 @@ from django.core.management.base import BaseCommand, CommandError
 from common.logger import log
 
 
+db_tables = db.connection.introspection.table_names
+new_tables = {
+    'sync_media_metadata_format',
+    'sync_media_metadata',
+    'sync_metadataformat',
+    'sync_metadata',
+}
+
 def _(arg_str):
     return str(gettext_lazy(arg_str))
 
 def SQLTable(arg_table):
-    if not isinstance(arg_table, str):
-        raise TypeError(type(arg_table))
-    tables = db.connection.introspection.table_names(include_views=False)
+    assert isinstance(arg_table, str), type(arg_table)
+    needle = arg_table
+    if needle.startswith('new__'):
+        needle = arg_table[len('new__'):]
     valid_table_name = (
-        arg_table.startswith('sync_') and
-        arg_table in tables
+        needle in new_tables and
+        arg_table in db_tables(include_views=False)
     )
     if not valid_table_name:
         raise ValueError(_('Invalid table name'))
