@@ -55,7 +55,7 @@ def check_migration_status(migration_str, /):
     wrap_stdout.seek(0, 0)
     stdout_lines = wrap_stdout.readlines()
     return (
-        bool([ line.decode() for line in stdout_lines if needle.encode() in line ]),
+        bool([ line.decode() for line in stdout_lines if needle in line ]),
         stderr_lines,
         stdout_lines,
     )
@@ -64,7 +64,7 @@ def check_migration_status(migration_str, /):
 class Command(BaseCommand):
 
     help = _('Fixes MariaDB database issues')
-    requires_migrations_checks = True
+    requires_migrations_checks = False
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -204,12 +204,18 @@ class Command(BaseCommand):
                 pp( schema.collected_sql )
 
         if table_names:
+            pp( check_migration_status( '0029', ) )
             pp( check_migration_status(
                 '0030_alter_source_source_vcodec',
             ))
             pp( check_migration_status(
                 '0031_squashed_metadata_metadataformat',
             ))
+            pp( check_migration_status( '0032_metadata_transfer', ))
+            if check_migration_status('0032_metadata_transfer')[0]:
+                raise CommandError(_(
+                    'Deleting tables that are in use is not safe!'
+                ))
             
             self.stdout.write('Tables to delete:')
             pp( table_names )
