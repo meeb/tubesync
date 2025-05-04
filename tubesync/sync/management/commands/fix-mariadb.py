@@ -7,7 +7,6 @@ from django.core.management.base import BaseCommand, CommandError
 from common.logger import log
 
 
-db_columns = db.connection.introspection.get_table_description
 db_tables = db.connection.introspection.table_names
 db_quote_name = db.connection.ops.quote_name
 new_tables = {
@@ -45,12 +44,15 @@ def check_migration_status(migration_str, /, *, needle=None):
     if needle is None:
         needle = 'No planned migration operations.'
     wrap_stderr, wrap_stdout = _mk_wrapper(), _mk_wrapper()
-    call_command(
-        'migrate', '-v', '3', '--plan', 'sync',
-        migration_str,
-        stderr=wrap_stderr,
-        stdout=wrap_stdout,
-    )
+    try:
+        call_command(
+            'migrate', '-v', '3', '--plan', 'sync',
+            migration_str,
+            stderr=wrap_stderr,
+            stdout=wrap_stdout,
+        )
+    except db.migrations.exceptions.NodeNotFoundError:
+        return (False, None, None,)
     wrap_stderr.seek(0, 0)
     stderr_lines = wrap_stderr.readlines()
     wrap_stdout.seek(0, 0)
@@ -61,13 +63,27 @@ def check_migration_status(migration_str, /, *, needle=None):
         stdout_lines,
     )
 
+def db_columns(table_str, /):
+    columns = list()
+    db_gtd = db.connection.introspection.get_table_description
+    with db.connection.cursor() as cursor:
+        columns.extend(db_gtd(cursor, table_str))
+    return columns
+
 
 class Command(BaseCommand):
 
     help = _('Fixes MariaDB database issues')
+    output_transaction = True
     requires_migrations_checks = False
 
     def add_arguments(self, parser):
+        parser.add_argument(
+            '--dry-run',
+            action='store_true',
+            default=False,
+            help=_('Only show the SQL; do not apply it to the database'),
+        )
         parser.add_argument(
             '--uuid-columns',
             action='store_true',
@@ -80,25 +96,21 @@ class Command(BaseCommand):
             default=list(),
             metavar='TABLE',
             type=SQLTable,
-            help=_('SQL table name'),
+            help=_('SQL table name to be deleted'),
         )
 
-    def _get_fields(self, table_str, /):
-        columns = list()
-        with db.connection.cursor() as cursor:
-            columns.extend(db_columns(cursor, table_str))
-        return columns
-
-    def _using_char_for_uuid(self, table_str, /):
-        fields = self._get_fields(table_str)
-        return 'uuid' in [
-            f.name for f in fields if 'varchar' == f.data_type and 32 == f.display_size
+    def _using_char(self, table_str, column_str='uuid', /):
+        cols = db_columns(table_str)
+        char_sizes = { 32, 36, }
+        char_types = { 'char', 'varchar', }
+        return column_str in [
+            c.name for c in cols if c.data_type in char_types and c.display_size in char_sizes
         ]
 
     def _column_type(self, table_str, column_str='uuid', /):
-        fields = self._get_fields(table_str)
+        cols = db_columns(table_str)
         found = [
-            f'{f.data_type}({f.display_size})' for f in fields if column_str.lower() == f.name.lower()
+            f'{c.data_type}({c.display_size})' for c in cols if column_str.lower() == c.name.lower()
         ]
         if not found:
             return str()
@@ -125,6 +137,8 @@ class Command(BaseCommand):
         quote_name = schema.quote_name
 
         log.info('Start')
+
+
         if options['uuid_columns']:
             if 'uuid' != db.connection.data_types.get('UUIDField', ''):
                 raise CommandError(_(
@@ -132,8 +146,8 @@ class Command(BaseCommand):
                 ))
             uuid_column_type_str = 'uuid(36)'
             both_tables = (
-                self._using_char_for_uuid('sync_source') and
-                self._using_char_for_uuid('sync_media')
+                self._using_char('sync_source', 'uuid') and
+                self._using_char('sync_media', 'uuid')
             )
             if not both_tables:
                 if uuid_column_type_str == self._column_type('sync_source', 'uuid').lower():
@@ -148,8 +162,6 @@ class Command(BaseCommand):
                         'native UUID columns. Manual intervention is required.'
                     ))
             else:
-                self.stdout.write('Time to update the columns!')
-
                 media_table_str = quote_name('sync_media')
                 source_table_str = quote_name('sync_source')
                 fk_name_str = quote_name('sync_media_source_id_36827e1d_fk_sync_source_uuid')
@@ -202,7 +214,6 @@ class Command(BaseCommand):
                 )
                 schema.execute(add_fk, None)
 
-                pp( schema.collected_sql )
 
         if table_names:
             # Check that the migration is at an appropriate step
@@ -223,8 +234,6 @@ class Command(BaseCommand):
                     'Deleting metadata tables that are in use is not safe!'
                 ))
             
-            self.stdout.write('Tables to delete:')
-            pp( table_names )
             for table in table_names:
                 schema.execute(
                     schema.sql_delete_table % dict(
@@ -232,7 +241,15 @@ class Command(BaseCommand):
                     ),
                     None,
                 )
-            pp( schema.collected_sql )
+
+        if not options['dry_run']:
+            with db.connection.schema_editor(collect_sql=False) as schema_editor:
+                for sql in schema.collected_sql:
+                    schema_editor.execute(sql, None)
+        else:
+            for sql in schema.collected_sql:
+                self.stdout.write(sql)
+
 
         # All done
         log.info('Done')
