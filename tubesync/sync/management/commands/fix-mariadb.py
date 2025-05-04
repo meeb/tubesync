@@ -120,11 +120,12 @@ class Command(BaseCommand):
                 self.stdout.write('Time to update the columns!')
 
                 schema = db.connection.schema_editor()
-                media_table_str = db_quote_name('sync_media')
-                source_table_str = db_quote_name('sync_source')
-                fk_name_str = db_quote_name('sync_media_source_id_36827e1d_fk_sync_source_uuid')
-                source_id_column_str = db_quote_name('source_id')
-                uuid_column_str = db_quote_name('uuid')
+                quote_name = schema.quote_name
+                media_table_str = quote_name('sync_media')
+                source_table_str = quote_name('sync_source')
+                fk_name_str = quote_name('sync_media_source_id_36827e1d_fk_sync_source_uuid')
+                source_id_column_str = quote_name('source_id')
+                uuid_column_str = quote_name('uuid')
                 uuid_type_str = 'uuid'.upper()
                 remove_fk = schema.sql_delete_fk % dict(
                     table=media_table_str,
