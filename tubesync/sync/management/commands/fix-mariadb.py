@@ -243,6 +243,7 @@ class Command(BaseCommand):
                 )
 
         if options['dry_run']:
+            log.info('Done')
             return '\n'.join(schema.collected_sql)
         else:
             with db.connection.schema_editor(collect_sql=False) as schema_editor:
