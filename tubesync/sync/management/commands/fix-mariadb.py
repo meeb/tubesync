@@ -33,10 +33,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if 'mysql' != db.connection.vendor:
-            raise CommandError(
-                _('An invalid database vendor is configured')
+            raise CommandError(_(
+                'An invalid database vendor is configured'
                 f': {db.connection.vendor}'
-            )
+            ))
         if not db.connection.mysql_is_mariadb():
             raise CommandError(_('Not conbected to a MariaDB database server.'))
 
