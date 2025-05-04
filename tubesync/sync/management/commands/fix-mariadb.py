@@ -5,7 +5,9 @@ from django.core.management.base import BaseCommand, CommandError
 from common.logger import log
 
 
+db_columns = db.connection.introspection.get_table_description
 db_tables = db.connection.introspection.table_names
+db_quote_name = db.connection.ops.quote_name
 new_tables = {
     'sync_media_metadata_format',
     'sync_media_metadata',
@@ -51,6 +53,20 @@ class Command(BaseCommand):
             help=_('SQL table name'),
         )
 
+    def _get_fields(self, table_str, /):
+        columns = list()
+        with db.connection.cursor() as cursor:
+            columns.extend(db_columns(cursor, table_str))
+        return columns
+
+    def _using_char_for_uuid(self, table_str, /):
+        fields = self._get_fields(table_str)
+        return 'uuid' in [ f.name for f in fields if 'char(32)' == f.type_code ]
+
+    def _uuid_column_type(self, table_str, /):
+        fields = self._get_fields(table_str)
+        return [ f.type_code for f in fields if 'uuid' == f.name ][0]
+
     def handle(self, *args, **options):
         if 'mysql' != db.connection.vendor:
             raise CommandError(
@@ -75,7 +91,22 @@ class Command(BaseCommand):
                 raise CommandError(_(
                     f'The {display_name} database server does not support UUID columns.'
                 ))
-            self.stdout.write('Time to update the columns!')
+            both_tables = (
+                self._using_char_for_uuid('sync_source') and
+                self._using_char_for_uuid('sync_media')
+            )
+            if not both_tables:
+                if 'uuid' == self._uuid_column_type('sync_source').lower():
+                    log.notice('The source table is already using a native UUID column.')
+                elif 'uuid' == self._uuid_column_type('sync_media').lower():
+                    log.notice('The media table is already using a native UUID column.')
+                else:
+                    raise CommandError(_(
+                        'The database is not in an appropriate state to switch to '
+                        'native UUID columns. Manual intervention is required.'
+                    ))
+            else:
+                self.stdout.write('Time to update the columns!')
 
         self.stdout.write('Tables to delete:')
         pp( table_names )
