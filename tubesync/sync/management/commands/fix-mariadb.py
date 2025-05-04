@@ -181,7 +181,8 @@ class Command(BaseCommand):
                     deferrable='',
                 )
 
-                schema.execute(remove_fk, None)
+                schema.execute('SET foreign_key_checks=0', None)
+                #schema.execute(remove_fk, None)
                 schema.execute(
                     schema.sql_alter_column % dict(
                         table=media_table_str,
@@ -212,7 +213,8 @@ class Command(BaseCommand):
                     ),
                     None,
                 )
-                schema.execute(add_fk, None)
+                #schema.execute(add_fk, None)
+                schema.execute('SET foreign_key_checks=1', None)
 
 
         if table_names:
