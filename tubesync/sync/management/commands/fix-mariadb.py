@@ -138,7 +138,7 @@ class Command(BaseCommand):
                     to_column=uuid_column_str,
                     deferrable='',
                 )
-                statement_list = list((
+                statement_list = [ f'{statement};' for statement in (
                     remove_fk,
                     schema.sql_alter_column % dict(
                         table=media_table_str,
@@ -162,7 +162,7 @@ class Command(BaseCommand):
                         ),
                     ),
                     add_fk,
-                ))
+                ) ]
                 pp( statement_list )
 
         self.stdout.write('Tables to delete:')
