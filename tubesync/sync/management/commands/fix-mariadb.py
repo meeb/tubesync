@@ -203,8 +203,16 @@ class Command(BaseCommand):
 
                 pp( schema.collected_sql )
 
-        self.stdout.write('Tables to delete:')
-        pp( table_names )
+        if table_names:
+            pp( check_migration_status(
+                '0030_alter_source_source_vcodec',
+            ))
+            pp( check_migration_status(
+                '0031_squashed_metadata_metadataformat',
+            ))
+            
+            self.stdout.write('Tables to delete:')
+            pp( table_names )
 
         # All done
         log.info('Done')
