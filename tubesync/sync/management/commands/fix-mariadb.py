@@ -14,6 +14,7 @@ new_tables = {
     'sync_metadataformat',
     'sync_metadata',
 }
+sql_statements = db.connection.ops.prepare_sql_script
 
 def _(arg_str):
     return str(gettext_lazy(arg_str))
@@ -109,6 +110,52 @@ class Command(BaseCommand):
                     ))
             else:
                 self.stdout.write('Time to update the columns!')
+
+                schema = db.connection.schema_editor()
+                media_table_str = db_quote_name('sync_media')
+                source_table_str = db_quote_name('sync_source')
+                fk_name_str = db_quote_name('sync_media_source_id_36827e1d_fk_sync_source_uuid')
+                source_id_column_str = db_quote_name('source_id')
+                uuid_column_str = db_quote_name('uuid')
+                uuid_type_str = 'uuid'.upper()
+                remove_fk = schema.sql_delete_fk.format(dict(
+                    table=media_table_str,
+                    name=fk_name_str,
+                ))
+                add_fk = schema.sql_create_fk.format(dict(
+                    table=media_table_str,
+                    name=fk_name_str,
+                    column=source_id_column_str,
+                    to_table=source_table_str,
+                    to_column=uuid_column_str,
+                    deferrable='',
+                ))
+                statement_list = list((
+                    remove_fk,
+                    schema.sql_alter_column.format(dict(
+                        table=media_table_str,
+                        changes=schema.sql_alter_column_not_null.format(dict(
+                            type=uuid_type_str,
+                            column=uuid_column_str,
+                        )),
+                    )),
+                    schema.sql_alter_column.format(dict(
+                        table=media_table_str,
+                        changes=schema.sql_alter_column_not_null.format(dict(
+                            type=uuid_type_str,
+                            column=source_id_column_str,
+                        )),
+                    )),
+                    schema.sql_alter_column.format(dict(
+                        table=source_table_str,
+                        changes=schema.sql_alter_column_not_null.format(dict(
+                            type=uuid_type_str,
+                            column=uuid_column_str,
+                        )),
+                    )),
+                    add_fk,
+                ))
+                pp( statement_list )
 
         self.stdout.write('Tables to delete:')
         pp( table_names )
