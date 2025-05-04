@@ -242,13 +242,12 @@ class Command(BaseCommand):
                     None,
                 )
 
-        if not options['dry_run']:
+        if options['dry_run']:
+            return '\n'.join(schema.collected_sql)
+        else:
             with db.connection.schema_editor(collect_sql=False) as schema_editor:
                 for sql in schema.collected_sql:
                     schema_editor.execute(sql, None)
-        else:
-            for sql in schema.collected_sql:
-                self.stdout.write(sql)
 
 
         # All done
