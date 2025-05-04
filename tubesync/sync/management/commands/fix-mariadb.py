@@ -62,11 +62,11 @@ class Command(BaseCommand):
 
     def _using_char_for_uuid(self, table_str, /):
         fields = self._get_fields(table_str)
-        return 'uuid' in [ f.name for f in fields if 'char(32)' == f.type_code ]
+        return 'uuid' in [ f.name for f in fields if 'varchar' == f.data_type ]
 
     def _column_type(self, table_str, column_str='uuid', /):
         fields = self._get_fields(table_str)
-        return [ f.type_code for f in fields if column_str.lower() == f.name.lower() ][0]
+        return [ f.data_type for f in fields if column_str.lower() == f.name.lower() ][0]
 
     def handle(self, *args, **options):
         if 'mysql' != db.connection.vendor:
@@ -78,7 +78,7 @@ class Command(BaseCommand):
         db_is_mariadb = (
             hasattr(db.connection, 'mysql_is_mariadb') and
             db.connection.is_usable() and
-            db.connection.mysql_is_mariadb()
+            db.connection.mysql_is_mariadb
         )
         if not db_is_mariadb:
             raise CommandError(_('Not conbected to a MariaDB database server.'))
@@ -98,11 +98,11 @@ class Command(BaseCommand):
             )
             if not both_tables:
                 if 'uuid' == self._column_type('sync_source', 'uuid').lower():
-                    log.notice('The source table is already using a native UUID column.')
+                    log.info('The source table is already using a native UUID column.')
                 elif 'uuid' == self._column_type('sync_media', 'uuid').lower():
-                    log.notice('The media table is already using a native UUID column.')
+                    log.info('The media table is already using a native UUID column.')
                 elif 'uuid' == self._column_type('sync_media', 'source_id').lower():
-                    log.notice('The media table is already using a native UUID column.')
+                    log.info('The media table is already using a native UUID column.')
                 else:
                     raise CommandError(_(
                         'The database is not in an appropriate state to switch to '
