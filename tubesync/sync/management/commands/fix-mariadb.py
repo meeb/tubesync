@@ -62,11 +62,18 @@ class Command(BaseCommand):
 
     def _using_char_for_uuid(self, table_str, /):
         fields = self._get_fields(table_str)
-        return 'uuid' in [ f.name for f in fields if 'varchar' == f.data_type ]
+        return 'uuid' in [
+            f.name for f in fields if 'varchar' == f.data_type and 32 == f.display_size
+        ]
 
     def _column_type(self, table_str, column_str='uuid', /):
         fields = self._get_fields(table_str)
-        return [ f.data_type for f in fields if column_str.lower() == f.name.lower() ][0]
+        found = [
+            f'{f.data_type}({f.display_size})' for f in fields if column_str.lower() == f.name.lower()
+        ]
+        if not found:
+            return str()
+        return found[0]
 
     def handle(self, *args, **options):
         if 'mysql' != db.connection.vendor:
@@ -92,16 +99,17 @@ class Command(BaseCommand):
                 raise CommandError(_(
                     f'The {display_name} database server does not support UUID columns.'
                 ))
+            uuid_column_type_str = 'uuid(36)'
             both_tables = (
                 self._using_char_for_uuid('sync_source') and
                 self._using_char_for_uuid('sync_media')
             )
             if not both_tables:
-                if 'uuid' == self._column_type('sync_source', 'uuid').lower():
+                if uuid_column_type_str == self._column_type('sync_source', 'uuid').lower():
                     log.info('The source table is already using a native UUID column.')
-                elif 'uuid' == self._column_type('sync_media', 'uuid').lower():
+                elif uuid_column_type_str == self._column_type('sync_media', 'uuid').lower():
                     log.info('The media table is already using a native UUID column.')
-                elif 'uuid' == self._column_type('sync_media', 'source_id').lower():
+                elif uuid_column_type_str == self._column_type('sync_media', 'source_id').lower():
                     log.info('The media table is already using a native UUID column.')
                 else:
                     raise CommandError(_(
@@ -118,41 +126,41 @@ class Command(BaseCommand):
                 source_id_column_str = db_quote_name('source_id')
                 uuid_column_str = db_quote_name('uuid')
                 uuid_type_str = 'uuid'.upper()
-                remove_fk = schema.sql_delete_fk.format(dict(
+                remove_fk = schema.sql_delete_fk % dict(
                     table=media_table_str,
                     name=fk_name_str,
-                ))
-                add_fk = schema.sql_create_fk.format(dict(
+                )
+                add_fk = schema.sql_create_fk % dict(
                     table=media_table_str,
                     name=fk_name_str,
                     column=source_id_column_str,
                     to_table=source_table_str,
                     to_column=uuid_column_str,
                     deferrable='',
-                ))
+                )
                 statement_list = list((
                     remove_fk,
-                    schema.sql_alter_column.format(dict(
+                    schema.sql_alter_column % dict(
                         table=media_table_str,
-                        changes=schema.sql_alter_column_not_null.format(dict(
+                        changes=schema.sql_alter_column_not_null % dict(
                             type=uuid_type_str,
                             column=uuid_column_str,
-                        )),
-                    )),
-                    schema.sql_alter_column.format(dict(
+                        ),
+                    ),
+                    schema.sql_alter_column % dict(
                         table=media_table_str,
-                        changes=schema.sql_alter_column_not_null.format(dict(
+                        changes=schema.sql_alter_column_not_null % dict(
                             type=uuid_type_str,
                             column=source_id_column_str,
-                        )),
-                    )),
-                    schema.sql_alter_column.format(dict(
+                        ),
+                    ),
+                    schema.sql_alter_column % dict(
                         table=source_table_str,
-                        changes=schema.sql_alter_column_not_null.format(dict(
+                        changes=schema.sql_alter_column_not_null % dict(
                             type=uuid_type_str,
                             column=uuid_column_str,
-                        )),
-                    )),
+                        ),
+                    ),
                     add_fk,
                 ))
                 pp( statement_list )
