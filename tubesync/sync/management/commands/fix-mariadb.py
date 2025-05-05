@@ -180,11 +180,9 @@ class Command(BaseCommand):
                     deferrable='',
                 )
 
-                schema.execute('SET foreign_key_checks=0', None)
-                #schema.execute(remove_fk, None)
                 schema.execute(
                     schema.sql_alter_column % dict(
-                        table=source_table_str,
+                        table=media_table_str,
                         changes=schema.sql_alter_column_not_null % dict(
                             type=uuid_type_str,
                             column=uuid_column_str,
@@ -192,9 +190,10 @@ class Command(BaseCommand):
                     ),
                     None,
                 )
+                schema.execute(remove_fk, None)
                 schema.execute(
                     schema.sql_alter_column % dict(
-                        table=media_table_str,
+                        table=source_table_str,
                         changes=schema.sql_alter_column_not_null % dict(
                             type=uuid_type_str,
                             column=uuid_column_str,
@@ -212,8 +211,7 @@ class Command(BaseCommand):
                     ),
                     None,
                 )
-                #schema.execute(add_fk, None)
-                schema.execute('SET foreign_key_checks=1', None)
+                schema.execute(add_fk, None)
 
 
         if table_names:
