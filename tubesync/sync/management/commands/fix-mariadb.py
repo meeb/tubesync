@@ -184,6 +184,16 @@ class Command(BaseCommand):
                 #schema.execute(remove_fk, None)
                 schema.execute(
                     schema.sql_alter_column % dict(
+                        table=source_table_str,
+                        changes=schema.sql_alter_column_not_null % dict(
+                            type=uuid_type_str,
+                            column=uuid_column_str,
+                        ),
+                    ),
+                    None,
+                )
+                schema.execute(
+                    schema.sql_alter_column % dict(
                         table=media_table_str,
                         changes=schema.sql_alter_column_not_null % dict(
                             type=uuid_type_str,
@@ -198,16 +208,6 @@ class Command(BaseCommand):
                         changes=schema.sql_alter_column_not_null % dict(
                             type=uuid_type_str,
                             column=source_id_column_str,
-                        ),
-                    ),
-                    None,
-                )
-                schema.execute(
-                    schema.sql_alter_column % dict(
-                        table=source_table_str,
-                        changes=schema.sql_alter_column_not_null % dict(
-                            type=uuid_type_str,
-                            column=uuid_column_str,
                         ),
                     ),
                     None,
