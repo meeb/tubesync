@@ -336,7 +336,7 @@ def download_media(
         )
         # assignment is the quickest way to cover both 'get' cases
         pp_opts.exec_cmd['after_move'] = cmds
-    else:
+    elif '+' not in media_format:
         pp_opts.remuxvideo = extension
 
     ytopts = {
