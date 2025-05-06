@@ -336,12 +336,15 @@ def download_media(
         )
         # assignment is the quickest way to cover both 'get' cases
         pp_opts.exec_cmd['after_move'] = cmds
+    else:
+        pp_opts.remuxvideo = extension
 
     ytopts = {
         'format': media_format,
         'final_ext': extension,
         'merge_output_format': extension,
         'outtmpl': os.path.basename(output_file),
+        'remuxvideo': pp_opts.remuxvideo,
         'quiet': False if settings.DEBUG else True,
         'verbose': True if settings.DEBUG else False,
         'noprogress': None if settings.DEBUG else True,
