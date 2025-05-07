@@ -18,6 +18,14 @@ reset your database. If you are comfortable with Django you can export and re-im
 existing database data with:
 
 ```bash
+# Stop services
+$ docker exec -t tubesync \
+    bash -c 'for svc in \
+    /run/service/{gunicorn,tubesync*-worker} ; \
+do \
+    /command/s6-svc -wd -D "${svc}" ; \
+done'
+# Backup the database into a compressed file
 $ docker exec -t tubesync \
     python3 /app/manage.py \
     dumpdata --format jsonl \
@@ -41,6 +49,14 @@ If you use `-` as the destination, then `docker cp` provides a `tar` archive.
 After you have changed your database backend over, then use:
 
 ```bash
+# Stop services
+$ docker exec -t tubesync \
+    bash -c 'for svc in \
+    /run/service/{gunicorn,tubesync*-worker} ; \
+do \
+    /command/s6-svc -wd -D "${svc}" ; \
+done'
+# Load fixture file into the database
 $ docker exec -t tubesync \
     python3 /app/manage.py \
     loaddata /downloads/tubesync-database-backup.jsonl.xz
@@ -48,6 +64,14 @@ $ docker exec -t tubesync \
 
 Or, if you only have the copy in `/tmp/`, then you would use:
 ```bash
+# Stop services
+$ docker exec -t tubesync \
+    bash -c 'for svc in \
+    /run/service/{gunicorn,tubesync*-worker} ; \
+do \
+    /command/s6-svc -wd -D "${svc}" ; \
+done'
+# Load fixture data from standard input into the database
 $ xzcat /tmp/tubesync-database-backup.jsonl.xz | \
     docker exec -i tubesync \
     python3 /app/manage.py \
