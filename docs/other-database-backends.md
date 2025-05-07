@@ -125,9 +125,9 @@ the DB for the performance benefits, a configuration like this would be enough:
   container_name: tubesync-db
   restart: unless-stopped
   volumes:
-   - /<path/to>/init.sql:/docker-entrypoint-initdb.d/init.sql
    - /<path/to>/tubesync-db:/var/lib/postgresql/data
   environment:
+   - POSTGRES_DB=tubesync
    - POSTGRES_USER=postgres
    - POSTGRES_PASSWORD=testpassword
 
@@ -145,15 +145,3 @@ the DB for the performance benefits, a configuration like this would be enough:
   depends_on:
    - tubesync-db
 ```
-
-Note that an `init.sql` file is needed to initialize the `tubesync`
-database before it can be written to. This file should contain:
-
-```
-CREATE DATABASE tubesync;
-```
-
-
-Then it must be mapped to `/docker-entrypoint-initdb.d/init.sql` for it
-to be executed on first startup of the container. See the `tubesync-db`
-volume mapping above for how to do this.
