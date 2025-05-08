@@ -3,7 +3,7 @@ from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceVie
                     SourceView, UpdateSourceView, DeleteSourceView, MediaView,
                     MediaThumbView, MediaItemView, MediaRedownloadView, MediaSkipView,
                     MediaEnableView, MediaContent, TasksView, CompletedTasksView, ResetTasks,
-                    MediaServersView, AddMediaServerView, MediaServerView,
+                    TaskScheduleView, MediaServersView, AddMediaServerView, MediaServerView,
                     DeleteMediaServerView, UpdateMediaServerView)
 
 
@@ -124,7 +124,7 @@ urlpatterns = [
 
     path(
         'task/<int:pk>/schedule/now',
-        TasksView.as_view(),
+        TaskScheduleView.as_view(),
         name='run-task',
     ),
 
