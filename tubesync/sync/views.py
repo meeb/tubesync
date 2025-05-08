@@ -24,7 +24,7 @@ from common.utils import append_uri_params
 from background_task.models import Task, CompletedTask
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
-                    SkipMediaForm, EnableMediaForm, ResetTasksForm,
+                    SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
                     ConfirmDeleteMediaServerForm)
 from .utils import validate_url, delete_file, multi_key_sort, mkdir_p
 from .tasks import (map_task_to_instance, get_error_message,
@@ -1002,6 +1002,41 @@ class ResetTasks(FormView):
     def get_success_url(self):
         url = reverse_lazy('sync:tasks')
         return append_uri_params(url, {'message': 'reset'})
+
+
+class TaskScheduleView(FormView, SingleObjectMixin):
+    '''
+        Confirm that the task should be re-scheduled.
+    '''
+
+    template_name = 'sync/task-schedule.html'
+    form_class = ScheduleTaskForm
+    model = Task
+
+    def __init__(self, *args, **kwargs):
+        self.object = None
+        self.schedule = 0
+        super().__init__(*args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_success_url(self):
+        return append_uri_params(
+            reverse_lazy('sync:tasks'),
+            dict(
+                message='scheduled',
+                pk=str(self.object.pk),
+            ),
+        )
+
+    def form_valid(self, form):
+        max_attempts = getattr(settings, 'MAX_ATTEMPTS', 15)
+        self.object.attempts = max_attempts // 2
+        self.object.run_at = timezone.now() + timezone.timedelta(seconds=self.schedule)
+        self.object.save()
+        return super().form_valid(form)
 
 
 class MediaServersView(ListView):
