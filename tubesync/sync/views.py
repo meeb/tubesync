@@ -168,6 +168,7 @@ class ValidateSourceView(FormView):
     template_name = 'sync/source-validate.html'
     form_class = ValidateSourceForm
     errors = {
+        'invalid_source': _('Invalid type for the source.'),
         'invalid_url': _('Invalid URL, the URL must for a "{item}" must be in '
                          'the format of "{example}". The error was: {error}.'),
     }
