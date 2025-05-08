@@ -44,9 +44,15 @@ class ResetTasksForm(forms.Form):
     pass
 
 
+class ScheduleTaskForm(forms.Form):
+
+    pass
+
+
 class ConfirmDeleteMediaServerForm(forms.Form):
 
     pass
+
 
 _media_server_type_label = 'Jellyfin'
 class JellyfinMediaServerForm(forms.Form):
