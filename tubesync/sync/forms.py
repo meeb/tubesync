@@ -46,7 +46,10 @@ class ResetTasksForm(forms.Form):
 
 class ScheduleTaskForm(forms.Form):
 
-    pass
+    when = forms.DateTimeField(
+        label=_('When the task should run'),
+        required=True,
+    )
 
 
 class ConfirmDeleteMediaServerForm(forms.Form):
