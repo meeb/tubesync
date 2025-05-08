@@ -69,7 +69,7 @@
         <a href="{% url task.url pk=task.instance.pk %}" class="collection-item">
           <i class="fas fa-hourglass-start"></i> <strong>{{ task }}</strong><br>
           {% if task.instance.index_schedule and task.repeat > 0 %}Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>{% endif %}
-          <i class="far fa-clock"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong></a><a href="{% url 'sync:task-run' pk=task.pk %}">
+          <i class="far fa-clock"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong></a><a href="{% url 'sync:run-task' pk=task.pk %}">
           <i class="far fa-play-circle"></i>{% endif %}
         </a>
       {% empty %}
