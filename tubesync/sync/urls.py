@@ -130,7 +130,7 @@ urlpatterns = [
 
     path(
         'task/<int:pk>/schedule/<int:timestamp>',
-        TasksView.as_view(),
+        TaskScheduleView.as_view(),
         name='schedule-task',
     ),
 
