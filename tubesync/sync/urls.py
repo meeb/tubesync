@@ -123,6 +123,18 @@ urlpatterns = [
     ),
 
     path(
+        'task/<int:pk>/schedule/now',
+        TasksView.as_view(),
+        name='run-task',
+    ),
+
+    path(
+        'task/<int:pk>/schedule/<int:timestamp>',
+        TasksView.as_view(),
+        name='schedule-task',
+    ),
+
+    path(
         'tasks-completed',
         CompletedTasksView.as_view(),
         name='tasks-completed',
