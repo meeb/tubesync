@@ -396,7 +396,7 @@ def media_post_delete(sender, instance, **kwargs):
         key=instance.key,
         source=instance.source,
     )
-    if created:
+    if False and created:
         old_metadata = instance.loaded_metadata
         skipped_media.downloaded = False
         skipped_media.duration = instance.duration
