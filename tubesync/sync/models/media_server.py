@@ -1,4 +1,3 @@
-import json
 from django import db
 from django.utils.translation import gettext_lazy as _
 from ..choices import Val, MediaServerType
@@ -48,7 +47,7 @@ class MediaServer(db.models.Model):
         _('options'),
         blank=False,
         null=True,
-        help_text=_('JSON encoded options for the media server'),
+        help_text=_('Options for the media server'),
     )
 
     def __str__(self):
