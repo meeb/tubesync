@@ -28,7 +28,7 @@ from ..choices import ( Val, Fallback, MediaState, SourceResolution,
                         YouTube_AudioCodec, YouTube_VideoCodec)
 from .source import Source
 from .misc import (
-    media_file_storage, _srctype_dict,
+    media_file_storage, _srctype_dict, _nfo_element,
     get_media_thumb_path, get_media_file_path,
 )
 
@@ -942,37 +942,27 @@ class Media(models.Model):
         nfo = ElementTree.Element('episodedetails')
         nfo.text = '\n  '
         # title = media metadata title
-        title = nfo.makeelement('title', {})
-        title.text = clean_emoji(self.title)
-        title.tail = '\n  '
-        nfo.append(title)
+        nfo.append(_nfo_element(nfo,
+            'title', clean_emoji(self.title),
+        ))
         # showtitle = source name
-        showtitle = nfo.makeelement('showtitle', {})
-        showtitle.text = clean_emoji(str(self.source.name).strip())
-        showtitle.tail = '\n  '
-        nfo.append(showtitle)
+        nfo.append(_nfo_element(nfo,
+            'showtitle', clean_emoji(str(self.source.name).strip()),
+        ))
         # season = upload date year
-        season = nfo.makeelement('season', {})
-        if self.source.is_playlist:
-            # If it's a playlist, set season to 1
-            season.text = '1'
-        else:
-            # If it's not a playlist, set season to upload date year
-            season.text = str(self.upload_date.year) if self.upload_date else ''
-        season.tail = '\n  '
-        nfo.append(season)
+        nfo.append(_nfo_element(nfo,
+            'season',
+            '1' if self.source.is_playlist else str(
+                self.upload_date.year if self.upload_date else ''
+            ),
+        ))
         # episode = number of video in the year
-        episode = nfo.makeelement('episode', {})
-        episode.text = self.get_episode_str()
-        episode.tail = '\n  '
-        nfo.append(episode)
+        nfo.append(_nfo_element(nfo,
+            'episode', self.get_episode_str(),
+        ))
         # ratings = media metadata youtube rating
-        value = nfo.makeelement('value', {})
-        value.text = str(self.rating)
-        value.tail = '\n      '
-        votes = nfo.makeelement('votes', {})
-        votes.text = str(self.votes)
-        votes.tail = '\n    '
+        value = _nfo_element(nfo, 'value', str(self.rating), indent=6)
+        votes = _nfo_element(nfo, 'votes', str(self.votes), indent=4)
         rating_attrs = OrderedDict()
         rating_attrs['name'] = 'youtube'
         rating_attrs['max'] = '5'
@@ -989,61 +979,51 @@ class Media(models.Model):
         ratings.tail = '\n  '
         nfo.append(ratings)
         # plot = media metadata description
-        plot = nfo.makeelement('plot', {})
-        plot.text = clean_emoji(str(self.description).strip())
-        plot.tail = '\n  '
-        nfo.append(plot)
+        nfo.append(_nfo_element(nfo,
+            'plot', clean_emoji(str(self.description).strip()),
+        ))
         # thumb = local path to media thumbnail
-        thumb = nfo.makeelement('thumb', {})
-        thumb.text = self.thumbname if self.source.copy_thumbnails else ''
-        thumb.tail = '\n  '
-        nfo.append(thumb)
+        nfo.append(_nfo_element(nfo,
+            'thumb', self.thumbname if self.source.copy_thumbnails else '',
+        ))
         # mpaa = media metadata age requirement
-        mpaa = nfo.makeelement('mpaa', {})
-        mpaa.text = str(self.age_limit)
-        mpaa.tail = '\n  '
         if self.age_limit and self.age_limit > 0:
-            nfo.append(mpaa)
+            nfo.append(_nfo_element(nfo,
+                'mpaa', str(self.age_limit),
+            ))
         # runtime = media metadata duration in seconds
-        runtime = nfo.makeelement('runtime', {})
-        runtime.text = str(self.duration)
-        runtime.tail = '\n  '
-        nfo.append(runtime)
+        nfo.append(_nfo_element(nfo,
+            'runtime', str(self.duration),
+        ))
         # id = media key
-        idn = nfo.makeelement('id', {})
-        idn.text = str(self.key).strip()
-        idn.tail = '\n  '
-        nfo.append(idn)
+        nfo.append(_nfo_element(nfo,
+            'id', str(self.key).strip(),
+        ))
         # uniqueid = media key
         uniqueid_attrs = OrderedDict()
         uniqueid_attrs['type'] = 'youtube'
         uniqueid_attrs['default'] = 'True'
-        uniqueid = nfo.makeelement('uniqueid', uniqueid_attrs)
-        uniqueid.text = str(self.key).strip()
-        uniqueid.tail = '\n  '
-        nfo.append(uniqueid)
+        nfo.append(_nfo_element(nfo,
+            'uniqueid', str(self.key).strip(), attrs=uniqueid_attrs,
+        ))
         # studio = media metadata uploader
-        studio = nfo.makeelement('studio', {})
-        studio.text = clean_emoji(str(self.uploader).strip())
-        studio.tail = '\n  '
-        nfo.append(studio)
+        nfo.append(_nfo_element(nfo,
+            'studio', clean_emoji(str(self.uploader).strip()),
+        ))
         # aired = media metadata uploaded date
-        aired = nfo.makeelement('aired', {})
         upload_date = self.upload_date
-        aired.text = upload_date.strftime('%Y-%m-%d') if upload_date else ''
-        aired.tail = '\n  '
-        nfo.append(aired)
+        nfo.append(_nfo_element(nfo,
+            'aired', upload_date.strftime('%Y-%m-%d') if upload_date else '',
+        ))
         # dateadded = date and time media was created in tubesync
-        dateadded = nfo.makeelement('dateadded', {})
-        dateadded.text = self.created.strftime('%Y-%m-%d %H:%M:%S')
-        dateadded.tail = '\n  '
-        nfo.append(dateadded)
+        nfo.append(_nfo_element(nfo,
+            'dateadded', self.created.strftime('%Y-%m-%d %H:%M:%S'),
+        ))
         # genre = any media metadata categories if they exist
         for category_str in self.categories:
-            genre = nfo.makeelement('genre', {})
-            genre.text = str(category_str).strip()
-            genre.tail = '\n  '
-            nfo.append(genre)
+            nfo.append(_nfo_element(nfo,
+                'genre', str(category_str).strip(),
+            ))
         nfo[-1].tail = '\n'
         # Return XML tree as a prettified string
         return ElementTree.tostring(nfo, encoding='utf8', method='xml').decode('utf8')
