@@ -471,19 +471,6 @@ class FrontEndTestCase(TestCase):
         q = {'task_name': 'sync.tasks.download_media_thumbnail'}
         download_media_thumbnail_tasks = Task.objects.filter(**q)
         self.assertFalse(download_media_thumbnail_tasks)
-        found_thumbnail_task1 = False
-        found_thumbnail_task2 = False
-        found_thumbnail_task3 = False
-        for task in download_media_thumbnail_tasks:
-            if test_media1_pk in task.task_params:
-                found_thumbnail_task1 = True
-            if test_media2_pk in task.task_params:
-                found_thumbnail_task2 = True
-            if test_media3_pk in task.task_params:
-                found_thumbnail_task3 = True
-        self.assertFalse(found_thumbnail_task1)
-        self.assertFalse(found_thumbnail_task2)
-        self.assertFalse(found_thumbnail_task3)
         q = {'task_name': 'sync.tasks.download_media'}
         download_media_tasks = Task.objects.filter(**q)
         self.assertFalse(download_media_tasks)
