@@ -18,6 +18,7 @@ from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.logger import log
+from common.json import JSONEncoder
 from common.errors import NoFormatException
 from common.utils import (  clean_filename, clean_emoji,
                             django_queryset_generator as qs_gen, )
@@ -35,6 +36,7 @@ from ..choices import (  Val, CapChoices, Fallback, FileExtension,
                         MediaState, SourceResolution, SourceResolutionInteger,
                         SponsorBlock_Category, YouTube_AudioCodec,
                         YouTube_SourceType, YouTube_VideoCodec)
+from .metadata_format import MetadataFormat
 from .media_server import MediaServer
 
 media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
@@ -1929,73 +1931,3 @@ class Metadata(models.Model):
 
         return self.with_formats
 
-
-class MetadataFormat(models.Model):
-    '''
-        A format from the Metadata for an indexed `Media` item.
-    '''
-    class Meta:
-        db_table = f'{Metadata._meta.db_table}_format'
-        verbose_name = _('Format from Media Metadata')
-        verbose_name_plural = _('Formats from Media Metadata')
-        unique_together = (
-            ('metadata', 'site', 'key', 'number'),
-        )
-        ordering = ['site', 'key', 'number']
-
-    uuid = models.UUIDField(
-        _('uuid'),
-        primary_key=True,
-        editable=False,
-        default=uuid.uuid4,
-        help_text=_('UUID of the format'),
-    )
-    metadata = models.ForeignKey(
-        Metadata,
-        # on_delete=models.DO_NOTHING,
-        on_delete=models.CASCADE,
-        related_name='format',
-        help_text=_('Metadata the format belongs to'),
-        null=False,
-    )
-    site = models.CharField(
-        _('site'),
-        max_length=256,
-        blank=True,
-        db_index=True,
-        null=False,
-        default='Youtube',
-        help_text=_('Site from which the format is available'),
-    )
-    key = models.CharField(
-        _('key'),
-        max_length=256,
-        blank=True,
-        db_index=True,
-        null=False,
-        default='',
-        help_text=_('Media identifier at the site from which this format is available'),
-    )
-    number = models.PositiveIntegerField(
-        _('number'),
-        blank=False,
-        null=False,
-        help_text=_('Ordering number for this format')
-    )
-    value = models.JSONField(
-        _('value'),
-        encoder=JSONEncoder,
-        null=False,
-        default=dict,
-        help_text=_('JSON metadata format object'),
-    )
-
-
-    def __str__(self):
-        template = '#{:n} "{}" from {}: {}'
-        return template.format(
-            self.number,
-            self.key,
-            self.site,
-            self.value.get('format') or self.value.get('format_id'),
-        )
