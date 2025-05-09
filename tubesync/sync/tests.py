@@ -469,10 +469,12 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 404)
         # Confirm any tasks have been deleted
         q = {'task_name': 'sync.tasks.download_media_thumbnail'}
+        download_media_thumbnail_tasks = Task.objects.filter(**q)
+        self.assertFalse(download_media_thumbnail_tasks)
         found_thumbnail_task1 = False
         found_thumbnail_task2 = False
         found_thumbnail_task3 = False
-        for task in Task.objects.filter(**q):
+        for task in download_media_thumbnail_tasks:
             if test_media1_pk in task.task_params:
                 found_thumbnail_task1 = True
             if test_media2_pk in task.task_params:
