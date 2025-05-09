@@ -1,7 +1,6 @@
 import os
 import uuid
 import json
-import re
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone as tz
@@ -9,16 +8,12 @@ from pathlib import Path
 from xml.etree import ElementTree
 from django.conf import settings
 from django.db import models
-from django.core.exceptions import ObjectDoesNotExist, SuspiciousOperation
-from django.core.files.storage import FileSystemStorage
-from django.core.serializers.json import DjangoJSONEncoder
-from django.core.validators import RegexValidator
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.transaction import atomic
 from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.logger import log
-from common.json import JSONEncoder
 from common.errors import NoFormatException
 from common.utils import (  clean_filename, clean_emoji,
                             django_queryset_generator as qs_gen, )
@@ -30,7 +25,6 @@ from ..utils import (seconds_to_timestr, parse_media_format, filter_response,
                     multi_key_sort)
 from ..matching import ( get_best_combined_format, get_best_audio_format,
                         get_best_video_format)
-from ..fields import CommaSepChoiceField
 from ..choices import (  Val, CapChoices, Fallback, FileExtension,
                         FilterSeconds, IndexSchedule, MediaServerType,
                         MediaState, SourceResolution, SourceResolutionInteger,
