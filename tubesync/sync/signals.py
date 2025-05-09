@@ -295,6 +295,25 @@ def media_post_save(sender, instance, created, **kwargs):
 
 @receiver(pre_delete, sender=Media)
 def media_pre_delete(sender, instance, **kwargs):
+    # Save the metadata site & thumbnail URL to the metadata column
+    existing_metadata = instance.loaded_metadata
+    metadata_str = instance.metadata or '{}'
+    column_metadata = instance.metadata_loads(metadata_str)
+    instance.metadata = instance.metadata_dumps(
+        arg_dict=dict(column_metadata).update(
+            deleted=True,
+            site=instance.get_metadata_first_value(
+                'extractor_key',
+                'Youtube',
+                arg_dict=existing_metadata,
+            ),
+            thumbnail=instance.get_metadata_first_value(
+                'thumbnail',
+                arg_dict=existing_metadata,
+            ),
+        ),
+    )
+    instance.save()
     # Triggered before media is deleted, delete any unlocked scheduled tasks
     log.info(f'Deleting tasks for media: {instance.name}')
     delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
@@ -369,4 +388,33 @@ def media_post_delete(sender, instance, **kwargs):
         for file in all_related_files:
             log.info(f'Deleting file for: {instance} path: {file}')
             delete_file(file)
+
+    # Create a media entry for the indexing task to find
+    # Requirements:
+    #     source, key, duration, title, published
+    skipped_media, created = Media.objects.get_or_create(
+        key=instance.key,
+        source=instance.source,
+    )
+    if created:
+        old_metadata = instance.loaded_metadata
+        skipped_media.downloaded = False
+        skipped_media.duration = instance.duration
+        skipped_media.metadata = skipped_media.metadata_dumps(
+            arg_dict=dict(
+                _media_instance_was_deleted=True,
+                site=old_metadata.get('site'),
+                thumbnail=old_metadata.get('thumbnail'),
+            ),
+        )
+        skipped_media.published = instance.published
+        skipped_media.title = instance.title
+        skipped_media.skip = True
+        skipped_media.manual_skip = True
+        skipped_media.save()
+        Metadata.objects.filter(
+            media__isnull=True,
+            site=old_metadata.get('site') or 'Youtube',
+            key=skipped_media.key,
+        ).update(media=skipped_media)
 
