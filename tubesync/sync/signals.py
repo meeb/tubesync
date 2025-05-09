@@ -295,27 +295,6 @@ def media_post_save(sender, instance, created, **kwargs):
 
 @receiver(pre_delete, sender=Media)
 def media_pre_delete(sender, instance, **kwargs):
-    # Save the metadata site & thumbnail URL to the metadata column
-    existing_metadata = instance.loaded_metadata
-    metadata_str = instance.metadata or '{}'
-    column_metadata = instance.metadata_loads(metadata_str)
-    instance.metadata = instance.metadata_dumps(
-        arg_dict=dict(column_metadata).update(
-            deleted=True,
-            site=instance.get_metadata_first_value(
-                'extractor_key',
-                'Youtube',
-                arg_dict=existing_metadata,
-            ),
-            thumbnail=instance.get_metadata_first_value(
-                'thumbnail',
-                arg_dict=existing_metadata,
-            ),
-        ),
-    )
-    # Do not create more tasks before deleting
-    instance.manual_skip = True
-    instance.save()
     # Triggered before media is deleted, delete any unlocked scheduled tasks
     log.info(f'Deleting tasks for media: {instance.name}')
     delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
@@ -331,6 +310,24 @@ def media_pre_delete(sender, instance, **kwargs):
     # Remove thumbnail file for deleted media
     if instance.thumb:
         instance.thumb.delete(save=False)
+    # Save the metadata site & thumbnail URL to the metadata column
+    existing_metadata = instance.loaded_metadata
+    metadata_str = instance.metadata or '{}'
+    column_metadata = instance.metadata_loads(metadata_str)
+    instance.metadata = instance.metadata_dumps(
+        arg_dict=dict(column_metadata).update(
+            deleted=True,
+            site=instance.get_metadata_first_value(
+                'extractor_key',
+                'Youtube',
+                arg_dict=existing_metadata,
+            ),
+            thumbnail=thumbnail_url,
+        ),
+    )
+    # Do not create more tasks before deleting
+    instance.manual_skip = True
+    instance.save()
 
 
 @receiver(post_delete, sender=Media)
