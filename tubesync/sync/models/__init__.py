@@ -1,5 +1,7 @@
 from common.json import JSONEncoder
 
+from ..fields import CommaSepChoiceField
+
 from .media import Media
 from .source import Source
 from .metadata import Metadata
