@@ -37,20 +37,10 @@ from ..choices import (  Val, CapChoices, Fallback, FileExtension,
                         SponsorBlock_Category, YouTube_AudioCodec,
                         YouTube_SourceType, YouTube_VideoCodec)
 from .source import Source
-from .misc import media_file_storage, _srctype_dict
-
-def get_media_thumb_path(instance, filename):
-    # we don't want to use alternate names for thumb files
-    if instance.thumb:
-        instance.thumb.delete(save=False)
-    fileid = str(instance.uuid).lower()
-    filename = f'{fileid}.jpg'
-    prefix = fileid[:2]
-    return Path('thumbs') / prefix / filename
-
-
-def get_media_file_path(instance, filename):
-    return instance.filepath
+from .misc import (
+    media_file_storage, _srctype_dict,
+    get_media_thumb_path, get_media_file_path,
+)
 
 
 class Media(models.Model):
