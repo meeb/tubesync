@@ -36,9 +36,8 @@ from ..choices import (  Val, CapChoices, Fallback, FileExtension,
                         MediaState, SourceResolution, SourceResolutionInteger,
                         SponsorBlock_Category, YouTube_AudioCodec,
                         YouTube_SourceType, YouTube_VideoCodec)
-
-media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
-_srctype_dict = lambda n: dict(zip( YouTube_SourceType.values, (n,) * len(YouTube_SourceType.values) ))
+from .source import Source
+from .misc import media_file_storage, _srctype_dict
 
 def get_media_thumb_path(instance, filename):
     # we don't want to use alternate names for thumb files
