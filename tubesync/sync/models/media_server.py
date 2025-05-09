@@ -74,10 +74,6 @@ class MediaServer(db.models.Model):
         handler_class = self.HANDLERS.get(self.server_type)
         return handler_class(self)
 
-    @property
-    def loaded_options(self):
-        return self.options or dict()
-
     def validate(self):
         return self.handler.validate()
 
