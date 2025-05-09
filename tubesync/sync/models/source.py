@@ -5,6 +5,7 @@ from pathlib import Path
 from django import db
 from django.conf import settings
 from django.core.exceptions import SuspiciousOperation
+from django.core.validators import RegexValidator
 from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
