@@ -4,7 +4,7 @@ from common.timestamp import timestamp_to_datetime
 from common.utils import django_queryset_generator as qs_gen
 from django import db
 from django.utils.translation import gettext_lazy as _
-from .legacy import Media
+from .media import Media
 
 
 class Metadata(db.models.Model):
