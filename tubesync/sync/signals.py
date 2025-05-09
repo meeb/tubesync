@@ -313,7 +313,7 @@ def media_pre_delete(sender, instance, **kwargs):
             ),
         ),
     )
-    instance.save()
+    # TODO: instance.save()
     # Triggered before media is deleted, delete any unlocked scheduled tasks
     log.info(f'Deleting tasks for media: {instance.name}')
     delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
