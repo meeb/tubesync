@@ -19,7 +19,7 @@ from ..youtube import (
     get_media_info as get_youtube_media_info,
     get_channel_image_info as get_youtube_channel_image_info,
 )
-from .legacy import _srctype_dict, media_file_storage
+from .misc import _srctype_dict, media_file_storage
 
 
 class Source(db.models.Model):
