@@ -313,7 +313,9 @@ def media_pre_delete(sender, instance, **kwargs):
             ),
         ),
     )
-    # TODO: instance.save()
+    # Do not create more tasks before deleting
+    instance.manual_skip = True
+    instance.save()
     # Triggered before media is deleted, delete any unlocked scheduled tasks
     log.info(f'Deleting tasks for media: {instance.name}')
     delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
@@ -396,7 +398,7 @@ def media_post_delete(sender, instance, **kwargs):
         key=instance.key,
         source=instance.source,
     )
-    if False and created:
+    if created:
         old_metadata = instance.loaded_metadata
         skipped_media.downloaded = False
         skipped_media.duration = instance.duration
