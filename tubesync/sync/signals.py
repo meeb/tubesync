@@ -313,21 +313,18 @@ def media_pre_delete(sender, instance, **kwargs):
     # Save the metadata site & thumbnail URL to the metadata column
     existing_metadata = instance.loaded_metadata
     metadata_str = instance.metadata or '{}'
-    column_metadata = instance.metadata_loads(metadata_str)
+    arg_dict = instance.metadata_loads(metadata_str)
     site_field = instance.get_metadata_field('extractor_key')
     thumbnail_field = instance.get_metadata_field('thumbnail')
-    instance.metadata = instance.metadata_dumps(
-        arg_dict=dict(column_metadata).update(dict(
-            deleted=True,
-        ).update({
-            site_field: instance.get_metadata_first_value(
-                'extractor_key',
-                'Youtube',
-                arg_dict=existing_metadata,
-            ),
-            thumbnail_field: thumbnail_url,
-        })),
-    )
+    arg_dict.update({
+        site_field: instance.get_metadata_first_value(
+            'extractor_key',
+            'Youtube',
+            arg_dict=existing_metadata,
+        ),
+        thumbnail_field: thumbnail_url,
+    })
+    instance.metadata = instance.metadata_dumps(arg_dict=arg_dict)
     # Do not create more tasks before deleting
     instance.manual_skip = True
     instance.save()
@@ -399,19 +396,21 @@ def media_post_delete(sender, instance, **kwargs):
         source=instance.source,
     )
     if created:
+        old_metadata = instance.loaded_metadata
         site_field = instance.get_metadata_field('extractor_key')
         thumbnail_url = instance.thumbnail
         thumbnail_field = instance.get_metadata_field('thumbnail')
-        old_metadata = instance.loaded_metadata
         skipped_media.downloaded = False
         skipped_media.duration = instance.duration
+        arg_dict=dict(
+            _media_instance_was_deleted=True,
+        )
+        arg_dict.update({
+            site_field: old_metadata.get(site_field),
+            thumbnail_field: thumbnail_url,
+        })
         skipped_media.metadata = skipped_media.metadata_dumps(
-            arg_dict=dict(
-                _media_instance_was_deleted=True,
-            ).update({
-                site_field: old_metadata.get(site_field),
-                thumbnail_field: thumbnail_url,
-            }),
+            arg_dict=arg_dict,
         )
         skipped_media.published = instance.published
         skipped_media.title = instance.title
