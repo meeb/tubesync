@@ -10,7 +10,7 @@ from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from ..choices import (Val,
     SponsorBlock_Category, YouTube_SourceType, IndexSchedule,
-    CapChoices, FilterSeconds, FileExtension,
+    CapChoices, Fallback, FileExtension, FilterSeconds,
     SourceResolution, SourceResolutionInteger,
     YouTube_VideoCodec, YouTube_AudioCodec,
 )
