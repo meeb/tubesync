@@ -314,16 +314,19 @@ def media_pre_delete(sender, instance, **kwargs):
     existing_metadata = instance.loaded_metadata
     metadata_str = instance.metadata or '{}'
     column_metadata = instance.metadata_loads(metadata_str)
+    site_field = instance.get_metadata_field('extractor_key')
+    thumbnail_field = instance.get_metadata_field('thumbnail')
     instance.metadata = instance.metadata_dumps(
-        arg_dict=dict(column_metadata).update(
+        arg_dict=dict(column_metadata).update(dict(
             deleted=True,
-            site=instance.get_metadata_first_value(
+        ).update({
+            site_field: instance.get_metadata_first_value(
                 'extractor_key',
                 'Youtube',
                 arg_dict=existing_metadata,
             ),
-            thumbnail=thumbnail_url,
-        ),
+            thumbnail_field: thumbnail_url,
+        })),
     )
     # Do not create more tasks before deleting
     instance.manual_skip = True
@@ -396,15 +399,19 @@ def media_post_delete(sender, instance, **kwargs):
         source=instance.source,
     )
     if created:
+        site_field = instance.get_metadata_field('extractor_key')
+        thumbnail_url = instance.thumbnail
+        thumbnail_field = instance.get_metadata_field('thumbnail')
         old_metadata = instance.loaded_metadata
         skipped_media.downloaded = False
         skipped_media.duration = instance.duration
         skipped_media.metadata = skipped_media.metadata_dumps(
             arg_dict=dict(
                 _media_instance_was_deleted=True,
-                site=old_metadata.get('site'),
-                thumbnail=old_metadata.get('thumbnail'),
-            ),
+            ).update({
+                site_field: old_metadata.get(site_field),
+                thumbnail_field: thumbnail_url,
+            }),
         )
         skipped_media.published = instance.published
         skipped_media.title = instance.title
@@ -413,7 +420,7 @@ def media_post_delete(sender, instance, **kwargs):
         skipped_media.save()
         Metadata.objects.filter(
             media__isnull=True,
-            site=old_metadata.get('site') or 'Youtube',
+            site=old_metadata.get(site_field) or 'Youtube',
             key=skipped_media.key,
         ).update(media=skipped_media)
 
