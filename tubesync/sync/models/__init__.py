@@ -1,12 +1,20 @@
+# These are referenced from the migration files
+# TODO: update migration files to remove
+#    CommaSepChoiceField and JSONEncoder
+
 from common.json import JSONEncoder
 
 from ..fields import CommaSepChoiceField
+
+# Used by migration files and staying here
 
 from .misc import (
     get_media_file_path,
     get_media_thumb_path,
     media_file_storage,
 )
+
+# The actual model classes
 
 from .media import Media
 from .source import Source
