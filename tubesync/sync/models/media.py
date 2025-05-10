@@ -26,11 +26,11 @@ from ..matching import (get_best_combined_format, get_best_audio_format,
                         get_best_video_format)
 from ..choices import ( Val, Fallback, MediaState, SourceResolution,
                         YouTube_AudioCodec, YouTube_VideoCodec)
-from .source import Source
-from .misc import (
-    media_file_storage, _srctype_dict, _nfo_element,
-    get_media_thumb_path, get_media_file_path,
+from ._migrations import (
+    media_file_storage, get_media_thumb_path, get_media_file_path,
 )
+from ._private import _srctype_dict, _nfo_element
+from .source import Source
 
 
 class Media(models.Model):
