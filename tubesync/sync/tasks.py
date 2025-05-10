@@ -933,6 +933,10 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
         for media in qs_gen(mqs):
             log.info(f'Deleting media for source: {source_name} item: {media.name}')
             with atomic():
+                #media.downloaded = False
+                media.skip = True
+                media.manual_skip = True
+                media.save()
                 media.delete()
     # Remove the directory, if the user requested that
     directory_path = Path(source_directory)
