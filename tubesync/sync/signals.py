@@ -333,7 +333,13 @@ def media_pre_delete(sender, instance, **kwargs):
 @receiver(post_delete, sender=Media)
 def media_post_delete(sender, instance, **kwargs):
     # Remove the video file, when configured to do so
-    if instance.source.delete_files_on_disk and instance.media_file:
+    remove_files = (
+        instance.source and
+        instance.source.delete_files_on_disk and
+        instance.downloaded and
+        instance.media_file
+    )
+    if remove_files:
         video_path = Path(str(instance.media_file.path)).resolve(strict=False)
         instance.media_file.delete(save=False)
         # the other files we created have these known suffixes
@@ -391,10 +397,19 @@ def media_post_delete(sender, instance, **kwargs):
     # Create a media entry for the indexing task to find
     # Requirements:
     #     source, key, duration, title, published
-    skipped_media, created = Media.objects.get_or_create(
-        key=instance.key,
-        source=instance.source,
+    created = False
+    create_for_indexing_task = (
+        not (
+            #not instance.downloaded and
+            instance.skip and
+            instance.manual_skip
+        )
     )
+    if create_for_indexing_task:
+        skipped_media, created = Media.objects.get_or_create(
+            key=instance.key,
+            source=instance.source,
+        )
     if created:
         old_metadata = instance.loaded_metadata
         site_field = instance.get_metadata_field('extractor_key')
