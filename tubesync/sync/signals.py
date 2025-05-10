@@ -272,8 +272,15 @@ def media_post_save(sender, instance, created, **kwargs):
                 thumbnail_url,
                 verbose_name=verbose_name.format(instance.name),
             )
+    media_file_exists = False
+    try:
+        media_file_exists |= instance.media_file_exists
+        media_file_exists |= instance.filepath.exists()
+    except OSError as e:
+        log.exception(e)
+        pass
     # If the media has not yet been downloaded schedule it to be downloaded
-    if not (instance.media_file_exists or instance.filepath.exists() or existing_media_download_task):
+    if not (media_file_exists or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
         if instance.can_download and instance.downloaded:
             skip_changed = True != instance.skip
