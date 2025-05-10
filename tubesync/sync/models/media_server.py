@@ -1,3 +1,4 @@
+from common.json import JSONEncoder
 from django import db
 from django.utils.translation import gettext_lazy as _
 from ..choices import Val, MediaServerType
@@ -45,6 +46,7 @@ class MediaServer(db.models.Model):
     )
     options = db.models.JSONField(
         _('options'),
+        encoder=JSONEncoder,
         blank=False,
         null=True,
         help_text=_('Options for the media server'),
