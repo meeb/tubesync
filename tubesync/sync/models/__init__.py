@@ -1,8 +1,6 @@
 # These are referenced from the migration files
 # TODO: update migration files to remove
-#    CommaSepChoiceField and JSONEncoder
-
-from common.json import JSONEncoder
+#    CommaSepChoiceField
 
 from ..fields import CommaSepChoiceField
 
