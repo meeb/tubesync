@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from background_task.signals import task_failed
 from background_task.models import Task
 from common.logger import log
-from .models import Source, Media, MediaServer
+from .models import Source, Media, MediaServer, Metadata
 from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
                     download_media_thumbnail, download_media_metadata,
                     map_task_to_instance, check_source_directory_exists,
@@ -272,8 +272,15 @@ def media_post_save(sender, instance, created, **kwargs):
                 thumbnail_url,
                 verbose_name=verbose_name.format(instance.name),
             )
+    media_file_exists = False
+    try:
+        media_file_exists |= instance.media_file_exists
+        media_file_exists |= instance.filepath.exists()
+    except OSError as e:
+        log.exception(e)
+        pass
     # If the media has not yet been downloaded schedule it to be downloaded
-    if not (instance.media_file_exists or instance.filepath.exists() or existing_media_download_task):
+    if not (media_file_exists or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
         if instance.can_download and instance.downloaded:
             skip_changed = True != instance.skip
@@ -310,12 +317,36 @@ def media_pre_delete(sender, instance, **kwargs):
     # Remove thumbnail file for deleted media
     if instance.thumb:
         instance.thumb.delete(save=False)
+    # Save the metadata site & thumbnail URL to the metadata column
+    existing_metadata = instance.loaded_metadata
+    metadata_str = instance.metadata or '{}'
+    arg_dict = instance.metadata_loads(metadata_str)
+    site_field = instance.get_metadata_field('extractor_key')
+    thumbnail_field = instance.get_metadata_field('thumbnail')
+    arg_dict.update({
+        site_field: instance.get_metadata_first_value(
+            'extractor_key',
+            'Youtube',
+            arg_dict=existing_metadata,
+        ),
+        thumbnail_field: thumbnail_url,
+    })
+    instance.metadata = instance.metadata_dumps(arg_dict=arg_dict)
+    # Do not create more tasks before deleting
+    instance.manual_skip = True
+    instance.save()
 
 
 @receiver(post_delete, sender=Media)
 def media_post_delete(sender, instance, **kwargs):
     # Remove the video file, when configured to do so
-    if instance.source.delete_files_on_disk and instance.media_file:
+    remove_files = (
+        instance.source and
+        instance.source.delete_files_on_disk and
+        instance.downloaded and
+        instance.media_file
+    )
+    if remove_files:
         video_path = Path(str(instance.media_file.path)).resolve(strict=False)
         instance.media_file.delete(save=False)
         # the other files we created have these known suffixes
@@ -369,4 +400,48 @@ def media_post_delete(sender, instance, **kwargs):
         for file in all_related_files:
             log.info(f'Deleting file for: {instance} path: {file}')
             delete_file(file)
+
+    # Create a media entry for the indexing task to find
+    # Requirements:
+    #     source, key, duration, title, published
+    created = False
+    create_for_indexing_task = (
+        not (
+            #not instance.downloaded and
+            instance.skip and
+            instance.manual_skip
+        )
+    )
+    if create_for_indexing_task:
+        skipped_media, created = Media.objects.get_or_create(
+            key=instance.key,
+            source=instance.source,
+        )
+    if created:
+        old_metadata = instance.loaded_metadata
+        site_field = instance.get_metadata_field('extractor_key')
+        thumbnail_url = instance.thumbnail
+        thumbnail_field = instance.get_metadata_field('thumbnail')
+        skipped_media.downloaded = False
+        skipped_media.duration = instance.duration
+        arg_dict=dict(
+            _media_instance_was_deleted=True,
+        )
+        arg_dict.update({
+            site_field: old_metadata.get(site_field),
+            thumbnail_field: thumbnail_url,
+        })
+        skipped_media.metadata = skipped_media.metadata_dumps(
+            arg_dict=arg_dict,
+        )
+        skipped_media.published = instance.published
+        skipped_media.title = instance.title
+        skipped_media.skip = True
+        skipped_media.manual_skip = True
+        skipped_media.save()
+        Metadata.objects.filter(
+            media__isnull=True,
+            site=old_metadata.get(site_field) or 'Youtube',
+            key=skipped_media.key,
+        ).update(media=skipped_media)
 

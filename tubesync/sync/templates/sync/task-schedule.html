@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block headtitle %}Schedule task{% endblock %}
+
+{% block content %}
+<div class="row no-margin-bottom">
+  <div class="col s12">
+    <h1>Schedule task</h1>
+    <p>
+      If you don't want to wait for the existing schedule to be triggered,
+      you can use this to change when the task will be scheduled to run.
+      It is not guaranteed to run at any exact time, because when a task
+      requests to run and when a slot to execute it, in the appropriate
+      queue and with the priority level assigned, is dependent on how long
+      other tasks are taking to complete the assigned work.
+    </p>
+    <p>
+      This will change the time that the task is requesting to be run
+      to the current time, plus some number of seconds.
+    </p>
+  </div>
+</div>
+<div class="row">
+  <form method="post" action="{% url 'sync:run-task' pk=task.pk %}" class="col s12 simpleform">
+    {% csrf_token %}
+    {% include 'simpleform.html' with form=form %}
+    <div class="row no-margin-bottom padding-top">
+      <div class="col s12">
+        <button class="btn" type="submit" name="action">Really schedule task <i class="far fa-clock"></i></button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

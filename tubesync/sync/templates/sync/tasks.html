@@ -43,11 +43,16 @@
     </p>
     <div class="collection">
       {% for task in errors %}
-        <a href="{% url task.url pk=task.instance.pk %}" class="collection-item error-text">
-          <i class="fas fa-exclamation-triangle"></i> <strong>{{ task }}</strong>, attempted {{ task.attempts }} time{{ task.attempts|pluralize }}<br>
-          Error: &quot;{{ task.error_message }}&quot;<br>
+        <div class="collection-item error-text">
+          <a href="{% url task.url pk=task.instance.pk %}" class="error-text">
+            <i class="fas fa-exclamation-triangle"></i> <strong>{{ task }}</strong>, attempted {{ task.attempts }} time{{ task.attempts|pluralize }}<br>
+            Error: &quot;{{ task.error_message }}&quot;<br>
+          </a>
           <i class="fas fa-history"></i> Task will be retried at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
-        </a>
+          <a href="{% url 'sync:run-task' pk=task.pk %}" class="error-text">
+            <i class="fas fa-undo"></i>
+          </a>
+        </div>
       {% empty %}
         <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no tasks with errors on this page.</span>
       {% endfor %}
@@ -66,11 +71,17 @@
     </p>
     <div class="collection">
       {% for task in scheduled %}
-        <a href="{% url task.url pk=task.instance.pk %}" class="collection-item">
-          <i class="fas fa-stopwatch"></i> <strong>{{ task }}</strong><br>
-          {% if task.instance.index_schedule and task.repeat > 0 %}Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>{% endif %}
-          <i class="fas fa-redo"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>{% endif %}
-        </a>
+        <div class="collection-item">
+          <a href="{% url task.url pk=task.instance.pk %}">
+            <i class="fas fa-hourglass-start"></i> <strong>{{ task }}</strong><br>
+            {% if task.instance.index_schedule and task.repeat > 0 %}Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>{% endif %}
+            <i class="far fa-clock"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+          </a>
+          <a href="{% url 'sync:run-task' pk=task.pk %}">
+            <i class="far fa-play-circle"></i>
+          {% endif %}
+          </a>
+        </div>
       {% empty %}
         <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no scheduled tasks on this page.</span>
       {% endfor %}

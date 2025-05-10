@@ -44,9 +44,18 @@ class ResetTasksForm(forms.Form):
     pass
 
 
+class ScheduleTaskForm(forms.Form):
+
+    when = forms.DateTimeField(
+        label=_('When the task should run'),
+        required=True,
+    )
+
+
 class ConfirmDeleteMediaServerForm(forms.Form):
 
     pass
+
 
 _media_server_type_label = 'Jellyfin'
 class JellyfinMediaServerForm(forms.Form):

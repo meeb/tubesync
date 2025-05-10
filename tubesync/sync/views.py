@@ -20,11 +20,12 @@ from django.utils.text import slugify
 from django.utils._os import safe_join
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params
 from background_task.models import Task, CompletedTask
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
-                    SkipMediaForm, EnableMediaForm, ResetTasksForm,
+                    SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
                     ConfirmDeleteMediaServerForm)
 from .utils import validate_url, delete_file, multi_key_sort, mkdir_p
 from .tasks import (map_task_to_instance, get_error_message,
@@ -168,6 +169,7 @@ class ValidateSourceView(FormView):
     template_name = 'sync/source-validate.html'
     form_class = ValidateSourceForm
     errors = {
+        'invalid_source': _('Invalid type for the source.'),
         'invalid_url': _('Invalid URL, the URL must for a "{item}" must be in '
                          'the format of "{example}". The error was: {error}.'),
     }
@@ -1002,6 +1004,84 @@ class ResetTasks(FormView):
     def get_success_url(self):
         url = reverse_lazy('sync:tasks')
         return append_uri_params(url, {'message': 'reset'})
+
+
+class TaskScheduleView(FormView, SingleObjectMixin):
+    '''
+        Confirm that the task should be re-scheduled.
+    '''
+
+    template_name = 'sync/task-schedule.html'
+    form_class = ScheduleTaskForm
+    model = Task
+    errors = dict(
+        invalid_when=_('The type ({}) was incorrect.'),
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.object = None
+        self.timestamp = None
+        self.when = None
+        super().__init__(*args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        self.timestamp = kwargs.get('timestamp', '')
+        try:
+            self.timestamp = int(self.timestamp, 10)
+        except (TypeError, ValueError):
+            self.timestamp = None
+        else:
+            try:
+                self.when = timestamp_to_datetime(self.timestamp)
+            except AssertionError:
+                self.when = None
+        if self.when is None:
+            self.when = timezone.now()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['when'] = self.when
+        return initial
+
+    def get_context_data(self, *args, **kwargs):
+        data = super().get_context_data(*args, **kwargs)
+        data['when'] = self.when
+        return data
+
+    def get_success_url(self):
+        return append_uri_params(
+            reverse_lazy('sync:tasks'),
+            dict(
+                message='scheduled',
+                pk=str(self.object.pk),
+            ),
+        )
+
+    def form_valid(self, form):
+        max_attempts = getattr(settings, 'MAX_ATTEMPTS', 15)
+        now = timezone.now()
+        when = form.cleaned_data.get('when')
+  
+        if not isinstance(when, now.__class__):
+            form.add_error(
+                'when',
+                ValidationError(
+                    errors['invalid_when'].format(
+                        type(when),
+                    ),
+                ),
+            )
+
+        if form.errors:
+            return super().form_invalid(form)
+
+        self.object.attempts = max_attempts // 2
+        self.object.run_at = when
+        self.object.save()
+
+        return super().form_valid(form)
 
 
 class MediaServersView(ListView):
