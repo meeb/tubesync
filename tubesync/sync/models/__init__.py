@@ -1,10 +1,4 @@
 # These are referenced from the migration files
-# TODO: update migration files to remove
-#    CommaSepChoiceField
-
-from ..fields import CommaSepChoiceField
-
-# Used by migration files and staying here
 
 from .misc import (
     get_media_file_path,
