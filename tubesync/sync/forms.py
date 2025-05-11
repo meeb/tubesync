@@ -49,6 +49,13 @@ class ScheduleTaskForm(forms.Form):
     when = forms.DateTimeField(
         label=_('When the task should run'),
         required=True,
+        #widget=forms.SplitDateTimeWidget(
+        #    date_attrs={'type': 'date'},
+        #    time_attrs={'type': 'time'},
+        #),
+        widget=forms.DateTimeInput(
+            attrs={'type': 'datetime-local'},
+        ),
     )
 
 
