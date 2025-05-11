@@ -46,6 +46,17 @@ class ResetTasksForm(forms.Form):
 
 class ScheduleTaskForm(forms.Form):
 
+    now = forms.DateTimeField(
+        label=_('The current date and time'),
+        required=False,
+        widget=forms.DateTimeInput(
+            attrs={
+                'type': 'datetime-local',
+                'readonly': 'true',
+            },
+        ),
+    )
+
     when = forms.DateTimeField(
         label=_('When the task should run'),
         required=True,
