@@ -1026,18 +1026,16 @@ class TaskScheduleView(FormView, SingleObjectMixin):
 
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()
-        self.timestamp = kwargs.get('timestamp', '')
+        self.timestamp = kwargs.get('timestamp')
         try:
-            self.timestamp = int(self.timestamp, 10)
-        except (TypeError, ValueError):
-            self.timestamp = None
-        else:
-            try:
-                self.when = timestamp_to_datetime(self.timestamp)
-            except AssertionError:
-                self.when = None
+            self.when = timestamp_to_datetime(self.timestamp)
+        except AssertionError:
+            self.when = None
         if self.when is None:
             self.when = timezone.now()
+        # Use the next minute and zero seconds
+        # The web browser does not select seconds by default
+        self.when = self.when.replace(second=0) + timezone.timedelta(minutes=1)
         return super().dispatch(request, *args, **kwargs)
 
     def get_initial(self):
