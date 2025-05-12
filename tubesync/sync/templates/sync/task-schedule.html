@@ -15,8 +15,8 @@
       other tasks are taking to complete the assigned work.
     </p>
     <p>
-      This will change the time that the task is requesting to be run
-      to the current time, plus some number of seconds.
+      This will change the time that the task is requesting to be the 
+      current time, or a chosen future time.
     </p>
   </div>
 </div>
@@ -26,7 +26,7 @@
     {% include 'simpleform.html' with form=form %}
     <div class="row no-margin-bottom padding-top">
       <div class="col s12">
-        <button class="btn" type="submit" name="action">Really schedule task <i class="far fa-clock"></i></button>
+        <button class="btn" type="submit" name="action">Schedule task <i class="far fa-clock"></i></button>
       </div>
     </div>
   </form>
