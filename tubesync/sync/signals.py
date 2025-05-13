@@ -2,6 +2,7 @@ from functools import partial
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from django.conf import settings
+from django.db import IntegrityError
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
 from django.db.transaction import on_commit
 from django.dispatch import receiver
@@ -439,9 +440,20 @@ def media_post_delete(sender, instance, **kwargs):
         skipped_media.skip = True
         skipped_media.manual_skip = True
         skipped_media.save()
-        Metadata.objects.filter(
+        # Re-use the old metadata if it exists
+        instance_qs = Metadata.objects.filter(
             media__isnull=True,
             site=old_metadata.get(site_field) or 'Youtube',
             key=skipped_media.key,
-        ).update(media=skipped_media)
+        )
+        try:
+            instance_qs.update(media=skipped_media)
+        except IntegrityError:
+            # Delete the new metadata
+            Metadata.objects.filter(media=skipped_media).delete()
+            try:
+                instance_qs.update(media=skipped_media)
+            except IntegrityError:
+                # Delete the old metadata if it still failed
+                instance_qs.delete()
 
