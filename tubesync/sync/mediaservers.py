@@ -29,7 +29,7 @@ class MediaServer:
     def make_request_args(self, uri='/', token_header=None, headers={}, token_param=None, params={}):
         base_parts = urlsplit(self.object.url)
         if self.token is None:
-            self.token = self.object.loaded_options['token'] or None
+            self.token = self.object.options['token'] or None
         if token_header and self.token:
             headers.update({token_header: self.token})
         self.headers.update(headers)
@@ -116,7 +116,7 @@ class PlexMediaServer(MediaServer):
         if port < 1 or port > 65535:
             raise ValidationError('Plex Media Server "port" must be between 1 '
                                   'and 65535')
-        options = self.object.loaded_options
+        options = self.object.options
         if 'token' not in options:
             raise ValidationError('Plex Media Server requires a "token"')
         token = options['token'].strip()
@@ -183,7 +183,7 @@ class PlexMediaServer(MediaServer):
 
     def update(self):
         # For each section / library ID pop off a request to refresh it
-        libraries = self.object.loaded_options.get('libraries', '')
+        libraries = self.object.options.get('libraries', '')
         for library_id in libraries.split(','):
             library_id = library_id.strip()
             uri = f'/library/sections/{library_id}/refresh'
@@ -258,7 +258,7 @@ class JellyfinMediaServer(MediaServer):
         except (TypeError, ValueError):
             raise ValidationError('Jellyfin Media Server "port" must be an integer')
 
-        options = self.object.loaded_options
+        options = self.object.options
         if 'token' not in options:
             raise ValidationError('Jellyfin Media Server requires a "token"')
         if 'libraries' not in options:
@@ -302,7 +302,7 @@ class JellyfinMediaServer(MediaServer):
         return True
 
     def update(self):
-        libraries = self.object.loaded_options.get('libraries', '').split(',')
+        libraries = self.object.options.get('libraries', '').split(',')
         for library_id in map(str.strip, libraries):
             uri = f'/Items/{library_id}/Refresh'
             response = self.make_request(uri, method='POST')

@@ -1,6 +1,5 @@
 import glob
 import os
-import json
 from base64 import b64decode
 import pathlib
 import sys
@@ -1153,14 +1152,14 @@ class AddMediaServerView(FormView):
     def form_valid(self, form):
         # Assign mandatory fields, bundle other fields into options
         mediaserver = MediaServer(server_type=self.server_type)
-        options = {}
+        options = dict()
         model_fields = [field.name for field in MediaServer._meta.fields]
         for field_name, field_value in form.cleaned_data.items():
             if field_name in model_fields:
                 setattr(mediaserver, field_name, field_value)
             else:
                 options[field_name] = field_value
-        mediaserver.options = json.dumps(options)
+        mediaserver.options = options
         # Test the media server details are valid
         try:
             mediaserver.validate()
@@ -1267,21 +1266,21 @@ class UpdateMediaServerView(FormView, SingleObjectMixin):
         for field in self.object._meta.fields:
             if field.name in self.form_class.declared_fields:
                 initial[field.name] = getattr(self.object, field.name)
-        for option_key, option_val in self.object.loaded_options.items():
+        for option_key, option_val in self.object.options.items():
             if option_key in self.form_class.declared_fields:
                 initial[option_key] = option_val
         return initial
 
     def form_valid(self, form):
         # Assign mandatory fields, bundle other fields into options
-        options = {}
+        options = dict()
         model_fields = [field.name for field in MediaServer._meta.fields]
         for field_name, field_value in form.cleaned_data.items():
             if field_name in model_fields:
                 setattr(self.object, field_name, field_value)
             else:
                 options[field_name] = field_value
-        self.object.options = json.dumps(options)
+        self.object.options = options
         # Test the media server details are valid
         try:
             self.object.validate()
