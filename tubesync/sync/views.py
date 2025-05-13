@@ -1015,37 +1015,40 @@ class TaskScheduleView(FormView, SingleObjectMixin):
     model = Task
     errors = dict(
         invalid_when=_('The type ({}) was incorrect.'),
+        when_before_now=_('The date and time must be in the future.'),
     )
 
     def __init__(self, *args, **kwargs):
+        self.now = timezone.now()
         self.object = None
         self.timestamp = None
         self.when = None
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
+        self.now = timezone.now()
         self.object = self.get_object()
-        self.timestamp = kwargs.get('timestamp', '')
+        self.timestamp = kwargs.get('timestamp')
         try:
-            self.timestamp = int(self.timestamp, 10)
-        except (TypeError, ValueError):
-            self.timestamp = None
-        else:
-            try:
-                self.when = timestamp_to_datetime(self.timestamp)
-            except AssertionError:
-                self.when = None
+            self.when = timestamp_to_datetime(self.timestamp)
+        except AssertionError:
+            self.when = None
         if self.when is None:
-            self.when = timezone.now()
+            self.when = self.now
+        # Use the next minute and zero seconds
+        # The web browser does not select seconds by default
+        self.when = self.when.replace(second=0) + timezone.timedelta(minutes=1)
         return super().dispatch(request, *args, **kwargs)
 
     def get_initial(self):
         initial = super().get_initial()
+        initial['now'] = self.now
         initial['when'] = self.when
         return initial
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
+        data['now'] = self.now
         data['when'] = self.when
         return data
 
@@ -1060,24 +1063,28 @@ class TaskScheduleView(FormView, SingleObjectMixin):
 
     def form_valid(self, form):
         max_attempts = getattr(settings, 'MAX_ATTEMPTS', 15)
-        now = timezone.now()
         when = form.cleaned_data.get('when')
   
-        if not isinstance(when, now.__class__):
+        if not isinstance(when, self.now.__class__):
             form.add_error(
                 'when',
                 ValidationError(
-                    errors['invalid_when'].format(
+                    self.errors['invalid_when'].format(
                         type(when),
                     ),
                 ),
+            )
+        if when < self.now:
+            form.add_error(
+                'when',
+                ValidationError(self.errors['when_before_now']),
             )
 
         if form.errors:
             return super().form_invalid(form)
 
         self.object.attempts = max_attempts // 2
-        self.object.run_at = when
+        self.object.run_at = max(self.now, when)
         self.object.save()
 
         return super().form_valid(form)
