@@ -103,7 +103,7 @@ jobs:
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/yt_dlp/ patches/yt_dlp/*
           cd tubesync && python3 -B manage.py collectstatic --no-input --link
       - name: Run Django tests
-        run: cd tubesync && python3 -W default manage.py test --verbosity=2
+        run: cd tubesync && python3 -B -W default manage.py test --verbosity=2
 
   containerise:
     if: ${{ !cancelled() && 'success' == needs.info.result }}
