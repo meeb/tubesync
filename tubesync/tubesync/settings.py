@@ -1,3 +1,4 @@
+from django import VERSION as DJANGO_VERSION
 from pathlib import Path
 from common.utils import getenv
 
@@ -99,7 +100,9 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = getenv('TZ', 'UTC')
 USE_I18N = True
-USE_L10N = True
+# Removed in Django 5.0
+if DJANGO_VERSION[0:3] < (5, 0, 0):
+    USE_L10N = True
 USE_TZ = True
 
 
