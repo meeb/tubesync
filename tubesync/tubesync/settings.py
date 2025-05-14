@@ -100,8 +100,9 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = getenv('TZ', 'UTC')
 USE_I18N = True
-# Removed in Django 5.0
-if DJANGO_VERSION[0:3] < (5, 0, 0):
+# Removed in Django 5.0, set to True by default in Django 4.0
+# https://docs.djangoproject.com/en/4.1/releases/4.0/#localization
+if DJANGO_VERSION[0:3] < (4, 0, 0):
     USE_L10N = True
 USE_TZ = True
 
