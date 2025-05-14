@@ -12,7 +12,8 @@ class ValidateSourceForm(forms.Form):
     )
     source_url = forms.URLField(
         label=_('Source URL'),
-        required=True
+        required=True,
+        assume_scheme='http', # Silence RemovedInDjango60Warning
     )
 
 
