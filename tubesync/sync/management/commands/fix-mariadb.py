@@ -222,7 +222,7 @@ class Command(BaseCommand):
             at_31, err_31, out_31 = check_migration_status( '0031_metadata_metadataformat' )
             at_31s, err_31s, out_31s = check_migration_status( '0031_squashed_metadata_metadataformat' )
             after_31, err_31a, out_31a = check_migration_status(
-                '0030_alter_source_source_vcodec',
+                '0031_metadata_metadataformat',
                 needle='Undo Rename table for metadata to sync_media_metadata',
             )
 
