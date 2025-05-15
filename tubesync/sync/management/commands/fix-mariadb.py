@@ -24,6 +24,7 @@ def SQLTable(arg_table):
     needle = arg_table
     if needle.startswith('new__'):
         needle = arg_table[len('new__'):]
+    db.connection.ensure_connection()
     valid_table_name = (
         needle in new_tables and
         arg_table in db_tables(include_views=False)
@@ -122,6 +123,7 @@ class Command(BaseCommand):
                 + f': {db.connection.vendor}'
             )
 
+        db.connection.ensure_connection()
         db_is_mariadb = (
             hasattr(db.connection, 'mysql_is_mariadb') and
             db.connection.is_usable() and
