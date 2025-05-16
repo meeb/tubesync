@@ -1,0 +1,41 @@
+name: Get tag
+description: Get tag name from GITHUB_REF environment variable
+inputs:
+  strip_v:
+    required: false
+    default: false
+    description: Whether to strip "v" from the tag or not
+outputs:
+  tag:
+    value: ${{ steps.set.outputs.tag }}
+    description: Git tag name
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set outputs
+      id: 'set'
+      env:
+        INPUT_STRIP_V '${{ inputs.strip_v }}'
+      shell: 'bash'
+      run: |
+        tag="${GITHUB_REF}"
+        printf -- 'Manipulating string: %s\n' "${tag}"
+        test -n "${tag}" || exit 1
+
+        case "${tag}" in
+          (refs/tags/*) tag="${tag#refs/tags/}" ;;
+          (*) printf -- 'Not a tag ref\n' ; exit 2 ;;
+        esac
+
+        if [ 'true' = "${INPUT_STRIP_V,,}" ]
+        then
+            tag="${tag#[Vv]}"
+        fi
+        
+        set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
+
+        set_sl_var tag "${tag}" >> "${GITHUB_OUTPUT}"
+
+        set_sl_var 'tag ' " ${tag}"
+
