@@ -16,7 +16,7 @@ runs:
     - name: Set outputs
       id: 'set'
       env:
-        INPUT_STRIP_V '${{ inputs.strip_v }}'
+        INPUT_STRIP_V: '${{ inputs.strip_v }}'
       shell: 'bash'
       run: |
         tag="${GITHUB_REF}"
