@@ -146,7 +146,7 @@ services:
 
 ## Optional authentication
 
-Available in `v1.0` (or `:latest`)and later. If you want to enable a basic username and
+Available in `v1.0` (or `:latest`) and later. If you want to enable a basic username and
 password to be required to access the TubeSync dashboard you can set them with the
 following environment variables:
 
@@ -187,6 +187,14 @@ $ docker pull ghcr.io/meeb/tubesync:v[number]
 ```
 
 Back-end updates such as database migrations should be automatic.
+
+> [!IMPORTANT]
+> `MariaDB` was not automatically upgraded for `UUID` column types.
+> To see what changes are needed, you can run:
+> ```bash
+> docker exec -it tubesync python3 /app/manage.py fix-mariadb --dry-run --uuid-columns
+> ```
+> Removing the `--dry-run` will attempt to execute those statements using the configured database connection.
 
 
 # Moving, backing up, etc.
@@ -349,7 +357,7 @@ and you can probably break things by playing in the admin. If you still want to 
 it you can run:
 
 ```bash
-$ docker exec -ti tubesync python3 /app/manage.py createsuperuser
+$ docker exec -it tubesync python3 /app/manage.py createsuperuser
 ```
 
 And follow the instructions to create an initial Django superuser, once created, you
@@ -415,7 +423,7 @@ following this rough guide, you are on your own and should be knowledgeable abou
 installing and running WSGI-based Python web applications before attempting this.
 
 1. Clone or download this repo
-2. Make sure you're running a modern version of Python (>=3.9) and have Pipenv
+2. Make sure you're running a modern version of Python (>=3.10) and have Pipenv
    installed
 3. Set up the environment with `pipenv install`
 4. Copy `tubesync/tubesync/local_settings.py.example` to

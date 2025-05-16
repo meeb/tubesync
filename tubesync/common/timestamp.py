@@ -1,8 +1,8 @@
 import datetime
 
 
-posix_epoch = datetime.datetime.utcfromtimestamp(0)
 utc_tz = datetime.timezone.utc
+posix_epoch = datetime.datetime.fromtimestamp(0, utc_tz)
 
 
 def add_epoch(seconds):
@@ -13,10 +13,9 @@ def add_epoch(seconds):
 
 def subtract_epoch(arg_dt, /):
     assert isinstance(arg_dt, datetime.datetime)
-    epoch = posix_epoch.astimezone(utc_tz)
     utc_dt = arg_dt.astimezone(utc_tz)
 
-    return utc_dt - epoch
+    return utc_dt - posix_epoch
 
 def datetime_to_timestamp(arg_dt, /, *, integer=True):
     timestamp = subtract_epoch(arg_dt).total_seconds()
