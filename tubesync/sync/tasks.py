@@ -887,26 +887,19 @@ def rename_all_media_for_source(source_id):
 
 @background(schedule=dict(priority=0, run_at=60), queue=Val(TaskQueue.DB), remove_existing_tasks=True)
 def wait_for_media_premiere(media_id):
-    hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
-
     try:
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
         raise InvalidTaskError(_('no such media')) from e
     else:
-        if media.has_metadata:
+        valid, hours = media.wait_for_premiere()
+        if not valid:
             return
-        now = timezone.now()
-        if media.published < now:
-            media.manual_skip = False
-            media.skip = False
-            # the download tasks start after the media is saved
-        else:
-            media.manual_skip = True
-            media.title = _(f'Premieres in {hours(media.published - now)} hours')
+        
+        if hours:
             task = get_media_premiere_task(media_id)
             if task:
-                update_task_status(task, f'available in {hours(media.published - now)} hours')
+                update_task_status(task, f'available in {hours} hours')
         save_model(media)
 
 
