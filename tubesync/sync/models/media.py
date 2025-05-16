@@ -40,6 +40,7 @@ from ._migrations import (
     media_file_storage, get_media_thumb_path, get_media_file_path,
 )
 from ._private import _srctype_dict, _nfo_element
+from .media__tasks import wait_for_premiere
 from .source import Source
 
 
@@ -1218,4 +1219,8 @@ class Media(models.Model):
                             parent_dir = parent_dir.parent
                     except OSError as e:
                         pass
+
+
+# add imported functions
+Media.wait_for_premiere = wait_for_premiere
 
