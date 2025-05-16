@@ -41,7 +41,7 @@ from ._migrations import (
 )
 from ._private import _srctype_dict, _nfo_element
 from .media__tasks import (
-    download_checklist, wait_for_premiere,
+    download_checklist, download_finished, wait_for_premiere,
 )
 from .source import Source
 
@@ -1225,5 +1225,6 @@ class Media(models.Model):
 
 # add imported functions
 Media.download_checklist = download_checklist
+Media.download_finished = download_finished
 Media.wait_for_premiere = wait_for_premiere
 
