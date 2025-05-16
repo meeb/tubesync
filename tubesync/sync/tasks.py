@@ -649,42 +649,7 @@ def download_media(media_id, override=False):
             raise DownloadFailedException(err)
 
         # Media has been downloaded successfully
-        log.info(f'Successfully downloaded media: {media} (UUID: {media.pk}) to: '
-                 f'"{filepath}"')
-        # Link the media file to the object and update info about the download
-        media.media_file.name = str(media.source.type_directory_path / media.filename)
-        media.downloaded = True
-        media.download_date = timezone.now()
-        media.downloaded_filesize = os.path.getsize(filepath)
-        media.downloaded_container = container
-        if '+' in format_str:
-            # Seperate audio and video streams
-            vformat_code, aformat_code = format_str.split('+')
-            aformat = media.get_format_by_code(aformat_code)
-            vformat = media.get_format_by_code(vformat_code)
-            media.downloaded_format = vformat['format']
-            media.downloaded_height = vformat['height']
-            media.downloaded_width = vformat['width']
-            media.downloaded_audio_codec = aformat['acodec']
-            media.downloaded_video_codec = vformat['vcodec']
-            media.downloaded_container = container
-            media.downloaded_fps = vformat['fps']
-            media.downloaded_hdr = vformat['is_hdr']
-        else:
-            # Combined stream or audio-only stream
-            cformat_code = format_str
-            cformat = media.get_format_by_code(cformat_code)
-            media.downloaded_audio_codec = cformat['acodec']
-            if cformat['vcodec']:
-                # Combined
-                media.downloaded_format = cformat['format']
-                media.downloaded_height = cformat['height']
-                media.downloaded_width = cformat['width']
-                media.downloaded_video_codec = cformat['vcodec']
-                media.downloaded_fps = cformat['fps']
-                media.downloaded_hdr = cformat['is_hdr']
-            else:
-                media.downloaded_format = 'audio'
+        media.download_finished(format_str, container, filepath)
         save_model(media)
         # If selected, copy the thumbnail over as well
         if media.source.copy_thumbnails:
