@@ -604,7 +604,7 @@ def download_media_thumbnail(media_id, url):
 
 
 @background(schedule=dict(priority=30, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def download_media(media_id):
+def download_media(media_id, override=False):
     '''
         Downloads the media to disk and attaches it to the Media instance.
     '''
@@ -613,41 +613,10 @@ def download_media(media_id):
     except Media.DoesNotExist as e:
         # Task triggered but the media no longer exists, do nothing
         raise InvalidTaskError(_('no such media')) from e
-    if not media.source.download_media:
-        log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
-                 f'the source {media.source} has since been marked to not download, '
-                 f'not downloading')
-        return
-    if media.skip or media.manual_skip:
-        # Media was toggled to be skipped after the task was scheduled
-        log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
-                 f'it is now marked to be skipped, not downloading')
-        return
-    # metadata is required to generate the proper filepath
-    if not media.has_metadata:
-        raise NoMetadataException('Metadata is not yet available.')
-    downloaded_file_exists = (
-        media.downloaded and
-        media.has_metadata and
-        (
-            media.media_file_exists or
-            media.filepath.exists()
-        )
-    )
-    if downloaded_file_exists:
-        # Media has been marked as downloaded before the download_media task was fired,
-        # skip it
-        log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
-                 f'it has already been marked as downloaded, not downloading again')
-        return
-    max_cap_age = media.source.download_cap_date
-    published = media.published
-    if max_cap_age and published:
-        if published <= max_cap_age:
-            log.warn(f'Download task triggered media: {media} (UUID: {media.pk}) but '
-                     f'the source has a download cap and the media is now too old, '
-                     f'not downloading')
+    else:
+        if not media.download_checklist(override):
             return
+
     filepath = media.filepath
     container = format_str = None
     log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
