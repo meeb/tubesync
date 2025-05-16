@@ -22,6 +22,13 @@ class NoMetadataException(Exception):
     pass
 
 
+class NoThumbnailException(Exception):
+    '''
+        Raised when a thumbnail was not found at the remote URL.
+    '''
+    pass
+
+
 class DownloadFailedException(Exception):
     '''
         Raised when a downloaded media file is expected to be present, but doesn't

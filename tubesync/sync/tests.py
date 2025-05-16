@@ -1836,5 +1836,6 @@ class TasksTestCase(TestCase):
         cleanup_old_media()
 
         self.assertEqual(src1.media_source.all().count(), 3)
-        self.assertEqual(src2.media_source.all().count(), 2)
+        self.assertEqual(src2.media_source.all().count(), 3)
         self.assertEqual(Media.objects.filter(pk=m22.pk).exists(), False)
+        self.assertEqual(Media.objects.filter(source=src2, key=m22.key, skip=True).exists(), True)

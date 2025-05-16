@@ -1,6 +1,5 @@
 import glob
 import os
-import json
 from base64 import b64decode
 import pathlib
 import sys
@@ -20,11 +19,12 @@ from django.utils.text import slugify
 from django.utils._os import safe_join
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params
 from background_task.models import Task, CompletedTask
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
-                    SkipMediaForm, EnableMediaForm, ResetTasksForm,
+                    SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
                     ConfirmDeleteMediaServerForm)
 from .utils import validate_url, delete_file, multi_key_sort, mkdir_p
 from .tasks import (map_task_to_instance, get_error_message,
@@ -168,6 +168,7 @@ class ValidateSourceView(FormView):
     template_name = 'sync/source-validate.html'
     form_class = ValidateSourceForm
     errors = {
+        'invalid_source': _('Invalid type for the source.'),
         'invalid_url': _('Invalid URL, the URL must for a "{item}" must be in '
                          'the format of "{example}". The error was: {error}.'),
     }
@@ -523,6 +524,9 @@ class MediaThumbView(DetailView):
 
     def get(self, request, *args, **kwargs):
         media = self.get_object()
+        # Thumbnail media is never updated so we can ask the browser to cache it
+        # for ages, 604800 = 7 days
+        max_age = 604800
         if media.thumb_file_exists:
             thumb_path = pathlib.Path(media.thumb.path)
             thumb = thumb_path.read_bytes()
@@ -532,10 +536,10 @@ class MediaThumbView(DetailView):
             thumb = b64decode('R0lGODlhAQABAIABAP///wAAACH5BAEKAAEALAA'
                               'AAAABAAEAAAICTAEAOw==')
             content_type = 'image/gif'
+            max_age = 600
         response = HttpResponse(thumb, content_type=content_type)
-        # Thumbnail media is never updated so we can ask the browser to cache it
-        # for ages, 604800 = 7 days
-        response['Cache-Control'] = 'public, max-age=604800'
+        
+        response['Cache-Control'] = f'public, max-age={max_age}'
         return response
 
 
@@ -1001,6 +1005,91 @@ class ResetTasks(FormView):
         return append_uri_params(url, {'message': 'reset'})
 
 
+class TaskScheduleView(FormView, SingleObjectMixin):
+    '''
+        Confirm that the task should be re-scheduled.
+    '''
+
+    template_name = 'sync/task-schedule.html'
+    form_class = ScheduleTaskForm
+    model = Task
+    errors = dict(
+        invalid_when=_('The type ({}) was incorrect.'),
+        when_before_now=_('The date and time must be in the future.'),
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.now = timezone.now()
+        self.object = None
+        self.timestamp = None
+        self.when = None
+        super().__init__(*args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        self.now = timezone.now()
+        self.object = self.get_object()
+        self.timestamp = kwargs.get('timestamp')
+        try:
+            self.when = timestamp_to_datetime(self.timestamp)
+        except AssertionError:
+            self.when = None
+        if self.when is None:
+            self.when = self.now
+        # Use the next minute and zero seconds
+        # The web browser does not select seconds by default
+        self.when = self.when.replace(second=0) + timezone.timedelta(minutes=1)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['now'] = self.now
+        initial['when'] = self.when
+        return initial
+
+    def get_context_data(self, *args, **kwargs):
+        data = super().get_context_data(*args, **kwargs)
+        data['now'] = self.now
+        data['when'] = self.when
+        return data
+
+    def get_success_url(self):
+        return append_uri_params(
+            reverse_lazy('sync:tasks'),
+            dict(
+                message='scheduled',
+                pk=str(self.object.pk),
+            ),
+        )
+
+    def form_valid(self, form):
+        max_attempts = getattr(settings, 'MAX_ATTEMPTS', 15)
+        when = form.cleaned_data.get('when')
+  
+        if not isinstance(when, self.now.__class__):
+            form.add_error(
+                'when',
+                ValidationError(
+                    self.errors['invalid_when'].format(
+                        type(when),
+                    ),
+                ),
+            )
+        if when < self.now:
+            form.add_error(
+                'when',
+                ValidationError(self.errors['when_before_now']),
+            )
+
+        if form.errors:
+            return super().form_invalid(form)
+
+        self.object.attempts = max_attempts // 2
+        self.object.run_at = max(self.now, when)
+        self.object.save()
+
+        return super().form_valid(form)
+
+
 class MediaServersView(ListView):
     '''
         List of media servers which have been added.
@@ -1063,14 +1152,14 @@ class AddMediaServerView(FormView):
     def form_valid(self, form):
         # Assign mandatory fields, bundle other fields into options
         mediaserver = MediaServer(server_type=self.server_type)
-        options = {}
+        options = dict()
         model_fields = [field.name for field in MediaServer._meta.fields]
         for field_name, field_value in form.cleaned_data.items():
             if field_name in model_fields:
                 setattr(mediaserver, field_name, field_value)
             else:
                 options[field_name] = field_value
-        mediaserver.options = json.dumps(options)
+        mediaserver.options = options
         # Test the media server details are valid
         try:
             mediaserver.validate()
@@ -1177,21 +1266,21 @@ class UpdateMediaServerView(FormView, SingleObjectMixin):
         for field in self.object._meta.fields:
             if field.name in self.form_class.declared_fields:
                 initial[field.name] = getattr(self.object, field.name)
-        for option_key, option_val in self.object.loaded_options.items():
+        for option_key, option_val in self.object.options.items():
             if option_key in self.form_class.declared_fields:
                 initial[option_key] = option_val
         return initial
 
     def form_valid(self, form):
         # Assign mandatory fields, bundle other fields into options
-        options = {}
+        options = dict()
         model_fields = [field.name for field in MediaServer._meta.fields]
         for field_name, field_value in form.cleaned_data.items():
             if field_name in model_fields:
                 setattr(self.object, field_name, field_value)
             else:
                 options[field_name] = field_value
-        self.object.options = json.dumps(options)
+        self.object.options = options
         # Test the media server details are valid
         try:
             self.object.validate()

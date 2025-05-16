@@ -8,6 +8,7 @@ DOMAINS = dict({
     'youtube': frozenset({
         'youtube.com',
         'm.youtube.com',
+        'music.youtube.com',
         'www.youtube.com',
     }),
 })

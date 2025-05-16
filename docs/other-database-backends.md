@@ -18,22 +18,73 @@ reset your database. If you are comfortable with Django you can export and re-im
 existing database data with:
 
 ```bash
-$ docker exec -i tubesync python3 /app/manage.py dumpdata > some-file.json
+# Stop services
+$ docker exec -t tubesync \
+    bash -c 'for svc in \
+    /run/service/{gunicorn,tubesync*-worker} ; \
+do \
+    /command/s6-svc -wd -D "${svc}" ; \
+done'
+# Backup the database into a compressed file
+$ docker exec -t tubesync \
+    python3 /app/manage.py \
+    dumpdata --format jsonl \
+    --exclude background_task \
+    --output /downloads/tubesync-database-backup.jsonl.xz
 ```
 
-Then change you database backend over, then use
+Writing the compressed backup file to your `/downloads/` makes sense, as long as that directory is still available after destroying the current container.
+If you have a configuration where that file will be deleted, choose a different place to store the output (perhaps `/config/`, if it has sufficient storage available) and place the file there instead.
+
+You can also copy the file from the container to the local filesystem (`/tmp/` in this example) with:
 
 ```bash
-$ cat some-file.json | docker exec -i tubesync python3 /app/manage.py loaddata - --format=json
+$ docker cp \
+    tubesync:/downloads/tubesync-database-backup.jsonl.xz \
+    /tmp/
+```
+
+If you use `-` as the destination, then `docker cp` provides a `tar` archive.
+
+After you have changed your database backend over, then use:
+
+```bash
+# Stop services
+$ docker exec -t tubesync \
+    bash -c 'for svc in \
+    /run/service/{gunicorn,tubesync*-worker} ; \
+do \
+    /command/s6-svc -wd -D "${svc}" ; \
+done'
+# Load fixture file into the database
+$ docker exec -t tubesync \
+    python3 /app/manage.py \
+    loaddata /downloads/tubesync-database-backup.jsonl.xz
+```
+
+Or, if you only have the copy in `/tmp/`, then you would use:
+```bash
+# Stop services
+$ docker exec -t tubesync \
+    bash -c 'for svc in \
+    /run/service/{gunicorn,tubesync*-worker} ; \
+do \
+    /command/s6-svc -wd -D "${svc}" ; \
+done'
+# Load fixture data from standard input into the database
+$ xzcat /tmp/tubesync-database-backup.jsonl.xz | \
+    docker exec -i tubesync \
+    python3 /app/manage.py \
+    loaddata --format=jsonl -
 ```
 
 As detailed in the Django documentation:
 
-https://docs.djangoproject.com/en/3.1/ref/django-admin/#dumpdata
+https://docs.djangoproject.com/en/5.1/ref/django-admin/#dumpdata
 
 and:
 
-https://docs.djangoproject.com/en/3.1/ref/django-admin/#loaddata
+https://docs.djangoproject.com/en/5.1/ref/django-admin/#loaddata
 
 Further instructions are beyond the scope of TubeSync documenation and you should refer
 to Django documentation for more details.
@@ -94,13 +145,13 @@ the DB for the performance benefits, a configuration like this would be enough:
 
 ```
  tubesync-db:
-  image: postgres:15.2
+  image: postgres:17
   container_name: tubesync-db
   restart: unless-stopped
   volumes:
-   - /<path/to>/init.sql:/docker-entrypoint-initdb.d/init.sql
    - /<path/to>/tubesync-db:/var/lib/postgresql/data
   environment:
+   - POSTGRES_DB=tubesync
    - POSTGRES_USER=postgres
    - POSTGRES_PASSWORD=testpassword
 
@@ -118,15 +169,3 @@ the DB for the performance benefits, a configuration like this would be enough:
   depends_on:
    - tubesync-db
 ```
-
-Note that an `init.sql` file is needed to initialize the `tubesync`
-database before it can be written to. This file should contain:
-
-```
-CREATE DATABASE tubesync;
-```
-
-
-Then it must be mapped to `/docker-entrypoint-initdb.d/init.sql` for it
-to be executed on first startup of the container. See the `tubesync-db`
-volume mapping above for how to do this.

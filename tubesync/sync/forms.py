@@ -1,8 +1,14 @@
 
-from django import forms
+from django import forms, VERSION as DJANGO_VERSION
 from django.utils.translation import gettext_lazy as _
 
 
+if DJANGO_VERSION[0:3] < (5, 0, 0):
+    _assume_scheme = dict()
+else:
+    # Silence RemovedInDjango60Warning
+    _assume_scheme = dict(assume_scheme='http')
+    
 class ValidateSourceForm(forms.Form):
 
     source_type = forms.CharField(
@@ -12,7 +18,8 @@ class ValidateSourceForm(forms.Form):
     )
     source_url = forms.URLField(
         label=_('Source URL'),
-        required=True
+        required=True,
+        **_assume_scheme,
     )
 
 
@@ -44,9 +51,32 @@ class ResetTasksForm(forms.Form):
     pass
 
 
+class ScheduleTaskForm(forms.Form):
+
+    now = forms.DateTimeField(
+        label=_('The current date and time'),
+        required=False,
+        widget=forms.DateTimeInput(
+            attrs={
+                'type': 'datetime-local',
+                'readonly': 'true',
+            },
+        ),
+    )
+
+    when = forms.DateTimeField(
+        label=_('When the task should run'),
+        required=True,
+        widget=forms.DateTimeInput(
+            attrs={'type': 'datetime-local'},
+        ),
+    )
+
+
 class ConfirmDeleteMediaServerForm(forms.Form):
 
     pass
+
 
 _media_server_type_label = 'Jellyfin'
 class JellyfinMediaServerForm(forms.Form):

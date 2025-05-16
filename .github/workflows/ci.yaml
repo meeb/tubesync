@@ -84,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
       - name: Install Python ${{ matrix.python-version }}
@@ -101,8 +101,9 @@ jobs:
           cp -v -p tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/background_task/ patches/background_task/*
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/yt_dlp/ patches/yt_dlp/*
+          cd tubesync && python3 -B manage.py collectstatic --no-input --link
       - name: Run Django tests
-        run: cd tubesync && python3 manage.py test --verbosity=2
+        run: cd tubesync && python3 -B -W default manage.py test --verbosity=2
 
   containerise:
     if: ${{ !cancelled() && 'success' == needs.info.result }}

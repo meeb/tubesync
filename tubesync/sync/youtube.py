@@ -198,6 +198,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'clean_infojson': False,
         'daterange': yt_dlp.utils.DateRange(start=start),
         'extractor_args': {
+            'youtube': {'formats': ['missing_pot']},
             'youtubetab': {'approximate_date': ['true']},
         },
         'outtmpl': outtmpl,
@@ -335,12 +336,15 @@ def download_media(
         )
         # assignment is the quickest way to cover both 'get' cases
         pp_opts.exec_cmd['after_move'] = cmds
+    elif '+' not in media_format:
+        pp_opts.remuxvideo = extension
 
     ytopts = {
         'format': media_format,
         'final_ext': extension,
         'merge_output_format': extension,
         'outtmpl': os.path.basename(output_file),
+        'remuxvideo': pp_opts.remuxvideo,
         'quiet': False if settings.DEBUG else True,
         'verbose': True if settings.DEBUG else False,
         'noprogress': None if settings.DEBUG else True,
@@ -355,6 +359,7 @@ def download_media(
         'sleep_interval': 10,
         'max_sleep_interval': min(20*60, max(60, settings.DOWNLOAD_MEDIA_DELAY)),
         'sleep_interval_requests': 1 + (2 * settings.BACKGROUND_TASK_ASYNC_THREADS),
+        'extractor_args': opts.get('extractor_args', dict()),
         'paths': opts.get('paths', dict()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),
         'postprocessor_hooks': opts.get('postprocessor_hooks', list()),
@@ -376,6 +381,18 @@ def download_media(
     ytopts['paths'].update({
         'home': str(output_dir),
         'temp': str(temp_dir_path),
+    })
+
+    # Allow download of formats that tested good with 'missing_pot'
+    youtube_ea_dict = ytopts['extractor_args'].get('youtube', dict())
+    formats_list = youtube_ea_dict.get('formats', list())
+    if 'missing_pot' not in formats_list:
+        formats_list += ('missing_pot',)
+        youtube_ea_dict.update({
+            'formats': formats_list,
+        })
+    ytopts['extractor_args'].update({
+        'youtube': youtube_ea_dict,
     })
 
     postprocessor_hook_func = postprocessor_hook.get('function', None)

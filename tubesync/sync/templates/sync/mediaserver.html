@@ -28,7 +28,7 @@
         <td class="hide-on-small-only">Verify HTTPS</td>
         <td><span class="hide-on-med-and-up">Verify HTTPS<br></span><strong>{% if mediaserver.verify_https %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
       </tr>
-      {% for name, value in mediaserver.loaded_options.items %}
+      {% for name, value in mediaserver.options.items %}
       <tr title="Unique key of the source, such as the channel name or playlist ID">
         <td class="hide-on-small-only">{{ name|title }}</td>
         <td><span class="hide-on-med-and-up">{{ name|title }}<br></span><strong>{% if name in private_options %}{{ value|truncatechars:6 }} (hidden){% else %}{{ value }}{% endif %}</strong></td>

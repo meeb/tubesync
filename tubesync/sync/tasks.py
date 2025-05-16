@@ -8,6 +8,7 @@ import os
 import json
 import math
 import random
+import requests
 import time
 import uuid
 from io import BytesIO
@@ -29,7 +30,8 @@ from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import ( NoFormatException, NoMediaException,
-                            NoMetadataException, DownloadFailedException, )
+                            NoMetadataException, NoThumbnailException,
+                            DownloadFailedException, )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, )
 from .choices import Val, TaskQueue
@@ -330,9 +332,13 @@ def index_source_task(source_id):
         media.duration = float(video.get(fields('duration', media), None) or 0) or None
         media.title = str(video.get(fields('title', media), ''))[:200]
         timestamp = video.get(fields('timestamp', media), None)
-        published_dt = media.metadata_published(timestamp)
-        if published_dt is not None:
-            media.published = published_dt
+        try:
+            published_dt = media.ts_to_dt(timestamp)
+        except AssertionError:
+            pass
+        else:
+            if published_dt:
+                media.published = published_dt
         try:
             media.save()
         except IntegrityError as e:
@@ -348,8 +354,21 @@ def index_source_task(source_id):
             )
             if new_media_instance:
                 log.info(f'Indexed new media: {source} / {media}')
+                log.info(f'Scheduling tasks to download thumbnail for: {media.key}')
+                thumbnail_fmt = 'https://i.ytimg.com/vi/{}/{}default.jpg'
+                vn_fmt = _('Downloading {} thumbnail for: "{}": {}')
+                for prefix in ('hq', 'sd', 'maxres',):
+                    thumbnail_url = thumbnail_fmt.format(
+                        media.key,
+                        prefix,
+                    )
+                    download_media_thumbnail(
+                        str(media.pk),
+                        thumbnail_url,
+                        verbose_name=vn_fmt.format(prefix, media.key, media.name),
+                    )
                 log.info(f'Scheduling task to download metadata for: {media.url}')
-                verbose_name = _('Downloading metadata for: {}: "{}"')
+                verbose_name = _('Downloading metadata for: "{}": {}')
                 download_media_metadata(
                     str(media.pk),
                     verbose_name=verbose_name.format(media.key, media.name),
@@ -500,9 +519,17 @@ def download_media_metadata(media_id):
     # Media must have a valid upload date
     if upload_date:
         media.published = timezone.make_aware(upload_date)
-    published = media.metadata_published()
-    if published:
-        media.published = published
+    timestamp = media.get_metadata_first_value(
+        ('release_timestamp', 'timestamp',),
+        arg_dict=response,
+    )
+    try:
+        published_dt = media.ts_to_dt(timestamp)
+    except AssertionError:
+        pass
+    else:
+        if published_dt:
+            media.published = published_dt
 
     # Store title in DB so it's fast to access
     if media.metadata_title:
@@ -536,7 +563,15 @@ def download_media_thumbnail(media_id, url):
         return
     width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
     height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
-    i = get_remote_image(url)
+    try:
+        try:
+            i = get_remote_image(url)
+        except requests.HTTPError as re:
+            if 404 != re.response.status_code:
+                raise
+            raise NoThumbnailException(re.response.reason) from re
+    except NoThumbnailException as e:
+        raise InvalidTaskError(str(e.__cause__)) from e
     if (i.width > width) and (i.height > height):
         log.info(f'Resizing {i.width}x{i.height} thumbnail to '
                  f'{width}x{height}: {url}')
@@ -555,6 +590,16 @@ def download_media_thumbnail(media_id, url):
     )
     i = image_file = None
     log.info(f'Saved thumbnail for: {media} from: {url}')
+    # After media is downloaded, copy the updated thumbnail.
+    copy_thumbnail = (
+        media.downloaded and
+        media.source.copy_thumbnails and
+        media.thumb_file_exists
+    )
+    if copy_thumbnail:
+        log.info(f'Copying media thumbnail from: {media.thumb.path} '
+                 f'to: {media.thumbpath}')
+        copyfile(media.thumb.path, media.thumbpath)        
     return True
 
 
@@ -888,6 +933,10 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
         for media in qs_gen(mqs):
             log.info(f'Deleting media for source: {source_name} item: {media.name}')
             with atomic():
+                #media.downloaded = False
+                media.skip = True
+                media.manual_skip = True
+                media.save()
                 media.delete()
     # Remove the directory, if the user requested that
     directory_path = Path(source_directory)
