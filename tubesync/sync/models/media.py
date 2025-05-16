@@ -40,7 +40,9 @@ from ._migrations import (
     media_file_storage, get_media_thumb_path, get_media_file_path,
 )
 from ._private import _srctype_dict, _nfo_element
-from .media__tasks import wait_for_premiere
+from .media__tasks import (
+    download_checklist, wait_for_premiere,
+)
 from .source import Source
 
 
@@ -1222,5 +1224,6 @@ class Media(models.Model):
 
 
 # add imported functions
+Media.download_checklist = download_checklist
 Media.wait_for_premiere = wait_for_premiere
 
