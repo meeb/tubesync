@@ -20,10 +20,10 @@ jobs:
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
       ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
     steps:
+      - uses: actions/checkout@v4
       - name: Get tag
         id: tag
-        uses: dawidd6/action-get-tag@v1
-      - uses: actions/checkout@v4
+        uses: ./.github/actions/get-tag
       - name: Lowercase github username
         id: github-actor
         uses: ./.github/actions/string-case
