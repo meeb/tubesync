@@ -4,6 +4,7 @@ from common.errors import (
     NoMetadataException,
 )
 from django.utils import timezone
+from ..choices import Val, SourceResolution
 
 
 def download_checklist(self, skip_checks=False):
@@ -58,7 +59,7 @@ def download_finished(self, format_str, container, downloaded_filepath=None):
     log.info(f'Successfully downloaded media: {media} (UUID: {media.pk}) to: '
              f'"{filepath}"')
     # Link the media file to the object and update info about the download
-    media.media_file.name = str(media.source.type_directory_path / media.filename)
+    self.media_file.name = str(filepath.relative_to(self.media_file.storage.location))
     media.downloaded = True
     media.download_date = timezone.now()
     media.downloaded_filesize = os.path.getsize(filepath)
@@ -90,7 +91,7 @@ def download_finished(self, format_str, container, downloaded_filepath=None):
             media.downloaded_fps = cformat['fps']
             media.downloaded_hdr = cformat['is_hdr']
         else:
-            media.downloaded_format = 'audio'
+            self.downloaded_format = Val(SourceResolution.AUDIO)
 
 
 def wait_for_premiere(self):
