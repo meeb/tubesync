@@ -53,6 +53,7 @@ def download_finished(self, format_str, container, downloaded_filepath=None):
     if downloaded_filepath is None:
         downloaded_filepath = self.filepath
     filepath = Path(downloaded_filepath)
+
     # Media has been downloaded successfully
     log.info(f'Successfully downloaded media: {media} (UUID: {media.pk}) to: '
              f'"{filepath}"')
