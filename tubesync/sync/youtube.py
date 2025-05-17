@@ -6,7 +6,6 @@
 
 import os
 
-from collections import namedtuple
 from common.logger import log
 from copy import deepcopy
 from pathlib import Path
@@ -102,7 +101,7 @@ def get_channel_image_info(url):
                     avatar_url = thumbnail['url']
                 if thumbnail['id'] == 'banner_uncropped':
                     banner_url = thumbnail['url']
-                if banner_url != None and avatar_url != None:
+                if banner_url is not None and avatar_url is not None:
                     break
 
             return avatar_url, banner_url
@@ -143,7 +142,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
     if days is not None:
         try:
             days = int(str(days), 10)
-        except Exception as e:
+        except (TypeError, ValueError):
             days = None
         start = (
             f'yesterday-{days!s}days' if days else None

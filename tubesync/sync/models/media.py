@@ -17,7 +17,6 @@ from common.logger import log
 from common.errors import NoFormatException
 from common.utils import (
     clean_filename, clean_emoji,
-    django_queryset_generator as qs_gen,
 )
 from ..youtube import (
     get_media_info as get_youtube_media_info,
@@ -688,7 +687,7 @@ class Media(models.Model):
                 pass
             setattr(self, '_cached_metadata_dict', data)
             return data
-        except Exception as e:
+        except Exception:
             return {}
 
 
@@ -1219,7 +1218,7 @@ class Media(models.Model):
                             parent_dir.rmdir()
                             log.info(f'Removed empty directory: {parent_dir!s}')
                             parent_dir = parent_dir.parent
-                    except OSError as e:
+                    except OSError:
                         pass
 
 
