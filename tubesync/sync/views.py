@@ -35,6 +35,7 @@ from .tasks import (map_task_to_instance, get_error_message,
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
                         youtube_help, youtube_validation_urls)
+from . import signals # noqa
 from . import youtube
 
 
