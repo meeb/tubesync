@@ -112,6 +112,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     services:
+      wormhole-mailbox:
+        image: 'ghcr.io/tcely/docker-magic-wormhole-mailbox-server:service'
+        ports:
+          - '4000:4000'
       wormhole-transit:
         image: 'ghcr.io/tcely/docker-magic-wormhole-transit-relay:main'
         ports:
@@ -247,10 +251,6 @@ jobs:
         if: ${{ 'true' != steps.cache.outputs.cache-hit }}
         id: wormhole
         run: |
-          # port 4000
-          docker run --pull always --rm -dt -p 4000:4000 \
-              ghcr.io/tcely/docker-magic-wormhole-mailbox-server:main \
-              --usage-db=/data/usage.sqlite --motd=TubeSync
           rm -rf .cache/runner/wormhole
           sudo apt-get install python3-venv
           venv_dir=".cache/runner/${RUNNER_ARCH}/wormhole" &&
