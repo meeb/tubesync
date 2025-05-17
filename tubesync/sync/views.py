@@ -35,7 +35,6 @@ from .tasks import (map_task_to_instance, get_error_message,
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
                         youtube_help, youtube_validation_urls)
-from . import signals
 from . import youtube
 
 
@@ -258,7 +257,7 @@ class ValidateSourceView(FormView):
                 self.key = youtube.get_channel_id(
                     index_url.replace('/channel/', '/')
                 )
-            except youtube.YouTubeError as e:
+            except youtube.YouTubeError:
                 # It did not work, revert to previous behavior
                 self.key = old_key
                 self.source_type = old_source_type
@@ -296,10 +295,13 @@ class EditSourceMixin:
     def form_valid(self, form: Form):
         # Perform extra validation to make sure the media_format is valid
         obj = form.save(commit=False)
-        source_type = form.cleaned_data['media_format']
+        # temporarily use media_format from the form
+        saved_media_format = obj.media_format
+        obj.media_format = form.cleaned_data['media_format']
         example_media_file = obj.get_example_media_format()
+        obj.media_format = saved_media_format
 
-        if example_media_file == '':
+        if '' == example_media_file:
             form.add_error(
                 'media_format',
                 ValidationError(self.errors['invalid_media_format'])
@@ -307,12 +309,16 @@ class EditSourceMixin:
 
         # Check for suspicious file path(s)
         try:
-            targetCheck = form.cleaned_data['directory']+"/.virt"
-            newdir = safe_join(settings.DOWNLOAD_ROOT,targetCheck)
+            targetCheck = form.cleaned_data['directory'] + '/.virt'
+            safe_join(settings.DOWNLOAD_ROOT, targetCheck)
         except SuspiciousFileOperation:
             form.add_error(
                 'directory',
-                ValidationError(self.errors['dir_outside_dlroot'].replace("%BASEDIR%",str(settings.DOWNLOAD_ROOT)))
+                ValidationError(
+                    self.errors['dir_outside_dlroot'].replace(
+                        "%BASEDIR%", str(settings.DOWNLOAD_ROOT)
+                    )
+                ),
             )
 
         if form.errors:
