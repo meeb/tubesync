@@ -84,14 +84,11 @@ def parse_database_connection_string(database_connection_string):
                                       f'invalid driver, must be one of {valid_drivers}')
     django_driver = django_backends.get(driver)
     host_parts = user_pass_host_port.split('@')
-    if len(host_parts) != 2:
-        raise DatabaseConnectionError(f'Database connection string netloc must be in '
-                                      f'the format of user:pass@host')
+    user_pass_parts = host_parts[0].split(':')
+    if len(host_parts) != 2 or len(user_pass_parts) != 2:
+        raise DatabaseConnectionError('Database connection string netloc must be in '
+                                      'the format of user:pass@host')
     user_pass, host_port = host_parts
-    user_pass_parts = user_pass.split(':')
-    if len(user_pass_parts) != 2:
-        raise DatabaseConnectionError(f'Database connection string netloc must be in '
-                                      f'the format of user:pass@host')
     username, password = user_pass_parts
     host_port_parts = host_port.split(':')
     if len(host_port_parts) == 1:
@@ -113,13 +110,13 @@ def parse_database_connection_string(database_connection_string):
                                           f'65535, got {port}')
     else:
         # Malformed
-        raise DatabaseConnectionError(f'Database connection host must be a hostname or '
-                                      f'a hostname:port combination')
+        raise DatabaseConnectionError('Database connection host must be a hostname or '
+                                      'a hostname:port combination')
     if database.startswith('/'):
         database = database[1:]
     if not database:
-        raise DatabaseConnectionError(f'Database connection string path must be a '
-                                      f'string in the format of /databasename')    
+        raise DatabaseConnectionError('Database connection string path must be a '
+                                      'string in the format of /databasename')    
     if '/' in database:
         raise DatabaseConnectionError(f'Database connection string path can only '
                                       f'contain a single string name, got: {database}')
