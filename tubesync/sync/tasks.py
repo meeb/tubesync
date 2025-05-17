@@ -605,7 +605,7 @@ def download_media_thumbnail(media_id, url):
 
 
 @background(schedule=dict(priority=30, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def download_media(media_id):
+def download_media(media_id, override=False):
     '''
         Downloads the media to disk and attaches it to the Media instance.
     '''
@@ -614,41 +614,10 @@ def download_media(media_id):
     except Media.DoesNotExist as e:
         # Task triggered but the media no longer exists, do nothing
         raise InvalidTaskError(_('no such media')) from e
-    if not media.source.download_media:
-        log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
-                 f'the source {media.source} has since been marked to not download, '
-                 f'not downloading')
-        return
-    if media.skip or media.manual_skip:
-        # Media was toggled to be skipped after the task was scheduled
-        log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
-                 f'it is now marked to be skipped, not downloading')
-        return
-    # metadata is required to generate the proper filepath
-    if not media.has_metadata:
-        raise NoMetadataException('Metadata is not yet available.')
-    downloaded_file_exists = (
-        media.downloaded and
-        media.has_metadata and
-        (
-            media.media_file_exists or
-            media.filepath.exists()
-        )
-    )
-    if downloaded_file_exists:
-        # Media has been marked as downloaded before the download_media task was fired,
-        # skip it
-        log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
-                 f'it has already been marked as downloaded, not downloading again')
-        return
-    max_cap_age = media.source.download_cap_date
-    published = media.published
-    if max_cap_age and published:
-        if published <= max_cap_age:
-            log.warn(f'Download task triggered media: {media} (UUID: {media.pk}) but '
-                     f'the source has a download cap and the media is now too old, '
-                     f'not downloading')
+    else:
+        if not media.download_checklist(override):
             return
+
     filepath = media.filepath
     container = format_str = None
     log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
@@ -681,42 +650,7 @@ def download_media(media_id):
             raise DownloadFailedException(err)
 
         # Media has been downloaded successfully
-        log.info(f'Successfully downloaded media: {media} (UUID: {media.pk}) to: '
-                 f'"{filepath}"')
-        # Link the media file to the object and update info about the download
-        media.media_file.name = str(media.source.type_directory_path / media.filename)
-        media.downloaded = True
-        media.download_date = timezone.now()
-        media.downloaded_filesize = os.path.getsize(filepath)
-        media.downloaded_container = container
-        if '+' in format_str:
-            # Seperate audio and video streams
-            vformat_code, aformat_code = format_str.split('+')
-            aformat = media.get_format_by_code(aformat_code)
-            vformat = media.get_format_by_code(vformat_code)
-            media.downloaded_format = vformat['format']
-            media.downloaded_height = vformat['height']
-            media.downloaded_width = vformat['width']
-            media.downloaded_audio_codec = aformat['acodec']
-            media.downloaded_video_codec = vformat['vcodec']
-            media.downloaded_container = container
-            media.downloaded_fps = vformat['fps']
-            media.downloaded_hdr = vformat['is_hdr']
-        else:
-            # Combined stream or audio-only stream
-            cformat_code = format_str
-            cformat = media.get_format_by_code(cformat_code)
-            media.downloaded_audio_codec = cformat['acodec']
-            if cformat['vcodec']:
-                # Combined
-                media.downloaded_format = cformat['format']
-                media.downloaded_height = cformat['height']
-                media.downloaded_width = cformat['width']
-                media.downloaded_video_codec = cformat['vcodec']
-                media.downloaded_fps = cformat['fps']
-                media.downloaded_hdr = cformat['is_hdr']
-            else:
-                media.downloaded_format = 'audio'
+        media.download_finished(format_str, container, filepath)
         save_model(media)
         # If selected, copy the thumbnail over as well
         if media.source.copy_thumbnails:
@@ -888,26 +822,19 @@ def rename_all_media_for_source(source_id):
 
 @background(schedule=dict(priority=0, run_at=60), queue=Val(TaskQueue.DB), remove_existing_tasks=True)
 def wait_for_media_premiere(media_id):
-    hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
-
     try:
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
         raise InvalidTaskError(_('no such media')) from e
     else:
-        if media.has_metadata:
+        valid, hours = media.wait_for_premiere()
+        if not valid:
             return
-        now = timezone.now()
-        if media.published < now:
-            media.manual_skip = False
-            media.skip = False
-            # the download tasks start after the media is saved
-        else:
-            media.manual_skip = True
-            media.title = _(f'Premieres in {hours(media.published - now)} hours')
+        
+        if hours:
             task = get_media_premiere_task(media_id)
             if task:
-                update_task_status(task, f'available in {hours(media.published - now)} hours')
+                update_task_status(task, f'available in {hours} hours')
         save_model(media)
 
 
