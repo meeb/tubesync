@@ -2,4 +2,14 @@
 
 cd /
 
+https="${TUBESYNC_POT_HTTPS:+https}"
+ip_address="${TUBESYNC_POT_IPADDR}"
+port="${TUBESYNC_POT_PORT:+:}${TUBESYNC_POT_PORT}"
+
+if [ -n "${ip_address}" ]
+then
+    YT_POT_BGUTIL_BASE_URL="${https:-http}://${ip_address}${port}"
+    export YT_POT_BGUTIL_BASE_URL
+fi
+
 exec /usr/bin/openresty -c /etc/nginx/nginx.conf -e stderr
