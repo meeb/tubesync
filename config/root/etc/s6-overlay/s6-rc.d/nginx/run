@@ -3,7 +3,8 @@
 cd /
 
 https="${TUBESYNC_POT_HTTPS:+https}"
-ip_address="${TUBESYNC_POT_IPADDR}"
+ip_address="${TUBESYNC_POT_IPADDR:-${POTSERVER_PORT_4416_TCP_ADDR}}"
+: "${TUBESYNC_POT_PORT:=${POTSERVER_PORT_4416_TCP_PORT}}"
 port="${TUBESYNC_POT_PORT:+:}${TUBESYNC_POT_PORT}"
 
 if [ -n "${ip_address}" ]
