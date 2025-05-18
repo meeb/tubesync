@@ -93,9 +93,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install pipenv uv
-          PIPENV_VERBOSITY=64 pipenv install --system --skip-lock
+          python -m pip install uv
+          PIPENV_VERBOSITY=64 uvx --no-config --no-managed-python -v --from 'pipenv==2022.12.19' pipenv install --system --skip-lock
       - name: Set up Django environment
         run: |
           cp -v -p tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
