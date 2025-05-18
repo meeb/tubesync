@@ -63,7 +63,7 @@ class CommaSepChoiceField(models.CharField):
     def __init__(self, *args, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, **kwargs):
         kwargs.setdefault('max_length', 128)
         self.separator = str(separator)
-        self.possible_choices = possible_choices or kwargs['choices']
+        self.possible_choices = possible_choices or kwargs.get('choices')
         self.selected_choices = list()
         self.allow_all = allow_all
         self.all_label = all_label
