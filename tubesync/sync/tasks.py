@@ -7,12 +7,17 @@
 import os
 import json
 import math
+import random
+import requests
+import time
 import uuid
 from io import BytesIO
 from hashlib import sha1
+from pathlib import Path
 from datetime import datetime, timedelta
-from shutil import copyfile
+from shutil import copyfile, rmtree
 from PIL import Image
+from django import db
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -24,13 +29,18 @@ from background_task import background
 from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from common.logger import log
-from common.errors import NoMediaException, NoMetadataException, DownloadFailedException
-from common.utils import json_serial, remove_enclosed
+from common.errors import ( NoFormatException, NoMediaException,
+                            NoMetadataException, NoThumbnailException,
+                            DownloadFailedException, )
+from common.utils import (  django_queryset_generator as qs_gen,
+                            remove_enclosed, )
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer
-from .utils import (get_remote_image, resize_image_to_height, delete_file,
-                    write_text_file, filter_response)
+from .utils import ( get_remote_image, resize_image_to_height, delete_file,
+                    write_text_file, filter_response, )
 from .youtube import YouTubeError
+
+db_vendor = db.connection.vendor
 
 
 def get_hash(task_name, pk):
@@ -54,7 +64,7 @@ def map_task_to_instance(task):
         'sync.tasks.download_media': Media,
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
-        'sync.tasks.refesh_formats': Media,
+        'sync.tasks.refresh_formats': Media,
         'sync.tasks.rename_media': Media,
         'sync.tasks.rename_all_media_for_source': Source,
         'sync.tasks.wait_for_media_premiere': Media,
@@ -121,8 +131,7 @@ def update_task_status(task, status):
     else:
         task.verbose_name = f'[{status}] {task._verbose_name}'
     try:
-        with atomic():
-            task.save(update_fields={'verbose_name'})
+        task.save(update_fields={'verbose_name'})
     except DatabaseError as e:
         if 'Save with update_fields did not affect any rows.' == str(e):
             pass
@@ -200,25 +209,43 @@ def migrate_queues():
     return qs.update(queue=Val(TaskQueue.NET))
 
 
+def save_model(instance):
+    if 'sqlite' != db_vendor:
+        with atomic(durable=False):
+            instance.save()
+        return
+
+    # work around for SQLite and its many
+    # "database is locked" errors
+    with atomic(durable=False):
+        instance.save()
+    arg = getattr(settings, 'SQLITE_DELAY_FLOAT', 1.5)
+    time.sleep(random.expovariate(arg))
+
+
+@atomic(durable=False)
 def schedule_media_servers_update():
-    with atomic():
-        # Schedule a task to update media servers
-        log.info(f'Scheduling media server updates')
-        verbose_name = _('Request media server rescan for "{}"')
-        for mediaserver in MediaServer.objects.all():
-            rescan_media_server(
-                str(mediaserver.pk),
-                priority=10,
-                verbose_name=verbose_name.format(mediaserver),
-                remove_existing_tasks=True,
-            )
+    # Schedule a task to update media servers
+    log.info(f'Scheduling media server updates')
+    verbose_name = _('Request media server rescan for "{}"')
+    for mediaserver in MediaServer.objects.all():
+        rescan_media_server(
+            str(mediaserver.pk),
+            verbose_name=verbose_name.format(mediaserver),
+        )
 
 
 def cleanup_old_media():
     with atomic():
-        for source in Source.objects.filter(delete_old_media=True, days_to_keep__gt=0):
+        for source in qs_gen(Source.objects.filter(delete_old_media=True, days_to_keep__gt=0)):
             delta = timezone.now() - timedelta(days=source.days_to_keep)
-            for media in source.media_source.filter(downloaded=True, download_date__lt=delta):
+            mqs = source.media_source.defer(
+                'metadata',
+            ).filter(
+                downloaded=True,
+                download_date__lt=delta,
+            )
+            for media in qs_gen(mqs):
                 log.info(f'Deleting expired media: {source} / {media} '
                          f'(now older than {source.days_to_keep} days / '
                          f'download_date before {delta})')
@@ -232,8 +259,12 @@ def cleanup_removed_media(source, videos):
     if not source.delete_removed_media:
         return
     log.info(f'Cleaning up media no longer in source: {source}')
-    media_objects = Media.objects.filter(source=source)
-    for media in media_objects:
+    mqs = Media.objects.defer(
+        'metadata',
+    ).filter(
+        source=source,
+    )
+    for media in qs_gen(mqs):
         matching_source_item = [video['id'] for video in videos if video['id'] == media.key]
         if not matching_source_item:
             log.info(f'{media.name} is no longer in source, removing')
@@ -242,11 +273,12 @@ def cleanup_removed_media(source, videos):
     schedule_media_servers_update()
 
 
-@background(schedule=dict(priority=10, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+@background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def index_source_task(source_id):
     '''
         Indexes media available from a Source object.
     '''
+    db.reset_queries()
     cleanup_completed_tasks()
     # deleting expired media should happen any time an index task is requested
     cleanup_old_media()
@@ -261,7 +293,7 @@ def index_source_task(source_id):
     # Reset any errors
     # TODO: determine if this affects anything
     source.has_failed = False
-    source.save()
+    save_model(source)
     # Index the source
     videos = source.index_media()
     if not videos:
@@ -272,7 +304,7 @@ def index_source_task(source_id):
                                f'is reachable')
     # Got some media, update the last crawl timestamp
     source.last_crawl = timezone.now()
-    source.save()
+    save_model(source)
     num_videos = len(videos)
     log.info(f'Found {num_videos} media items for source: {source}')
     fields = lambda f, m: m.get_metadata_field(f)
@@ -291,6 +323,7 @@ def index_source_task(source_id):
             # Video has no unique key (ID), it can't be indexed
             continue
         update_task_status(task, tvn_format.format(vn))
+        # media, new_media = Media.objects.get_or_create(key=key, source=source)
         try:
             media = Media.objects.get(key=key, source=source)
         except Media.DoesNotExist:
@@ -299,9 +332,13 @@ def index_source_task(source_id):
         media.duration = float(video.get(fields('duration', media), None) or 0) or None
         media.title = str(video.get(fields('title', media), ''))[:200]
         timestamp = video.get(fields('timestamp', media), None)
-        published_dt = media.metadata_published(timestamp)
-        if published_dt is not None:
-            media.published = published_dt
+        try:
+            published_dt = media.ts_to_dt(timestamp)
+        except AssertionError:
+            pass
+        else:
+            if published_dt:
+                media.published = published_dt
         try:
             media.save()
         except IntegrityError as e:
@@ -310,23 +347,37 @@ def index_source_task(source_id):
             log.debug(f'Indexed media: {vn}: {source} / {media}')
             # log the new media instances
             new_media_instance = (
+                # new_media or
                 media.created and
                 source.last_crawl and
                 media.created >= source.last_crawl
             )
             if new_media_instance:
                 log.info(f'Indexed new media: {source} / {media}')
+                log.info(f'Scheduling tasks to download thumbnail for: {media.key}')
+                thumbnail_fmt = 'https://i.ytimg.com/vi/{}/{}default.jpg'
+                vn_fmt = _('Downloading {} thumbnail for: "{}": {}')
+                for prefix in ('hq', 'sd', 'maxres',):
+                    thumbnail_url = thumbnail_fmt.format(
+                        media.key,
+                        prefix,
+                    )
+                    download_media_thumbnail(
+                        str(media.pk),
+                        thumbnail_url,
+                        verbose_name=vn_fmt.format(prefix, media.key, media.name),
+                    )
                 log.info(f'Scheduling task to download metadata for: {media.url}')
-                verbose_name = _('Downloading metadata for "{}"')
+                verbose_name = _('Downloading metadata for: "{}": {}')
                 download_media_metadata(
                     str(media.pk),
-                    priority=20,
-                    verbose_name=verbose_name.format(media.pk),
+                    verbose_name=verbose_name.format(media.key, media.name),
                 )
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
     # Cleanup of media no longer available from the source
     cleanup_removed_media(source, videos)
+    videos = video = None
 
 
 @background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.FS))
@@ -348,7 +399,7 @@ def check_source_directory_exists(source_id):
         source.make_directory()
 
 
-@background(schedule=dict(priority=5, run_at=10), queue=Val(TaskQueue.NET))
+@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.NET))
 def download_source_images(source_id):
     '''
         Downloads an image and save it as a local thumbnail attached to a
@@ -379,6 +430,7 @@ def download_source_images(source_id):
             file_path = source.directory_path / file_name
             with open(file_path, 'wb') as f:
                 f.write(django_file.read())
+        i = image_file = None
 
     if avatar != None:
         url = avatar
@@ -394,11 +446,12 @@ def download_source_images(source_id):
             file_path = source.directory_path / file_name
             with open(file_path, 'wb') as f:
                 f.write(django_file.read())
+        i = image_file = None
 
     log.info(f'Thumbnail downloaded for source with ID: {source_id} / {source}')
 
 
-@background(schedule=dict(priority=20, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+@background(schedule=dict(priority=40, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def download_media_metadata(media_id):
     '''
         Downloads the metadata for a media item.
@@ -459,14 +512,24 @@ def download_media_metadata(media_id):
     response = metadata
     if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
         response = filter_response(metadata, True)
-    media.metadata = json.dumps(response, separators=(',', ':'), default=json_serial)
+    media.ingest_metadata(response)
+    pointer_dict = {'_using_table': True}
+    media.metadata = media.metadata_dumps(arg_dict=pointer_dict)
     upload_date = media.upload_date
     # Media must have a valid upload date
     if upload_date:
         media.published = timezone.make_aware(upload_date)
-    published = media.metadata_published()
-    if published:
-        media.published = published
+    timestamp = media.get_metadata_first_value(
+        ('release_timestamp', 'timestamp',),
+        arg_dict=response,
+    )
+    try:
+        published_dt = media.ts_to_dt(timestamp)
+    except AssertionError:
+        pass
+    else:
+        if published_dt:
+            media.published = published_dt
 
     # Store title in DB so it's fast to access
     if media.metadata_title:
@@ -477,12 +540,12 @@ def download_media_metadata(media_id):
         media.duration = media.metadata_duration
 
     # Don't filter media here, the post_save signal will handle that
-    media.save()
-    log.info(f'Saved {len(media.metadata)} bytes of metadata for: '
+    save_model(media)
+    log.info(f'Saved {len(media.metadata_dumps())} bytes of metadata for: '
              f'{source} / {media}: {media_id}')
 
 
-@background(schedule=dict(priority=15, run_at=10), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
 def download_media_thumbnail(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
@@ -500,10 +563,19 @@ def download_media_thumbnail(media_id, url):
         return
     width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
     height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
-    i = get_remote_image(url)
-    log.info(f'Resizing {i.width}x{i.height} thumbnail to '
-             f'{width}x{height}: {url}')
-    i = resize_image_to_height(i, width, height)
+    try:
+        try:
+            i = get_remote_image(url)
+        except requests.HTTPError as re:
+            if 404 != re.response.status_code:
+                raise
+            raise NoThumbnailException(re.response.reason) from re
+    except NoThumbnailException as e:
+        raise InvalidTaskError(str(e.__cause__)) from e
+    if (i.width > width) and (i.height > height):
+        log.info(f'Resizing {i.width}x{i.height} thumbnail to '
+                 f'{width}x{height}: {url}')
+        i = resize_image_to_height(i, width, height)
     image_file = BytesIO()
     i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
     image_file.seek(0)
@@ -516,12 +588,23 @@ def download_media_thumbnail(media_id, url):
         ),
         save=True
     )
+    i = image_file = None
     log.info(f'Saved thumbnail for: {media} from: {url}')
+    # After media is downloaded, copy the updated thumbnail.
+    copy_thumbnail = (
+        media.downloaded and
+        media.source.copy_thumbnails and
+        media.thumb_file_exists
+    )
+    if copy_thumbnail:
+        log.info(f'Copying media thumbnail from: {media.thumb.path} '
+                 f'to: {media.thumbpath}')
+        copyfile(media.thumb.path, media.thumbpath)        
     return True
 
 
-@background(schedule=dict(priority=15, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def download_media(media_id):
+@background(schedule=dict(priority=30, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+def download_media(media_id, override=False):
     '''
         Downloads the media to disk and attaches it to the Media instance.
     '''
@@ -530,83 +613,44 @@ def download_media(media_id):
     except Media.DoesNotExist as e:
         # Task triggered but the media no longer exists, do nothing
         raise InvalidTaskError(_('no such media')) from e
-    if not media.source.download_media:
-        log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
-                 f'the source {media.source} has since been marked to not download, '
-                 f'not downloading')
-        return
-    if media.skip or media.manual_skip:
-        # Media was toggled to be skipped after the task was scheduled
-        log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
-                 f'it is now marked to be skipped, not downloading')
-        return
-    # metadata is required to generate the proper filepath
-    if not media.has_metadata:
-        raise NoMetadataException('Metadata is not yet available.')
-    downloaded_file_exists = (
-        media.downloaded and
-        media.has_metadata and
-        (
-            media.media_file_exists or
-            media.filepath.exists()
-        )
-    )
-    if downloaded_file_exists:
-        # Media has been marked as downloaded before the download_media task was fired,
-        # skip it
-        log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
-                 f'it has already been marked as downloaded, not downloading again')
-        return
-    max_cap_age = media.source.download_cap_date
-    published = media.published
-    if max_cap_age and published:
-        if published <= max_cap_age:
-            log.warn(f'Download task triggered media: {media} (UUID: {media.pk}) but '
-                     f'the source has a download cap and the media is now too old, '
-                     f'not downloading')
+    else:
+        if not media.download_checklist(override):
             return
+
     filepath = media.filepath
+    container = format_str = None
     log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
-    format_str, container = media.download_media()
-    if os.path.exists(filepath):
+    try:
+        format_str, container = media.download_media()
+    except NoFormatException as e:
+        # Try refreshing formats
+        if media.has_metadata:
+            log.debug(f'Scheduling a task to refresh metadata for: {media.key}: "{media.name}"')
+            refresh_formats(
+                str(media.pk),
+                verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
+            )
+        log.exception(str(e))
+        raise
+    else:
+        if not os.path.exists(filepath):
+            # Try refreshing formats
+            if media.has_metadata:
+                log.debug(f'Scheduling a task to refresh metadata for: {media.key}: "{media.name}"')
+                refresh_formats(
+                    str(media.pk),
+                    verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
+                )
+            # Expected file doesn't exist on disk
+            err = (f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
+                   f'expected outfile does not exist: {filepath}')
+            log.error(err)
+            # Raising an error here triggers the task to be re-attempted (or fail)
+            raise DownloadFailedException(err)
+
         # Media has been downloaded successfully
-        log.info(f'Successfully downloaded media: {media} (UUID: {media.pk}) to: '
-                 f'"{filepath}"')
-        # Link the media file to the object and update info about the download
-        media.media_file.name = str(media.source.type_directory_path / media.filename)
-        media.downloaded = True
-        media.download_date = timezone.now()
-        media.downloaded_filesize = os.path.getsize(filepath)
-        media.downloaded_container = container
-        if '+' in format_str:
-            # Seperate audio and video streams
-            vformat_code, aformat_code = format_str.split('+')
-            aformat = media.get_format_by_code(aformat_code)
-            vformat = media.get_format_by_code(vformat_code)
-            media.downloaded_format = vformat['format']
-            media.downloaded_height = vformat['height']
-            media.downloaded_width = vformat['width']
-            media.downloaded_audio_codec = aformat['acodec']
-            media.downloaded_video_codec = vformat['vcodec']
-            media.downloaded_container = container
-            media.downloaded_fps = vformat['fps']
-            media.downloaded_hdr = vformat['is_hdr']
-        else:
-            # Combined stream or audio-only stream
-            cformat_code = format_str
-            cformat = media.get_format_by_code(cformat_code)
-            media.downloaded_audio_codec = cformat['acodec']
-            if cformat['vcodec']:
-                # Combined
-                media.downloaded_format = cformat['format']
-                media.downloaded_height = cformat['height']
-                media.downloaded_width = cformat['width']
-                media.downloaded_video_codec = cformat['vcodec']
-                media.downloaded_fps = cformat['fps']
-                media.downloaded_hdr = cformat['is_hdr']
-            else:
-                media.downloaded_format = 'audio'
-        media.save()
+        media.download_finished(format_str, container, filepath)
+        save_model(media)
         # If selected, copy the thumbnail over as well
         if media.source.copy_thumbnails:
             if not media.thumb_file_exists:
@@ -630,16 +674,6 @@ def download_media(media_id):
                 pass
         # Schedule a task to update media servers
         schedule_media_servers_update()
-    else:
-        # Expected file doesn't exist on disk
-        err = (f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
-               f'expected outfile does not exist: {filepath}')
-        log.error(err)
-        # Try refreshing formats
-        if media.has_metadata:
-            media.refresh_formats
-        # Raising an error here triggers the task to be re-attempted (or fail)
-        raise DownloadFailedException(err)
 
 
 @background(schedule=dict(priority=0, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
@@ -657,7 +691,7 @@ def rescan_media_server(mediaserver_id):
     mediaserver.update()
 
 
-@background(schedule=dict(priority=25, run_at=600), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
+@background(schedule=dict(priority=30, run_at=600), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
 def save_all_media_for_source(source_id):
     '''
         Iterates all media items linked to a source and saves them to
@@ -665,6 +699,7 @@ def save_all_media_for_source(source_id):
         source has its parameters changed and all media needs to be
         checked to see if its download status has changed.
     '''
+    db.reset_queries()
     try:
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist as e:
@@ -673,16 +708,27 @@ def save_all_media_for_source(source_id):
                   f'source exists with ID: {source_id}')
         raise InvalidTaskError(_('no such source')) from e
 
-    saved_later = set()
-    mqs = Media.objects.filter(source=source)
-    task = get_source_check_task(source_id)
-    refresh_qs = mqs.filter(
+    refresh_qs = Media.objects.all().only(
+        'pk',
+        'uuid',
+        'key',
+        'title', # for name property
+    ).filter(
+        source=source,
         can_download=False,
         skip=False,
         manual_skip=False,
         downloaded=False,
         metadata__isnull=False,
     )
+    save_qs = Media.objects.all().only(
+        'pk',
+        'uuid',
+    ).filter(
+        source=source,
+    )
+    saved_later = set()
+    task = get_source_check_task(source_id)
     if task:
         task._verbose_name = remove_enclosed(
             task.verbose_name, '[', ']', ' ',
@@ -690,28 +736,35 @@ def save_all_media_for_source(source_id):
             end=task.verbose_name.find('Check'),
         )
     tvn_format = '1/{:,}' + f'/{refresh_qs.count():,}'
-    for mn, media in enumerate(refresh_qs, start=1):
+    for mn, media in enumerate(qs_gen(refresh_qs), start=1):
         update_task_status(task, tvn_format.format(mn))
-        refesh_formats(
+        refresh_formats(
             str(media.pk),
             verbose_name=f'Refreshing metadata formats for: {media.key}: "{media.name}"',
         )
         saved_later.add(media.uuid)
 
+    # Keep out of the way of the index task!
+    # SQLite will be locked for a while if we start
+    # a large source, which reschedules a more costly task.
+    if 'sqlite' == db_vendor:
+        index_task = get_source_index_task(source_id)
+        if index_task and index_task.locked_by_pid_running():
+            raise Exception(_('Indexing not completed'))
+
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
-    tvn_format = '2/{:,}' + f'/{mqs.count():,}'
-    for mn, media in enumerate(mqs, start=1):
+    tvn_format = '2/{:,}' + f'/{save_qs.count():,}'
+    for mn, media in enumerate(qs_gen(save_qs), start=1):
         if media.uuid not in saved_later:
             update_task_status(task, tvn_format.format(mn))
-            with atomic():
-                media.save()
+            save_model(media)
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
 
 
-@background(schedule=dict(priority=10, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def refesh_formats(media_id):
+@background(schedule=dict(priority=50, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+def refresh_formats(media_id):
     try:
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
@@ -722,17 +775,18 @@ def refesh_formats(media_id):
         log.debug(f'Failed to refresh formats for: {media.source} / {media.key}: {e!s}')
         pass
     else:
-        with atomic():
-            media.save()
+        save_model(media)
 
 
 @background(schedule=dict(priority=20, run_at=60), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
 def rename_media(media_id):
     try:
-        media = Media.objects.defer('metadata', 'thumb').get(pk=media_id)
+        media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
         raise InvalidTaskError(_('no such media')) from e
-    media.rename_files()
+    else:
+        with atomic():
+            media.rename_files()
 
 
 @background(schedule=dict(priority=20, run_at=300), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
@@ -756,59 +810,71 @@ def rename_all_media_for_source(source_id):
     )
     if not create_rename_tasks:
         return
-    mqs = Media.objects.all().defer(
-        'metadata',
-        'thumb',
-    ).filter(
+    mqs = Media.objects.all().filter(
         source=source,
         downloaded=True,
     )
-    for media in mqs:
+    for media in qs_gen(mqs):
         with atomic():
             media.rename_files()
 
 
 @background(schedule=dict(priority=0, run_at=60), queue=Val(TaskQueue.DB), remove_existing_tasks=True)
 def wait_for_media_premiere(media_id):
-    hours = lambda td: 1+int((24*td.days)+(td.seconds/(60*60)))
-
     try:
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
         raise InvalidTaskError(_('no such media')) from e
-    if media.has_metadata:
-        return
-    now = timezone.now()
-    if media.published < now:
-        media.manual_skip = False
-        media.skip = False
-        # start the download tasks
-        media.save()
     else:
-        media.manual_skip = True
-        media.title = _(f'Premieres in {hours(media.published - now)} hours')
-        media.save()
-        task = get_media_premiere_task(media_id)
-        if task:
-            update_task_status(task, f'available in {hours(media.published - now)} hours')
+        valid, hours = media.wait_for_premiere()
+        if not valid:
+            return
+        
+        if hours:
+            task = get_media_premiere_task(media_id)
+            if task:
+                update_task_status(task, f'available in {hours} hours')
+        save_model(media)
 
-@background(schedule=dict(priority=1, run_at=300), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
-def delete_all_media_for_source(source_id, source_name):
+
+@background(schedule=dict(priority=1, run_at=90), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
+def delete_all_media_for_source(source_id, source_name, source_directory):
     source = None
+    assert source_id
+    assert source_name
+    assert source_directory
     try:
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist as e:
         # Task triggered but the source no longer exists, do nothing
-        log.error(f'Task delete_all_media_for_source(pk={source_id}) called but no '
+        log.warn(f'Task delete_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
-        raise InvalidTaskError(_('no such source')) from e
+        #raise InvalidTaskError(_('no such source')) from e
+        pass # this task can run after a source was deleted
     mqs = Media.objects.all().defer(
         'metadata',
     ).filter(
         source=source or source_id,
     )
-    for media in mqs:
-        log.info(f'Deleting media for source: {source_name} item: {media.name}')
-        with atomic():
-            media.delete()
+    with atomic(durable=True):
+        for media in qs_gen(mqs):
+            log.info(f'Deleting media for source: {source_name} item: {media.name}')
+            with atomic():
+                #media.downloaded = False
+                media.skip = True
+                media.manual_skip = True
+                media.save()
+                media.delete()
+    # Remove the directory, if the user requested that
+    directory_path = Path(source_directory)
+    remove = (
+        (source and source.delete_removed_media) or
+        (directory_path / '.to_be_removed').is_file()
+    )
+    if source:
+        with atomic(durable=True):
+            source.delete()
+    if remove:
+        log.info(f'Deleting directory for: {source_name}: {directory_path}')
+        rmtree(directory_path, True)
 

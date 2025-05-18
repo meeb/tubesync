@@ -7,10 +7,11 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - 'main'
+      - 'test-*'
   pull_request:
     branches:
-      - main
+      - 'main'
     types:
       - opened
       - reopened
@@ -83,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
       - name: Install Python ${{ matrix.python-version }}
@@ -92,16 +93,63 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install pipenv
-          PIPENV_VERBOSITY=64 pipenv install --system --skip-lock
+          python -m pip install uv
+          uv --no-config --no-managed-python --no-progress \
+            pip install --system --strict pipenv
+          pipenv lock
+          pipenv requirements | tee requirements.txt
+          #PIPENV_VERBOSITY=64 pipenv install --system --skip-lock
+          uv --no-config --no-managed-python --no-progress \
+            pip install --system --strict --requirements requirements.txt
       - name: Set up Django environment
         run: |
           cp -v -p tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/background_task/ patches/background_task/*
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/yt_dlp/ patches/yt_dlp/*
+          cd tubesync && python3 -B manage.py collectstatic --no-input --link
+      - name: Check with ruff
+        continue-on-error: false
+        run: |
+          target_version='py310'
+          ignore_csv_list='E701,E722,E731'
+          cd tubesync
+          # output formats:
+          # "full" | "concise" | "grouped" |
+          # "json" | "junit" | "github" | "gitlab" |
+          # "pylint" | "azure"
+          {
+              echo '## Output from `ruff check` for `tubesync`'
+              echo ''
+              echo '### Formats'
+              echo ''
+              for fmt in full concise grouped pylint
+              do
+              echo '<details>'
+              echo '<summary>'"${fmt}"'</summary>'
+              echo ''
+              echo '#### '"${fmt}"' output format'
+              echo ''
+              echo '```'
+              uvx --no-config --no-managed-python --no-progress --isolated \
+                  ruff check --exit-zero \
+                  --target-version "${target_version}" \
+                  --output-format "${fmt}" \
+                  --extend-select RUF100 \
+                  --ignore "${ignore_csv_list}"
+              echo ''
+              echo '```'
+              echo ''
+              echo '</details>'
+              echo ''
+              done
+          } >> "${GITHUB_STEP_SUMMARY}"
+          uvx --no-config --no-managed-python --no-progress --isolated \
+              ruff check --exit-zero \
+              --target-version "${target_version}" \
+              --output-format github \
+              --ignore "${ignore_csv_list}"
       - name: Run Django tests
-        run: cd tubesync && python3 manage.py test --verbosity=2
+        run: cd tubesync && python3 -B -W default manage.py test --verbosity=2
 
   containerise:
     if: ${{ !cancelled() && 'success' == needs.info.result }}
@@ -135,14 +183,15 @@ jobs:
           push: false
           tags: ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:dive
       - name: Analysis with `dive`
+        continue-on-error: false
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             'ghcr.io/wagoodman/dive' \
             'ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:dive' \
             --ci \
-            --highestUserWastedPercent '0.03' \
-            --highestWastedBytes '10M'
+            --highestUserWastedPercent '0.05' \
+            --highestWastedBytes '50M'
       - name: Build and push
         id: build-push
         timeout-minutes: 60

@@ -1,7 +1,6 @@
 import os
 import uuid
 import json
-import re
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone as tz
@@ -9,560 +8,42 @@ from pathlib import Path
 from xml.etree import ElementTree
 from django.conf import settings
 from django.db import models
-from django.core.exceptions import SuspiciousOperation
-from django.core.files.storage import FileSystemStorage
-from django.core.validators import RegexValidator
+from django.core.exceptions import ObjectDoesNotExist
+from django.db.transaction import atomic
 from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.logger import log
 from common.errors import NoFormatException
-from common.utils import clean_filename, clean_emoji
-from .youtube import (get_media_info as get_youtube_media_info,
-                      download_media as download_youtube_media,
-                      get_channel_image_info as get_youtube_channel_image_info)
-from .utils import (seconds_to_timestr, parse_media_format, filter_response,
-                    write_text_file, mkdir_p, directory_and_stem, glob_quote)
-from .matching import (get_best_combined_format, get_best_audio_format,
-                       get_best_video_format)
-from .fields import CommaSepChoiceField
-from .choices import (Val, CapChoices, Fallback, FileExtension,
-                        FilterSeconds, IndexSchedule, MediaServerType,
-                        MediaState, SourceResolution, SourceResolutionInteger,
-                        SponsorBlock_Category, YouTube_AudioCodec,
-                        YouTube_SourceType, YouTube_VideoCodec)
-
-media_file_storage = FileSystemStorage(location=str(settings.DOWNLOAD_ROOT), base_url='/media-data/')
-_srctype_dict = lambda n: dict(zip( YouTube_SourceType.values, (n,) * len(YouTube_SourceType.values) ))
-
-class Source(models.Model):
-    '''
-        A Source is a source of media. Currently, this is either a YouTube channel
-        or a YouTube playlist.
-    '''
-
-    sponsorblock_categories = CommaSepChoiceField(
-        _(''),
-        max_length=128,
-        possible_choices=SponsorBlock_Category.choices,
-        all_choice='all',
-        allow_all=True,
-        all_label='(All Categories)',
-        default='all',
-        help_text=_('Select the SponsorBlock categories that you wish to be removed from downloaded videos.')
-    )
-    embed_metadata = models.BooleanField(
-        _('embed metadata'),
-        default=False,
-        help_text=_('Embed metadata from source into file')
-    )
-    embed_thumbnail = models.BooleanField(
-        _('embed thumbnail'),
-        default=False,
-        help_text=_('Embed thumbnail into the file')
-    )
-    enable_sponsorblock = models.BooleanField(
-        _('enable sponsorblock'),
-        default=True,
-        help_text=_('Use SponsorBlock?')
-    )
-
-    # Fontawesome icons used for the source on the front end
-    ICONS = _srctype_dict('<i class="fab fa-youtube"></i>')
-
-    # Format to use to display a URL for the source
-    URLS = dict(zip(
-        YouTube_SourceType.values,
-        (
-            'https://www.youtube.com/c/{key}',
-            'https://www.youtube.com/channel/{key}',
-            'https://www.youtube.com/playlist?list={key}',
-        ),
-    ))
-
-    # Format used to create indexable URLs
-    INDEX_URLS = dict(zip(
-        YouTube_SourceType.values,
-        (
-            'https://www.youtube.com/c/{key}/{type}',
-            'https://www.youtube.com/channel/{key}/{type}',
-            'https://www.youtube.com/playlist?list={key}',
-        ),
-    ))
-
-    # Callback functions to get a list of media from the source
-    INDEXERS = _srctype_dict(get_youtube_media_info)
-
-    # Field names to find the media ID used as the key when storing media
-    KEY_FIELD = _srctype_dict('id')
-
-    uuid = models.UUIDField(
-        _('uuid'),
-        primary_key=True,
-        editable=False,
-        default=uuid.uuid4,
-        help_text=_('UUID of the source')
-    )
-    created = models.DateTimeField(
-        _('created'),
-        auto_now_add=True,
-        db_index=True,
-        help_text=_('Date and time the source was created')
-    )
-    last_crawl = models.DateTimeField(
-        _('last crawl'),
-        db_index=True,
-        null=True,
-        blank=True,
-        help_text=_('Date and time the source was last crawled')
-    )
-    source_type = models.CharField(
-        _('source type'),
-        max_length=1,
-        db_index=True,
-        choices=YouTube_SourceType.choices,
-        default=YouTube_SourceType.CHANNEL,
-        help_text=_('Source type')
-    )
-    key = models.CharField(
-        _('key'),
-        max_length=100,
-        db_index=True,
-        unique=True,
-        help_text=_('Source key, such as exact YouTube channel name or playlist ID')
-    )
-    name = models.CharField(
-        _('name'),
-        max_length=100,
-        db_index=True,
-        unique=True,
-        help_text=_('Friendly name for the source, used locally in TubeSync only')
-    )
-    directory = models.CharField(
-        _('directory'),
-        max_length=100,
-        db_index=True,
-        unique=True,
-        help_text=_('Directory name to save the media into')
-    )
-    media_format = models.CharField(
-        _('media format'),
-        max_length=200,
-        default=settings.MEDIA_FORMATSTR_DEFAULT,
-        help_text=_('File format to use for saving files, detailed options at bottom of page.')
-    )
-    index_schedule = models.IntegerField(
-        _('index schedule'),
-        choices=IndexSchedule.choices,
-        db_index=True,
-        default=IndexSchedule.EVERY_24_HOURS,
-        help_text=_('Schedule of how often to index the source for new media')
-    )
-    download_media = models.BooleanField(
-        _('download media'),
-        default=True,
-        help_text=_('Download media from this source, if not selected the source will only be indexed')
-    )
-    index_videos = models.BooleanField(
-        _('index videos'),
-        default=True,
-        help_text=_('Index video media from this source')
-    )
-    index_streams = models.BooleanField(
-        _('index streams'),
-        default=False,
-        help_text=_('Index live stream media from this source')
-    )
-    download_cap = models.IntegerField(
-        _('download cap'),
-        choices=CapChoices.choices,
-        default=CapChoices.CAP_NOCAP,
-        help_text=_('Do not download media older than this capped date')
-    )
-    delete_old_media = models.BooleanField(
-        _('delete old media'),
-        default=False,
-        help_text=_('Delete old media after "days to keep" days?')
-    )
-    days_to_keep = models.PositiveSmallIntegerField(
-        _('days to keep'),
-        default=14,
-        help_text=_('If "delete old media" is ticked, the number of days after which '
-                    'to automatically delete media')
-    )
-    filter_text = models.CharField(
-        _('filter string'),
-        max_length=200,
-        default='',
-        blank=True,
-        help_text=_('Regex compatible filter string for video titles')
-    )
-    filter_text_invert = models.BooleanField(
-        _("invert filter text matching"),
-        default=False,
-        help_text="Invert filter string regex match, skip any matching titles when selected",
-    )
-    filter_seconds = models.PositiveIntegerField(
-                _('filter seconds'),
-                blank=True,
-                null=True,
-                help_text=_('Filter Media based on Min/Max duration. Leave blank or 0 to disable filtering')
-    )
-    filter_seconds_min = models.BooleanField(
-        _('filter seconds min/max'),
-        choices=FilterSeconds.choices,
-        default=Val(FilterSeconds.MIN),
-        help_text=_('When Filter Seconds is > 0, do we skip on minimum (video shorter than limit) or maximum (video '
-                    'greater than maximum) video duration')
-    )
-    delete_removed_media = models.BooleanField(
-        _('delete removed media'),
-        default=False,
-        help_text=_('Delete media that is no longer on this playlist')
-    )
-    delete_files_on_disk = models.BooleanField(
-        _('delete files on disk'),
-        default=False,
-        help_text=_('Delete files on disk when they are removed from TubeSync')
-    )
-    source_resolution = models.CharField(
-        _('source resolution'),
-        max_length=8,
-        db_index=True,
-        choices=SourceResolution.choices,
-        default=SourceResolution.VIDEO_1080P,
-        help_text=_('Source resolution, desired video resolution to download')
-    )
-    source_vcodec = models.CharField(
-        _('source video codec'),
-        max_length=8,
-        db_index=True,
-        choices=list(reversed(YouTube_VideoCodec.choices)),
-        default=YouTube_VideoCodec.VP9,
-        help_text=_('Source video codec, desired video encoding format to download (ignored if "resolution" is audio only)')
-    )
-    source_acodec = models.CharField(
-        _('source audio codec'),
-        max_length=8,
-        db_index=True,
-        choices=list(reversed(YouTube_AudioCodec.choices)),
-        default=YouTube_AudioCodec.OPUS,
-        help_text=_('Source audio codec, desired audio encoding format to download')
-    )
-    prefer_60fps = models.BooleanField(
-        _('prefer 60fps'),
-        default=True,
-        help_text=_('Where possible, prefer 60fps media for this source')
-    )
-    prefer_hdr = models.BooleanField(
-        _('prefer hdr'),
-        default=False,
-        help_text=_('Where possible, prefer HDR media for this source')
-    )
-    fallback = models.CharField(
-        _('fallback'),
-        max_length=1,
-        db_index=True,
-        choices=Fallback.choices,
-        default=Fallback.NEXT_BEST_HD,
-        help_text=_('What do do when media in your source resolution and codecs is not available')
-    )
-    copy_channel_images = models.BooleanField(
-        _('copy channel images'),
-        default=False,
-        help_text=_('Copy channel banner and avatar. These may be detected and used by some media servers')
-    )
-    copy_thumbnails = models.BooleanField(
-        _('copy thumbnails'),
-        default=False,
-        help_text=_('Copy thumbnails with the media, these may be detected and used by some media servers')
-    )
-    write_nfo = models.BooleanField(
-        _('write nfo'),
-        default=False,
-        help_text=_('Write an NFO file in XML with the media info, these may be detected and used by some media servers')
-    )
-    write_json = models.BooleanField(
-        _('write json'),
-        default=False,
-        help_text=_('Write a JSON file with the media info, these may be detected and used by some media servers')
-    )
-    has_failed = models.BooleanField(
-        _('has failed'),
-        default=False,
-        help_text=_('Source has failed to index media')
-    )
-
-    write_subtitles = models.BooleanField(
-        _('write subtitles'),
-        default=False,
-        help_text=_('Download video subtitles')
-    )
-
-    auto_subtitles = models.BooleanField(
-        _('accept auto-generated subs'),
-        default=False,
-        help_text=_('Accept auto-generated subtitles')
-    )
-    sub_langs = models.CharField(
-        _('subs langs'),
-        max_length=30,
-        default='en',
-        help_text=_('List of subtitles langs to download, comma-separated. Example: en,fr or all,-fr,-live_chat'),
-        validators=[
-            RegexValidator(
-                regex=r"^(\-?[\_\.a-zA-Z-]+(,|$))+",
-                message=_('Subtitle langs must be a comma-separated list of langs. example: en,fr or all,-fr,-live_chat')
-            )
-        ]
-    )
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        verbose_name = _('Source')
-        verbose_name_plural = _('Sources')
-
-    @property
-    def icon(self):
-        return self.ICONS.get(self.source_type)
-
-    @property
-    def slugname(self):
-        replaced = self.name.replace('_', '-').replace('&', 'and').replace('+', 'and')
-        return slugify(replaced)[:80]
-
-    def deactivate(self):
-        self.download_media = False
-        self.index_streams = False
-        self.index_videos = False
-        self.index_schedule = IndexSchedule.NEVER
-        self.save(update_fields={
-            'download_media',
-            'index_streams',
-            'index_videos',
-            'index_schedule',
-        })
-
-    @property
-    def is_active(self):
-        active = (
-            self.download_media or
-            self.index_streams or
-            self.index_videos
-        )
-        return self.index_schedule and active
-
-    @property
-    def is_audio(self):
-        return self.source_resolution == SourceResolution.AUDIO.value
-
-    @property
-    def is_playlist(self):
-        return self.source_type == YouTube_SourceType.PLAYLIST.value
-
-    @property
-    def is_video(self):
-        return not self.is_audio
-
-    @property
-    def download_cap_date(self):
-        delta = self.download_cap
-        if delta > 0:
-            return timezone.now() - timedelta(seconds=delta)
-        else:
-            return False
-
-    @property
-    def days_to_keep_date(self):
-        delta = self.days_to_keep
-        if delta > 0:
-            return timezone.now() - timedelta(days=delta)
-        else:
-            return False
-
-    @property
-    def extension(self):
-        '''
-            The extension is also used by youtube-dl to set the output container. As
-            it is possible to quite easily pick combinations of codecs and containers
-            which are invalid (e.g. OPUS audio in an MP4 container) just set this for
-            people. All video is set to mkv containers, audio-only is set to m4a or ogg
-            depending on audio codec.
-        '''
-        if self.is_audio:
-            if self.source_acodec == Val(YouTube_AudioCodec.MP4A):
-                return Val(FileExtension.M4A)
-            elif self.source_acodec == Val(YouTube_AudioCodec.OPUS):
-                return Val(FileExtension.OGG)
-            else:
-                raise ValueError('Unable to choose audio extension, uknown acodec')
-        else:
-            return Val(FileExtension.MKV)
-
-    @classmethod
-    def create_url(obj, source_type, key):
-        url = obj.URLS.get(source_type)
-        return url.format(key=key)
-
-    @classmethod
-    def create_index_url(obj, source_type, key, type):
-        url = obj.INDEX_URLS.get(source_type)
-        return url.format(key=key, type=type)
-
-    @property
-    def url(self):
-        return Source.create_url(self.source_type, self.key)
-
-    def get_index_url(self, type):
-        return Source.create_index_url(self.source_type, self.key, type)
-
-    @property
-    def format_summary(self):
-        if self.is_audio:
-            vc = 'none'
-        else:
-            vc = self.source_vcodec
-        ac = self.source_acodec
-        f = ' 60FPS' if self.is_video and self.prefer_60fps else ''
-        h = ' HDR' if self.is_video and self.prefer_hdr else ''
-        return f'{self.source_resolution} (video:{vc}, audio:{ac}){f}{h}'.strip()
-
-    @property
-    def directory_path(self):
-        download_dir = Path(media_file_storage.location)
-        return download_dir / self.type_directory_path
-
-    @property
-    def type_directory_path(self):
-        if settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX:
-            if self.is_audio:
-                return Path(settings.DOWNLOAD_AUDIO_DIR) / self.directory
-            else:
-                return Path(settings.DOWNLOAD_VIDEO_DIR) / self.directory
-        else:
-            return Path(self.directory)
-
-    def make_directory(self):
-        return os.makedirs(self.directory_path, exist_ok=True)
-
-    @property
-    def get_image_url(self):
-        if self.is_playlist:
-            raise SuspiciousOperation('This source is a playlist so it doesn\'t have thumbnail.')
-
-        return get_youtube_channel_image_info(self.url)
-
-
-    def directory_exists(self):
-        return (os.path.isdir(self.directory_path) and
-                os.access(self.directory_path, os.W_OK))
-
-    @property
-    def key_field(self):
-        return self.KEY_FIELD.get(self.source_type, '')
-
-    @property
-    def source_resolution_height(self):
-        return SourceResolutionInteger.get(self.source_resolution, 0)
-
-    @property
-    def can_fallback(self):
-        return self.fallback != Val(Fallback.FAIL)
-
-    @property
-    def example_media_format_dict(self):
-        '''
-            Populates a dict with real-ish and some placeholder data for media name
-            format strings. Used for example filenames and media_format validation.
-        '''
-        fmt = []
-        if self.source_resolution:
-            fmt.append(self.source_resolution)
-        if self.source_vcodec:
-            fmt.append(self.source_vcodec.lower())
-        if self.source_acodec:
-            fmt.append(self.source_acodec.lower())
-        if self.prefer_60fps:
-            fmt.append('60fps')
-        if self.prefer_hdr:
-            fmt.append('hdr')
-        now = timezone.now()
-        return {
-            'yyyymmdd': now.strftime('%Y%m%d'),
-            'yyyy_mm_dd': now.strftime('%Y-%m-%d'),
-            'yyyy': now.strftime('%Y'),
-            'mm': now.strftime('%m'),
-            'dd': now.strftime('%d'),
-            'source': self.slugname,
-            'source_full': self.name,
-            'uploader': 'Some Channel Name',
-            'title': 'some-media-title-name',
-            'title_full': 'Some Media Title Name',
-            'key': 'SoMeUnIqUiD',
-            'format': '-'.join(fmt),
-            'playlist_title': 'Some Playlist Title',
-            'video_order': '01',
-            'ext': self.extension,
-            'resolution': self.source_resolution if self.source_resolution else '',
-            'height': '720' if self.source_resolution else '',
-            'width': '1280' if self.source_resolution else '',
-            'vcodec': self.source_vcodec.lower() if self.source_vcodec else '',
-            'acodec': self.source_acodec.lower(),
-            'fps': '24' if self.source_resolution else '',
-            'hdr': 'hdr' if self.source_resolution else ''
-        }
-
-    def get_example_media_format(self):
-        try:
-            return self.media_format.format(**self.example_media_format_dict)
-        except Exception as e:
-            return ''
-
-    def is_regex_match(self, media_item_title):
-        if not self.filter_text:
-            return True
-        return bool(re.search(self.filter_text, media_item_title))
-
-    def get_index(self, type):
-        indexer = self.INDEXERS.get(self.source_type, None)
-        if not callable(indexer):
-            raise Exception(f'Source type f"{self.source_type}" has no indexer')
-        days = None
-        if self.download_cap_date:
-            days = timedelta(seconds=self.download_cap).days
-        response = indexer(self.get_index_url(type=type), days=days)
-        if not isinstance(response, dict):
-            return []
-        entries = response.get('entries', []) 
-        return entries
-
-    def index_media(self):
-        '''
-            Index the media source returning a list of media metadata as dicts.
-        '''
-        entries = list()
-        if self.index_videos:
-            entries += self.get_index('videos')
-        # Playlists do something different that I have yet to figure out
-        if not self.is_playlist:
-            if self.index_streams:
-                entries += self.get_index('streams')
-
-        if settings.MAX_ENTRIES_PROCESSING:
-            entries = entries[:settings.MAX_ENTRIES_PROCESSING]
-        return entries
-
-def get_media_thumb_path(instance, filename):
-    fileid = str(instance.uuid)
-    filename = f'{fileid.lower()}.jpg'
-    prefix = fileid[:2]
-    return Path('thumbs') / prefix / filename
-
-
-def get_media_file_path(instance, filename):
-    return instance.filepath
+from common.utils import (
+    clean_filename, clean_emoji,
+    django_queryset_generator as qs_gen,
+)
+from ..youtube import (
+    get_media_info as get_youtube_media_info,
+    download_media as download_youtube_media,
+)
+from ..utils import (
+    seconds_to_timestr, parse_media_format, filter_response,
+    write_text_file, mkdir_p, directory_and_stem, glob_quote,
+    multi_key_sort,
+)
+from ..matching import (
+    get_best_combined_format,
+    get_best_audio_format, get_best_video_format,
+)
+from ..choices import (
+    Val, Fallback, MediaState, SourceResolution,
+    YouTube_AudioCodec, YouTube_VideoCodec,
+)
+from ._migrations import (
+    media_file_storage, get_media_thumb_path, get_media_file_path,
+)
+from ._private import _srctype_dict, _nfo_element
+from .media__tasks import (
+    download_checklist, download_finished, wait_for_premiere,
+)
+from .source import Source
 
 
 class Media(models.Model):
@@ -629,7 +110,7 @@ class Media(models.Model):
         Source,
         on_delete=models.CASCADE,
         related_name='media_source',
-        help_text=_('Source the media belongs to')
+        help_text=_('Source the media belongs to'),
     )
     published = models.DateTimeField(
         _('published'),
@@ -796,6 +277,7 @@ class Media(models.Model):
         )
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        setattr(self, '_cached_metadata_dict', None)
         # Correct the path after a source is renamed
         if self.created and self.downloaded and not self.media_file_exists:
             fp_list = list((self.filepath,))
@@ -814,14 +296,20 @@ class Media(models.Model):
                         update_fields = {'media_file', 'skip'}.union(update_fields)
 
         # Trigger an update of derived fields from metadata
-        if update_fields is None or 'metadata' in update_fields:
+        update_md = (
+            self.has_metadata and
+            (
+                update_fields is None or
+                'metadata' in update_fields
+            )
+        )
+        if update_md:
+            self.title = self.metadata_title[:200] or self.title
+            self.duration = self.metadata_duration or self.duration
             setattr(self, '_cached_metadata_dict', None)
-        if self.metadata:
-            self.title = self.metadata_title[:200]
-            self.duration = self.metadata_duration
-        if update_fields is not None and "metadata" in update_fields:
-            # If only some fields are being updated, make sure we update title and duration if metadata changes
-            update_fields = {"title", "duration"}.union(update_fields)
+            if update_fields is not None:
+                # If only some fields are being updated, make sure we update title and duration if metadata changes
+                update_fields = {"title", "duration"}.union(update_fields)
 
         super().save(
             force_insert=force_insert,
@@ -833,11 +321,14 @@ class Media(models.Model):
         fields = self.METADATA_FIELDS.get(field, {})
         return fields.get(self.source.source_type, field)
 
-    def get_metadata_first_value(self, iterable, default=None, /):
+    def get_metadata_first_value(self, iterable, default=None, /, *, arg_dict=None):
         '''
             fetch the first key with a value from metadata
         '''
-        
+
+        if arg_dict is None:
+            arg_dict = self.loaded_metadata
+        assert isinstance(arg_dict, dict), type(arg_dict)
         # str is an iterable of characters
         # we do not want to look for each character!
         if isinstance(iterable, str):
@@ -845,7 +336,7 @@ class Media(models.Model):
         for key in tuple(iterable):
             # reminder: unmapped fields return the key itself
             field = self.get_metadata_field(key)
-            value = self.loaded_metadata.get(field)
+            value = arg_dict.get(field)
             # value can be None because:
             #   - None was stored at the key
             #   - the key was not in the dictionary
@@ -913,7 +404,7 @@ class Media(models.Model):
                             return str(fmt.get('id'))
                     return False
         return False
- 
+
     def get_display_format(self, format_str):
         '''
             Returns a tuple used in the format component of the output filename. This
@@ -1079,13 +570,62 @@ class Media(models.Model):
         return self.metadata is not None
 
 
+    def metadata_clear(self, /, *, save=False):
+        self.metadata = None
+        setattr(self, '_cached_metadata_dict', None)
+        if save:
+            self.save()
+
+
+    def metadata_dumps(self, arg_dict=dict()):
+        from common.utils import json_serial
+        fallback = dict()
+        try:
+            fallback.update(self.new_metadata.with_formats)
+        except ObjectDoesNotExist:
+            pass
+        data = arg_dict or fallback
+        return json.dumps(data, separators=(',', ':'), default=json_serial)
+
+
+    def metadata_loads(self, arg_str='{}'):
+        data = json.loads(arg_str) or self.loaded_metadata
+        return data
+
+
+    @atomic(durable=False)
+    def ingest_metadata(self, data):
+        assert isinstance(data, dict), type(data)
+        site = self.get_metadata_first_value(
+            'extractor_key',
+            'Youtube',
+            arg_dict=data,
+        )
+        md_model = self._meta.fields_map.get('new_metadata').related_model
+        md, created = md_model.objects.get_or_create(
+            media_id=self.pk,
+            site=site,
+            key=self.key,
+        )
+        setattr(self, '_cached_metadata_dict', None)
+        return md.ingest_metadata(data)
+
+
     def save_to_metadata(self, key, value, /):
         data = self.loaded_metadata
+        using_new_metadata = self.get_metadata_first_value(
+            ('migrated', '_using_table',),
+            False,
+            arg_dict=data,
+        )
         data[key] = value
-        from common.utils import json_serial
-        compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
-        self.metadata = compact_json
-        self.save(update_fields={'metadata'})
+        self.ingest_metadata(data)
+        if not using_new_metadata:
+            epoch = self.get_metadata_first_value('epoch', arg_dict=data)
+            migrated = dict(migrated=True, epoch=epoch)
+            migrated['_using_table'] = True
+            self.metadata = self.metadata_dumps(arg_dict=migrated)
+            self.save()
         from common.logger import log
         log.debug(f'Saved to metadata: {self.key} / {self.uuid}: {key=}: {value}')
 
@@ -1098,16 +638,15 @@ class Media(models.Model):
             if '_reduce_data_ran_at' in data.keys():
                 total_seconds = data['_reduce_data_ran_at']
                 assert isinstance(total_seconds, int), type(total_seconds)
-                ran_at = self.metadata_published(total_seconds)
+                ran_at = self.ts_to_dt(total_seconds)
                 if (now - ran_at) < timedelta(hours=1):
                     return data
 
-            from common.utils import json_serial
-            compact_json = json.dumps(data, separators=(',', ':'), default=json_serial)
+            compact_json = self.metadata_dumps(arg_dict=data)
 
             filtered_data = filter_response(data, True)
             filtered_data['_reduce_data_ran_at'] = round((now - self.posix_epoch).total_seconds())
-            filtered_json = json.dumps(filtered_data, separators=(',', ':'), default=json_serial)
+            filtered_json = self.metadata_dumps(arg_dict=filtered_data)
         except Exception as e:
             from common.logger import log
             log.exception('reduce_data: %s', e)
@@ -1142,6 +681,11 @@ class Media(models.Model):
                 data = json.loads(self.metadata or "{}")
             if not isinstance(data, dict):
                 return {}
+            # if hasattr(self, 'new_metadata'):
+            try:
+                data.update(self.new_metadata.with_formats)
+            except ObjectDoesNotExist:
+                pass
             setattr(self, '_cached_metadata_dict', data)
             return data
         except Exception as e:
@@ -1164,13 +708,13 @@ class Media(models.Model):
         attempted_seconds = data.get(attempted_key)
         if attempted_seconds:
             # skip for recent unsuccessful refresh attempts also
-            attempted_dt = self.metadata_published(attempted_seconds)
+            attempted_dt = self.ts_to_dt(attempted_seconds)
             if (now - attempted_dt) < timedelta(seconds=self.source.index_schedule):
                 return False
         # skip for recent successful formats refresh
         refreshed_key = 'formats_epoch'
         formats_seconds = data.get(refreshed_key, metadata_seconds)
-        metadata_dt = self.metadata_published(formats_seconds)
+        metadata_dt = self.ts_to_dt(formats_seconds)
         if (now - metadata_dt) < timedelta(seconds=self.source.index_schedule):
             return False
 
@@ -1180,10 +724,31 @@ class Media(models.Model):
         metadata = self.index_metadata()
         if self.skip:
             return False
- 
+
         response = metadata
         if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
             response = filter_response(metadata, True)
+
+        # save the new list of thumbnails
+        thumbnails = self.get_metadata_first_value(
+            'thumbnails',
+            self.get_metadata_first_value('thumbnails', []),
+            arg_dict=response,
+        )
+        field = self.get_metadata_field('thumbnails')
+        self.save_to_metadata(field, thumbnails)
+
+        # select and save our best thumbnail url
+        try:
+            thumbnail = [ thumb.get('url') for thumb in multi_key_sort(
+                thumbnails,
+                [('preference', True,)],
+            ) if thumb.get('url', '').endswith('.jpg') ][0]
+        except IndexError:
+            pass
+        else:
+            field = self.get_metadata_field('thumbnail')
+            self.save_to_metadata(field, thumbnail)
 
         field = self.get_metadata_field('formats')
         self.save_to_metadata(field, response.get(field, []))
@@ -1206,17 +771,14 @@ class Media(models.Model):
     def metadata_title(self):
         return self.get_metadata_first_value(('fulltitle', 'title',), '')
 
-    def metadata_published(self, timestamp=None):
-        if timestamp is None:
-            timestamp = self.get_metadata_first_value('timestamp')
-        if timestamp is not None:
-            try:
-                timestamp_float = float(timestamp)
-            except Exception as e:
-                log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
-                pass
-            else:
-                return self.posix_epoch + timedelta(seconds=timestamp_float)
+    def ts_to_dt(self, /, timestamp):
+        try:
+            timestamp_float = float(timestamp)
+        except (TypeError, ValueError,) as e:
+            log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
+            pass
+        else:
+            return self.posix_epoch + timedelta(seconds=timestamp_float)
         return None
 
     @property
@@ -1393,37 +955,27 @@ class Media(models.Model):
         nfo = ElementTree.Element('episodedetails')
         nfo.text = '\n  '
         # title = media metadata title
-        title = nfo.makeelement('title', {})
-        title.text = clean_emoji(self.title)
-        title.tail = '\n  '
-        nfo.append(title)
+        nfo.append(_nfo_element(nfo,
+            'title', clean_emoji(self.title),
+        ))
         # showtitle = source name
-        showtitle = nfo.makeelement('showtitle', {})
-        showtitle.text = clean_emoji(str(self.source.name).strip())
-        showtitle.tail = '\n  '
-        nfo.append(showtitle)
+        nfo.append(_nfo_element(nfo,
+            'showtitle', clean_emoji(str(self.source.name).strip()),
+        ))
         # season = upload date year
-        season = nfo.makeelement('season', {})
-        if self.source.is_playlist:
-            # If it's a playlist, set season to 1
-            season.text = '1'
-        else:
-            # If it's not a playlist, set season to upload date year
-            season.text = str(self.upload_date.year) if self.upload_date else ''
-        season.tail = '\n  '
-        nfo.append(season)
+        nfo.append(_nfo_element(nfo,
+            'season',
+            '1' if self.source.is_playlist else str(
+                self.upload_date.year if self.upload_date else ''
+            ),
+        ))
         # episode = number of video in the year
-        episode = nfo.makeelement('episode', {})
-        episode.text = self.get_episode_str()
-        episode.tail = '\n  '
-        nfo.append(episode)
+        nfo.append(_nfo_element(nfo,
+            'episode', self.get_episode_str(),
+        ))
         # ratings = media metadata youtube rating
-        value = nfo.makeelement('value', {})
-        value.text = str(self.rating)
-        value.tail = '\n      '
-        votes = nfo.makeelement('votes', {})
-        votes.text = str(self.votes)
-        votes.tail = '\n    '
+        value = _nfo_element(nfo, 'value', str(self.rating), indent=6)
+        votes = _nfo_element(nfo, 'votes', str(self.votes), indent=4)
         rating_attrs = OrderedDict()
         rating_attrs['name'] = 'youtube'
         rating_attrs['max'] = '5'
@@ -1440,61 +992,51 @@ class Media(models.Model):
         ratings.tail = '\n  '
         nfo.append(ratings)
         # plot = media metadata description
-        plot = nfo.makeelement('plot', {})
-        plot.text = clean_emoji(str(self.description).strip())
-        plot.tail = '\n  '
-        nfo.append(plot)
+        nfo.append(_nfo_element(nfo,
+            'plot', clean_emoji(str(self.description).strip()),
+        ))
         # thumb = local path to media thumbnail
-        thumb = nfo.makeelement('thumb', {})
-        thumb.text = self.thumbname if self.source.copy_thumbnails else ''
-        thumb.tail = '\n  '
-        nfo.append(thumb)
+        nfo.append(_nfo_element(nfo,
+            'thumb', self.thumbname if self.source.copy_thumbnails else '',
+        ))
         # mpaa = media metadata age requirement
-        mpaa = nfo.makeelement('mpaa', {})
-        mpaa.text = str(self.age_limit)
-        mpaa.tail = '\n  '
         if self.age_limit and self.age_limit > 0:
-            nfo.append(mpaa)
+            nfo.append(_nfo_element(nfo,
+                'mpaa', str(self.age_limit),
+            ))
         # runtime = media metadata duration in seconds
-        runtime = nfo.makeelement('runtime', {})
-        runtime.text = str(self.duration)
-        runtime.tail = '\n  '
-        nfo.append(runtime)
+        nfo.append(_nfo_element(nfo,
+            'runtime', str(self.duration),
+        ))
         # id = media key
-        idn = nfo.makeelement('id', {})
-        idn.text = str(self.key).strip()
-        idn.tail = '\n  '
-        nfo.append(idn)
+        nfo.append(_nfo_element(nfo,
+            'id', str(self.key).strip(),
+        ))
         # uniqueid = media key
         uniqueid_attrs = OrderedDict()
         uniqueid_attrs['type'] = 'youtube'
         uniqueid_attrs['default'] = 'True'
-        uniqueid = nfo.makeelement('uniqueid', uniqueid_attrs)
-        uniqueid.text = str(self.key).strip()
-        uniqueid.tail = '\n  '
-        nfo.append(uniqueid)
+        nfo.append(_nfo_element(nfo,
+            'uniqueid', str(self.key).strip(), attrs=uniqueid_attrs,
+        ))
         # studio = media metadata uploader
-        studio = nfo.makeelement('studio', {})
-        studio.text = clean_emoji(str(self.uploader).strip())
-        studio.tail = '\n  '
-        nfo.append(studio)
+        nfo.append(_nfo_element(nfo,
+            'studio', clean_emoji(str(self.uploader).strip()),
+        ))
         # aired = media metadata uploaded date
-        aired = nfo.makeelement('aired', {})
         upload_date = self.upload_date
-        aired.text = upload_date.strftime('%Y-%m-%d') if upload_date else ''
-        aired.tail = '\n  '
-        nfo.append(aired)
+        nfo.append(_nfo_element(nfo,
+            'aired', upload_date.strftime('%Y-%m-%d') if upload_date else '',
+        ))
         # dateadded = date and time media was created in tubesync
-        dateadded = nfo.makeelement('dateadded', {})
-        dateadded.text = self.created.strftime('%Y-%m-%d %H:%M:%S')
-        dateadded.tail = '\n  '
-        nfo.append(dateadded)
+        nfo.append(_nfo_element(nfo,
+            'dateadded', self.created.strftime('%Y-%m-%d %H:%M:%S'),
+        ))
         # genre = any media metadata categories if they exist
         for category_str in self.categories:
-            genre = nfo.makeelement('genre', {})
-            genre.text = str(category_str).strip()
-            genre.tail = '\n  '
-            nfo.append(genre)
+            nfo.append(_nfo_element(nfo,
+                'genre', str(category_str).strip(),
+            ))
         nfo[-1].tail = '\n'
         # Return XML tree as a prettified string
         return ElementTree.tostring(nfo, encoding='utf8', method='xml').decode('utf8')
@@ -1681,89 +1223,8 @@ class Media(models.Model):
                         pass
 
 
-class MediaServer(models.Model):
-    '''
-        A remote media server, such as a Plex server.
-    '''
+# add imported functions
+Media.download_checklist = download_checklist
+Media.download_finished = download_finished
+Media.wait_for_premiere = wait_for_premiere
 
-    ICONS = {
-        Val(MediaServerType.JELLYFIN): '<i class="fas fa-server"></i>',
-        Val(MediaServerType.PLEX): '<i class="fas fa-server"></i>',
-    }
-    HANDLERS = MediaServerType.handlers_dict()
-
-    server_type = models.CharField(
-        _('server type'),
-        max_length=1,
-        db_index=True,
-        choices=MediaServerType.choices,
-        default=MediaServerType.PLEX,
-        help_text=_('Server type')
-    )
-    host = models.CharField(
-        _('host'),
-        db_index=True,
-        max_length=200,
-        help_text=_('Hostname or IP address of the media server')
-    )
-    port = models.PositiveIntegerField(
-        _('port'),
-        db_index=True,
-        help_text=_('Port number of the media server')
-    )
-    use_https = models.BooleanField(
-        _('use https'),
-        default=False,
-        help_text=_('Connect to the media server over HTTPS')
-    )
-    verify_https = models.BooleanField(
-        _('verify https'),
-        default=True,
-        help_text=_('If connecting over HTTPS, verify the SSL certificate is valid')
-    )
-    options = models.TextField(
-        _('options'),
-        blank=False, # valid JSON only
-        null=True,
-        help_text=_('JSON encoded options for the media server')
-    )
-
-    def __str__(self):
-        return f'{self.get_server_type_display()} server at {self.url}'
-
-    class Meta:
-        verbose_name = _('Media Server')
-        verbose_name_plural = _('Media Servers')
-        unique_together = (
-            ('host', 'port'),
-        )
-
-    @property
-    def url(self):
-        scheme = 'https' if self.use_https else 'http'
-        return f'{scheme}://{self.host.strip()}:{self.port}'
-
-    @property
-    def icon(self):
-        return self.ICONS.get(self.server_type)
-
-    @property
-    def handler(self):
-        handler_class = self.HANDLERS.get(self.server_type)
-        return handler_class(self)
-
-    @property
-    def loaded_options(self):
-        try:
-            return json.loads(self.options)
-        except Exception as e:
-            return {}
-
-    def validate(self):
-        return self.handler.validate()
-
-    def update(self):
-        return self.handler.update()
-
-    def get_help_html(self):
-        return self.handler.HELP

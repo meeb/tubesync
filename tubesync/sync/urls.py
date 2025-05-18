@@ -3,7 +3,7 @@ from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceVie
                     SourceView, UpdateSourceView, DeleteSourceView, MediaView,
                     MediaThumbView, MediaItemView, MediaRedownloadView, MediaSkipView,
                     MediaEnableView, MediaContent, TasksView, CompletedTasksView, ResetTasks,
-                    MediaServersView, AddMediaServerView, MediaServerView,
+                    TaskScheduleView, MediaServersView, AddMediaServerView, MediaServerView,
                     DeleteMediaServerView, UpdateMediaServerView)
 
 
@@ -14,104 +14,168 @@ urlpatterns = [
 
     # Dashboard URLs
 
-    path('',
-         DashboardView.as_view(),
-         name='dashboard'),
+    path(
+        '',
+        DashboardView.as_view(),
+        name='dashboard',
+    ),
 
     # Source URLs
 
-    path('sources',
-         SourcesView.as_view(),
-         name='sources'),
+    path(
+        'sources',
+        SourcesView.as_view(),
+        name='sources',
+    ),
 
-    path('source-validate/<slug:source_type>',
-         ValidateSourceView.as_view(),
-         name='validate-source'),
+    path(
+        'source-validate/<slug:source_type>',
+        ValidateSourceView.as_view(),
+        name='validate-source',
+    ),
 
-    path('source-sync-now/<uuid:pk>',
-         SourcesView.as_view(),
-         name='source-sync-now'),
+    path(
+        'source-sync-now/<uuid:pk>',
+        SourcesView.as_view(),
+        name='source-sync-now',
+    ),
 
-    path('source-add',
-         AddSourceView.as_view(),
-         name='add-source'),
+    path(
+        'source-add',
+        AddSourceView.as_view(),
+        name='add-source',
+    ),
 
-    path('source/<uuid:pk>',
-         SourceView.as_view(),
-         name='source'),
+    path(
+        'source/<uuid:pk>',
+        SourceView.as_view(),
+        name='source',
+    ),
 
-    path('source-update/<uuid:pk>',
-         UpdateSourceView.as_view(),
-         name='update-source'),
+    path(
+        'source-update/<uuid:pk>',
+        UpdateSourceView.as_view(),
+        name='update-source',
+    ),
 
-    path('source-delete/<uuid:pk>',
-         DeleteSourceView.as_view(),
-         name='delete-source'),
+    path(
+        'source-delete/<uuid:pk>',
+        DeleteSourceView.as_view(),
+        name='delete-source',
+    ),
 
     # Media URLs
 
-    path('media',
-         MediaView.as_view(),
-         name='media'),
+    path(
+        'media',
+        MediaView.as_view(),
+        name='media',
+    ),
 
-    path('media-thumb/<uuid:pk>',
-         MediaThumbView.as_view(),
-         name='media-thumb'),
+    path(
+        'media-thumb/<uuid:pk>',
+        MediaThumbView.as_view(),
+        name='media-thumb',
+    ),
 
-    path('media/<uuid:pk>',
-         MediaItemView.as_view(),
-         name='media-item'),
+    path(
+        'media/<uuid:pk>',
+        MediaItemView.as_view(),
+        name='media-item',
+    ),
 
-    path('media-redownload/<uuid:pk>',
-         MediaRedownloadView.as_view(),
-         name='redownload-media'),
+    path(
+        'media-redownload/<uuid:pk>',
+        MediaRedownloadView.as_view(),
+        name='redownload-media',
+    ),
 
-    path('media-skip/<uuid:pk>',
-         MediaSkipView.as_view(),
-         name='skip-media'),
+    path(
+        'media-thumb-redownload/<uuid:pk>',
+        MediaItemView.as_view(),
+        name='redownload-thumb',
+    ),
 
-    path('media-enable/<uuid:pk>',
-         MediaEnableView.as_view(),
-         name='enable-media'),
+    path(
+        'media-skip/<uuid:pk>',
+        MediaSkipView.as_view(),
+        name='skip-media',
+    ),
 
-    path('media-content/<uuid:pk>',
-         MediaContent.as_view(),
-         name='media-content'),
+    path(
+        'media-enable/<uuid:pk>',
+        MediaEnableView.as_view(),
+        name='enable-media',
+    ),
+
+    path(
+        'media-content/<uuid:pk>',
+        MediaContent.as_view(),
+        name='media-content',
+    ),
 
     # Task URLs
 
-    path('tasks',
-         TasksView.as_view(),
-         name='tasks'),
+    path(
+        'tasks',
+        TasksView.as_view(),
+        name='tasks',
+    ),
 
-    path('tasks-completed',
-         CompletedTasksView.as_view(),
-         name='tasks-completed'),
+    path(
+        'task/<int:pk>/schedule/now',
+        TaskScheduleView.as_view(),
+        name='run-task',
+    ),
 
-    path('tasks-reset',
-         ResetTasks.as_view(),
-         name='reset-tasks'),
+    path(
+        'task/<int:pk>/schedule/<int:timestamp>',
+        TaskScheduleView.as_view(),
+        name='schedule-task',
+    ),
+
+    path(
+        'tasks-completed',
+        CompletedTasksView.as_view(),
+        name='tasks-completed',
+    ),
+
+    path(
+        'tasks-reset',
+        ResetTasks.as_view(),
+        name='reset-tasks',
+    ),
 
     # Media Server URLs
 
-    path('mediaservers',
-         MediaServersView.as_view(),
-         name='mediaservers'),
+    path(
+        'mediaservers',
+        MediaServersView.as_view(),
+        name='mediaservers',
+    ),
 
-    path('mediaserver-add/<slug:server_type>',
-         AddMediaServerView.as_view(),
-         name='add-mediaserver'),
+    path(
+        'mediaserver-add/<slug:server_type>',
+        AddMediaServerView.as_view(),
+        name='add-mediaserver',
+    ),
 
-    path('mediaserver/<int:pk>',
-         MediaServerView.as_view(),
-         name='mediaserver'),
+    path(
+        'mediaserver/<int:pk>',
+        MediaServerView.as_view(),
+        name='mediaserver',
+    ),
 
-    path('mediaserver-delete/<int:pk>',
-         DeleteMediaServerView.as_view(),
-         name='delete-mediaserver'),
+    path(
+        'mediaserver-delete/<int:pk>',
+        DeleteMediaServerView.as_view(),
+        name='delete-mediaserver',
+    ),
 
-    path('mediaserver-update/<int:pk>',
-         UpdateMediaServerView.as_view(),
-         name='update-mediaserver'),
+    path(
+        'mediaserver-update/<int:pk>',
+        UpdateMediaServerView.as_view(),
+        name='update-mediaserver',
+    ),
 
 ]

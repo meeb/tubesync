@@ -25,6 +25,13 @@ then
     chmod -R 0755 /downloads
 fi
 
+if [ 'True' = "${TUBESYNC_DEBUG:-False}" ]
+then
+    s6-setuidgid app \
+        /usr/bin/python3 /app/manage.py \
+            showmigrations -v 3 --list
+fi
+
 # Run migrations
 exec s6-setuidgid app \
     /usr/bin/python3 /app/manage.py migrate

@@ -1,14 +1,16 @@
+from functools import partial
 from pathlib import Path
-from shutil import rmtree
 from tempfile import TemporaryDirectory
 from django.conf import settings
+from django.db import IntegrityError
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
+from django.db.transaction import on_commit
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from background_task.signals import task_failed
 from background_task.models import Task
 from common.logger import log
-from .models import Source, Media, MediaServer
+from .models import Source, Media, MediaServer, Metadata
 from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
                     download_media_thumbnail, download_media_metadata,
                     map_task_to_instance, check_source_directory_exists,
@@ -134,6 +136,7 @@ def source_post_save(sender, instance, created, **kwargs):
 def source_pre_delete(sender, instance, **kwargs):
     # Triggered before a source is deleted, delete all media objects to trigger
     # the Media models post_delete signal
+    source = instance
     log.info(f'Deactivating source: {instance.name}')
     instance.deactivate()
     log.info(f'Deleting tasks for source: {instance.name}')
@@ -141,20 +144,22 @@ def source_pre_delete(sender, instance, **kwargs):
     delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
-    # Schedule deletion of media
-    delete_task_by_source('sync.tasks.delete_all_media_for_source', instance.pk)
-    verbose_name = _('Deleting all media for source "{}"')
-    delete_all_media_for_source(
-        str(instance.pk),
-        str(instance.name),
-        verbose_name=verbose_name.format(instance.name),
-    )
-    # Try to do it all immediately
-    # If this is killed, the scheduled task should do the work instead.
-    delete_all_media_for_source.now(
-        str(instance.pk),
-        str(instance.name),
-    )
+
+    # Fetch the media source
+    sqs = Source.objects.filter(filter_text=str(source.pk))
+    if sqs.count():
+        media_source = sqs[0]
+        # Schedule deletion of media
+        delete_task_by_source('sync.tasks.delete_all_media_for_source', media_source.pk)
+        verbose_name = _('Deleting all media for source "{}"')
+        on_commit(partial(
+            delete_all_media_for_source,
+            str(media_source.pk),
+            str(media_source.name),
+            str(media_source.directory_path),
+            priority=1,
+            verbose_name=verbose_name.format(media_source.name),
+        ))
 
 
 @receiver(post_delete, sender=Source)
@@ -164,14 +169,8 @@ def source_post_delete(sender, instance, **kwargs):
     log.info(f'Deleting tasks for removed source: {source.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
     delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
-    delete_task_by_source('sync.tasks.delete_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
-    # Remove the directory, if the user requested that
-    directory_path = Path(source.directory_path)
-    if (directory_path / '.to_be_removed').is_file():
-        log.info(f'Deleting directory for: {source.name}: {directory_path}')
-        rmtree(directory_path, True)
 
 
 @receiver(task_failed, sender=Task)
@@ -207,15 +206,15 @@ def media_post_save(sender, instance, created, **kwargs):
         if not existing_media_download_task:
             # Recalculate the "can_download" flag, this may
             # need to change if the source specifications have been changed
-            if instance.metadata:
+            if media.has_metadata:
                 if instance.get_format_str():
                     if not instance.can_download:
                         instance.can_download = True
                         can_download_changed = True
-                    else:
-                        if instance.can_download:
-                            instance.can_download = False
-                            can_download_changed = True
+                else:
+                    if instance.can_download:
+                        instance.can_download = False
+                        can_download_changed = True
             # Recalculate the "skip_changed" flag
             skip_changed = filter_media(instance)
     else:
@@ -237,12 +236,12 @@ def media_post_save(sender, instance, created, **kwargs):
             )
 
     # If the media is missing metadata schedule it to be downloaded
-    if not (instance.skip or instance.metadata or existing_media_metadata_task):
+    if not (media.skip or media.has_metadata or existing_media_metadata_task):
         log.info(f'Scheduling task to download metadata for: {instance.url}')
-        verbose_name = _('Downloading metadata for "{}"')
+        verbose_name = _('Downloading metadata for: {}: "{}"')
         download_media_metadata(
             str(instance.pk),
-            verbose_name=verbose_name.format(instance.pk),
+            verbose_name=verbose_name.format(media.key, media.name),
         )
     # If the media is missing a thumbnail schedule it to be downloaded (unless we are skipping this media)
     if not instance.thumb_file_exists:
@@ -250,16 +249,25 @@ def media_post_save(sender, instance, created, **kwargs):
     if not instance.thumb and not instance.skip:
         thumbnail_url = instance.thumbnail
         if thumbnail_url:
-            log.info(f'Scheduling task to download thumbnail for: {instance.name} '
-                     f'from: {thumbnail_url}')
+            log.info(
+                'Scheduling task to download thumbnail'
+                f' for: {instance.name} from: {thumbnail_url}'
+            )
             verbose_name = _('Downloading thumbnail for "{}"')
             download_media_thumbnail(
                 str(instance.pk),
                 thumbnail_url,
                 verbose_name=verbose_name.format(instance.name),
             )
+    media_file_exists = False
+    try:
+        media_file_exists |= instance.media_file_exists
+        media_file_exists |= instance.filepath.exists()
+    except OSError as e:
+        log.exception(e)
+        pass
     # If the media has not yet been downloaded schedule it to be downloaded
-    if not (instance.media_file_exists or instance.filepath.exists() or existing_media_download_task):
+    if not (media_file_exists or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
         if instance.can_download and instance.downloaded:
             skip_changed = True != instance.skip
@@ -289,17 +297,43 @@ def media_pre_delete(sender, instance, **kwargs):
     delete_task_by_media('sync.tasks.wait_for_media_premiere', (str(instance.pk),))
     thumbnail_url = instance.thumbnail
     if thumbnail_url:
-        delete_task_by_media('sync.tasks.download_media_thumbnail',
-                             (str(instance.pk), thumbnail_url))
+        delete_task_by_media(
+            'sync.tasks.download_media_thumbnail',
+            (str(instance.pk), thumbnail_url,),
+        )
     # Remove thumbnail file for deleted media
     if instance.thumb:
         instance.thumb.delete(save=False)
+    # Save the metadata site & thumbnail URL to the metadata column
+    existing_metadata = instance.loaded_metadata
+    metadata_str = instance.metadata or '{}'
+    arg_dict = instance.metadata_loads(metadata_str)
+    site_field = instance.get_metadata_field('extractor_key')
+    thumbnail_field = instance.get_metadata_field('thumbnail')
+    arg_dict.update({
+        site_field: instance.get_metadata_first_value(
+            'extractor_key',
+            'Youtube',
+            arg_dict=existing_metadata,
+        ),
+        thumbnail_field: thumbnail_url,
+    })
+    instance.metadata = instance.metadata_dumps(arg_dict=arg_dict)
+    # Do not create more tasks before deleting
+    instance.manual_skip = True
+    instance.save()
 
 
 @receiver(post_delete, sender=Media)
 def media_post_delete(sender, instance, **kwargs):
     # Remove the video file, when configured to do so
-    if instance.source.delete_files_on_disk and instance.media_file:
+    remove_files = (
+        instance.source and
+        instance.source.delete_files_on_disk and
+        instance.downloaded and
+        instance.media_file
+    )
+    if remove_files:
         video_path = Path(str(instance.media_file.path)).resolve(strict=False)
         instance.media_file.delete(save=False)
         # the other files we created have these known suffixes
@@ -353,4 +387,59 @@ def media_post_delete(sender, instance, **kwargs):
         for file in all_related_files:
             log.info(f'Deleting file for: {instance} path: {file}')
             delete_file(file)
+
+    # Create a media entry for the indexing task to find
+    # Requirements:
+    #     source, key, duration, title, published
+    created = False
+    create_for_indexing_task = (
+        not (
+            #not instance.downloaded and
+            instance.skip and
+            instance.manual_skip
+        )
+    )
+    if create_for_indexing_task:
+        skipped_media, created = Media.objects.get_or_create(
+            key=instance.key,
+            source=instance.source,
+        )
+    if created:
+        old_metadata = instance.loaded_metadata
+        site_field = instance.get_metadata_field('extractor_key')
+        thumbnail_url = instance.thumbnail
+        thumbnail_field = instance.get_metadata_field('thumbnail')
+        skipped_media.downloaded = False
+        skipped_media.duration = instance.duration
+        arg_dict=dict(
+            _media_instance_was_deleted=True,
+        )
+        arg_dict.update({
+            site_field: old_metadata.get(site_field),
+            thumbnail_field: thumbnail_url,
+        })
+        skipped_media.metadata = skipped_media.metadata_dumps(
+            arg_dict=arg_dict,
+        )
+        skipped_media.published = instance.published
+        skipped_media.title = instance.title
+        skipped_media.skip = True
+        skipped_media.manual_skip = True
+        skipped_media.save()
+        # Re-use the old metadata if it exists
+        instance_qs = Metadata.objects.filter(
+            media__isnull=True,
+            site=old_metadata.get(site_field) or 'Youtube',
+            key=skipped_media.key,
+        )
+        try:
+            instance_qs.update(media=skipped_media)
+        except IntegrityError:
+            # Delete the new metadata
+            Metadata.objects.filter(media=skipped_media).delete()
+            try:
+                instance_qs.update(media=skipped_media)
+            except IntegrityError:
+                # Delete the old metadata if it still failed
+                instance_qs.delete()
 

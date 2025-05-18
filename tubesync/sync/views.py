@@ -1,6 +1,5 @@
 import glob
 import os
-import json
 from base64 import b64decode
 import pathlib
 import sys
@@ -20,17 +19,20 @@ from django.utils.text import slugify
 from django.utils._os import safe_join
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params
 from background_task.models import Task, CompletedTask
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
-                    SkipMediaForm, EnableMediaForm, ResetTasksForm,
+                    SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
                     ConfirmDeleteMediaServerForm)
-from .utils import validate_url, delete_file, multi_key_sort
+from .utils import validate_url, delete_file, multi_key_sort, mkdir_p
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
-                    delete_task_by_media, index_source_task, migrate_queues)
-from .choices import (Val, MediaServerType, SourceResolution,
+                    delete_task_by_media, index_source_task,
+                    download_media_thumbnail,
+                    check_source_directory_exists, migrate_queues)
+from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
                         youtube_help, youtube_validation_urls)
 from . import signals
@@ -166,6 +168,7 @@ class ValidateSourceView(FormView):
     template_name = 'sync/source-validate.html'
     form_class = ValidateSourceForm
     errors = {
+        'invalid_source': _('Invalid type for the source.'),
         'invalid_url': _('Invalid URL, the URL must for a "{item}" must be in '
                          'the format of "{example}". The error was: {error}.'),
     }
@@ -410,11 +413,39 @@ class DeleteSourceView(DeleteView, FormMixin):
     context_object_name = 'source'
 
     def post(self, request, *args, **kwargs):
+        source = self.get_object()
+        media_source = dict(
+            uuid=None,
+            index_schedule=IndexSchedule.NEVER,
+            download_media=False,
+            index_videos=False,
+            index_streams=False,
+            filter_text=str(source.pk),
+        )
+        copy_fields = set(map(lambda f: f.name, source._meta.fields)) - set(media_source.keys())
+        for k, v in source.__dict__.items():
+            if k in copy_fields:
+                media_source[k] = v
+        media_source = Source(**media_source)
         delete_media_val = request.POST.get('delete_media', False)
         delete_media = True if delete_media_val is not False else False
+        # overload this boolean for our own use
+        media_source.delete_removed_media = delete_media
+        # adjust the directory and key on the source to be deleted
+        source.directory = source.directory + '/deleted'
+        source.key = source.key + '/deleted'
+        source.name = f'[Deleting] {source.name}'
+        source.save(update_fields={'directory', 'key', 'name'})
+        source.refresh_from_db()
+        # save the new media source now that it is not a duplicate
+        media_source.uuid = None
+        media_source.save()
+        media_source.refresh_from_db()
+        # switch the media to the new source instance
+        Media.objects.filter(source=source).update(source=media_source)
         if delete_media:
-            source = self.get_object()
-            directory_path = pathlib.Path(source.directory_path)
+            directory_path = pathlib.Path(media_source.directory_path)
+            mkdir_p(directory_path)
             (directory_path / '.to_be_removed').touch(exist_ok=True)
         return super().post(request, *args, **kwargs)
 
@@ -493,6 +524,9 @@ class MediaThumbView(DetailView):
 
     def get(self, request, *args, **kwargs):
         media = self.get_object()
+        # Thumbnail media is never updated so we can ask the browser to cache it
+        # for ages, 604800 = 7 days
+        max_age = 604800
         if media.thumb_file_exists:
             thumb_path = pathlib.Path(media.thumb.path)
             thumb = thumb_path.read_bytes()
@@ -502,10 +536,10 @@ class MediaThumbView(DetailView):
             thumb = b64decode('R0lGODlhAQABAIABAP///wAAACH5BAEKAAEALAA'
                               'AAAABAAEAAAICTAEAOw==')
             content_type = 'image/gif'
+            max_age = 600
         response = HttpResponse(thumb, content_type=content_type)
-        # Thumbnail media is never updated so we can ask the browser to cache it
-        # for ages, 604800 = 7 days
-        response['Cache-Control'] = 'public, max-age=604800'
+        
+        response['Cache-Control'] = f'public, max-age={max_age}'
         return response
 
 
@@ -517,6 +551,7 @@ class MediaItemView(DetailView):
     template_name = 'sync/media-item.html'
     model = Media
     messages = {
+        'thumbnail': _('Thumbnail has been scheduled to redownload'),
         'redownloading': _('Media file has been deleted and scheduled to redownload'),
         'skipped': _('Media file has been deleted and marked to never download'),
         'enabled': _('Media has been re-enabled and will be downloaded'),
@@ -551,6 +586,24 @@ class MediaItemView(DetailView):
         data['filename_path'] = pathlib.Path(self.object.filename)
         data['media_file_path'] = pathlib.Path(self.object.media_file.path) if self.object.media_file else None
         return data
+
+    def get(self, *args, **kwargs):
+        if args[0].path.startswith("/media-thumb-redownload/"):
+            media = Media.objects.get(pk=kwargs["pk"])
+            if media is None:
+                return HttpResponseNotFound()
+
+            verbose_name = _('Redownload thumbnail for "{}": {}')
+            download_media_thumbnail(
+                str(media.pk),
+                media.thumbnail,
+                verbose_name=verbose_name.format(media.key, media.name),
+            )
+            url = reverse_lazy('sync:media-item', kwargs={'pk': media.pk})
+            url = append_uri_params(url, {'message': 'thumbnail'})
+            return HttpResponseRedirect(url)
+        else:
+            return super().get(self, *args, **kwargs)
 
 
 class MediaRedownloadView(FormView, SingleObjectMixin):
@@ -635,7 +688,7 @@ class MediaSkipView(FormView, SingleObjectMixin):
             for file in all_related_files:
                 delete_file(file)
         # Reset all download data
-        self.object.metadata = None
+        self.object.metadata_clear()
         self.object.downloaded = False
         self.object.downloaded_audio_codec = None
         self.object.downloaded_video_codec = None
@@ -952,6 +1005,91 @@ class ResetTasks(FormView):
         return append_uri_params(url, {'message': 'reset'})
 
 
+class TaskScheduleView(FormView, SingleObjectMixin):
+    '''
+        Confirm that the task should be re-scheduled.
+    '''
+
+    template_name = 'sync/task-schedule.html'
+    form_class = ScheduleTaskForm
+    model = Task
+    errors = dict(
+        invalid_when=_('The type ({}) was incorrect.'),
+        when_before_now=_('The date and time must be in the future.'),
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.now = timezone.now()
+        self.object = None
+        self.timestamp = None
+        self.when = None
+        super().__init__(*args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        self.now = timezone.now()
+        self.object = self.get_object()
+        self.timestamp = kwargs.get('timestamp')
+        try:
+            self.when = timestamp_to_datetime(self.timestamp)
+        except AssertionError:
+            self.when = None
+        if self.when is None:
+            self.when = self.now
+        # Use the next minute and zero seconds
+        # The web browser does not select seconds by default
+        self.when = self.when.replace(second=0) + timezone.timedelta(minutes=1)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['now'] = self.now
+        initial['when'] = self.when
+        return initial
+
+    def get_context_data(self, *args, **kwargs):
+        data = super().get_context_data(*args, **kwargs)
+        data['now'] = self.now
+        data['when'] = self.when
+        return data
+
+    def get_success_url(self):
+        return append_uri_params(
+            reverse_lazy('sync:tasks'),
+            dict(
+                message='scheduled',
+                pk=str(self.object.pk),
+            ),
+        )
+
+    def form_valid(self, form):
+        max_attempts = getattr(settings, 'MAX_ATTEMPTS', 15)
+        when = form.cleaned_data.get('when')
+  
+        if not isinstance(when, self.now.__class__):
+            form.add_error(
+                'when',
+                ValidationError(
+                    self.errors['invalid_when'].format(
+                        type(when),
+                    ),
+                ),
+            )
+        if when < self.now:
+            form.add_error(
+                'when',
+                ValidationError(self.errors['when_before_now']),
+            )
+
+        if form.errors:
+            return super().form_invalid(form)
+
+        self.object.attempts = max_attempts // 2
+        self.object.run_at = max(self.now, when)
+        self.object.save()
+
+        return super().form_valid(form)
+
+
 class MediaServersView(ListView):
     '''
         List of media servers which have been added.
@@ -1014,14 +1152,14 @@ class AddMediaServerView(FormView):
     def form_valid(self, form):
         # Assign mandatory fields, bundle other fields into options
         mediaserver = MediaServer(server_type=self.server_type)
-        options = {}
+        options = dict()
         model_fields = [field.name for field in MediaServer._meta.fields]
         for field_name, field_value in form.cleaned_data.items():
             if field_name in model_fields:
                 setattr(mediaserver, field_name, field_value)
             else:
                 options[field_name] = field_value
-        mediaserver.options = json.dumps(options)
+        mediaserver.options = options
         # Test the media server details are valid
         try:
             mediaserver.validate()
@@ -1128,21 +1266,21 @@ class UpdateMediaServerView(FormView, SingleObjectMixin):
         for field in self.object._meta.fields:
             if field.name in self.form_class.declared_fields:
                 initial[field.name] = getattr(self.object, field.name)
-        for option_key, option_val in self.object.loaded_options.items():
+        for option_key, option_val in self.object.options.items():
             if option_key in self.form_class.declared_fields:
                 initial[option_key] = option_val
         return initial
 
     def form_valid(self, form):
         # Assign mandatory fields, bundle other fields into options
-        options = {}
+        options = dict()
         model_fields = [field.name for field in MediaServer._meta.fields]
         for field_name, field_value in form.cleaned_data.items():
             if field_name in model_fields:
                 setattr(self.object, field_name, field_value)
             else:
                 options[field_name] = field_value
-        self.object.options = json.dumps(options)
+        self.object.options = options
         # Test the media server details are valid
         try:
             self.object.validate()

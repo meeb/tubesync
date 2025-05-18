@@ -20,7 +20,7 @@ from .utils import mkdir_p
 import yt_dlp
 import yt_dlp.patch.check_thumbnails
 import yt_dlp.patch.fatal_http_errors
-from yt_dlp.utils import remove_end, OUTTMPL_TYPES
+from yt_dlp.utils import remove_end, shell_quote, OUTTMPL_TYPES
 
 
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
@@ -198,6 +198,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'clean_infojson': False,
         'daterange': yt_dlp.utils.DateRange(start=start),
         'extractor_args': {
+            'youtube': {'formats': ['missing_pot']},
             'youtubetab': {'approximate_date': ['true']},
         },
         'outtmpl': outtmpl,
@@ -205,10 +206,14 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'paths': paths,
         'postprocessors': postprocessors,
         'skip_unavailable_fragments': False,
-        'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
+        'sleep_interval_requests': 1,
         'verbose': True if settings.DEBUG else False,
         'writeinfojson': True,
     })
+    if settings.BACKGROUND_TASK_RUN_ASYNC:
+        opts.update({
+            'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
+        })
     if start:
         log.debug(f'get_media_info: used date range: {opts["daterange"]} for URL: {url}')
     response = {}
@@ -310,11 +315,36 @@ def download_media(
     if extension in audio_exts:
         pp_opts.extractaudio = True
         pp_opts.nopostoverwrites = False
+        # The ExtractAudio post processor can change the extension.
+        # This post processor is to change the final filename back
+        # to what we are expecting it to be.
+        final_path = Path(output_file)
+        try:
+            final_path = final_path.resolve(strict=True)
+        except FileNotFoundError:
+            # This is very likely the common case
+            final_path = Path(output_file).resolve(strict=False)
+        expected_file = shell_quote(str(final_path))
+        cmds = pp_opts.exec_cmd.get('after_move', list())
+        # It is important that we use a tuple for strings.
+        # Otherwise, list adds each character instead.
+        # That last comma is really necessary!
+        cmds += (
+            f'test -f {expected_file} || '
+            'mv -T -u -- %(filepath,_filename|)q '
+            f'{expected_file}',
+        )
+        # assignment is the quickest way to cover both 'get' cases
+        pp_opts.exec_cmd['after_move'] = cmds
+    elif '+' not in media_format:
+        pp_opts.remuxvideo = extension
 
     ytopts = {
         'format': media_format,
+        'final_ext': extension,
         'merge_output_format': extension,
         'outtmpl': os.path.basename(output_file),
+        'remuxvideo': pp_opts.remuxvideo,
         'quiet': False if settings.DEBUG else True,
         'verbose': True if settings.DEBUG else False,
         'noprogress': None if settings.DEBUG else True,
@@ -329,6 +359,7 @@ def download_media(
         'sleep_interval': 10,
         'max_sleep_interval': min(20*60, max(60, settings.DOWNLOAD_MEDIA_DELAY)),
         'sleep_interval_requests': 1 + (2 * settings.BACKGROUND_TASK_ASYNC_THREADS),
+        'extractor_args': opts.get('extractor_args', dict()),
         'paths': opts.get('paths', dict()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),
         'postprocessor_hooks': opts.get('postprocessor_hooks', list()),
@@ -350,6 +381,18 @@ def download_media(
     ytopts['paths'].update({
         'home': str(output_dir),
         'temp': str(temp_dir_path),
+    })
+
+    # Allow download of formats that tested good with 'missing_pot'
+    youtube_ea_dict = ytopts['extractor_args'].get('youtube', dict())
+    formats_list = youtube_ea_dict.get('formats', list())
+    if 'missing_pot' not in formats_list:
+        formats_list += ('missing_pot',)
+        youtube_ea_dict.update({
+            'formats': formats_list,
+        })
+    ytopts['extractor_args'].update({
+        'youtube': youtube_ea_dict,
     })
 
     postprocessor_hook_func = postprocessor_hook.get('function', None)
@@ -376,6 +419,15 @@ def download_media(
         ytopts['postprocessor_args'].update({
             'modifychapters+ffmpeg': codec_options,
         })
+
+    # Provide the user control of 'overwrites' in the post processors.
+    pp_opts.overwrites = opts.get(
+        'overwrites',
+        ytopts.get(
+            'overwrites',
+            default_opts.overwrites,
+        ),
+    )
 
     # Create the post processors list.
     # It already included user configured post processors as well.

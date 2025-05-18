@@ -24,6 +24,7 @@ FROM debian:${DEBIAN_VERSION} AS tubesync-base
 ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND="noninteractive" \
+    APT_KEEP_ARCHIVES=1 \
     HOME="/root" \
     LANGUAGE="en_US.UTF-8" \
     LANG="en_US.UTF-8" \
@@ -39,16 +40,45 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     rm -f /var/cache/apt/*cache.bin ; \
     # Update from the network and keep cache
     rm -f /etc/apt/apt.conf.d/docker-clean ; \
+    # Do not generate more /var/cache/apt/*cache.bin files
+    # hopefully soon, this will be included in Debian images
+    printf -- >| /etc/apt/apt.conf.d/docker-disable-pkgcache \
+        'Dir::Cache::%spkgcache "";\n' '' src ; \
+	chmod a+r /etc/apt/apt.conf.d/docker-disable-pkgcache ; \
     set -x && \
     apt-get update && \
     # Install locales
+    LC_ALL='C.UTF-8' LANG='C.UTF-8' LANGUAGE='C.UTF-8' \
     apt-get -y --no-install-recommends install locales && \
+    # localedef -v -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8 && \
     printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
-    locale-gen en_US.UTF-8 && \
+    locale-gen && \
     # Clean up
     apt-get -y autopurge && \
     apt-get -y autoclean && \
     rm -f /var/cache/debconf/*.dat-old
+
+FROM alpine:${ALPINE_VERSION} AS openresty-debian
+ARG TARGETARCH
+ARG DEBIAN_VERSION
+ADD 'https://openresty.org/package/pubkey.gpg' '/downloaded/pubkey.gpg'
+RUN set -eu ; \
+    decide_arch() { \
+        case "${TARGETARCH}" in \
+            (amd64) printf -- '' ;; \
+            (arm64) printf -- 'arm64/' ;; \
+        esac ; \
+    } ; \
+    set -x ; \
+    mkdir -v -p '/etc/apt/trusted.gpg.d' && \
+    apk --no-cache --no-progress add cmd:gpg2 && \
+    gpg2 --dearmor \
+        -o '/etc/apt/trusted.gpg.d/openresty.gpg' \
+        < '/downloaded/pubkey.gpg' && \
+    mkdir -v -p '/etc/apt/sources.list.d' && \
+    printf -- >| '/etc/apt/sources.list.d/openresty.list' \
+        'deb http://openresty.org/package/%sdebian %s openresty' \
+        "$(decide_arch)" "${DEBIAN_VERSION%-slim}"
 
 FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -215,21 +245,22 @@ RUN set -eu ; \
       case "${arg1}" in \
         (amd64) printf -- 'x86_64' ;; \
         (arm64) printf -- 'aarch64' ;; \
-        (armv7l) printf -- 'arm' ;; \
+        (arm|armv7l) printf -- 'armhf' ;; \
         (*) printf -- '%s' "${arg1}" ;; \
       esac ; \
       unset -v arg1 ; \
     } ; \
 \
+    file_ext="${CHECKSUM_ALGORITHM}" ; \
     apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" ; \
     mkdir -v /verified ; \
     cd /downloaded ; \
-    for f in *.sha256 ; \
+    for f in *."${file_ext}" ; \
     do \
       "${CHECKSUM_ALGORITHM}sum" --check --warn --strict "${f}" || exit ; \
-      ln -v "${f%.sha256}" /verified/ || exit ; \
+      ln -v "${f%.${file_ext}}" /verified/ || exit ; \
     done ; \
-    unset -v f ; \
+    unset -v f file_ext ; \
 \
     S6_ARCH="$(decide_arch "${TARGETARCH}")" ; \
     set -x ; \
@@ -248,7 +279,38 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
-FROM tubesync-base AS tubesync
+FROM tubesync-base AS tubesync-openresty
+
+COPY --from=openresty-debian \
+    /etc/apt/trusted.gpg.d/openresty.gpg /etc/apt/trusted.gpg.d/openresty.gpg
+COPY --from=openresty-debian \
+    /etc/apt/sources.list.d/openresty.list /etc/apt/sources.list.d/openresty.list
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+  set -x && \
+  apt-get update && \
+  apt-get -y --no-install-recommends install nginx-common openresty && \
+  # Clean up
+  apt-get -y autopurge && \
+  apt-get -y autoclean && \
+  rm -v -f /var/cache/debconf/*.dat-old
+
+FROM tubesync-base AS tubesync-nginx
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+  set -x && \
+  apt-get update && \
+  apt-get -y --no-install-recommends install nginx-light && \
+  # openresty binary should still work
+  ln -v -s -T ../sbin/nginx /usr/bin/openresty && \
+  # Clean up
+  apt-get -y autopurge && \
+  apt-get -y autoclean && \
+  rm -v -f /var/cache/debconf/*.dat-old
+
+FROM tubesync-openresty AS tubesync
 
 ARG S6_VERSION
 
@@ -273,7 +335,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libmariadb3 \
   libpq5 \
   libwebp7 \
-  nginx-light \
   pipenv \
   pkgconf \
   python3 \
@@ -397,7 +458,7 @@ RUN set -x && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video && \
   # Check nginx configuration copied from config/root/etc
-  nginx -t && \
+  openresty -c /etc/nginx/nginx.conf -e stderr -t && \
   # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
