@@ -1,4 +1,4 @@
-from ..choices import Val, YouTube_SourceType
+from ..choices import Val, YouTube_SourceType # noqa
 
 
 _srctype_dict = lambda n: dict(zip( YouTube_SourceType.values, (n,) * len(YouTube_SourceType.values) ))
