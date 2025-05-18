@@ -28,7 +28,7 @@ from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import ( NoFormatException, NoMediaException,
-                            NoMetadataException, NoThumbnailException,
+                            NoThumbnailException,
                             DownloadFailedException, )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, )
