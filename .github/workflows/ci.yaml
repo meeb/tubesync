@@ -109,11 +109,46 @@ jobs:
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/yt_dlp/ patches/yt_dlp/*
           cd tubesync && python3 -B manage.py collectstatic --no-input --link
       - name: Check with ruff
-        continue-on-error: true
+        continue-on-error: false
         run: |
-          cd tubesync && uvx ruff check --output-format github \
-            --target-version py310 --isolated \
-            --ignore E701,E722,E731
+          target_version='py310'
+          ignore_csv_list='E701,E722,E731'
+          cd tubesync
+          # output formats:
+          # "full" | "concise" | "grouped" |
+          # "json" | "junit" | "github" | "gitlab" |
+          # "pylint" | "azure"
+          {
+              echo '## Output from `ruff check` for `tubesync`'
+              echo ''
+              echo '### Formats'
+              echo ''
+              for fmt in full concise grouped pylint
+              do
+              echo '<details>'
+              echo '<summary>'"${fmt}"'</summary>'
+              echo ''
+              echo '#### '"${fmt}"' output format'
+              echo ''
+              echo '```'
+              uvx --no-config --no-managed-python --no-progress --isolated \
+                  ruff check --exit-zero \
+                  --target-version "${target_version}" \
+                  --output-format "${fmt}" \
+                  --extend-select RUF100 \
+                  --ignore "${ignore_csv_list}"
+              echo ''
+              echo '```'
+              echo ''
+              echo '</details>'
+              echo ''
+              done
+          } >> "${GITHUB_STEP_SUMMARY}"
+          uvx --no-config --no-managed-python --no-progress --isolated \
+              ruff check --exit-zero \
+              --target-version "${target_version}" \
+              --output-format github \
+              --ignore "${ignore_csv_list}"
       - name: Run Django tests
         run: cd tubesync && python3 -B -W default manage.py test --verbosity=2
 
