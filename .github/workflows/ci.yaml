@@ -119,11 +119,12 @@ jobs:
               echo '## Output from `ruff check` for `tubesync`'
               echo ''
               echo '### Formats'
+              echo ''
               for fmt in full concise grouped pylint
               do
               echo '<details>'
               echo '<summary>'"${fmt}"'</summary>'
-              echo '#### '"${fmt}"' output format'
+              echo '### '"${fmt}"' output format'
               echo ''
               echo '```'
               uvx --no-config --no-managed-python --no-progress --isolated \
