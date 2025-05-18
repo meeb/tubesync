@@ -1,4 +1,6 @@
+from datetime import datetime
 from django.core.serializers.json import DjangoJSONEncoder
+from yt_dlp.utils import LazyList
 
 
 class JSONEncoder(DjangoJSONEncoder):
@@ -13,4 +15,12 @@ class JSONEncoder(DjangoJSONEncoder):
         else:
             return list(iterable)
         return super().default(obj)
+
+
+def json_serial(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, LazyList):
+        return list(obj)
+    raise TypeError(f'Type {type(obj)} is not json_serial()-able')
 

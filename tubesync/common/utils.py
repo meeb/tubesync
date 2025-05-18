@@ -6,10 +6,8 @@ import os
 import pstats
 import string
 import time
-from datetime import datetime
 from django.core.paginator import Paginator
 from urllib.parse import urlunsplit, urlencode, urlparse
-from yt_dlp.utils import LazyList
 from .errors import DatabaseConnectionError
 
 
@@ -167,14 +165,6 @@ def clean_emoji(s):
     if not isinstance(s, str):
         raise ValueError(f'parameter must be a str, got {type(s)}')
     return emoji.replace_emoji(s)
-
-
-def json_serial(obj):
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-    if isinstance(obj, LazyList):
-        return list(obj)
-    raise TypeError(f'Type {type(obj)} is not json_serial()-able')
 
 
 def time_func(func):

@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.logger import log
 from common.errors import NoFormatException
+from common.json import JSONEncoder
 from common.utils import (
     clean_filename, clean_emoji,
 )
@@ -577,14 +578,13 @@ class Media(models.Model):
 
 
     def metadata_dumps(self, arg_dict=dict()):
-        from common.utils import json_serial
         fallback = dict()
         try:
             fallback.update(self.new_metadata.with_formats)
         except ObjectDoesNotExist:
             pass
         data = arg_dict or fallback
-        return json.dumps(data, separators=(',', ':'), default=json_serial)
+        return json.dumps(data, separators=(',', ':'), cls=JSONEncoder)
 
 
     def metadata_loads(self, arg_str='{}'):
