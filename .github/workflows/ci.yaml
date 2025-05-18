@@ -127,14 +127,16 @@ jobs:
               echo ''
               echo '#### '"${fmt}"' output format'
               echo ''
-              echo '```'
+              case "${fmt}" in (full) echo '```' ;; esac
               uvx --no-config --no-managed-python --no-progress --isolated \
                   ruff check --exit-zero \
                   --target-version py310 \
                   --output-format "${fmt}" \
                   --extend-select RUF100 \
                   --ignore E701,E722,E731
-              echo '```'
+              echo ''
+              case "${fmt}" in (full) echo '```' ;; esac
+              echo ''
               echo '</details>'
               echo ''
               done
