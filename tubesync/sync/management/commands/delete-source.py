@@ -1,16 +1,15 @@
-import os
 import uuid
-from django.utils.translation import gettext_lazy as _
 from django.core.management.base import BaseCommand, CommandError
 from django.db.transaction import atomic
+from django.utils.translation import gettext_lazy as _
 from common.logger import log
-from sync.models import Source, Media, MediaServer
+from sync.models import Source
 from sync.tasks import schedule_media_servers_update
 
 
 class Command(BaseCommand):
 
-    help = _('Deletes a source by UUID')
+    help = 'Deletes a source by UUID'
 
     def add_arguments(self, parser):
         parser.add_argument('--source', action='store', required=True, help=_('Source UUID'))
