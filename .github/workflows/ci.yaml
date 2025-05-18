@@ -116,16 +116,26 @@ jobs:
           # "json" | "junit" | "github" | "gitlab" |
           # "pylint" | "azure"
           {
-              echo '# Output from `ruff check` for `tubesync`'
+              echo '## Output from `ruff check` for `tubesync`'
               echo ''
-              echo '## pylint format'
+              echo '### Formats'
+              for fmt in full concise grouped pylint
+              do
+              echo '<details>'
+              echo '<summary>'"${fmt}"'</summary>'
+              echo '#### '"${fmt}"' output format'
               echo ''
+              echo '```'
               uvx --no-config --no-managed-python --no-progress --isolated \
                   ruff check --exit-zero \
                   --target-version py310 \
-                  --output-format pylint \
+                  --output-format "${fmt}" \
                   --extend-select RUF100 \
                   --ignore E701,E722,E731
+              echo '```'
+              echo '</details>'
+              echo ''
+              done
           } >> "${GITHUB_STEP_SUMMARY}"
           uvx --no-config --no-managed-python --no-progress --isolated \
               ruff check --exit-zero \
