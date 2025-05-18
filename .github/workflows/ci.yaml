@@ -99,10 +99,11 @@ jobs:
           #PIPENV_VERBOSITY=64 pipenv lock
           #PIPENV_VERBOSITY=64 pipenv requirements > requirements.txt
           #cat -v -n requirements.txt
+          PIPENV_VERBOSITY=64 pipenv install --system --skip-lock
+          pipenv lock
+          pipenv requirements
           #uv --no-config --no-managed-python --no-progress -v \
           #  pip install --system --strict --requirements requirements.txt
-          PIPENV_VERBOSITY=64 pipenv install --system
-          pipenv requirements
       - name: Set up Django environment
         run: |
           cp -v -p tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
