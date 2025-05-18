@@ -6,7 +6,6 @@
 
 import os
 import json
-import math
 import random
 import requests
 import time
@@ -14,9 +13,8 @@ import uuid
 from io import BytesIO
 from hashlib import sha1
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import timedelta
 from shutil import copyfile, rmtree
-from PIL import Image
 from django import db
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -30,13 +28,13 @@ from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import ( NoFormatException, NoMediaException,
-                            NoMetadataException, NoThumbnailException,
+                            NoThumbnailException,
                             DownloadFailedException, )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, )
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer
-from .utils import ( get_remote_image, resize_image_to_height, delete_file,
+from .utils import ( get_remote_image, resize_image_to_height,
                     write_text_file, filter_response, )
 from .youtube import YouTubeError
 
@@ -226,7 +224,7 @@ def save_model(instance):
 @atomic(durable=False)
 def schedule_media_servers_update():
     # Schedule a task to update media servers
-    log.info(f'Scheduling media server updates')
+    log.info('Scheduling media server updates')
     verbose_name = _('Request media server rescan for "{}"')
     for mediaserver in MediaServer.objects.all():
         rescan_media_server(
@@ -417,7 +415,7 @@ def download_source_images(source_id):
     log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
         f'Banner: {banner}')
-    if banner != None:
+    if banner is not None:
         url = banner
         i = get_remote_image(url)
         image_file = BytesIO()
@@ -433,7 +431,7 @@ def download_source_images(source_id):
                 f.write(django_file.read())
         i = image_file = None
 
-    if avatar != None:
+    if avatar is not None:
         url = avatar
         i = get_remote_image(url)
         image_file = BytesIO()
@@ -846,7 +844,7 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
     assert source_directory
     try:
         source = Source.objects.get(pk=source_id)
-    except Source.DoesNotExist as e:
+    except Source.DoesNotExist:
         # Task triggered but the source no longer exists, do nothing
         log.warn(f'Task delete_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')

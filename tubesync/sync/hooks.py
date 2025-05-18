@@ -1,9 +1,7 @@
 import os
-import yt_dlp
 
 from common.logger import log
 from common.utils import remove_enclosed
-from django.conf import settings
 
 
 progress_hook = {

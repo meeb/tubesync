@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.urls import path
 from django.views.generic.base import RedirectView
-from django.views.generic import TemplateView
 from django.http import HttpResponse
 from .views import error403, error404, error500, HealthCheckView
 

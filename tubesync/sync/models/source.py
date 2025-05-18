@@ -510,7 +510,7 @@ class Source(db.models.Model):
     def get_example_media_format(self):
         try:
             return self.media_format.format(**self.example_media_format_dict)
-        except Exception as e:
+        except Exception:
             return ''
 
     def is_regex_match(self, media_item_title):
