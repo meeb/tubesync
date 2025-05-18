@@ -96,7 +96,7 @@ jobs:
           python -m pip install uv
           uv --no-config --no-managed-python --no-progress \
             pip install --system --strict pipenv
-          pipenv lock
+          #pipenv lock
           pipenv requirements | tee requirements.txt
           #PIPENV_VERBOSITY=64 pipenv install --system --skip-lock
           uv --no-config --no-managed-python --no-progress \
