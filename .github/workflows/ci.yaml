@@ -110,6 +110,8 @@ jobs:
       - name: Check with ruff
         continue-on-error: false
         run: |
+          target_version='py310'
+          ignore_csv_list='E701,E722,E731'
           cd tubesync
           # output formats:
           # "full" | "concise" | "grouped" |
@@ -130,10 +132,10 @@ jobs:
               echo '```'
               uvx --no-config --no-managed-python --no-progress --isolated \
                   ruff check --exit-zero \
-                  --target-version py310 \
+                  --target-version "${target_version}" \
                   --output-format "${fmt}" \
                   --extend-select RUF100 \
-                  --ignore E701,E722,E731
+                  --ignore "${ignore_csv_list}"
               echo ''
               echo '```'
               echo ''
@@ -143,9 +145,9 @@ jobs:
           } >> "${GITHUB_STEP_SUMMARY}"
           uvx --no-config --no-managed-python --no-progress --isolated \
               ruff check --exit-zero \
-              --target-version py310 \
+              --target-version "${target_version}" \
               --output-format github \
-              --ignore E701,E722,E731
+              --ignore "${ignore_csv_list}"
       - name: Run Django tests
         run: cd tubesync && python3 -B -W default manage.py test --verbosity=2
 
