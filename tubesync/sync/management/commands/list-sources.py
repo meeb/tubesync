@@ -1,7 +1,6 @@
-import os
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand, CommandError # noqa
 from common.logger import log
-from sync.models import Source, Media, MediaServer
+from sync.models import Source
 
 
 class Command(BaseCommand):
