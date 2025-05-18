@@ -124,7 +124,8 @@ jobs:
               do
               echo '<details>'
               echo '<summary>'"${fmt}"'</summary>'
-              echo '### '"${fmt}"' output format'
+              echo ''
+              echo '#### '"${fmt}"' output format'
               echo ''
               echo '```'
               uvx --no-config --no-managed-python --no-progress --isolated \
