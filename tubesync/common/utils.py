@@ -169,14 +169,6 @@ def clean_emoji(s):
     return emoji.replace_emoji(s)
 
 
-def json_serial(obj):
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-    if isinstance(obj, LazyList):
-        return list(obj)
-    raise TypeError(f'Type {type(obj)} is not json_serial()-able')
-
-
 def time_func(func):
     def wrapper(*args, **kwargs):
         start = time.perf_counter()
