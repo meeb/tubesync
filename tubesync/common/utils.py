@@ -6,10 +6,8 @@ import os
 import pstats
 import string
 import time
-from datetime import datetime
 from django.core.paginator import Paginator
 from urllib.parse import urlunsplit, urlencode, urlparse
-from yt_dlp.utils import LazyList
 from .errors import DatabaseConnectionError
 
 
