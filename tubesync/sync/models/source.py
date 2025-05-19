@@ -536,7 +536,7 @@ class Source(db.models.Model):
         '''
             Index the media source returning a queue of media metadata as dicts.
         '''
-        entries = queue(list(), settings.get('MAX_ENTRIES_PROCESSING', 0) or None)
+        entries = queue(list(), getattr(settings, 'MAX_ENTRIES_PROCESSING', 0) or None)
         if self.index_videos:
             entries.extend(reversed(self.get_index('videos')))
 
