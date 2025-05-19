@@ -122,7 +122,7 @@ def get_error_message(task):
 def update_task_status(task, status):
     if not task:
         return False
-    if not task._verbose_name:
+    if not hasattr(task, '_verbose_name'):
         task._verbose_name = remove_enclosed(
             task.verbose_name, '[', ']', ' ',
         )
