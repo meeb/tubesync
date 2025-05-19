@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+from collections import deque
 from pathlib import Path
 from django import db
 from django.conf import settings
@@ -533,17 +534,20 @@ class Source(db.models.Model):
 
     def index_media(self):
         '''
-            Index the media source returning a list of media metadata as dicts.
+            Index the media source returning a queue of media metadata as dicts.
         '''
-        entries = list()
+        entries = deque(list(), settings.get('MAX_ENTRIES_PROCESSING', 0) or None)
         if self.index_videos:
             entries.extend(self.get_index('videos'))
+
         # Playlists do something different that I have yet to figure out
         if not self.is_playlist:
             if self.index_streams:
-                entries.extend(self.get_index('streams'))
+                streams = self.get_index('streams')
+                # do not allow streams to consume all of the queue
+                if entries.maxlen and entries.maxlen <= len(streams):
+                    streams = streams[-1 * ( entries.maxlen // 2 ) :]
+                entries.extend(reversed(streams))
 
-        if settings.MAX_ENTRIES_PROCESSING:
-            entries = entries[:settings.MAX_ENTRIES_PROCESSING]
         return entries
 
