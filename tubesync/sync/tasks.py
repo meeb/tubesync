@@ -848,8 +848,7 @@ def wait_for_media_premiere(media_id):
         
         if hours:
             task = get_media_premiere_task(media_id)
-            if task:
-                update_task_status(task, f'available in {hours} hours')
+            update_task_status(task, f'available in {hours} hours')
         save_model(media)
 
 
