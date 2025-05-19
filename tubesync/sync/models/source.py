@@ -538,21 +538,21 @@ class Source(db.models.Model):
         '''
         entries = queue(list(), settings.get('MAX_ENTRIES_PROCESSING', 0) or None)
         if self.index_videos:
-            entries.extend(self.get_index('videos'))
+            entries.extend(reversed(self.get_index('videos')))
 
         # Playlists do something different that I have yet to figure out
         if not self.is_playlist:
             if self.index_streams:
                 streams = self.get_index('streams')
                 if entries.maxlen is None or 0 == len(entries):
-                    entries.extend(streams)
+                    entries.extend(reversed(streams))
                 else:
                     # share the queue between streams and videos
                     allowed_streams = max(
                         entries.maxlen // 2,
                         entries.maxlen - len(entries),
                     )
-                    entries.extend(streams[-1 * allowed_streams :])
+                    entries.extend(reversed(streams[-1 * allowed_streams :]))
 
         return entries
 
