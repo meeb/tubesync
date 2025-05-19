@@ -49,6 +49,7 @@ def download_checklist(self, skip_checks=False):
                      f'the source has a download cap and the media is now too old, '
                      f'not downloading')
             return False
+    return True
 
 
 def download_finished(self, format_str, container, downloaded_filepath=None):

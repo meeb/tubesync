@@ -634,6 +634,8 @@ def download_media(media_id, override=False):
         raise InvalidTaskError(_('no such media')) from e
     else:
         if not media.download_checklist(override):
+            # any condition that needs to reschedule the task
+            # should raise an exception to avoid this
             return
 
     filepath = media.filepath
