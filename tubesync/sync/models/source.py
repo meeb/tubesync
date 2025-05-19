@@ -544,10 +544,15 @@ class Source(db.models.Model):
         if not self.is_playlist:
             if self.index_streams:
                 streams = self.get_index('streams')
-                # do not allow streams to consume all of the queue
-                if entries.maxlen and entries.maxlen <= len(streams):
-                    streams = streams[-1 * ( entries.maxlen // 2 ) :]
-                entries.extend(reversed(streams))
+                if entries.maxlen is None or 0 == len(entries):
+                    entries.extend(streams)
+                else:
+                    # share the queue between streams and videos
+                    allowed_streams = max(
+                        entries.maxlen // 2,
+                        entries.maxlen - len(entries),
+                    )
+                    entries.extend(streams[-1 * allowed_streams :])
 
         return entries
 
