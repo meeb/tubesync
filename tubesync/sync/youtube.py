@@ -335,13 +335,10 @@ def download_media(
             final_path = Path(output_file).resolve(strict=False)
         expected_file = shell_quote(str(final_path))
         cmds = pp_opts.exec_cmd.get('after_move', list())
-        # It is important that we use a tuple for strings.
-        # Otherwise, list adds each character instead.
-        # That last comma is really necessary!
-        cmds += (
+        cmds.append(
             f'test -f {expected_file} || '
             'mv -T -u -- %(filepath,_filename|)q '
-            f'{expected_file}',
+            f'{expected_file}'
         )
         # assignment is the quickest way to cover both 'get' cases
         pp_opts.exec_cmd['after_move'] = cmds
@@ -396,7 +393,7 @@ def download_media(
     youtube_ea_dict = ytopts['extractor_args'].get('youtube', dict())
     formats_list = youtube_ea_dict.get('formats', list())
     if 'missing_pot' not in formats_list:
-        formats_list += ('missing_pot',)
+        formats_list.append('missing_pot')
         youtube_ea_dict.update({
             'formats': formats_list,
         })
