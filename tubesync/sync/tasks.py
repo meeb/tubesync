@@ -615,7 +615,7 @@ def download_media(media_id, override=False):
         raise InvalidTaskError(_('no such media')) from e
     else:
         if not media.download_checklist(override):
-            return
+            raise Exception('media download not ready')
 
     filepath = media.filepath
     container = format_str = None
