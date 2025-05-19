@@ -316,7 +316,10 @@ def index_source_task(source_id):
             end=task.verbose_name.find('Index'),
         )
     tvn_format = '{:,}' + f'/{num_videos:,}'
-    for vn, video in enumerate(videos, start=1):
+    vn = 0
+    while len(videos) > 0:
+        vn += 1
+        video = videos.popleft()
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
         if not key:
