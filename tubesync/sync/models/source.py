@@ -527,8 +527,8 @@ class Source(db.models.Model):
             days = timezone.timedelta(seconds=self.download_cap).days
         response = indexer(self.get_index_url(type=type), days=days)
         if not isinstance(response, dict):
-            return []
-        entries = response.get('entries', []) 
+            return list()
+        entries = response.get('entries', list()) 
         return entries
 
     def index_media(self):
@@ -537,11 +537,11 @@ class Source(db.models.Model):
         '''
         entries = list()
         if self.index_videos:
-            entries += self.get_index('videos')
+            entries.extend(self.get_index('videos'))
         # Playlists do something different that I have yet to figure out
         if not self.is_playlist:
             if self.index_streams:
-                entries += self.get_index('streams')
+                entries.extend(self.get_index('streams'))
 
         if settings.MAX_ENTRIES_PROCESSING:
             entries = entries[:settings.MAX_ENTRIES_PROCESSING]
