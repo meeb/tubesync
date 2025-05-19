@@ -458,6 +458,12 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     pipenv install --system --skip-lock && \
+  # remove the getpot_bgutil_script plugin
+  find /usr/local/lib \
+  -name 'getpot_bgutil_script.py' \
+  -path '*/yt_dlp_plugins/extractor/getpot_bgutil_script.py' \
+  -type f -print -delete \
+  && \
   # Clean up
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
