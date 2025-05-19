@@ -233,6 +233,21 @@ def schedule_media_servers_update():
         )
 
 
+def wait_for_errors(media, /, tn='sync.tasks.download_media_metadata'):
+    window = timezone.timedelta(hours=3) + timezone.now()
+    tqs = Task.objects.filter(
+        task_name=tn,
+        attempts__gt=0,
+        locked_at__isnull=True,
+        run_at__lte=window,
+        last_error__contains='HTTPError 429: Too Many Requests',
+    )
+    task = get_first_task(tn, instance=media)
+    update_task_status(task, 'paused (429)')
+    time.sleep(10 * tqs.count())
+    update_task_status(task, None)
+
+
 def cleanup_old_media():
     with atomic():
         for source in qs_gen(Source.objects.filter(delete_old_media=True, days_to_keep__gt=0)):
@@ -470,6 +485,7 @@ def download_media_metadata(media_id):
         log.info(f'Task for ID: {media_id} / {media} skipped, due to task being manually skipped.')
         return
     source = media.source
+    wait_for_errors(media)
     try:
         metadata = media.index_metadata()
     except YouTubeError as e:
