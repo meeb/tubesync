@@ -1,7 +1,7 @@
 import os
 import re
 import uuid
-from collections import deque
+from collections import deque as queue
 from pathlib import Path
 from django import db
 from django.conf import settings
@@ -536,7 +536,7 @@ class Source(db.models.Model):
         '''
             Index the media source returning a queue of media metadata as dicts.
         '''
-        entries = deque(list(), settings.get('MAX_ENTRIES_PROCESSING', 0) or None)
+        entries = queue(list(), settings.get('MAX_ENTRIES_PROCESSING', 0) or None)
         if self.index_videos:
             entries.extend(self.get_index('videos'))
 
