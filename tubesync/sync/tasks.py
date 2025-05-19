@@ -253,7 +253,7 @@ def cleanup_old_media():
     schedule_media_servers_update()
 
 
-def cleanup_removed_media(source, videos):
+def cleanup_removed_media(source, video_keys):
     if not source.delete_removed_media:
         return
     log.info(f'Cleaning up media no longer in source: {source}')
@@ -263,8 +263,7 @@ def cleanup_removed_media(source, videos):
         source=source,
     )
     for media in qs_gen(mqs):
-        matching_source_item = [video['id'] for video in videos if video['id'] == media.key]
-        if not matching_source_item:
+        if media.key not in video_keys:
             log.info(f'{media.name} is no longer in source, removing')
             with atomic():
                 media.delete()
@@ -315,6 +314,7 @@ def index_source_task(source_id):
         )
     tvn_format = '{:,}' + f'/{num_videos:,}'
     vn = 0
+    video_keys = set()
     while len(videos) > 0:
         vn += 1
         video = videos.popleft()
@@ -323,6 +323,7 @@ def index_source_task(source_id):
         if not key:
             # Video has no unique key (ID), it can't be indexed
             continue
+        video_keys.add(key)
         update_task_status(task, tvn_format.format(vn))
         # media, new_media = Media.objects.get_or_create(key=key, source=source)
         try:
@@ -378,7 +379,7 @@ def index_source_task(source_id):
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
     # Cleanup of media no longer available from the source
-    cleanup_removed_media(source, videos)
+    cleanup_removed_media(source, video_keys)
     videos = video = None
 
 
