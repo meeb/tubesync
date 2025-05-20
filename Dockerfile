@@ -383,8 +383,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 # Install third party software
 COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
-COPY --from=bun /usr/local/bun/ /usr/local/bun/
-COPY --from=bun /usr/local/bin/ /usr/local/bin/
+COPY --from=bun /usr/local/bun /usr/local/bin /usr/local/
 COPY --from=deno /usr/local/bin/ /usr/local/bin/
 COPY --from=uv /usr/local/bin/ /usr/local/bin/
 
