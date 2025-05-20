@@ -233,19 +233,33 @@ def schedule_media_servers_update():
         )
 
 
-def wait_for_errors(media, /, tn='sync.tasks.download_media_metadata'):
+def wait_for_errors(model, /, *, task_name=None):
+    if task_name is None:
+        task_name=tuple((
+            'sync.tasks.download_media',
+            'sync.tasks.download_media_metadata',
+        ))
+    elif isinstance(task_name, str):
+        task_name = tuple((task_name,))
+    tasks = list()
+    for tn in task_name:
+        ft = get_first_task(tn, instance=model)
+        if ft:
+            tasks.append(ft)
     window = timezone.timedelta(hours=3) + timezone.now()
     tqs = Task.objects.filter(
-        task_name=tn,
+        task_name__in=task_name,
         attempts__gt=0,
         locked_at__isnull=True,
         run_at__lte=window,
         last_error__contains='HTTPError 429: Too Many Requests',
     )
-    task = get_first_task(tn, instance=media)
-    update_task_status(task, 'paused (429)')
+    for task in tasks:
+        update_task_status(task, 'paused (429)')
+    log.info(f'waiting for errors: 429 ({tqs.count()}): {model}')
     time.sleep(10 * tqs.count())
-    update_task_status(task, None)
+    for task in tasks:
+        update_task_status(task, None)
 
 
 def cleanup_old_media():
@@ -485,7 +499,7 @@ def download_media_metadata(media_id):
         log.info(f'Task for ID: {media_id} / {media} skipped, due to task being manually skipped.')
         return
     source = media.source
-    wait_for_errors(media)
+    wait_for_errors(media, task_name='sync.tasks.download_media_metadata')
     try:
         metadata = media.index_metadata()
     except YouTubeError as e:
@@ -638,6 +652,7 @@ def download_media(media_id, override=False):
             # should raise an exception to avoid this
             return
 
+    wait_for_errors(media, task_name='sync.tasks.download_media')
     filepath = media.filepath
     container = format_str = None
     log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
@@ -853,8 +868,7 @@ def wait_for_media_premiere(media_id):
         
         if hours:
             task = get_media_premiere_task(media_id)
-            if task:
-                update_task_status(task, f'available in {hours} hours')
+            update_task_status(task, f'available in {hours} hours')
         save_model(media)
 
 
