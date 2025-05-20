@@ -361,7 +361,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libmariadb3 \
   libpq5 \
   libwebp7 \
-  pipenv \
   pkgconf \
   python3 \
   python3-libsass \
@@ -429,8 +428,6 @@ RUN --mount=type=tmpfs,target=/cache \
   libwebp-dev \
   make \
   postgresql-common \
-  python3-dev \
-  python3-pip \
   zlib1g-dev \
   && \
   # Install non-distro packages
@@ -439,6 +436,7 @@ RUN --mount=type=tmpfs,target=/cache \
   XDG_CACHE_HOME='/cache' \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX=/cache/pycache \
+    uvx -v --no-config --no-progress --isolated --no-managed-python \
     pipenv install --system --skip-lock && \
   # remove the getpot_bgutil_script plugin
   find /usr/local/lib \
@@ -456,8 +454,6 @@ RUN --mount=type=tmpfs,target=/cache \
   libwebp-dev \
   make \
   postgresql-common \
-  python3-dev \
-  python3-pip \
   zlib1g-dev \
   && \
   apt-get -y autopurge && \
