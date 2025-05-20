@@ -302,13 +302,12 @@ jobs:
           venv_dir=".cache/runner/${RUNNER_ARCH}/wormhole" &&
               python3 -m venv --upgrade-deps "${venv_dir}" &&
               . "${venv_dir}"/bin/activate || exit
-          pip install 'magic-wormhole==0.17.0'
+          pip install 'magic-wormhole'
           # determine the runner IP address
           _awk_prog='$0 !~ /scope host/ && "inet" == $1 {split($2, P, "/"); print P[1]; exit;}'
           runner_ip="$( ip addr sh | awk "${_awk_prog}" )"
           # set variables
           relay_arg="ws://${runner_ip}:4000/v1"
-          runner_ip='127.0.0.1'
           transit_arg="tcp:[${runner_ip}]:4001"
           # generate the code and receive the first transfer
           ( wormhole \
