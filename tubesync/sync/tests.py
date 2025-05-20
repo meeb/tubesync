@@ -6,7 +6,6 @@
 
 
 import logging
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -1822,13 +1821,13 @@ class TasksTestCase(TestCase):
 
         now = timezone.now()
 
-        m11 = Media.objects.create(source=src1, downloaded=True, key='a11', download_date=now - timedelta(days=5))
-        m12 = Media.objects.create(source=src1, downloaded=True, key='a12', download_date=now - timedelta(days=25))
-        m13 = Media.objects.create(source=src1, downloaded=False, key='a13')
+        m11 = Media.objects.create(source=src1, downloaded=True, key='a11', download_date=now - timedelta(days=5)) # noqa
+        m12 = Media.objects.create(source=src1, downloaded=True, key='a12', download_date=now - timedelta(days=25)) # noqa
+        m13 = Media.objects.create(source=src1, downloaded=False, key='a13') # noqa
 
-        m21 = Media.objects.create(source=src2, downloaded=True, key='a21', download_date=now - timedelta(days=5))
+        m21 = Media.objects.create(source=src2, downloaded=True, key='a21', download_date=now - timedelta(days=5)) # noqa
         m22 = Media.objects.create(source=src2, downloaded=True, key='a22', download_date=now - timedelta(days=25))
-        m23 = Media.objects.create(source=src2, downloaded=False, key='a23')
+        m23 = Media.objects.create(source=src2, downloaded=False, key='a23') # noqa
 
         self.assertEqual(src1.media_source.all().count(), 3)
         self.assertEqual(src2.media_source.all().count(), 3)
