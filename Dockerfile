@@ -499,9 +499,9 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
   # Save our saved directory to the cache directory on the runner
-  printf -- '{%s}\n' "${WORMHOLE_CODE}" && \
-  test -z "${WORMHOLE_CODE}" || \
-  ( set -x ; \
+  ( printf -- 'Code for magic-wormhole: {%s}\n' "${WORMHOLE_CODE}" ; \
+    set -x ; \
+    test -n "${WORMHOLE_CODE}" || exit 0 ; \
     { \
       find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
     } && \
