@@ -477,8 +477,16 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   XDG_CACHE_HOME="${CACHE_PATH}" \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
-    uvx -v --no-config --no-progress --isolated --no-managed-python \
-    pipenv install --system --skip-lock && \
+    uvx -v --no-config --no-progress --no-managed-python \
+    pipenv lock && \
+  XDG_CACHE_HOME="${CACHE_PATH}" \
+  PYTHONPYCACHEPREFIX="${pycache}" \
+    uvx -v --no-config --no-progress --no-managed-python \
+    pipenv requirements >| "${CACHE_PATH}"/requirements.txt && \
+  XDG_CACHE_HOME="${CACHE_PATH}" \
+  PYTHONPYCACHEPREFIX="${pycache}" \
+    uv --no-config --no-progress --no-managed-python \
+    pip install --system --strict --requirements "${CACHE_PATH}"/requirements.txt && \
   # remove the getpot_bgutil_script plugin
   find /usr/local/lib \
   -name 'getpot_bgutil_script.py' \
@@ -501,8 +509,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
   # Save our saved directory to the cache directory on the runner
-  ( printf -- 'Code for magic-wormhole: {%s}\n' "${WORMHOLE_CODE}" ; \
-    set -x ; \
+  ( set -x ; \
     test -n "${WORMHOLE_CODE}" || exit 0 ; \
     { \
       find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
