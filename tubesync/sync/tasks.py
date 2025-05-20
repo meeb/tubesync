@@ -122,7 +122,7 @@ def get_error_message(task):
 def update_task_status(task, status):
     if not task:
         return False
-    if not task._verbose_name:
+    if not hasattr(task, '_verbose_name'):
         task._verbose_name = remove_enclosed(
             task.verbose_name, '[', ']', ' ',
         )
@@ -233,6 +233,21 @@ def schedule_media_servers_update():
             str(mediaserver.pk),
             verbose_name=verbose_name.format(mediaserver),
         )
+
+
+def wait_for_errors(media, /, tn='sync.tasks.download_media_metadata'):
+    window = timezone.timedelta(hours=3) + timezone.now()
+    tqs = Task.objects.filter(
+        task_name=tn,
+        attempts__gt=0,
+        locked_at__isnull=True,
+        run_at__lte=window,
+        last_error__contains='HTTPError 429: Too Many Requests',
+    )
+    task = get_first_task(tn, instance=media)
+    update_task_status(task, 'paused (429)')
+    time.sleep(10 * tqs.count())
+    update_task_status(task, None)
 
 
 def cleanup_old_media():
@@ -471,6 +486,7 @@ def download_media_metadata(media_id):
         log.info(f'Task for ID: {media_id} / {media} skipped, due to task being manually skipped.')
         return
     source = media.source
+    wait_for_errors(media)
     try:
         metadata = media.index_metadata()
     except YouTubeError as e:
@@ -836,8 +852,7 @@ def wait_for_media_premiere(media_id):
         
         if hours:
             task = get_media_premiere_task(media_id)
-            if task:
-                update_task_status(task, f'available in {hours} hours')
+            update_task_status(task, f'available in {hours} hours')
         save_model(media)
 
 
