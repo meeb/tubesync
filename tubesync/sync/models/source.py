@@ -552,7 +552,7 @@ class Source(db.models.Model):
                         entries.maxlen // 2,
                         entries.maxlen - len(entries),
                     )
-                    entries.extend(reversed(streams[-1 * allowed_streams :]))
+                    entries.extend(reversed(streams[: allowed_streams]))
 
         return entries
 
