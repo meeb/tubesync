@@ -428,6 +428,7 @@ RUN --mount=type=tmpfs,target=/cache \
   libwebp-dev \
   make \
   postgresql-common \
+  python3-dev \
   zlib1g-dev \
   && \
   # Install non-distro packages
@@ -454,6 +455,7 @@ RUN --mount=type=tmpfs,target=/cache \
   libwebp-dev \
   make \
   postgresql-common \
+  python3-dev \
   zlib1g-dev \
   && \
   apt-get -y autopurge && \
