@@ -295,6 +295,11 @@ RUN mkdir -v -p /usr/local/bun/node-fallback/bin && \
     /usr/local/bin/bun /usr/local/bin/bunx && \
     /usr/local/bun/bin/bun --version
 
+FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
+
+FROM debian:${DEBIAN_VERSION} AS uv
+COPY --from=uv-binaries /uv /uvx /usr/local/bin/
+
 FROM tubesync-base AS tubesync-openresty
 
 COPY --from=openresty-debian \
@@ -375,6 +380,7 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 COPY --from=bun /usr/local/bun/ /usr/local/bun/
 COPY --from=bun /usr/local/bin/ /usr/local/bin/
+COPY --from=uv /usr/local/bin/ /usr/local/bin/
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
