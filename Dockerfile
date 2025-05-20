@@ -295,6 +295,11 @@ RUN mkdir -v -p /usr/local/bun/node-fallback/bin && \
     /usr/local/bin/bun /usr/local/bin/bunx && \
     /usr/local/bun/bin/bun --version
 
+FROM denoland/deno:bin AS deno-binary
+
+FROM debian:${DEBIAN_VERSION} AS deno
+COPY --from=deno-binary /deno /usr/local/bin/
+
 FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
 
 FROM debian:${DEBIAN_VERSION} AS uv
@@ -380,6 +385,7 @@ COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 COPY --from=bun /usr/local/bun/ /usr/local/bun/
 COPY --from=bun /usr/local/bin/ /usr/local/bin/
+COPY --from=deno /usr/local/bin/ /usr/local/bin/
 COPY --from=uv /usr/local/bin/ /usr/local/bin/
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
