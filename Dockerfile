@@ -10,6 +10,7 @@ ARG SHA256_S6_ARM64="8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f6
 ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae"
 
 ARG ALPINE_VERSION="latest"
+ARG BUN_VERSION="1-slim"
 ARG DEBIAN_VERSION="bookworm-slim"
 
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
@@ -279,6 +280,21 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
+FROM oven/bun:${BUN_VERSION} AS bun-base
+
+FROM debian:${DEBIAN_VERSION} AS bun
+COPY --from=bun-base /usr/local/bin/bun /usr/local/bun/bin/bun
+RUN mkdir -v -p /usr/local/bun/node-fallback/bin && \
+    ln -v -T -s ../../bin/bun /usr/local/bun/node-fallback/bin/node && \
+    ln -v -T -s bun /usr/local/bun/bin/bunx && \
+    mkdir -v -p /usr/local/bin && \
+    ln -v -T -s ../bun/bin/bun /usr/local/bin/bun && \
+    ln -v -T -s bun /usr/local/bin/bunx && \
+    ls -H -l /usr/local/bun/node-fallback/bin/node \
+    /usr/local/bun/bin/bun /usr/local/bun/bin/bunx \
+    /usr/local/bin/bun /usr/local/bin/bunx && \
+    /usr/local/bun/bin/bun --version
+
 FROM tubesync-base AS tubesync-openresty
 
 COPY --from=openresty-debian \
@@ -357,6 +373,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 # Install third party software
 COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
+COPY --from=bun /usr/local/bun/ /usr/local/bun/
+COPY --from=bun /usr/local/bin/ /usr/local/bin/
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
