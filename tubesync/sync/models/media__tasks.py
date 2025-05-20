@@ -1,9 +1,11 @@
 import os
+from pathlib import Path
 from common.logger import log
 from common.errors import (
     NoMetadataException,
 )
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from ..choices import Val, SourceResolution
 
 
@@ -47,6 +49,7 @@ def download_checklist(self, skip_checks=False):
                      f'the source has a download cap and the media is now too old, '
                      f'not downloading')
             return False
+    return True
 
 
 def download_finished(self, format_str, container, downloaded_filepath=None):
