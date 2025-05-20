@@ -35,7 +35,7 @@ from common.utils import (  django_queryset_generator as qs_gen,
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer
 from .utils import ( get_remote_image, resize_image_to_height,
-                    write_text_file, filter_response, )
+                    write_text_file, filter_response, seconds_to_timestr, )
 from .youtube import YouTubeError
 
 db_vendor = db.connection.vendor
@@ -256,8 +256,11 @@ def wait_for_errors(model, /, *, task_name=None):
     )
     for task in tasks:
         update_task_status(task, 'paused (429)')
-    log.info(f'waiting for errors: 429 ({tqs.count()}): {model}')
-    time.sleep(10 * tqs.count())
+    
+    delay = 10 * tqs.count()
+    time_str = seconds_to_timestr(delay)
+    log.info(f'waiting for errors: 429 ({time_str}): {model}')
+    time.sleep(delay)
     for task in tasks:
         update_task_status(task, None)
 
