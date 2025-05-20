@@ -119,9 +119,6 @@ class PlexMediaServer(MediaServer):
         options = self.object.options
         if 'token' not in options:
             raise ValidationError('Plex Media Server requires a "token"')
-        token = options['token'].strip()
-        if 'token' not in options:
-            raise ValidationError('Plex Media Server requires a "token"')
         if 'libraries' not in options:
             raise ValidationError('Plex Media Server requires a "libraries"')
         libraries = options['libraries'].strip().split(',')

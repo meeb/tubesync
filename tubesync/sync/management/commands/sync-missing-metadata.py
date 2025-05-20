@@ -1,6 +1,5 @@
-import os
 from shutil import copyfile
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand, CommandError # noqa
 from django.db.models import Q
 from common.logger import log
 from sync.models import Source, Media

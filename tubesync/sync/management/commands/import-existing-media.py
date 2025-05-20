@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand, CommandError # noqa
 from common.logger import log
 from common.timestamp import timestamp_to_datetime
 from sync.choices import FileExtension
@@ -18,7 +18,7 @@ class Command(BaseCommand):
         dirmap = {}
         for s in Source.objects.all():
             dirmap[str(s.directory_path)] = s
-        log.info(f'Scanning sources...')
+        log.info('Scanning sources...')
         file_extensions = list(FileExtension.values) + self.extra_extensions
         for sourceroot, source in dirmap.items():
             media = list(Media.objects.filter(source=source, downloaded=False,

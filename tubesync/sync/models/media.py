@@ -15,9 +15,9 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.logger import log
 from common.errors import NoFormatException
+from common.json import JSONEncoder
 from common.utils import (
     clean_filename, clean_emoji,
-    django_queryset_generator as qs_gen,
 )
 from ..youtube import (
     get_media_info as get_youtube_media_info,
@@ -40,6 +40,9 @@ from ._migrations import (
     media_file_storage, get_media_thumb_path, get_media_file_path,
 )
 from ._private import _srctype_dict, _nfo_element
+from .media__tasks import (
+    download_checklist, download_finished, wait_for_premiere,
+)
 from .source import Source
 
 
@@ -575,14 +578,13 @@ class Media(models.Model):
 
 
     def metadata_dumps(self, arg_dict=dict()):
-        from common.utils import json_serial
         fallback = dict()
         try:
             fallback.update(self.new_metadata.with_formats)
         except ObjectDoesNotExist:
             pass
         data = arg_dict or fallback
-        return json.dumps(data, separators=(',', ':'), default=json_serial)
+        return json.dumps(data, separators=(',', ':'), cls=JSONEncoder)
 
 
     def metadata_loads(self, arg_str='{}'):
@@ -685,7 +687,7 @@ class Media(models.Model):
                 pass
             setattr(self, '_cached_metadata_dict', data)
             return data
-        except Exception as e:
+        except Exception:
             return {}
 
 
@@ -1216,6 +1218,12 @@ class Media(models.Model):
                             parent_dir.rmdir()
                             log.info(f'Removed empty directory: {parent_dir!s}')
                             parent_dir = parent_dir.parent
-                    except OSError as e:
+                    except OSError:
                         pass
+
+
+# add imported functions
+Media.download_checklist = download_checklist
+Media.download_finished = download_finished
+Media.wait_for_premiere = wait_for_premiere
 

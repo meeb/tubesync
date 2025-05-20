@@ -6,7 +6,6 @@
 
 import os
 
-from collections import namedtuple
 from common.logger import log
 from copy import deepcopy
 from pathlib import Path
@@ -102,7 +101,7 @@ def get_channel_image_info(url):
                     avatar_url = thumbnail['url']
                 if thumbnail['id'] == 'banner_uncropped':
                     banner_url = thumbnail['url']
-                if banner_url != None and avatar_url != None:
+                if banner_url is not None and avatar_url is not None:
                     break
 
             return avatar_url, banner_url
@@ -143,7 +142,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
     if days is not None:
         try:
             days = int(str(days), 10)
-        except Exception as e:
+        except (TypeError, ValueError):
             days = None
         start = (
             f'yesterday-{days!s}days' if days else None
@@ -326,13 +325,10 @@ def download_media(
             final_path = Path(output_file).resolve(strict=False)
         expected_file = shell_quote(str(final_path))
         cmds = pp_opts.exec_cmd.get('after_move', list())
-        # It is important that we use a tuple for strings.
-        # Otherwise, list adds each character instead.
-        # That last comma is really necessary!
-        cmds += (
+        cmds.append(
             f'test -f {expected_file} || '
             'mv -T -u -- %(filepath,_filename|)q '
-            f'{expected_file}',
+            f'{expected_file}'
         )
         # assignment is the quickest way to cover both 'get' cases
         pp_opts.exec_cmd['after_move'] = cmds
@@ -387,7 +383,7 @@ def download_media(
     youtube_ea_dict = ytopts['extractor_args'].get('youtube', dict())
     formats_list = youtube_ea_dict.get('formats', list())
     if 'missing_pot' not in formats_list:
-        formats_list += ('missing_pot',)
+        formats_list.append('missing_pot')
         youtube_ea_dict.update({
             'formats': formats_list,
         })

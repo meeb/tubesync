@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+from collections import deque as queue
 from pathlib import Path
 from django import db
 from django.conf import settings
@@ -510,7 +511,7 @@ class Source(db.models.Model):
     def get_example_media_format(self):
         try:
             return self.media_format.format(**self.example_media_format_dict)
-        except Exception as e:
+        except Exception:
             return ''
 
     def is_regex_match(self, media_item_title):
@@ -527,23 +528,31 @@ class Source(db.models.Model):
             days = timezone.timedelta(seconds=self.download_cap).days
         response = indexer(self.get_index_url(type=type), days=days)
         if not isinstance(response, dict):
-            return []
-        entries = response.get('entries', []) 
+            return list()
+        entries = response.get('entries', list()) 
         return entries
 
     def index_media(self):
         '''
-            Index the media source returning a list of media metadata as dicts.
+            Index the media source returning a queue of media metadata as dicts.
         '''
-        entries = list()
+        entries = queue(list(), getattr(settings, 'MAX_ENTRIES_PROCESSING', 0) or None)
         if self.index_videos:
-            entries += self.get_index('videos')
+            entries.extend(reversed(self.get_index('videos')))
+
         # Playlists do something different that I have yet to figure out
         if not self.is_playlist:
             if self.index_streams:
-                entries += self.get_index('streams')
+                streams = self.get_index('streams')
+                if entries.maxlen is None or 0 == len(entries):
+                    entries.extend(reversed(streams))
+                else:
+                    # share the queue between streams and videos
+                    allowed_streams = max(
+                        entries.maxlen // 2,
+                        entries.maxlen - len(entries),
+                    )
+                    entries.extend(reversed(streams[: allowed_streams]))
 
-        if settings.MAX_ENTRIES_PROCESSING:
-            entries = entries[:settings.MAX_ENTRIES_PROCESSING]
         return entries
 
