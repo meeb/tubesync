@@ -453,20 +453,12 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     saved="${CACHE_PATH}/.saved" ; \
     pipenv_cache="${CACHE_PATH}/pipenv" ; \
     pycache="${CACHE_PATH}/pycache" ; \
-    wormhole_venv="${CACHE_PATH}/wormhole" ; \
     mkdir -p "${saved}/${TARGETARCH}" ; \
     # keep the real HOME clean
     mkdir -p "${CACHE_PATH}/.home-directories" ; \
     cp -at "${CACHE_PATH}/.home-directories/" "${HOME}" && \
     HOME="${CACHE_PATH}/.home-directories/${HOME#/}" ; \
   } && \
-  # install magic-wormhole
-  ( test -d "${wormhole_venv}/bin" || \
-    python3 -m venv --clear --system-site-packages --upgrade-deps "${wormhole_venv}" ; \
-    . "${wormhole_venv}/bin/activate" || exit ; \
-    test -x "${wormhole_venv}/bin/wormhole" || \
-    pip install 'magic-wormhole==0.17.0' ; \
-  ) && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -508,28 +500,35 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   apt-get -y autoclean && \
   # Save our saved directory to the cache directory on the runner
   test -z "${WORMHOLE_CODE}" || \
-  ( set +x ; \
-    . "${wormhole_venv}/bin/activate" && \
-    set -x && \
+  ( set -x ; \
     { \
       find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
     } && \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
     cp -a /var/lib/apt "${saved}/${TARGETARCH}/apt-lib-cache" && \
     cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
-    cp -a "${wormhole_venv}" "${saved}/${TARGETARCH}/" && \
     ls -al "${saved}" && ls -al "${saved}"/* && \
     ls -al "${saved}/${TARGETARCH}"/* && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
-      timeout -v -k 10m 1h wormhole \
+      XDG_CACHE_HOME="${CACHE_PATH}" \
+      timeout -v -k 10m 1h \
+      uvx -v --no-config --no-progress --isolated --no-managed-python \
+      --from 'magic-wormhole' \
+      wormhole \
         --appid TubeSync \
         --relay-url "${WORMHOLE_RELAY}" \
         --transit-helper "${WORMHOLE_TRANSIT}" \
         send \
+        --hide-progress --no-qr \
         --code "${WORMHOLE_CODE}" \
         "${saved}" || : ; \
     else \
-      timeout -v -k 10m 1h wormhole send \
+      XDG_CACHE_HOME="${CACHE_PATH}" \
+      timeout -v -k 10m 1h \
+      uvx -v --no-config --no-progress --isolated --no-managed-python \
+      --from 'magic-wormhole' \
+      wormhole send \
+        --hide-progress --no-qr \
         --code "${WORMHOLE_CODE}" \
         "${saved}" || : ; \
     fi ; \
