@@ -223,14 +223,6 @@ def clean_emoji(s):
     return emoji.replace_emoji(s)
 
 
-def json_serial(obj):
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-    if isinstance(obj, LazyList):
-        return list(obj)
-    raise TypeError(f'Type {type(obj)} is not json_serial()-able')
-
-
 def seconds_to_timestr(seconds):
     seconds = seconds % (24 * 3600)
     hour = seconds // 3600
