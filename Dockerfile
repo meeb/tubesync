@@ -499,6 +499,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
   # Save our saved directory to the cache directory on the runner
+  printf -- '{%s}\n' "${WORMHOLE_CODE}" && \
   test -z "${WORMHOLE_CODE}" || \
   ( set -x ; \
     { \
@@ -511,7 +512,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     ls -al "${saved}/${TARGETARCH}"/* && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
       XDG_CACHE_HOME="${CACHE_PATH}" \
-      timeout -v -k 10m 1h \
+      timeout -v -k 10m 15m \
       uvx -v --no-config --no-progress --isolated --no-managed-python \
       --from 'magic-wormhole' \
       wormhole \
@@ -524,7 +525,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
         "${saved}" || : ; \
     else \
       XDG_CACHE_HOME="${CACHE_PATH}" \
-      timeout -v -k 10m 1h \
+      timeout -v -k 10m 15m \
       uvx -v --no-config --no-progress --isolated --no-managed-python \
       --from 'magic-wormhole' \
       wormhole send \
