@@ -233,7 +233,7 @@ def schedule_media_servers_update():
         )
 
 
-def wait_for_errors(media, /, tn='sync.tasks.download_media_metadata'):
+def wait_for_errors(model, /, tn='sync.tasks.download_media_metadata'):
     window = timezone.timedelta(hours=3) + timezone.now()
     tqs = Task.objects.filter(
         task_name=tn,
@@ -242,7 +242,7 @@ def wait_for_errors(media, /, tn='sync.tasks.download_media_metadata'):
         run_at__lte=window,
         last_error__contains='HTTPError 429: Too Many Requests',
     )
-    task = get_first_task(tn, instance=media)
+    task = get_first_task(tn, instance=model)
     update_task_status(task, 'paused (429)')
     time.sleep(10 * tqs.count())
     update_task_status(task, None)
