@@ -233,10 +233,17 @@ def schedule_media_servers_update():
         )
 
 
-def wait_for_errors(model, /, tn='sync.tasks.download_media_metadata'):
+def wait_for_errors(model, /, *, task_name=None):
+    if task_name is None:
+        task_name=tuple((
+            'sync.tasks.download_media',
+            'sync.tasks.download_media_metadata',
+        ))
+    elif isinstance(task_name, str):
+        task_name = tuple((task_name,))
     window = timezone.timedelta(hours=3) + timezone.now()
     tqs = Task.objects.filter(
-        task_name=tn,
+        task_name__in=task_name,
         attempts__gt=0,
         locked_at__isnull=True,
         run_at__lte=window,
@@ -484,7 +491,7 @@ def download_media_metadata(media_id):
         log.info(f'Task for ID: {media_id} / {media} skipped, due to task being manually skipped.')
         return
     source = media.source
-    wait_for_errors(media)
+    wait_for_errors(media, task_name='sync.tasks.download_media_metadata')
     try:
         metadata = media.index_metadata()
     except YouTubeError as e:
@@ -637,6 +644,7 @@ def download_media(media_id, override=False):
             # should raise an exception to avoid this
             return
 
+    wait_for_errors(media, task_name='sync.tasks.download_media')
     filepath = media.filepath
     container = format_str = None
     log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
