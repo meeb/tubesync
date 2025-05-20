@@ -241,6 +241,11 @@ def wait_for_errors(model, /, *, task_name=None):
         ))
     elif isinstance(task_name, str):
         task_name = tuple((task_name,))
+    tasks = list()
+    for tn in task_name:
+        ft = get_first_task(tn, instance=model)
+        if ft:
+            tasks.append(ft)
     window = timezone.timedelta(hours=3) + timezone.now()
     tqs = Task.objects.filter(
         task_name__in=task_name,
@@ -249,10 +254,12 @@ def wait_for_errors(model, /, *, task_name=None):
         run_at__lte=window,
         last_error__contains='HTTPError 429: Too Many Requests',
     )
-    task = get_first_task(tn, instance=model)
-    update_task_status(task, 'paused (429)')
+    for task in tasks:
+        update_task_status(task, 'paused (429)')
+    log.info(f'waiting for errors: 429 ({tqs.count()}): {model}')
     time.sleep(10 * tqs.count())
-    update_task_status(task, None)
+    for task in tasks:
+        update_task_status(task, None)
 
 
 def cleanup_old_media():
