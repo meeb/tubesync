@@ -435,7 +435,7 @@ ARG YTDLP_DATE
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=cache,sharing=locked,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
     --mount=type=cache,sharing=locked,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
-    --mount=type=cache,sharing=locked,target=${CACHE_PATH}/uv.old,source=/uv-cache,from=populate-uv-cache-dir \
+    --mount=type=cache,sharing=private,target=${CACHE_PATH}/.restored-uv,source=/uv-cache,from=populate-uv-cache-dir \
     --mount=type=secret,id=WORMHOLE_CODE,env=WORMHOLE_CODE \
     --mount=type=secret,id=WORMHOLE_RELAY,env=WORMHOLE_RELAY \
     --mount=type=secret,id=WORMHOLE_TRANSIT,env=WORMHOLE_TRANSIT \
@@ -455,7 +455,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     cp -at "${CACHE_PATH}/.home-directories/" "${HOME}" && \
     HOME="${CACHE_PATH}/.home-directories/${HOME#/}" ; \
     # copy the restored uv directory
-    cp -a "${CACHE_PATH}"/uv.old/* "${CACHE_PATH}"/uv/ || : ; \
+    cp -a "${CACHE_PATH}"/.restored-uv/* "${CACHE_PATH}"/uv/ || : ; \
   } && \
   apt-get update && \
   # Install required build packages
@@ -474,13 +474,13 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   # Install non-distro packages
   PYTHONPYCACHEPREFIX="${pycache}" \
     uv --no-config --no-progress --no-managed-python \
-    cache prune --ci && \
+    cache prune && \
   PYTHONPYCACHEPREFIX="${pycache}" \
-    uvx -v --no-config --no-progress --no-managed-python \
+    uvx --no-config --no-progress --no-managed-python \
     --from 'pipenv' -- \
     pipenv --version && \
   PYTHONPYCACHEPREFIX="${pycache}" \
-    uvx -v --no-config --no-progress --no-managed-python \
+    uvx --no-config --no-progress --no-managed-python \
     --from 'magic-wormhole' -- \
     wormhole --version && \
   PIPENV_VERBOSITY=2 \
@@ -527,7 +527,6 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
     cp -a /var/lib/apt "${saved}/${TARGETARCH}/apt-lib-cache" && \
     cp -a "${CACHE_PATH}/uv" "${saved}/uv-cache" && \
-    mkdir -v -p "${saved}/pipenv-cache" && \
     ls -al "${saved}" && ls -al "${saved}"/* && \
     ls -al "${saved}/${TARGETARCH}"/* && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
