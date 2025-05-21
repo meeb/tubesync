@@ -475,21 +475,21 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   && \
   # Install non-distro packages
   XDG_CACHE_HOME="${CACHE_PATH}" \
-  notPIPENV_VERBOSITY=64 \
+  PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
-    uvx --no-config --no-progress --no-managed-python \
+    uvx -v --no-config --no-progress --no-managed-python \
     pipenv lock && \
   XDG_CACHE_HOME="${CACHE_PATH}" \
-  PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx --no-config --no-progress --no-managed-python \
     pipenv requirements --from-pipfile --hash >| "${CACHE_PATH}"/requirements.txt && \
   rm -v Pipfile.lock && \
+  cat -v "${CACHE_PATH}"/requirements.txt && \
   XDG_CACHE_HOME="${CACHE_PATH}" \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uv -v --no-config --no-progress --no-managed-python \
-    pip install --system --break-system-packages --strict \
-    --requirements "${CACHE_PATH}"/requirements.txt && \
+    pip install --strict --system --break-system-packages \
+    --link-mode copy --requirements "${CACHE_PATH}"/requirements.txt && \
   # remove the getpot_bgutil_script plugin
   find /usr/local/lib \
   -name 'getpot_bgutil_script.py' \
