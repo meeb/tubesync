@@ -474,7 +474,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   # Install non-distro packages
   PYTHONPYCACHEPREFIX="${pycache}" \
     uv --no-config --no-progress --no-managed-python \
-    cache prune && \
+    cache prune --ci && \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx --no-config --no-progress --no-managed-python \
     --from 'pipenv' -- \
