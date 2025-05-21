@@ -477,10 +477,9 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   XDG_CACHE_HOME="${CACHE_PATH}" \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
-    : uvx --no-config --no-progress --no-managed-python \
+    uvx --no-config --no-progress --no-managed-python \
     pipenv lock && \
   XDG_CACHE_HOME="${CACHE_PATH}" \
-  PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx --no-config --no-progress --no-managed-python \
     pipenv requirements --from-pipfile --hash >| "${CACHE_PATH}"/requirements.txt && \
