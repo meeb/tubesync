@@ -10,6 +10,7 @@ ARG SHA256_S6_ARM64="8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f6
 ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae"
 
 ARG ALPINE_VERSION="latest"
+ARG BUN_VERSION="1-slim"
 ARG DEBIAN_VERSION="bookworm-slim"
 
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
@@ -18,6 +19,19 @@ ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 
+ARG CACHE_PATH="/cache"
+
+
+FROM alpine:${ALPINE_VERSION} AS populate-apt-cache-dirs
+ARG TARGETARCH
+RUN --mount=type=bind,from=cache-tubesync,target=/restored \
+    set -ex ; \
+    mkdir -v -p /apt-cache-cache /apt-lib-cache ; \
+    # restore `apt` files
+    cp -at /apt-cache-cache/ /restored/apt-cache-cache/* || : ; \
+    # to be careful, ensure that these files aren't from a different architecture
+    rm -v -f /apt-cache-cache/*cache.bin ; \
+    cp -at /apt-lib-cache/ "/restored/${TARGETARCH}/apt-lib-cache"/* || : ;
 
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
@@ -34,8 +48,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_NO_COMPILE=1 \
     PIP_ROOT_USER_ACTION='ignore'
 
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
     # to be careful, ensure that these files aren't from a different architecture
     rm -f /var/cache/apt/*cache.bin ; \
     # Update from the network and keep cache
@@ -279,6 +293,37 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
+FROM oven/bun:${BUN_VERSION} AS bun-base
+
+FROM debian:${DEBIAN_VERSION} AS bun
+COPY --from=bun-base /usr/local/bin/bun /usr/local/bun/bin/bun
+RUN mkdir -v -p /usr/local/bun/node-fallback/bin && \
+    ln -v -T -s ../../bin/bun /usr/local/bun/node-fallback/bin/node && \
+    ln -v -T -s bun /usr/local/bun/bin/bunx && \
+    mkdir -v -p /usr/local/bin && \
+    ln -v -T -s ../bun/bin/bun /usr/local/bin/bun && \
+    ln -v -T -s bun /usr/local/bin/bunx && \
+    ls -H -l /usr/local/bun/node-fallback/bin/node \
+    /usr/local/bun/bin/bun /usr/local/bun/bin/bunx \
+    /usr/local/bin/bun /usr/local/bin/bunx && \
+    /usr/local/bun/bin/bun --version
+
+FROM denoland/deno:bin AS deno-binary
+
+FROM debian:${DEBIAN_VERSION} AS deno
+COPY --from=deno-binary /deno /usr/local/bin/
+
+FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
+
+FROM debian:${DEBIAN_VERSION} AS uv
+COPY --from=uv-binaries /uv /uvx /usr/local/bin/
+
+FROM alpine:${ALPINE_VERSION} AS populate-uv-cache-dir
+RUN --mount=type=bind,from=cache-tubesync,target=/restored \
+    set -x ; \
+    cp -at / '/restored/uv-cache' || \
+        mkdir -v /uv-cache ;
+
 FROM tubesync-base AS tubesync-openresty
 
 COPY --from=openresty-debian \
@@ -286,8 +331,8 @@ COPY --from=openresty-debian \
 COPY --from=openresty-debian \
     /etc/apt/sources.list.d/openresty.list /etc/apt/sources.list.d/openresty.list
 
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
   set -x && \
   apt-get update && \
   apt-get -y --no-install-recommends install nginx-common openresty && \
@@ -298,11 +343,11 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 
 FROM tubesync-base AS tubesync-nginx
 
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
   set -x && \
   apt-get update && \
-  apt-get -y --no-install-recommends install nginx-light && \
+  apt-get -y --no-install-recommends install nginx-light libnginx-mod-http-lua && \
   # openresty binary should still work
   ln -v -s -T ../sbin/nginx /usr/bin/openresty && \
   # Clean up
@@ -310,22 +355,22 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   apt-get -y autoclean && \
   rm -v -f /var/cache/debconf/*.dat-old
 
-FROM tubesync-openresty AS tubesync
+FROM tubesync-nginx AS tubesync
 
 ARG S6_VERSION
 
-ARG FFMPEG_DATE
-ARG FFMPEG_VERSION
-
-ARG TARGETARCH
+ARG FFMPEG_DATE FFMPEG_VERSION
 
 ENV S6_VERSION="${S6_VERSION}" \
     FFMPEG_DATE="${FFMPEG_DATE}" \
-    FFMPEG_VERSION="${FFMPEG_VERSION}"
+    FFMPEG_VERSION="${FFMPEG_VERSION}" \
+    UV_LINK_MODE='copy'
+
+ARG TARGETARCH
 
 # Reminder: the SHELL handles all variables
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
   set -x && \
   apt-get update && \
   # Install dependencies we keep
@@ -335,12 +380,9 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libmariadb3 \
   libpq5 \
   libwebp7 \
-  pipenv \
   pkgconf \
   python3 \
-  python3-libsass \
   python3-socks \
-  python3-wheel \
   curl \
   less \
   && \
@@ -357,9 +399,13 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 # Install third party software
 COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
+#COPY --from=bun /usr/local/bun/ /usr/local/bun/
+#COPY --from=bun /usr/local/bin/ /usr/local/bin/
+#COPY --from=deno /usr/local/bin/ /usr/local/bin/
+COPY --from=uv /usr/local/bin/ /usr/local/bin/
 
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
     set -x && \
     apt-get update && \
     # Install file
@@ -379,15 +425,34 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 # Switch workdir to the the app
 WORKDIR /app
 
+ARG CI
+ARG CACHE_PATH
 ARG YTDLP_DATE
+ARG WORMHOLE_RELAY
 
 # Set up the app
-RUN --mount=type=tmpfs,target=/cache \
-    --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
-    --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+RUN --mount=type=tmpfs,target=${CACHE_PATH} \
+    --mount=type=cache,sharing=locked,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,sharing=locked,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,sharing=locked,target=${CACHE_PATH}/uv,source=/uv-cache,from=populate-uv-cache-dir \
+    --mount=type=secret,id=WORMHOLE_CODE,env=WORMHOLE_CODE \
+    --mount=type=secret,id=WORMHOLE_RELAY,env=WORMHOLE_RELAY \
+    --mount=type=secret,id=WORMHOLE_TRANSIT,env=WORMHOLE_TRANSIT \
+    --mount=type=cache,sharing=private,target=${CACHE_PATH}/pip \
+    --mount=type=cache,sharing=private,target=${CACHE_PATH}/pipenv \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
+  # set up cache
+  { \
+    XDG_CACHE_HOME="${CACHE_PATH}" ; export XDG_CACHE_HOME ; \
+    saved="${CACHE_PATH}/.saved" ; \
+    pycache="${CACHE_PATH}/pycache" ; \
+    mkdir -p "${saved}/${TARGETARCH}" ; \
+    # keep the real HOME clean
+    mkdir -p "${CACHE_PATH}/.home-directories" ; \
+    cp -at "${CACHE_PATH}/.home-directories/" "${HOME}" && \
+    HOME="${CACHE_PATH}/.home-directories/${HOME#/}" ; \
+  } && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -400,16 +465,29 @@ RUN --mount=type=tmpfs,target=/cache \
   make \
   postgresql-common \
   python3-dev \
-  python3-pip \
   zlib1g-dev \
   && \
   # Install non-distro packages
-  cp -at /tmp/ "${HOME}" && \
-  HOME="/tmp/${HOME#/}" \
-  XDG_CACHE_HOME='/cache' \
-  PIPENV_VERBOSITY=64 \
-  PYTHONPYCACHEPREFIX=/cache/pycache \
-    pipenv install --system --skip-lock && \
+  if [ -n "${WORMHOLE_CODE}" ] ; then \
+  PYTHONPYCACHEPREFIX="${pycache}" \
+    uvx --no-config --no-progress --no-managed-python \
+    --from 'magic-wormhole' -- \
+    wormhole --version ; \
+  fi && \
+  PIPENV_VERBOSITY=2 \
+  PYTHONPYCACHEPREFIX="${pycache}" \
+    uvx --no-config --no-progress --no-managed-python -- \
+    pipenv lock && \
+  PIPENV_VERBOSITY=1 \
+  PYTHONPYCACHEPREFIX="${pycache}" \
+    uvx --no-config --no-progress --no-managed-python -- \
+    pipenv requirements --from-pipfile --hash >| "${CACHE_PATH}"/requirements.txt && \
+  rm -v Pipfile.lock && \
+  cat -v "${CACHE_PATH}"/requirements.txt && \
+  PYTHONPYCACHEPREFIX="${pycache}" \
+    uv --no-config --no-progress --no-managed-python \
+    pip install --strict --system --break-system-packages \
+    --requirements "${CACHE_PATH}"/requirements.txt && \
   # remove the getpot_bgutil_script plugin
   find /usr/local/lib \
   -name 'getpot_bgutil_script.py' \
@@ -427,12 +505,52 @@ RUN --mount=type=tmpfs,target=/cache \
   make \
   postgresql-common \
   python3-dev \
-  python3-pip \
   zlib1g-dev \
   && \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
-  rm -v -f /var/cache/debconf/*.dat-old && \
+  # Save our saved directory to the cache directory on the runner
+  ( set -x ; \
+    test -n "${WORMHOLE_CODE}" || exit 0 ; \
+    { \
+      find /var/cache/apt/ -mindepth 1 -maxdepth 1 -name '*cache.bin' -delete || : ; \
+    } && \
+    cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
+    cp -a /var/lib/apt "${saved}/${TARGETARCH}/apt-lib-cache" && \
+    cp -a "${CACHE_PATH}/uv" "${saved}/uv-cache" && \
+    XDG_CACHE_HOME="${CACHE_PATH}" \
+    PYTHONPYCACHEPREFIX="${pycache}" \
+    uv --no-config --no-progress --no-managed-python \
+    cache prune --ci --cache-dir "${saved}/uv-cache" && \
+    ls -al "${saved}" && ls -al "${saved}"/* && \
+    ls -al "${saved}/${TARGETARCH}"/* && \
+    if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
+      XDG_CACHE_HOME="${CACHE_PATH}" \
+      PYTHONPYCACHEPREFIX="${pycache}" \
+      timeout -v -k 10m 25m \
+      uvx --no-config --no-progress --no-managed-python \
+      --from 'magic-wormhole' -- \
+      wormhole \
+        --appid TubeSync \
+        --relay-url "${WORMHOLE_RELAY}" \
+        --transit-helper "${WORMHOLE_TRANSIT}" \
+        send \
+        --hide-progress --no-qr \
+        --code "${WORMHOLE_CODE}" \
+        "${saved}" || : ; \
+    else \
+      XDG_CACHE_HOME="${CACHE_PATH}" \
+      PYTHONPYCACHEPREFIX="${pycache}" \
+      timeout -v -k 10m 25m \
+      uvx --no-config --no-progress --no-managed-python \
+      --from 'magic-wormhole' -- \
+      wormhole send \
+        --hide-progress --no-qr \
+        --code "${WORMHOLE_CODE}" \
+        "${saved}" || : ; \
+    fi ; \
+  ) && \
+  rm -v -f Pipfile.lock /var/cache/debconf/*.dat-old && \
   rm -v -rf /tmp/*
 
 # Copy root
@@ -464,6 +582,9 @@ RUN set -x && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video && \
   # Check nginx configuration copied from config/root/etc
+  mkdir -v -p /config/log && \
+  cp -a /var/log/nginx /config/log/ && \
+  cp -v -p /config/log/nginx/access.log /config/log/nginx/access.log.gz && \
   openresty -c /etc/nginx/nginx.conf -e stderr -t && \
   # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \

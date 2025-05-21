@@ -25,6 +25,21 @@ then
     chmod -R 0755 /downloads
 fi
 
+# Prepare for nginx logging into /config/log/nginx
+mkdir -p /config/log
+rm -rf /config/log/nginx.9
+for n in $(seq 8 -1 0)
+do
+    test '!' -d "/config/log/nginx.${n}" ||
+    mv "/config/log/nginx.${n}" "/config/log/nginx.$((1 + n))"
+done ; unset -v n ;
+rm -rf /config/log/nginx.0
+test '!' -d /config/log/nginx ||
+mv /config/log/nginx /config/log/nginx.0
+rm -rf /config/log/nginx
+cp -a /var/log/nginx /config/log/
+cp -p /config/log/nginx/access.log /config/log/nginx/access.log.gz
+
 if [ 'True' = "${TUBESYNC_DEBUG:-False}" ]
 then
     s6-setuidgid app \

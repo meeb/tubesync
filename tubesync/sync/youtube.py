@@ -213,6 +213,16 @@ def get_media_info(url, /, *, days=None, info_json=None):
         opts.update({
             'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
         })
+    try:
+        info_json_path = Path(info_json).resolve(strict=False)
+    except:
+        pass
+    else:
+        opts['paths'].update({
+            'infojson': user_set('infojson', opts['paths'], str(info_json_path))
+        })
+    if 'infojson' not in opts['paths'].keys():
+        opts.update({'writeinfojson': False})
     if start:
         log.debug(f'get_media_info: used date range: {opts["daterange"]} for URL: {url}')
     response = {}
