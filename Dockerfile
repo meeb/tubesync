@@ -435,7 +435,7 @@ ARG YTDLP_DATE
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=cache,sharing=locked,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
     --mount=type=cache,sharing=locked,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
-    --mount=type=cache,sharing=private,target=${CACHE_PATH}/.restored-uv,source=/uv-cache,from=populate-uv-cache-dir \
+    --mount=type=cache,sharing=locked,target=${CACHE_PATH}/.restored-uv,source=/uv-cache,from=populate-uv-cache-dir \
     --mount=type=secret,id=WORMHOLE_CODE,env=WORMHOLE_CODE \
     --mount=type=secret,id=WORMHOLE_RELAY,env=WORMHOLE_RELAY \
     --mount=type=secret,id=WORMHOLE_TRANSIT,env=WORMHOLE_TRANSIT \
