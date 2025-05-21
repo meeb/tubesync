@@ -324,13 +324,6 @@ RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     cp -at / '/restored/uv-cache' || \
         mkdir -v /uv-cache ;
 
-FROM alpine:${ALPINE_VERSION} AS populate-wormhole-dir
-ARG TARGETARCH
-RUN --mount=type=bind,from=cache-tubesync,target=/restored \
-    set -x ; \
-    cp -at / "/restored/${TARGETARCH}/wormhole" || \
-        mkdir -v /wormhole ;
-
 FROM tubesync-base AS tubesync-openresty
 
 COPY --from=openresty-debian \
@@ -439,10 +432,9 @@ ARG YTDLP_DATE
 
 # Set up the app
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
-    --mount=type=cache,sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
-    --mount=type=cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
-    --mount=type=cache,sharing=private,target=${CACHE_PATH}/uv,source=/uv-cache,from=populate-uv-cache-dir \
-    --mount=type=cache,sharing=private,target=${CACHE_PATH}/wormhole,source=/wormhole,from=populate-wormhole-dir \
+    --mount=type=cache,sharing=locked,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,sharing=locked,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
+    --mount=type=cache,sharing=locked,target=${CACHE_PATH}/uv,source=/uv-cache,from=populate-uv-cache-dir \
     --mount=type=secret,id=WORMHOLE_CODE,env=WORMHOLE_CODE \
     --mount=type=secret,id=WORMHOLE_RELAY,env=WORMHOLE_RELAY \
     --mount=type=secret,id=WORMHOLE_TRANSIT,env=WORMHOLE_TRANSIT \
