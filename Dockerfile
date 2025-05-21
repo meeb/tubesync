@@ -477,12 +477,16 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   && \
   # Install non-distro packages
   PYTHONPYCACHEPREFIX="${pycache}" \
-    uvx --no-config --no-progress --no-managed-python \
+    uv -v --no-config --no-progress --no-managed-python \
+    cache prune && \
+  PYTHONPYCACHEPREFIX="${pycache}" \
+    uvx -v --no-config --no-progress --no-managed-python \
+    --from 'pipenv' -- \
+    pipenv --version && \
+  PYTHONPYCACHEPREFIX="${pycache}" \
+    uvx -v --no-config --no-progress --no-managed-python \
     --from 'magic-wormhole' -- \
     wormhole --version && \
-  PYTHONPYCACHEPREFIX="${pycache}" \
-    uv --no-config --no-progress --no-managed-python \
-    cache prune && \
   PIPENV_VERBOSITY=2 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx --no-config --no-progress --no-managed-python -- \
