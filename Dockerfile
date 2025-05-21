@@ -318,12 +318,6 @@ FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
 FROM debian:${DEBIAN_VERSION} AS uv
 COPY --from=uv-binaries /uv /uvx /usr/local/bin/
 
-FROM alpine:${ALPINE_VERSION} AS populate-pipenv-cache-dir
-RUN --mount=type=bind,from=cache-tubesync,target=/restored \
-    set -x ; \
-    cp -at / '/restored/pipenv-cache' || \
-        mkdir -v /pipenv-cache ;
-
 FROM alpine:${ALPINE_VERSION} AS populate-uv-cache-dir
 RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     set -x ; \
@@ -483,12 +477,17 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   && \
   # Install non-distro packages
   PYTHONPYCACHEPREFIX="${pycache}" \
+    uvx --no-config --no-progress --no-managed-python \
+    --from 'magic-wormhole' -- \
+    wormhole --version && \
+  PYTHONPYCACHEPREFIX="${pycache}" \
     uv --no-config --no-progress --no-managed-python \
     cache prune && \
-  PIPENV_VERBOSITY=1 \
+  PIPENV_VERBOSITY=2 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx --no-config --no-progress --no-managed-python -- \
     pipenv lock && \
+  PIPENV_VERBOSITY=1 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx --no-config --no-progress --no-managed-python -- \
     pipenv requirements --from-pipfile --hash >| "${CACHE_PATH}"/requirements.txt && \
@@ -528,12 +527,13 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
     cp -a /var/lib/apt "${saved}/${TARGETARCH}/apt-lib-cache" && \
     cp -a "${CACHE_PATH}/uv" "${saved}/uv-cache" && \
+    mkdir -v -p "${saved}/pipenv-cache" && \
     ls -al "${saved}" && ls -al "${saved}"/* && \
     ls -al "${saved}/${TARGETARCH}"/* && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
       XDG_CACHE_HOME="${CACHE_PATH}" \
       PYTHONPYCACHEPREFIX="${pycache}" \
-      timeout -v -k 10m 15m \
+      timeout -v -k 10m 25m \
       uvx --no-config --no-progress --no-managed-python \
       --from 'magic-wormhole' -- \
       wormhole \
@@ -547,7 +547,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     else \
       XDG_CACHE_HOME="${CACHE_PATH}" \
       PYTHONPYCACHEPREFIX="${pycache}" \
-      timeout -v -k 10m 15m \
+      timeout -v -k 10m 25m \
       uvx --no-config --no-progress --no-managed-python \
       --from 'magic-wormhole' -- \
       wormhole send \
