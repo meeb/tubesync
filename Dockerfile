@@ -430,6 +430,7 @@ WORKDIR /app
 
 ARG CACHE_PATH
 ARG YTDLP_DATE
+ARG WORMHOLE_RELAY
 
 # Set up the app
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
