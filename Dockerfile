@@ -475,17 +475,19 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   && \
   # Install non-distro packages
   XDG_CACHE_HOME="${CACHE_PATH}" \
-  PIPENV_VERBOSITY=64 \
+  notPIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx --no-config --no-progress --no-managed-python \
     pipenv lock && \
   XDG_CACHE_HOME="${CACHE_PATH}" \
+  PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx --no-config --no-progress --no-managed-python \
     pipenv requirements --from-pipfile --hash >| "${CACHE_PATH}"/requirements.txt && \
+  rm -v Pipfile.lock && \
   XDG_CACHE_HOME="${CACHE_PATH}" \
   PYTHONPYCACHEPREFIX="${pycache}" \
-    uv --no-config --no-progress --no-managed-python \
+    uv -v --no-config --no-progress --no-managed-python \
     pip install --system --break-system-packages --strict \
     --requirements "${CACHE_PATH}"/requirements.txt && \
   # remove the getpot_bgutil_script plugin
@@ -544,7 +546,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
         "${saved}" || : ; \
     fi ; \
   ) && \
-  rm -v -f /var/cache/debconf/*.dat-old && \
+  rm -v -f Pipfile.lock /var/cache/debconf/*.dat-old && \
   rm -v -rf /tmp/*
 
 # Copy root
