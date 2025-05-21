@@ -428,6 +428,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 # Switch workdir to the the app
 WORKDIR /app
 
+ARG CI
 ARG CACHE_PATH
 ARG YTDLP_DATE
 ARG WORMHOLE_RELAY
@@ -470,9 +471,10 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   zlib1g-dev \
   && \
   # Install non-distro packages
+  if [ -n "${WORMHOLE_CODE}" ] ; then \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uv --no-config --no-progress --no-managed-python \
-    cache prune --ci && \
+    cache prune && \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx --no-config --no-progress --no-managed-python \
     --from 'pipenv' -- \
@@ -480,7 +482,8 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx --no-config --no-progress --no-managed-python \
     --from 'magic-wormhole' -- \
-    wormhole --version && \
+    wormhole --version ; \
+  fi && \
   PIPENV_VERBOSITY=2 \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx --no-config --no-progress --no-managed-python -- \
