@@ -324,6 +324,12 @@ RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     cp -at / '/restored/pipenv-cache' || \
         mkdir -v /pipenv-cache ;
 
+FROM alpine:${ALPINE_VERSION} AS populate-uv-cache-dir
+RUN --mount=type=bind,from=cache-tubesync,target=/restored \
+    set -x ; \
+    cp -at / '/restored/uv-cache' || \
+        mkdir -v /uv-cache ;
+
 FROM alpine:${ALPINE_VERSION} AS populate-wormhole-dir
 ARG TARGETARCH
 RUN --mount=type=bind,from=cache-tubesync,target=/restored \
@@ -441,17 +447,19 @@ ARG YTDLP_DATE
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=cache,sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
     --mount=type=cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
-    --mount=type=cache,sharing=private,target=${CACHE_PATH}/pipenv,source=/pipenv-cache,from=populate-pipenv-cache-dir \
+    --mount=type=cache,sharing=private,target=${CACHE_PATH}/uv,source=/uv-cache,from=populate-uv-cache-dir \
     --mount=type=cache,sharing=private,target=${CACHE_PATH}/wormhole,source=/wormhole,from=populate-wormhole-dir \
     --mount=type=secret,id=WORMHOLE_CODE,env=WORMHOLE_CODE \
     --mount=type=secret,id=WORMHOLE_RELAY,env=WORMHOLE_RELAY \
     --mount=type=secret,id=WORMHOLE_TRANSIT,env=WORMHOLE_TRANSIT \
+    --mount=type=cache,sharing=private,target=${CACHE_PATH}/pip \
+    --mount=type=cache,sharing=private,target=${CACHE_PATH}/pipenv \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
   # set up cache
   { \
+    XDG_CACHE_HOME="${CACHE_PATH}" ; export XDG_CACHE_HOME ; \
     saved="${CACHE_PATH}/.saved" ; \
-    pipenv_cache="${CACHE_PATH}/pipenv" ; \
     pycache="${CACHE_PATH}/pycache" ; \
     mkdir -p "${saved}/${TARGETARCH}" ; \
     # keep the real HOME clean
@@ -474,19 +482,18 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   zlib1g-dev \
   && \
   # Install non-distro packages
-  XDG_CACHE_HOME="${CACHE_PATH}" \
-  PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX="${pycache}" \
-    uvx --no-config --no-progress --no-managed-python \
-    pipenv lock && \
-  XDG_CACHE_HOME="${CACHE_PATH}" \
+    uv --no-config --no-progress --no-managed-python \
+    cache prune && \
   PIPENV_VERBOSITY=1 \
   PYTHONPYCACHEPREFIX="${pycache}" \
-    uvx -v --no-config --no-progress --no-managed-python \
+    uvx --no-config --no-progress --no-managed-python -- \
+    pipenv lock && \
+  PYTHONPYCACHEPREFIX="${pycache}" \
+    uvx --no-config --no-progress --no-managed-python -- \
     pipenv requirements --from-pipfile --hash >| "${CACHE_PATH}"/requirements.txt && \
   rm -v Pipfile.lock && \
   cat -v "${CACHE_PATH}"/requirements.txt && \
-  XDG_CACHE_HOME="${CACHE_PATH}" \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uv --no-config --no-progress --no-managed-python \
     pip install --strict --system --break-system-packages \
@@ -520,14 +527,15 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     } && \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
     cp -a /var/lib/apt "${saved}/${TARGETARCH}/apt-lib-cache" && \
-    cp -a "${pipenv_cache}" "${saved}/pipenv-cache" && \
+    cp -a "${CACHE_PATH}/uv" "${saved}/uv-cache" && \
     ls -al "${saved}" && ls -al "${saved}"/* && \
     ls -al "${saved}/${TARGETARCH}"/* && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
       XDG_CACHE_HOME="${CACHE_PATH}" \
+      PYTHONPYCACHEPREFIX="${pycache}" \
       timeout -v -k 10m 15m \
-      uvx -v --no-config --no-progress --isolated --no-managed-python \
-      --from 'magic-wormhole' \
+      uvx --no-config --no-progress --no-managed-python \
+      --from 'magic-wormhole' -- \
       wormhole \
         --appid TubeSync \
         --relay-url "${WORMHOLE_RELAY}" \
@@ -538,9 +546,10 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
         "${saved}" || : ; \
     else \
       XDG_CACHE_HOME="${CACHE_PATH}" \
+      PYTHONPYCACHEPREFIX="${pycache}" \
       timeout -v -k 10m 15m \
-      uvx -v --no-config --no-progress --isolated --no-managed-python \
-      --from 'magic-wormhole' \
+      uvx --no-config --no-progress --no-managed-python \
+      --from 'magic-wormhole' -- \
       wormhole send \
         --hide-progress --no-qr \
         --code "${WORMHOLE_CODE}" \
