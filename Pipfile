@@ -9,6 +9,7 @@ autopep8 = "*"
 [packages]
 django = "~=5.2.1"
 django-sass-processor = {extras = ["management-command"], version = "*"}
+libsass = "*"
 pillow = "*"
 whitenoise = "*"
 gunicorn = "*"
