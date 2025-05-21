@@ -347,7 +347,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
   set -x && \
   apt-get update && \
-  apt-get -y --no-install-recommends install nginx-light && \
+  apt-get -y --no-install-recommends install nginx-light libnginx-mod-http-lua && \
   # openresty binary should still work
   ln -v -s -T ../sbin/nginx /usr/bin/openresty && \
   # Clean up
@@ -355,7 +355,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   apt-get -y autoclean && \
   rm -v -f /var/cache/debconf/*.dat-old
 
-FROM tubesync-openresty AS tubesync
+FROM tubesync-nginx AS tubesync
 
 ARG S6_VERSION
 
@@ -382,10 +382,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libwebp7 \
   pkgconf \
   python3 \
-  python3-libsass \
   python3-socks \
-  python3-venv \
-  python3-wheel \
   curl \
   less \
   && \
@@ -402,9 +399,9 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 # Install third party software
 COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
-COPY --from=bun /usr/local/bun/ /usr/local/bun/
-COPY --from=bun /usr/local/bin/ /usr/local/bin/
-COPY --from=deno /usr/local/bin/ /usr/local/bin/
+#COPY --from=bun /usr/local/bun/ /usr/local/bun/
+#COPY --from=bun /usr/local/bin/ /usr/local/bin/
+#COPY --from=deno /usr/local/bin/ /usr/local/bin/
 COPY --from=uv /usr/local/bin/ /usr/local/bin/
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
@@ -472,13 +469,6 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   && \
   # Install non-distro packages
   if [ -n "${WORMHOLE_CODE}" ] ; then \
-  PYTHONPYCACHEPREFIX="${pycache}" \
-    uv --no-config --no-progress --no-managed-python \
-    cache prune && \
-  PYTHONPYCACHEPREFIX="${pycache}" \
-    uvx --no-config --no-progress --no-managed-python \
-    --from 'pipenv' -- \
-    pipenv --version && \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx --no-config --no-progress --no-managed-python \
     --from 'magic-wormhole' -- \
