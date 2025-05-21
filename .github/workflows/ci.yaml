@@ -350,10 +350,13 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           build-args: |
+            CI=${{ env.CI }}
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
             FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
+            WORMHOLE_RELAY=${{ env.WORMHOLE_RELAY }}
+            WORMHOLE_TRANSIT=${{ env.WORMHOLE_TRANSIT }}
           build-contexts: |
             cache-tubesync=.cache/saved
           cache-from: type=gha
@@ -391,10 +394,13 @@ jobs:
           cache-to: |
             type=gha,mode=max
           build-args: |
+            CI=${{ env.CI }}
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
             FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
+            WORMHOLE_RELAY=${{ env.WORMHOLE_RELAY }}
+            WORMHOLE_TRANSIT=${{ env.WORMHOLE_TRANSIT }}
           build-contexts: |
             cache-tubesync=.cache/saved
           secret-envs: |
