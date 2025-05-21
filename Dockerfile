@@ -363,7 +363,8 @@ ARG FFMPEG_DATE FFMPEG_VERSION
 
 ENV S6_VERSION="${S6_VERSION}" \
     FFMPEG_DATE="${FFMPEG_DATE}" \
-    FFMPEG_VERSION="${FFMPEG_VERSION}"
+    FFMPEG_VERSION="${FFMPEG_VERSION}" \
+    UV_LINK_MODE='copy'
 
 ARG TARGETARCH
 
@@ -470,7 +471,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   # Install non-distro packages
   PYTHONPYCACHEPREFIX="${pycache}" \
     uv -v --no-config --no-progress --no-managed-python \
-    cache prune && \
+    cache prune ${CI:+--ci} && \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uvx -v --no-config --no-progress --no-managed-python \
     --from 'pipenv' -- \
@@ -492,7 +493,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   PYTHONPYCACHEPREFIX="${pycache}" \
     uv --no-config --no-progress --no-managed-python \
     pip install --strict --system --break-system-packages \
-    --link-mode copy --requirements "${CACHE_PATH}"/requirements.txt && \
+    --requirements "${CACHE_PATH}"/requirements.txt && \
   # remove the getpot_bgutil_script plugin
   find /usr/local/lib \
   -name 'getpot_bgutil_script.py' \
