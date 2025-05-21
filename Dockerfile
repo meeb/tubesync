@@ -435,13 +435,12 @@ ARG YTDLP_DATE
 RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=cache,sharing=locked,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
     --mount=type=cache,sharing=locked,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
-    --mount=type=cache,sharing=locked,target=${CACHE_PATH}/.restored-uv,source=/uv-cache,from=populate-uv-cache-dir \
+    --mount=type=cache,sharing=locked,target=${CACHE_PATH}/uv,source=/uv-cache,from=populate-uv-cache-dir \
     --mount=type=secret,id=WORMHOLE_CODE,env=WORMHOLE_CODE \
     --mount=type=secret,id=WORMHOLE_RELAY,env=WORMHOLE_RELAY \
     --mount=type=secret,id=WORMHOLE_TRANSIT,env=WORMHOLE_TRANSIT \
     --mount=type=cache,sharing=private,target=${CACHE_PATH}/pip \
     --mount=type=cache,sharing=private,target=${CACHE_PATH}/pipenv \
-    --mount=type=cache,sharing=private,target=${CACHE_PATH}/uv \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
   # set up cache
@@ -454,8 +453,6 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     mkdir -p "${CACHE_PATH}/.home-directories" ; \
     cp -at "${CACHE_PATH}/.home-directories/" "${HOME}" && \
     HOME="${CACHE_PATH}/.home-directories/${HOME#/}" ; \
-    # copy the restored uv directory
-    cp -a "${CACHE_PATH}"/.restored-uv/* "${CACHE_PATH}"/uv/ || : ; \
   } && \
   apt-get update && \
   # Install required build packages
