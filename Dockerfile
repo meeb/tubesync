@@ -524,6 +524,10 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     cp -a /var/cache/apt "${saved}/apt-cache-cache" && \
     cp -a /var/lib/apt "${saved}/${TARGETARCH}/apt-lib-cache" && \
     cp -a "${CACHE_PATH}/uv" "${saved}/uv-cache" && \
+    XDG_CACHE_HOME="${CACHE_PATH}" \
+    PYTHONPYCACHEPREFIX="${pycache}" \
+    uv --no-config --no-progress --no-managed-python \
+    cache prune --ci --cache-dir "${saved}/uv-cache" && \
     ls -al "${saved}" && ls -al "${saved}"/* && \
     ls -al "${saved}/${TARGETARCH}"/* && \
     if [ -n "${WORMHOLE_RELAY}" ] && [ -n "${WORMHOLE_TRANSIT}" ]; then \
