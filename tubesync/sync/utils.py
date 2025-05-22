@@ -130,7 +130,7 @@ def file_is_editable(filepath):
     return False
 
 
-def directory_and_stem(arg_path, /, *, only_once=False):
+def directory_and_stem(arg_path, /, *, only_once=True):
     filepath = Path(arg_path)
     stem = Path(filepath.stem)
     while not only_once and stem.suffixes and '' != stem.suffix:
