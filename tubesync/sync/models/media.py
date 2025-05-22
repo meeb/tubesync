@@ -1172,7 +1172,7 @@ class Media(models.Model):
                     self.save(update_fields=('media_file', 'skip'))
                     log.info(f'Updated "media_file" in the database for: {self!s}')
 
-                    (new_prefix_path, new_stem) = directory_and_stem(new_video_path)
+                    (new_prefix_path, new_stem) = directory_and_stem(new_video_path, only_once=True)
 
                     # move and change names to match stem
                     for other_path in other_paths:
