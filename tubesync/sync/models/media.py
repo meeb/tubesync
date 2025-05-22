@@ -1193,7 +1193,7 @@ class Media(models.Model):
                             other_path.replace(new_file_path)
 
                     for fuzzy_path in fuzzy_paths:
-                        (fuzzy_prefix_path, fuzzy_stem) = directory_and_stem(fuzzy_path)
+                        (fuzzy_prefix_path, fuzzy_stem) = directory_and_stem(fuzzy_path, only_once=False)
                         old_file_str = fuzzy_path.name
                         new_file_str = new_stem + old_file_str[len(fuzzy_stem):]
                         new_file_path = Path(new_prefix_path / new_file_str)
