@@ -1152,7 +1152,7 @@ class Media(models.Model):
 
                 # collect the list of files to move
                 # this should not include the video we just moved
-                (old_prefix_path, old_stem) = directory_and_stem(old_video_path)
+                (old_prefix_path, old_stem) = directory_and_stem(old_video_path, only_once=True)
                 other_paths = list(old_prefix_path.glob(glob_quote(old_stem) + '*'))
                 log.info(f'Collected {len(other_paths)} other paths for: {self!s}')
 
