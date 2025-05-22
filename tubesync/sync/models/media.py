@@ -25,8 +25,7 @@ from ..youtube import (
 )
 from ..utils import (
     seconds_to_timestr, parse_media_format, filter_response,
-    write_text_file, mkdir_p, directory_and_stem, glob_quote,
-    multi_key_sort,
+    write_text_file, mkdir_p, glob_quote, multi_key_sort,
 )
 from ..matching import (
     get_best_combined_format,
@@ -39,7 +38,7 @@ from ..choices import (
 from ._migrations import (
     media_file_storage, get_media_thumb_path, get_media_file_path,
 )
-from ._private import _srctype_dict, _nfo_element
+from ._private import _srctype_dict, _nfo_element, directory_and_stem
 from .media__tasks import (
     download_checklist, download_finished, wait_for_premiere,
 )
@@ -1152,7 +1151,7 @@ class Media(models.Model):
 
                 # collect the list of files to move
                 # this should not include the video we just moved
-                (old_prefix_path, old_stem) = directory_and_stem(old_video_path, only_once=True)
+                (old_prefix_path, old_stem) = directory_and_stem(old_video_path)
                 other_paths = list(old_prefix_path.glob(glob_quote(old_stem) + '*'))
                 log.info(f'Collected {len(other_paths)} other paths for: {self!s}')
 
@@ -1172,7 +1171,7 @@ class Media(models.Model):
                     self.save(update_fields=('media_file', 'skip'))
                     log.info(f'Updated "media_file" in the database for: {self!s}')
 
-                    (new_prefix_path, new_stem) = directory_and_stem(new_video_path, only_once=True)
+                    (new_prefix_path, new_stem) = directory_and_stem(new_video_path)
 
                     # move and change names to match stem
                     for other_path in other_paths:
@@ -1193,7 +1192,7 @@ class Media(models.Model):
                             other_path.replace(new_file_path)
 
                     for fuzzy_path in fuzzy_paths:
-                        (fuzzy_prefix_path, fuzzy_stem) = directory_and_stem(fuzzy_path, only_once=False)
+                        (fuzzy_prefix_path, fuzzy_stem) = directory_and_stem(fuzzy_path, True)
                         old_file_str = fuzzy_path.name
                         new_file_str = new_stem + old_file_str[len(fuzzy_stem):]
                         new_file_path = Path(new_prefix_path / new_file_str)
