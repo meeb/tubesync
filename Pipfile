@@ -24,5 +24,4 @@ yt-dlp = {extras = ["default", "curl-cffi"], version = "*"}
 emoji = "*"
 brotli = "*"
 html5lib = "*"
-yt-dlp-get-pot = "*"
 bgutil-ytdlp-pot-provider = "*"
