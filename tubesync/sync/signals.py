@@ -10,11 +10,11 @@ from django.utils.translation import gettext_lazy as _
 from background_task.signals import task_failed
 from background_task.models import Task
 from common.logger import log
-from .models import Source, Media, MediaServer, Metadata
+from .models import Source, Media, Metadata
 from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
                     download_media_thumbnail, download_media_metadata,
                     map_task_to_instance, check_source_directory_exists,
-                    download_media, rescan_media_server, download_source_images,
+                    download_media, download_source_images,
                     delete_all_media_for_source, save_all_media_for_source,
                     rename_media, get_media_metadata_task, get_media_download_task)
 from .utils import delete_file, glob_quote, mkdir_p
@@ -270,7 +270,7 @@ def media_post_save(sender, instance, created, **kwargs):
     if not (media_file_exists or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
         if instance.can_download and instance.downloaded:
-            skip_changed = True != instance.skip
+            skip_changed = True if not instance.skip else False
             instance.skip = True
         downloaded = False
     if (instance.source.download_media and instance.can_download) and not (
@@ -374,13 +374,13 @@ def media_post_delete(sender, instance, **kwargs):
                         try:
                             p.rmdir()
                             log.info(f'Deleted directory for: {instance} path: {p!s}')
-                        except OSError as e:
+                        except OSError:
                             pass
                 # Delete the directory itself
                 try:
                     other_path.rmdir()
                     log.info(f'Deleted directory for: {instance} path: {other_path!s}')
-                except OSError as e:
+                except OSError:
                     pass
         # Get all files that start with the bare file path
         all_related_files = video_path.parent.glob(f'{glob_quote(video_path.with_suffix("").name)}*')

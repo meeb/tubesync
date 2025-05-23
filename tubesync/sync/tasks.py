@@ -6,7 +6,6 @@
 
 import os
 import json
-import math
 import random
 import requests
 import time
@@ -14,9 +13,8 @@ import uuid
 from io import BytesIO
 from hashlib import sha1
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import timedelta
 from shutil import copyfile, rmtree
-from PIL import Image
 from django import db
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -30,14 +28,14 @@ from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from common.logger import log
 from common.errors import ( NoFormatException, NoMediaException,
-                            NoMetadataException, NoThumbnailException,
+                            NoThumbnailException,
                             DownloadFailedException, )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, )
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer
-from .utils import ( get_remote_image, resize_image_to_height, delete_file,
-                    write_text_file, filter_response, )
+from .utils import ( get_remote_image, resize_image_to_height,
+                    write_text_file, filter_response, seconds_to_timestr, )
 from .youtube import YouTubeError
 
 db_vendor = db.connection.vendor
@@ -122,7 +120,7 @@ def get_error_message(task):
 def update_task_status(task, status):
     if not task:
         return False
-    if not task._verbose_name:
+    if not hasattr(task, '_verbose_name'):
         task._verbose_name = remove_enclosed(
             task.verbose_name, '[', ']', ' ',
         )
@@ -226,13 +224,45 @@ def save_model(instance):
 @atomic(durable=False)
 def schedule_media_servers_update():
     # Schedule a task to update media servers
-    log.info(f'Scheduling media server updates')
+    log.info('Scheduling media server updates')
     verbose_name = _('Request media server rescan for "{}"')
     for mediaserver in MediaServer.objects.all():
         rescan_media_server(
             str(mediaserver.pk),
             verbose_name=verbose_name.format(mediaserver),
         )
+
+
+def wait_for_errors(model, /, *, task_name=None):
+    if task_name is None:
+        task_name=tuple((
+            'sync.tasks.download_media',
+            'sync.tasks.download_media_metadata',
+        ))
+    elif isinstance(task_name, str):
+        task_name = tuple((task_name,))
+    tasks = list()
+    for tn in task_name:
+        ft = get_first_task(tn, instance=model)
+        if ft:
+            tasks.append(ft)
+    window = timezone.timedelta(hours=3) + timezone.now()
+    tqs = Task.objects.filter(
+        task_name__in=task_name,
+        attempts__gt=0,
+        locked_at__isnull=True,
+        run_at__lte=window,
+        last_error__contains='HTTPError 429: Too Many Requests',
+    )
+    for task in tasks:
+        update_task_status(task, 'paused (429)')
+    
+    delay = 10 * tqs.count()
+    time_str = seconds_to_timestr(delay)
+    log.info(f'waiting for errors: 429 ({time_str}): {model}')
+    time.sleep(delay)
+    for task in tasks:
+        update_task_status(task, None)
 
 
 def cleanup_old_media():
@@ -255,7 +285,7 @@ def cleanup_old_media():
     schedule_media_servers_update()
 
 
-def cleanup_removed_media(source, videos):
+def cleanup_removed_media(source, video_keys):
     if not source.delete_removed_media:
         return
     log.info(f'Cleaning up media no longer in source: {source}')
@@ -265,8 +295,7 @@ def cleanup_removed_media(source, videos):
         source=source,
     )
     for media in qs_gen(mqs):
-        matching_source_item = [video['id'] for video in videos if video['id'] == media.key]
-        if not matching_source_item:
+        if media.key not in video_keys:
             log.info(f'{media.name} is no longer in source, removing')
             with atomic():
                 media.delete()
@@ -316,12 +345,17 @@ def index_source_task(source_id):
             end=task.verbose_name.find('Index'),
         )
     tvn_format = '{:,}' + f'/{num_videos:,}'
-    for vn, video in enumerate(videos, start=1):
+    vn = 0
+    video_keys = set()
+    while len(videos) > 0:
+        vn += 1
+        video = videos.popleft()
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
         if not key:
             # Video has no unique key (ID), it can't be indexed
             continue
+        video_keys.add(key)
         update_task_status(task, tvn_format.format(vn))
         # media, new_media = Media.objects.get_or_create(key=key, source=source)
         try:
@@ -376,7 +410,7 @@ def index_source_task(source_id):
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
     # Cleanup of media no longer available from the source
-    cleanup_removed_media(source, videos)
+    cleanup_removed_media(source, video_keys)
     videos = video = None
 
 
@@ -416,7 +450,7 @@ def download_source_images(source_id):
     log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
         f'Banner: {banner}')
-    if banner != None:
+    if banner is not None:
         url = banner
         i = get_remote_image(url)
         image_file = BytesIO()
@@ -432,7 +466,7 @@ def download_source_images(source_id):
                 f.write(django_file.read())
         i = image_file = None
 
-    if avatar != None:
+    if avatar is not None:
         url = avatar
         i = get_remote_image(url)
         image_file = BytesIO()
@@ -467,6 +501,7 @@ def download_media_metadata(media_id):
         log.info(f'Task for ID: {media_id} / {media} skipped, due to task being manually skipped.')
         return
     source = media.source
+    wait_for_errors(media, task_name='sync.tasks.download_media_metadata')
     try:
         metadata = media.index_metadata()
     except YouTubeError as e:
@@ -615,8 +650,11 @@ def download_media(media_id, override=False):
         raise InvalidTaskError(_('no such media')) from e
     else:
         if not media.download_checklist(override):
+            # any condition that needs to reschedule the task
+            # should raise an exception to avoid this
             return
 
+    wait_for_errors(media, task_name='sync.tasks.download_media')
     filepath = media.filepath
     container = format_str = None
     log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
@@ -832,8 +870,7 @@ def wait_for_media_premiere(media_id):
         
         if hours:
             task = get_media_premiere_task(media_id)
-            if task:
-                update_task_status(task, f'available in {hours} hours')
+            update_task_status(task, f'available in {hours} hours')
         save_model(media)
 
 
@@ -845,7 +882,7 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
     assert source_directory
     try:
         source = Source.objects.get(pk=source_id)
-    except Source.DoesNotExist as e:
+    except Source.DoesNotExist:
         # Task triggered but the source no longer exists, do nothing
         log.warn(f'Task delete_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')

@@ -198,7 +198,7 @@ RENAME_SOURCES = list()
 # You have been warned!
 
 try:
-    from .local_settings import *
+    from .local_settings import * # noqa
 except ImportError as e:
     import sys
     sys.stderr.write(f'Unable to import local_settings: {e}\n')
@@ -222,5 +222,5 @@ if BACKGROUND_TASK_ASYNC_THREADS > MAX_BACKGROUND_TASK_ASYNC_THREADS:
     BACKGROUND_TASK_ASYNC_THREADS = MAX_BACKGROUND_TASK_ASYNC_THREADS
 
 
-from .dbutils import patch_ensure_connection
+from .dbutils import patch_ensure_connection # noqa
 patch_ensure_connection()
