@@ -343,6 +343,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   pkgconf \
   python3 \
   python3-libsass \
+  python3-pip-whl \
   python3-socks \
   curl \
   less \
