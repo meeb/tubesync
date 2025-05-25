@@ -316,7 +316,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   apt-get -y autoclean && \
   rm -v -f /var/cache/debconf/*.dat-old
 
-FROM tubesync-nginx AS tubesync
+FROM tubesync-openresty AS tubesync
 
 ARG S6_VERSION
 
