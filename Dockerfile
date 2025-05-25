@@ -19,6 +19,8 @@ ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 
+ARG CACHE_MOUNT='/cache'
+
 
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
@@ -365,7 +367,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   python3 \
   python3-libsass \
   python3-socks \
-  python3-wheel \
   curl \
   less \
   && \
@@ -411,8 +412,11 @@ WORKDIR /app
 ARG YTDLP_DATE
 
 # Set up the app
-RUN --mount=type=tmpfs,target=/cache \
-    --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
+ARG CACHE_MOUNT
+RUN --mount=type=tmpfs,target="${CACHE_MOUNT}" \
+    --mount=type=cache,id=uv-cache,sharing=locked,target="${CACHE_MOUNT}/uv" \
+    --mount=type=cache,id=pipenv-cache,sharing=locked,target="${CACHE_MOUNT}/pipenv" \
+    --mount=type=cache,id=pycache-cache,sharing=private,target="${CACHE_MOUNT}/pycache" \
     --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
@@ -432,11 +436,11 @@ RUN --mount=type=tmpfs,target=/cache \
   zlib1g-dev \
   && \
   # Install non-distro packages
-  cp -at /tmp/ "${HOME}" && \
-  HOME="/tmp/${HOME#/}" \
-  XDG_CACHE_HOME='/cache' \
+  cp -at "${CACHE_MOUNT}/.home-directories/" "${HOME}" && \
+  HOME="${CACHE_MOUNT}/${HOME#/}" \
   PIPENV_VERBOSITY=64 \
-  PYTHONPYCACHEPREFIX=/cache/pycache \
+  XDG_CACHE_HOME="${CACHE_MOUNT}" \
+  PYTHONPYCACHEPREFIX="${CACHE_MOUNT}/pycache" \
     uvx -v --no-config --no-progress --isolated --no-managed-python \
     pipenv install --system --skip-lock && \
   # remove the getpot_bgutil_script plugin
