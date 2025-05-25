@@ -415,6 +415,7 @@ RUN --mount=type=tmpfs,target=/cache \
   zlib1g-dev \
   && \
   # Install non-distro packages
+  mkdir -v -p /cache/.home-directories && \
   cp -at /cache/.home-directories/ "${HOME}" && \
   HOME="/cache/.home-directories/${HOME#/}" \
   XDG_CACHE_HOME='/cache' \
