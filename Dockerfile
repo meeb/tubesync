@@ -391,6 +391,7 @@ RUN --mount=type=tmpfs,target=/cache \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    --mount=type=bind,source=/uv,target=/usr/local/bin/uv,from=uv-binaries \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
   apt-get update && \
