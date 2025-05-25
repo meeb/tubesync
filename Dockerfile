@@ -441,7 +441,7 @@ RUN --mount=type=tmpfs,target="${CACHE_MOUNT}" \
   PIPENV_VERBOSITY=64 \
   XDG_CACHE_HOME="${CACHE_MOUNT}" \
   PYTHONPYCACHEPREFIX="${CACHE_MOUNT}/pycache" \
-    uvx -v --no-config --no-progress --isolated --no-managed-python \
+    uv tool run --no-config --no-progress --no-managed-python -- \
     pipenv install --system --skip-lock && \
   # remove the getpot_bgutil_script plugin
   find /usr/local/lib \
