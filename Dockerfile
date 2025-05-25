@@ -402,7 +402,7 @@ COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 #COPY --from=bun /usr/local/bun/ /usr/local/bun/
 #COPY --from=bun /usr/local/bin/ /usr/local/bin/
 #COPY --from=deno /usr/local/bin/ /usr/local/bin/
-COPY --from=uv /usr/local/bin/ /usr/local/bin/
+#COPY --from=uv /usr/local/bin/ /usr/local/bin/
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
@@ -441,6 +441,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     --mount=type=cache,sharing=private,target=${CACHE_PATH}/pip \
     --mount=type=cache,sharing=private,target=${CACHE_PATH}/pipenv \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
+    --mount=type=bind,source=/uv,target=/usr/local/bin/uv,from=uv-binaries \
   set -x && \
   # set up cache
   { \
@@ -470,17 +471,17 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   # Install non-distro packages
   if [ -n "${WORMHOLE_CODE}" ] ; then \
   PYTHONPYCACHEPREFIX="${pycache}" \
-    uvx --no-config --no-progress --no-managed-python \
+    uv tool run --no-config --no-progress --no-managed-python \
     --from 'magic-wormhole' -- \
     wormhole --version ; \
   fi && \
   PIPENV_VERBOSITY=2 \
   PYTHONPYCACHEPREFIX="${pycache}" \
-    uvx --no-config --no-progress --no-managed-python -- \
+    uv tool run --no-config --no-progress --no-managed-python -- \
     pipenv lock && \
   PIPENV_VERBOSITY=1 \
   PYTHONPYCACHEPREFIX="${pycache}" \
-    uvx --no-config --no-progress --no-managed-python -- \
+    uv tool run --no-config --no-progress --no-managed-python -- \
     pipenv requirements --from-pipfile --hash >| "${CACHE_PATH}"/requirements.txt && \
   rm -v Pipfile.lock && \
   cat -v "${CACHE_PATH}"/requirements.txt && \
@@ -528,7 +529,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
       XDG_CACHE_HOME="${CACHE_PATH}" \
       PYTHONPYCACHEPREFIX="${pycache}" \
       timeout -v -k 10m 25m \
-      uvx --no-config --no-progress --no-managed-python \
+      uv tool run --no-config --no-progress --no-managed-python \
       --from 'magic-wormhole' -- \
       wormhole \
         --appid TubeSync \
@@ -542,7 +543,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
       XDG_CACHE_HOME="${CACHE_PATH}" \
       PYTHONPYCACHEPREFIX="${pycache}" \
       timeout -v -k 10m 25m \
-      uvx --no-config --no-progress --no-managed-python \
+      uv tool run --no-config --no-progress --no-managed-python \
       --from 'magic-wormhole' -- \
       wormhole send \
         --hide-progress --no-qr \
