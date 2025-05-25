@@ -431,6 +431,7 @@ RUN --mount=type=tmpfs,target=/cache \
   rm -v Pipfile.lock && \
   cat -v /cache/requirements.txt && \
   HOME="/tmp/${HOME#/}" \
+  UV_LINK_MODE='copy' \
   XDG_CACHE_HOME='/cache' \
   PYTHONPYCACHEPREFIX=/cache/pycache \
     uv --no-config --no-progress --no-managed-python \
