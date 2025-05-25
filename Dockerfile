@@ -415,14 +415,14 @@ RUN --mount=type=tmpfs,target=/cache \
   zlib1g-dev \
   && \
   # Install non-distro packages
-  cp -at /tmp/ "${HOME}" && \
-  HOME="/tmp/${HOME#/}" \
+  cp -at /cache/.home-directories/ "${HOME}" && \
+  HOME="/cache/.home-directories/${HOME#/}" \
   XDG_CACHE_HOME='/cache' \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX=/cache/pycache \
   uv tool run --no-config --no-progress --no-managed-python -- \
     pipenv lock && \
-  HOME="/tmp/${HOME#/}" \
+  HOME="/cache/.home-directories/${HOME#/}" \
   XDG_CACHE_HOME='/cache' \
   PIPENV_VERBOSITY=1 \
   PYTHONPYCACHEPREFIX=/cache/pycache \
@@ -430,7 +430,7 @@ RUN --mount=type=tmpfs,target=/cache \
     pipenv requirements --from-pipfile --hash >| /cache/requirements.txt && \
   rm -v Pipfile.lock && \
   cat -v /cache/requirements.txt && \
-  HOME="/tmp/${HOME#/}" \
+  HOME="/cache/.home-directories/${HOME#/}" \
   XDG_CACHE_HOME='/cache' \
   PYTHONPYCACHEPREFIX=/cache/pycache \
     uv --no-config --no-progress --no-managed-python \
