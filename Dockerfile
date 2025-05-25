@@ -340,12 +340,10 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libmariadb3 \
   libpq5 \
   libwebp7 \
-  pipenv \
   pkgconf \
   python3 \
   python3-libsass \
   python3-socks \
-  python3-wheel \
   curl \
   less \
   && \
@@ -388,6 +386,7 @@ ARG YTDLP_DATE
 
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=cache,id=uv-cache,sharing=locked,target=/cache/uv \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
@@ -406,7 +405,6 @@ RUN --mount=type=tmpfs,target=/cache \
   make \
   postgresql-common \
   python3-dev \
-  python3-pip \
   zlib1g-dev \
   && \
   # Install non-distro packages
@@ -415,6 +413,7 @@ RUN --mount=type=tmpfs,target=/cache \
   XDG_CACHE_HOME='/cache' \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX=/cache/pycache \
+  uv tool run --no-config --no-progress --no-managed-python -- \
     pipenv install --system --skip-lock && \
   # remove the getpot_bgutil_script plugin
   find /usr/local/lib \
@@ -433,7 +432,6 @@ RUN --mount=type=tmpfs,target=/cache \
   make \
   postgresql-common \
   python3-dev \
-  python3-pip \
   zlib1g-dev \
   && \
   apt-get -y autopurge && \
