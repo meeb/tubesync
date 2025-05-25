@@ -386,7 +386,6 @@ COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 COPY --from=bun /usr/local/bun/ /usr/local/bun/
 COPY --from=bun /usr/local/bin/ /usr/local/bin/
 COPY --from=deno /usr/local/bin/ /usr/local/bin/
-COPY --from=uv /usr/local/bin/ /usr/local/bin/
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
@@ -420,6 +419,7 @@ RUN --mount=type=tmpfs,target="${CACHE_MOUNT}" \
     --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
+    --mount=type=bind,source=/uv,target=/usr/local/bin/uv,from=uv-binaries \
   set -x && \
   apt-get update && \
   # Install required build packages
