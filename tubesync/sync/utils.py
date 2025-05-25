@@ -130,15 +130,6 @@ def file_is_editable(filepath):
     return False
 
 
-def directory_and_stem(arg_path):
-    filepath = Path(arg_path)
-    stem = Path(filepath.stem)
-    while stem.suffixes and '' != stem.suffix:
-        stem = Path(stem.stem)
-    stem = str(stem)
-    return (filepath.parent, stem,)
-
-
 def mkdir_p(arg_path, mode=0o777):
     '''
         Reminder: mode only affects the last directory
