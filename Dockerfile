@@ -10,6 +10,7 @@ ARG SHA256_S6_ARM64="8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f6
 ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae"
 
 ARG ALPINE_VERSION="latest"
+ARG BUN_VERSION="1-slim"
 ARG DEBIAN_VERSION="bookworm-slim"
 
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
@@ -17,6 +18,8 @@ ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
+
+ARG CACHE_MOUNT='/cache'
 
 
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
@@ -279,6 +282,31 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
+FROM oven/bun:${BUN_VERSION} AS bun-base
+
+FROM debian:${DEBIAN_VERSION} AS bun
+COPY --from=bun-base /usr/local/bin/bun /usr/local/bun/bin/bun
+RUN mkdir -v -p /usr/local/bun/node-fallback/bin && \
+    ln -v -T -s ../../bin/bun /usr/local/bun/node-fallback/bin/node && \
+    ln -v -T -s bun /usr/local/bun/bin/bunx && \
+    mkdir -v -p /usr/local/bin && \
+    ln -v -T -s ../bun/bin/bun /usr/local/bin/bun && \
+    ln -v -T -s bun /usr/local/bin/bunx && \
+    ls -H -l /usr/local/bun/node-fallback/bin/node \
+    /usr/local/bun/bin/bun /usr/local/bun/bin/bunx \
+    /usr/local/bin/bun /usr/local/bin/bunx && \
+    /usr/local/bun/bin/bun --version
+
+FROM denoland/deno:bin AS deno-binary
+
+FROM debian:${DEBIAN_VERSION} AS deno
+COPY --from=deno-binary /deno /usr/local/bin/
+
+FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
+
+FROM debian:${DEBIAN_VERSION} AS uv
+COPY --from=uv-binaries /uv /uvx /usr/local/bin/
+
 FROM tubesync-base AS tubesync-openresty
 
 COPY --from=openresty-debian \
@@ -335,12 +363,10 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libmariadb3 \
   libpq5 \
   libwebp7 \
-  pipenv \
   pkgconf \
   python3 \
   python3-libsass \
   python3-socks \
-  python3-wheel \
   curl \
   less \
   && \
@@ -357,6 +383,9 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 # Install third party software
 COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
+COPY --from=bun /usr/local/bun/ /usr/local/bun/
+COPY --from=bun /usr/local/bin/ /usr/local/bin/
+COPY --from=deno /usr/local/bin/ /usr/local/bin/
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
@@ -382,11 +411,15 @@ WORKDIR /app
 ARG YTDLP_DATE
 
 # Set up the app
-RUN --mount=type=tmpfs,target=/cache \
-    --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
+ARG CACHE_MOUNT
+RUN --mount=type=tmpfs,target="${CACHE_MOUNT}" \
+    --mount=type=cache,id=uv-cache,sharing=locked,target="${CACHE_MOUNT}/uv" \
+    --mount=type=cache,id=pipenv-cache,sharing=locked,target="${CACHE_MOUNT}/pipenv" \
+    --mount=type=cache,id=pycache-cache,sharing=private,target="${CACHE_MOUNT}/pycache" \
     --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
+    --mount=type=bind,source=/uv,target=/usr/local/bin/uv,from=uv-binaries \
   set -x && \
   apt-get update && \
   # Install required build packages
@@ -400,15 +433,15 @@ RUN --mount=type=tmpfs,target=/cache \
   make \
   postgresql-common \
   python3-dev \
-  python3-pip \
   zlib1g-dev \
   && \
   # Install non-distro packages
-  cp -at /tmp/ "${HOME}" && \
-  HOME="/tmp/${HOME#/}" \
-  XDG_CACHE_HOME='/cache' \
+  cp -at "${CACHE_MOUNT}/.home-directories/" "${HOME}" && \
+  HOME="${CACHE_MOUNT}/${HOME#/}" \
   PIPENV_VERBOSITY=64 \
-  PYTHONPYCACHEPREFIX=/cache/pycache \
+  XDG_CACHE_HOME="${CACHE_MOUNT}" \
+  PYTHONPYCACHEPREFIX="${CACHE_MOUNT}/pycache" \
+    uv tool run --no-config --no-progress --no-managed-python -- \
     pipenv install --system --skip-lock && \
   # remove the getpot_bgutil_script plugin
   find /usr/local/lib \
@@ -427,7 +460,6 @@ RUN --mount=type=tmpfs,target=/cache \
   make \
   postgresql-common \
   python3-dev \
-  python3-pip \
   zlib1g-dev \
   && \
   apt-get -y autopurge && \
