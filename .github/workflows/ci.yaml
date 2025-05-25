@@ -144,7 +144,7 @@ jobs:
               done
           } >> "${GITHUB_STEP_SUMMARY}"
           uvx --no-config --no-managed-python --no-progress --isolated \
-              ruff check --exit-zero \
+              ruff check \
               --target-version "${target_version}" \
               --output-format github \
               --ignore "${ignore_csv_list}"

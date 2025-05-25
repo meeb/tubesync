@@ -845,9 +845,11 @@ class TasksView(ListView):
         data = super().get_context_data(*args, **kwargs)
         now = timezone.now()
         qs = Task.objects.all()
-        errors_qs = qs.filter(attempts__gt=0, locked_by__isnull=True)
         running_qs = qs.filter(locked_by__isnull=False)
         scheduled_qs = qs.filter(locked_by__isnull=True)
+        errors_qs = scheduled_qs.filter(
+            attempts__gt=0
+        ).exclude(last_error__exact='')
 
         # Add to context data from ListView
         data['message'] = self.message
