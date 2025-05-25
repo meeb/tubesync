@@ -3,6 +3,8 @@ import os
 from common.logger import log
 from common.utils import remove_enclosed
 
+from .models import Media
+
 
 progress_hook = {
     'status': dict(),
@@ -49,7 +51,6 @@ class BaseStatus:
     def update_task(self):
         if self.media_key is None:
             return
-        from .models import Media
         from .tasks import get_media_download_task
 
         media = task = None
@@ -224,6 +225,18 @@ def yt_dlp_postprocessor_hook(event):
     status.update_task()
 
     log.info(f'[{event["postprocessor"]}] {event["status"]} for: {name}')
+    if 'started' == event['status'] and 'Merger' == event['postprocessor']:
+        files_to_merge = event['info_dict'].get('__files_to_merge') or list()
+        log.info(f'[{event["postprocessor"]}] Files to merge: {files_to_merge}')
+        try:
+            media = Media.objects.get(pk=status.media_uuid)
+            media.new_metadata.value['requested_formats'] = event['info_dict'].get('requested_formats')
+            media.new_metadata.value['requested_subtitles'] = event['info_dict'].get('requested_subtitles')
+            media.new_metadata.save()
+        except Media.DoesNotExist:
+            pass
+        except Exception as e:
+            log.exception(e)
     if 'finished' == event['status']:
         status.cleanup()
 
