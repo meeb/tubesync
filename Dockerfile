@@ -290,7 +290,10 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
   set -x && \
   apt-get update && \
-  apt-get -y --no-install-recommends install nginx-common openresty && \
+  apt-get -y --no-install-recommends install \
+    nginx-common \
+    openresty \
+  && \
   # Clean up
   apt-get -y autopurge && \
   apt-get -y autoclean && \
@@ -302,7 +305,10 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
   set -x && \
   apt-get update && \
-  apt-get -y --no-install-recommends install nginx-light && \
+  apt-get -y --no-install-recommends install \
+    nginx-light \
+    libnginx-mod-http-lua \
+  && \
   # openresty binary should still work
   ln -v -s -T ../sbin/nginx /usr/bin/openresty && \
   # Clean up
@@ -310,7 +316,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   apt-get -y autoclean && \
   rm -v -f /var/cache/debconf/*.dat-old
 
-FROM tubesync-openresty AS tubesync
+FROM tubesync-nginx AS tubesync
 
 ARG S6_VERSION
 
