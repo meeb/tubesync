@@ -2,6 +2,7 @@ import os
 
 from common.logger import log
 from common.utils import remove_enclosed
+from sync.utils import filter_response
 
 
 progress_hook = {
@@ -212,11 +213,15 @@ def yt_dlp_postprocessor_hook(event):
     status.media_name = name
 
     if 'started' == event['status']:
-        if 'formats' in event['info_dict']:
-            del event['info_dict']['formats']
-        if 'automatic_captions' in event['info_dict']:
-            del event['info_dict']['automatic_captions']
-        log.debug(repr(event['info_dict']))
+        remove_keys = frozenset({
+            'formats',
+            'automatic_captions',
+        })
+        logged_dict = filter_response(event['info_dict'], True)
+        found_keys = set(logged_dict.keys()).intersection(remove_keys)
+        for key in found_keys:
+            del logged_dict[key]
+        log.debug(repr(logged_dict))
 
     if 'Unknown' != key:
         status.media_key = key
