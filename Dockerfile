@@ -58,6 +58,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y autoclean && \
     rm -f /var/cache/debconf/*.dat-old
 
+FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
+
 FROM alpine:${ALPINE_VERSION} AS openresty-debian
 ARG TARGETARCH
 ARG DEBIAN_VERSION
@@ -278,6 +280,9 @@ RUN set -eu ; \
 
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
+
+FROM tubesync-base AS tubesync-uv
+COPY --from=uv-binaries /uv /uvx /usr/local/bin/
 
 FROM tubesync-base AS tubesync-openresty
 
