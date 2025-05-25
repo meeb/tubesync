@@ -58,6 +58,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y autoclean && \
     rm -f /var/cache/debconf/*.dat-old
 
+FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
+
 FROM alpine:${ALPINE_VERSION} AS openresty-debian
 ARG TARGETARCH
 ARG DEBIAN_VERSION
@@ -279,6 +281,9 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
+FROM tubesync-base AS tubesync-uv
+COPY --from=uv-binaries /uv /uvx /usr/local/bin/
+
 FROM tubesync-base AS tubesync-openresty
 
 COPY --from=openresty-debian \
@@ -341,12 +346,10 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libmariadb3 \
   libpq5 \
   libwebp7 \
-  pipenv \
   pkgconf \
   python3 \
   python3-libsass \
   python3-socks \
-  python3-wheel \
   curl \
   less \
   && \
@@ -389,9 +392,11 @@ ARG YTDLP_DATE
 
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=cache,id=uv-cache,sharing=locked,target=/cache/uv \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    --mount=type=bind,source=/uv,target=/usr/local/bin/uv,from=uv-binaries \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
   apt-get update && \
@@ -406,7 +411,6 @@ RUN --mount=type=tmpfs,target=/cache \
   make \
   postgresql-common \
   python3-dev \
-  python3-pip \
   zlib1g-dev \
   && \
   # Install non-distro packages
@@ -415,6 +419,7 @@ RUN --mount=type=tmpfs,target=/cache \
   XDG_CACHE_HOME='/cache' \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX=/cache/pycache \
+  uv tool run --no-config --no-progress --no-managed-python -- \
     pipenv install --system --skip-lock && \
   # remove the getpot_bgutil_script plugin
   find /usr/local/lib \
@@ -433,7 +438,6 @@ RUN --mount=type=tmpfs,target=/cache \
   make \
   postgresql-common \
   python3-dev \
-  python3-pip \
   zlib1g-dev \
   && \
   apt-get -y autopurge && \
