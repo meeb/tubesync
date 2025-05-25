@@ -13,11 +13,10 @@ from pathlib import Path
 from urllib.parse import urlunsplit, urlencode, urlparse
 from .errors import DatabaseConnectionError
 
-
-def directory_and_stem(arg_path, /):
+def directory_and_stem(arg_path, /, all_suffixes=False):
     filepath = Path(arg_path)
     stem = Path(filepath.stem)
-    while stem.suffixes and '' != stem.suffix:
+    while all_suffixes and stem.suffixes and '' != stem.suffix:
         stem = Path(stem.stem)
     return (filepath.parent, str(stem),)
 
