@@ -421,7 +421,21 @@ RUN --mount=type=tmpfs,target=/cache \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX=/cache/pycache \
   uv tool run --no-config --no-progress --no-managed-python -- \
-    pipenv install --system --skip-lock && \
+    pipenv lock && \
+  HOME="/tmp/${HOME#/}" \
+  XDG_CACHE_HOME='/cache' \
+  PIPENV_VERBOSITY=1 \
+  PYTHONPYCACHEPREFIX=/cache/pycache \
+  uv tool run --no-config --no-progress --no-managed-python -- \
+    pipenv requirements --from-pipfile --hash >| /cache/requirements.txt && \
+  rm -v Pipfile.lock && \
+  cat -v /cache/requirements.txt && \
+  HOME="/tmp/${HOME#/}" \
+  XDG_CACHE_HOME='/cache' \
+  PYTHONPYCACHEPREFIX=/cache/pycache \
+    uv --no-config --no-progress --no-managed-python \
+    pip install --strict --system --break-system-packages \
+    --requirements /cache/requirements.txt && \
   # remove the getpot_bgutil_script plugin
   find /usr/local/lib \
   -name 'getpot_bgutil_script.py' \
