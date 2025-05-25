@@ -20,6 +20,7 @@ mysqlclient = "*"
 PySocks = "*"
 urllib3 = {extras = ["socks"], version = "*"}
 requests = {extras = ["socks"], version = "*"}
+mutagen = "*"
 yt-dlp = {extras = ["default", "curl-cffi"], version = "*"}
 emoji = "*"
 brotli = "*"
