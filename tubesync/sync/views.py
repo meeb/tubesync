@@ -349,6 +349,9 @@ class AddSourceView(EditSourceMixin, CreateView):
 
     def get_initial(self):
         initial = super().get_initial()
+        initial['target_schedule'] = timezone.now().replace(
+            second=0, microsecond=0,
+        ).isoformat(timespec='minutes')
         for k, v in self.prepopulated_data.items():
             initial[k] = v
         return initial
