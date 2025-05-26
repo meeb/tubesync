@@ -95,7 +95,7 @@ def source_pre_save(sender, instance, **kwargs):
         index_source_task(
             str(instance.pk),
             repeat=instance.index_schedule,
-            schedule=instance.index_schedule,
+            schedule=instance.task_run_at_dt,
             verbose_name=verbose_name.format(instance.name),
         )
 
