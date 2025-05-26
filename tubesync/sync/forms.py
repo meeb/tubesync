@@ -13,6 +13,7 @@ else:
 
 SourceForm = forms.modelform_factory(
     Source,
+    fields = '__all__',
     widgets = {
         'target_schedule': forms.DateTimeInput(
             attrs={'type': 'datetime-local'},
