@@ -387,7 +387,7 @@ class Source(db.models.Model):
     @property
     def task_run_at_dt(self):
         now = timezone.now()
-        if self.target_schedule > now:
+        if now < self.target_schedule:
             return self.target_schedule
         when = now.replace(minute=0, second=0, microsecond=0)
         while when.hour != self.target_schedule.hour:
