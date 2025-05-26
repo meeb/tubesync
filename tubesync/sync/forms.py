@@ -2,13 +2,24 @@
 from django import forms, VERSION as DJANGO_VERSION
 from django.utils.translation import gettext_lazy as _
 
+from .models import Source
+
 
 if DJANGO_VERSION[0:3] < (5, 0, 0):
     _assume_scheme = dict()
 else:
     # Silence RemovedInDjango60Warning
     _assume_scheme = dict(assume_scheme='http')
-    
+
+SourceForm = forms.modelform_factory(
+    Source,
+    widgets = {
+        'target_schedule': forms.DateTimeInput(
+            attrs={'type': 'datetime-local'},
+        ),
+    },
+)
+
 class ValidateSourceForm(forms.Form):
 
     source_type = forms.CharField(
