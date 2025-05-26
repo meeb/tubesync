@@ -130,6 +130,7 @@ class Source(db.models.Model):
     )
     target_schedule = db.models.DateTimeField(
         _('target schedule'),
+        blank=True,
         db_index=True,
         default=timezone.now,
         help_text=_('Date and time when the task to index the source should begin'),
