@@ -13,7 +13,15 @@ else:
 
 SourceForm = forms.modelform_factory(
     Source,
-    fields = '__all__',
+    # manual ordering
+    fields = (
+        'source_type', 'key', 'name', 'directory', 'filter_text', 'filter_text_invert', 'filter_seconds', 'filter_seconds_min',
+        'media_format', 'target_schedule', 'index_schedule', 'index_videos', 'index_streams', 'download_media',
+        'download_cap', 'delete_old_media', 'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
+        'prefer_60fps', 'prefer_hdr', 'fallback', 'delete_removed_media', 'delete_files_on_disk', 'copy_channel_images',
+        'copy_thumbnails', 'write_nfo', 'write_json', 'embed_metadata', 'embed_thumbnail',
+        'enable_sponsorblock', 'sponsorblock_categories', 'write_subtitles', 'auto_subtitles', 'sub_langs',
+    ),
     widgets = {
         'target_schedule': forms.DateTimeInput(
             attrs={'type': 'datetime-local'},
