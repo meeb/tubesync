@@ -387,11 +387,28 @@ class Source(db.models.Model):
     @property
     def task_run_at_dt(self):
         now = timezone.now()
+        when = now.replace(minute=0, second=0, microsecond=0)
+
+        def advance_hour(arg_dt, target_hour, /):
+            dt = arg_dt
+            while dt.hour != target_hour:
+                dt += timezone.timedelta(hours=1)
+            return dt
+
+        if Val(IndexSchedule.EVERY_24_HOURS) > self.index_schedule:
+            self.target_schedule = now + timezone.timedelta(
+                seconds=1+self.index_schedule,
+            )
+        elif Val(IndexSchedule.EVERY_7_DAYS) > self.index_schedule:
+            self.target_schedule = advance_hour(
+                when.replace(hour=1+when.hour),
+                self.target_schedule.hour,
+            )
+
         if now < self.target_schedule:
             return self.target_schedule
-        when = now.replace(minute=0, second=0, microsecond=0)
-        while when.hour != self.target_schedule.hour:
-            when += timezone.timedelta(hours=1)
+
+        when = advance_hour(when, self.target_schedule.hour)
         while when.weekday != self.target_schedule.weekday:
             when += timezone.timedelta(days=1)
         self.target_schedule = when
