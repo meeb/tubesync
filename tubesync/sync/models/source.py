@@ -395,6 +395,8 @@ class Source(db.models.Model):
                 dt += timezone.timedelta(hours=1)
             return dt
 
+        if self.target_schedule is None:
+            self.target_schedule = when
         if Val(IndexSchedule.EVERY_24_HOURS) > self.index_schedule:
             self.target_schedule = now + timezone.timedelta(
                 seconds=1+self.index_schedule,
