@@ -319,6 +319,8 @@ def index_source_task(source_id):
     # An inactive Source would return an empty list for videos anyway
     if not source.is_active:
         return
+    # update the target schedule column
+    source.task_run_at_dt
     # Reset any errors
     # TODO: determine if this affects anything
     source.has_failed = False
@@ -407,6 +409,9 @@ def index_source_task(source_id):
                     str(media.pk),
                     verbose_name=verbose_name.format(media.key, media.name),
                 )
+    # start run_at with the next schedule target
+    if task:
+        task.run_at = source.task_run_at_dt
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
     # Cleanup of media no longer available from the source
