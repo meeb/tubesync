@@ -31,7 +31,6 @@ class Source(db.models.Model):
         or a YouTube playlist.
     '''
 
-    
     embed_metadata = db.models.BooleanField(
         _('embed metadata'),
         default=False,
