@@ -41,7 +41,6 @@ class Source(db.models.Model):
         default=False,
         help_text=_('Embed thumbnail into the file'),
     )
-    
 
     # Fontawesome icons used for the source on the front end
     ICONS = _srctype_dict('<i class="fab fa-youtube"></i>')
