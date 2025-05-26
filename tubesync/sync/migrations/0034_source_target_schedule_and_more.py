@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             model_name='source',
             name='target_schedule',
             field=models.DateTimeField(
-                db_index=True, default=django.utils.timezone.now,
+                blank=True, db_index=True, default=django.utils.timezone.now,
                 help_text='Date and time when the task to index the source should begin',
                 verbose_name='target schedule',
             ),
