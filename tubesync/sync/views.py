@@ -25,7 +25,7 @@ from background_task.models import Task, CompletedTask
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
-                    ConfirmDeleteMediaServerForm)
+                    ConfirmDeleteMediaServerForm, SourceForm)
 from .utils import validate_url, delete_file, multi_key_sort, mkdir_p
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
@@ -276,6 +276,7 @@ class ValidateSourceView(FormView):
 
 class EditSourceMixin:
     model = Source
+    form_class = SourceForm
     # manual ordering
     fields = ('source_type', 'key', 'name', 'directory', 'filter_text', 'filter_text_invert', 'filter_seconds', 'filter_seconds_min',
               'media_format', 'target_schedule', 'index_schedule', 'index_videos', 'index_streams', 'download_media',
