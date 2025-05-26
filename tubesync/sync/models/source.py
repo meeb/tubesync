@@ -31,16 +31,7 @@ class Source(db.models.Model):
         or a YouTube playlist.
     '''
 
-    sponsorblock_categories = CommaSepChoiceField(
-        _(''),
-        max_length=128,
-        possible_choices=SponsorBlock_Category.choices,
-        all_choice='all',
-        allow_all=True,
-        all_label='(All Categories)',
-        default='all',
-        help_text=_('Select the SponsorBlock categories that you wish to be removed from downloaded videos.'),
-    )
+    
     embed_metadata = db.models.BooleanField(
         _('embed metadata'),
         default=False,
@@ -51,11 +42,7 @@ class Source(db.models.Model):
         default=False,
         help_text=_('Embed thumbnail into the file'),
     )
-    enable_sponsorblock = db.models.BooleanField(
-        _('enable sponsorblock'),
-        default=True,
-        help_text=_('Use SponsorBlock?'),
-    )
+    
 
     # Fontawesome icons used for the source on the front end
     ICONS = _srctype_dict('<i class="fab fa-youtube"></i>')
@@ -140,6 +127,12 @@ class Source(db.models.Model):
         max_length=200,
         default=settings.MEDIA_FORMATSTR_DEFAULT,
         help_text=_('File format to use for saving files, detailed options at bottom of page.'),
+    )
+    target_schedule = db.models.DateTimeField(
+        _('target schedule'),
+        auto_now_add=True,
+        db_index=True,
+        help_text=_('Date and time when the task to index the source should begin'),
     )
     index_schedule = db.models.IntegerField(
         _('index schedule'),
@@ -310,6 +303,21 @@ class Source(db.models.Model):
             ),
         ],
     )
+    enable_sponsorblock = db.models.BooleanField(
+        _('enable sponsorblock'),
+        default=True,
+        help_text=_('Use SponsorBlock?'),
+    )
+    sponsorblock_categories = CommaSepChoiceField(
+        _('removed categories'),
+        max_length=128,
+        possible_choices=SponsorBlock_Category.choices,
+        all_choice='all',
+        allow_all=True,
+        all_label='(All Categories)',
+        default='all',
+        help_text=_('Select the SponsorBlock categories that you wish to be removed from downloaded videos.'),
+    )
 
     def __str__(self):
         return self.name
@@ -375,6 +383,19 @@ class Source(db.models.Model):
             return timezone.now() - timezone.timedelta(days=delta)
         else:
             return False
+
+    @property
+    def task_run_at_dt(self):
+        now = timezone.now()
+        if self.target_schedule > now:
+            return self.target_schedule
+        when = now.replace(minute=0, second=0, microsecond=0)
+        while when.hour != self.target_schedule.hour:
+            when += timezone.timedelta(hours=1)
+        while when.weekday != self.target_schedule.weekday:
+            when += timezone.timedelta(days=1)
+        self.target_schedule = when
+        return when
 
     @property
     def extension(self):
