@@ -351,7 +351,7 @@ class AddSourceView(EditSourceMixin, CreateView):
         initial = super().get_initial()
         initial['target_schedule'] = timezone.now().replace(
             second=0, microsecond=0,
-        ).isoformat(timespec='minutes')
+        )
         for k, v in self.prepopulated_data.items():
             initial[k] = v
         return initial
@@ -397,6 +397,12 @@ class SourceView(DetailView):
 class UpdateSourceView(EditSourceMixin, UpdateView):
 
     template_name = 'sync/source-update.html'
+
+    def get_initial(self):
+        initial = super().get_initial()
+        when = getattr(self.object, 'target_schedule') or timezone.now()
+        initial['target_schedule'] = when.replace(second=0, microsecond=0)
+        return initial
 
     def get_success_url(self):
         url = reverse_lazy('sync:source', kwargs={'pk': self.object.pk})
