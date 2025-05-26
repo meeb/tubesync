@@ -19,7 +19,6 @@ class Migration(migrations.Migration):
                 help_text='Date and time when the task to index the source should begin',
                 verbose_name='target schedule',
             ),
-            preserve_default=False,
         ),
         migrations.AlterField(
             model_name='source',
