@@ -409,9 +409,6 @@ def index_source_task(source_id):
                     str(media.pk),
                     verbose_name=verbose_name.format(media.key, media.name),
                 )
-    # start run_at with the next schedule target
-    if task:
-        task.run_at = source.task_run_at_dt
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
     # Cleanup of media no longer available from the source
