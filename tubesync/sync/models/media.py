@@ -600,8 +600,10 @@ class Media(models.Model):
             arg_dict=data,
         )
         md_model = self._meta.fields_map.get('new_metadata').related_model
-        md, created = md_model.objects.get_or_create(
-            media_id=self.pk,
+        md, created = md_model.objects.filter(
+            source__isnull=True,
+        ).get_or_create(
+            media=self,
             site=site,
             key=self.key,
         )
