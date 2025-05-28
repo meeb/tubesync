@@ -7,7 +7,8 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('sync', '0034_source_target_schedule_and_more'),
+        ('sync', '0033_alter_mediaserver_options_alter_source_source_acodec_and_more'),
+        #('sync', '0034_source_target_schedule_and_more'),
     ]
 
     operations = [
