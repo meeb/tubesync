@@ -395,7 +395,7 @@ def index_source_task(source_id):
         update_task_status(task, tvn_format.format(vn))
         data, new_data = source.videos.defer('value').filter(
             media__isnull=True,
-        ).get_or_create(key=key)
+        ).get_or_create(source=source, key=key)
         data.retrieved = source.last_crawl
         data.value = video
         db_batch_data.append(data)
@@ -404,7 +404,7 @@ def index_source_task(source_id):
             'source',
             'key',
             *db_fields_media,
-        ).get_or_create(key=key)
+        ).get_or_create(source=source, key=key)
         media.duration = float(video.get(fields('duration', media), None) or 0) or None
         media.title = str(video.get(fields('title', media), ''))[:200]
         timestamp = video.get(fields('timestamp', media), None)
