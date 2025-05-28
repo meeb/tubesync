@@ -342,6 +342,7 @@ def index_source_task(source_id):
     # TODO: determine if this affects anything
     source.has_failed = False
     save_model(source)
+    delete_task_by_source('sync.tasks.save_all_media_for_source', source.pk)
     # Index the source
     videos = source.index_media()
     if not videos:
@@ -353,6 +354,7 @@ def index_source_task(source_id):
     # Got some media, update the last crawl timestamp
     source.last_crawl = timezone.now()
     save_model(source)
+    delete_task_by_source('sync.tasks.save_all_media_for_source', source.pk)
     num_videos = len(videos)
     log.info(f'Found {num_videos} media items for source: {source}')
     fields = lambda f, m: m.get_metadata_field(f)
@@ -445,13 +447,15 @@ def index_source_task(source_id):
     save_db_batch(Media.objects, db_batch_media, db_fields_media)
     # Cleanup of media no longer available from the source
     cleanup_removed_media(source, video_keys)
+    # Clear references to indexed data
     videos = video = None
     db_batch_data.clear()
     db_batch_media.clear()
-    # Trigger any signals that we skipped with batches
+    # Trigger any signals that we skipped with batched updates
     vn_fmt = _('Checking all media for "{}"')
     save_all_media_for_source(
         str(source.pk),
+        schedule=dict(run_at=60),
         verbose_name=vn_fmt.format(source.name),
     )
 
