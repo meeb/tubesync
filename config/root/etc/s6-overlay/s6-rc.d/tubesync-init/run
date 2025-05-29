@@ -4,6 +4,9 @@
 groupmod -o -g "${PGID:=911}" app
 usermod -o -u "${PUID:=911}" app
 
+# Ensure /config directories exist
+mkdir -v -p /config/tasks
+
 # Reset permissions
 chown -R app:app /run/app
 chmod -R 0700 /run/app
