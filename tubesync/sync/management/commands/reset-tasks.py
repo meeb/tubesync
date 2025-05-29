@@ -29,7 +29,7 @@ class Command(BaseCommand):
                 index_source_task(
                     str(source.pk),
                     repeat=source.index_schedule,
-                    schedule=source.index_schedule,
+                    schedule=source.task_run_at_dt,
                     verbose_name=verbose_name.format(source.name),
                 )
                 # This also chains down to call each Media objects .save() as well
