@@ -415,15 +415,19 @@ def index_source_task(source_id):
             'key',
             *db_fields_media,
         ).get_or_create(defaults=media_defaults, source=source, key=key)
-        for key in ('epoch', 'availability',):
+        for key in ('epoch', 'availability', 'extractor_key',):
             field = fields(key, media)
             value = video.get(field)
-            if value is None and 'epoch' == key:
-                value = timestamp
+            existing_value = media.get_metadata_first_value(key)
+            if value is None:
+                if 'epoch' == key:
+                    value = timestamp
+                elif 'extractor_key' == key:
+                    value = site
             if value is not None:
+                if existing_value and ('epoch' == key or value == existing_value):
+                    continue
                 media.save_to_metadata(field, value)
-        if site:
-            media.save_to_metadata(fields('extractor_key', media), site)
         db_batch_media.append(media)
         data, new_data = source.videos.defer('value').filter(
             media__isnull=True,
