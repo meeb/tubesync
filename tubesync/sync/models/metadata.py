@@ -146,9 +146,9 @@ class Metadata(db.models.Model):
                     ('release_timestamp', 'timestamp',),
                     arg_dict=data,
                 )
-            ) or self.media.published
+            ) or self.media.published or self.retrieved
         except AssertionError:
-            self.published = self.media.published
+            self.published = self.media.published or self.retrieved
 
         self.value = data.copy() # try not to have side-effects for the caller
         formats_key = self.media.get_metadata_field('formats')

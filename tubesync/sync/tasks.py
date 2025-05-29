@@ -338,6 +338,8 @@ def index_source_task(source_id):
     # An inactive Source would return an empty list for videos anyway
     if not source.is_active:
         return
+    # update the target schedule column
+    source.task_run_at_dt
     # Reset any errors
     # TODO: determine if this affects anything
     source.has_failed = False
