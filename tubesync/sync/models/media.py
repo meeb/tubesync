@@ -566,7 +566,11 @@ class Media(models.Model):
 
     @property
     def has_metadata(self):
-        return self.metadata is not None
+        result = self.metadata is not None
+        if not result:
+            return False
+        value = self.get_metadata_first_value(('id', 'display_id', 'channel_id', 'uploader_id',))
+        return value is not None
 
 
     def metadata_clear(self, /, *, save=False):
