@@ -699,8 +699,7 @@ class Media(models.Model):
         data = self.loaded_metadata
         metadata_seconds = data.get('epoch', None)
         if not metadata_seconds:
-            self.metadata = None
-            self.save(update_fields={'metadata'})
+            self.metadata_clear(save=True)
             return False
 
         now = timezone.now()
