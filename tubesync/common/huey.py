@@ -10,10 +10,21 @@ def sqlite_tasks(key, /, prefix=None):
     return dict(
         huey_class='huey.SqliteHuey',
         name=name,
+        immediate=False,
+        results=True,
+        store_none=False,
+        utc=True,
+        compression=True,
         connection=dict(
             filename=f'/config/tasks/{name}.db',
             fsync=True,
             strict_fifo=True,
+        ),
+        consumer=dict(
+            workers=1,
+            worker_type='process',
+            max_delay=20.0,
+            scheduler_interval=10,
         ),
     )
 
