@@ -58,7 +58,7 @@ DJANGO_HUEY = {
         'network': sqlite_tasks('network'),
     },
 }
-for django_huey_queue in DJANGO_HUEY['queues'].items():
+for django_huey_queue in DJANGO_HUEY['queues'].values():
     connection = django_huey_queue.get('connection')
     if connection:
         filepath = Path('/.' + connection.get('filename') or '').resolve(strict=False)
