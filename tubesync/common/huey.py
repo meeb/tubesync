@@ -5,6 +5,34 @@ from django_huey import db_task, task # noqa
 
 
 class CompatibleTaskWrapper(TaskWrapper):
+    def __call__(self, *args, **kwargs):
+        kwargs.pop('creator')
+        kwargs.pop('queue')
+        kwargs.pop('repeat')
+        repeat_until = kwargs.pop('repeat_until')
+        schedule = kwargs.pop('schedule')
+        self.remove_existing_tasks = kwargs.pop('remove_existing_tasks', self._background_args[3])
+        self.verbose_name = kwargs.pop('verbose_name')
+        _delay = None
+        _eta = None
+        _priority = kwargs.pop('priority', None)
+        if _priority and self._nice_priority_ordering:
+            _priority = 1_000_000 - _priority
+        if isinstance(schedule, dict):
+            _delay = schedule.get('run_at')
+            _priority = schedule.get('priority')
+        elif isinstance(schedule, (int, timedelta, datetime)):
+            _delay = schedule
+        if isinstance(_delay, datetime):
+            _eta = _delay
+            _delay = None
+        kwargs.update(dict(
+            eta=_eta,
+            expires=kwargs['expires'] or repeat_until,
+            delay=_delay,
+            priority=_priority,
+        ))
+        return self.huey.enqueue(self.s(*args, **kwargs))
     pass
 CompatibleTaskWrapper.now = CompatibleTaskWrapper.call_local
 
@@ -30,7 +58,8 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
     if isinstance(_delay, datetime):
         _eta = _delay
         _delay = None
-    if _priority and kwargs.pop('nice_priority_ordering'):
+    _nice_priority_ordering = kwargs.pop('nice_priority_ordering')
+    if _priority and _nice_priority_ordering:
         _priority = 1_000_000 - _priority
     _retry_delay = max(
         (5+(2**4)),
@@ -60,6 +89,7 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
         wrapper = ret_func(fn)
         wrapper.now = wrapper.call_local
         wrapper._background_args = _background_args
+        wrapper._nice_priority_ordering = _nice_priority_ordering
         return wrapper
     elif name:
         ret_func = _decorator(None)
