@@ -5,7 +5,7 @@ groupmod -o -g "${PGID:=911}" app
 usermod -o -u "${PUID:=911}" app
 
 # Ensure /config directories exist
-mkdir -v -p /config/tasks
+mkdir -v -p /config/{cache,media,tasks,tubesync}
 
 # Copy local_settings.py for the user
 if [ -f /config/tubesync/local_settings.py ]
