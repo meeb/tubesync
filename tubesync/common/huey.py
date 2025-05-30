@@ -24,6 +24,7 @@ def sqlite_tasks(key, /, prefix=None):
             workers=1,
             worker_type='process',
             max_delay=20.0,
+            flush_locks=True,
             scheduler_interval=10,
             simple_log=False,
             # verbose has three positions:
