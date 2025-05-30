@@ -11,7 +11,8 @@ class CompatibleTaskWrapper(TaskWrapper):
         kwargs.pop('repeat', None)
         repeat_until = kwargs.pop('repeat_until', None)
         schedule = kwargs.pop('schedule', None)
-        self.remove_existing_tasks = kwargs.pop('remove_existing_tasks', self._background_args[3])
+        _ret_saved = None if not hasattr(self, '_background_args') else self._background_args[3]
+        self.remove_existing_tasks = kwargs.pop('remove_existing_tasks', _ret_saved)
         self.verbose_name = kwargs.pop('verbose_name', None)
         _delay = None
         _eta = None
