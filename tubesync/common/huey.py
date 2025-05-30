@@ -25,6 +25,12 @@ def sqlite_tasks(key, /, prefix=None):
             worker_type='process',
             max_delay=20.0,
             scheduler_interval=10,
+            simple_log=False,
+            # verbose has three positions:
+            # DEBUG: True
+            # INFO: None
+            # WARNING: False
+            verbose=False,
         ),
     )
 
