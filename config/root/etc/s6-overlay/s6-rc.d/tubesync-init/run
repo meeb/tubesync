@@ -7,6 +7,18 @@ usermod -o -u "${PUID:=911}" app
 # Ensure /config directories exist
 mkdir -v -p /config/tasks
 
+# Copy local_settings.py for the user
+if [ -f /config/tubesync/local_settings.py ]
+then
+    # from the image for an example or comparison
+    cp -v -p /app/tubesync/local_settings.py \
+        /config/tubesync/local_settings.py.image
+
+    # to the image to apply the user's settings
+    cp -v -p /config/tubesync/local_settings.py \
+        /app/tubesync/local_settings.py
+fi
+
 # Reset permissions
 chown -R app:app /run/app
 chmod -R 0700 /run/app
