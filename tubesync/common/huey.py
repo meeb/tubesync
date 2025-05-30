@@ -29,7 +29,7 @@ class CompatibleTaskWrapper(TaskWrapper):
             _delay = None
         kwargs.update(dict(
             eta=_eta,
-            expires=kwargs['expires'] or repeat_until,
+            expires=kwargs.get('expires', repeat_until),
             delay=_delay,
             priority=_priority,
         ))
