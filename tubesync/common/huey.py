@@ -17,6 +17,7 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
     if name and callable(name):
         fn = name
         name = None
+    _background_args = (name, schedule, queue, remove_existing_tasks,)
     _priority = None
     if isinstance(schedule, dict):
         _priority = schedule.get('priority')
@@ -44,9 +45,14 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
         )
         return _huey_decorator
     if fn:
-        wrapper = _decorator(fn)
+        ret_func = _decorator(fn)
+        wrapper = ret_func(fn)
         wrapper.now = wrapper.call_local
+        wrapper._background_args = _background_args
         return wrapper
+    elif name:
+        ret_func = _decorator(None)
+        return ret_func
     return _decorator
 
 
