@@ -6,13 +6,13 @@ from huey.storage import SqliteStorage
 
 class CompatibleTaskWrapper(TaskWrapper):
     def __call__(self, *args, **kwargs):
-        kwargs.pop('creator')
-        kwargs.pop('queue')
-        kwargs.pop('repeat')
-        repeat_until = kwargs.pop('repeat_until')
-        schedule = kwargs.pop('schedule')
+        kwargs.pop('creator', None)
+        kwargs.pop('queue', None)
+        kwargs.pop('repeat', None)
+        repeat_until = kwargs.pop('repeat_until', None)
+        schedule = kwargs.pop('schedule', None)
         self.remove_existing_tasks = kwargs.pop('remove_existing_tasks', self._background_args[3])
-        self.verbose_name = kwargs.pop('verbose_name')
+        self.verbose_name = kwargs.pop('verbose_name', None)
         _delay = None
         _eta = None
         _priority = kwargs.pop('priority', None)
@@ -59,12 +59,12 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
     if isinstance(_delay, datetime):
         _eta = _delay
         _delay = None
-    _nice_priority_ordering = kwargs.pop('nice_priority_ordering')
+    _nice_priority_ordering = kwargs.pop('nice_priority_ordering', None)
     if _priority and _nice_priority_ordering:
         _priority = 1_000_000 - _priority
     _retry_delay = max(
         (5+(2**4)),
-        kwargs.pop('retry_delay') or 0,
+        kwargs.pop('retry_delay', 0),
     )
     def _decorator(fn):
         _name = name
@@ -74,14 +74,14 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
         # priority=None, context=False,
         # name=None, expires=None,
         _huey_decorator = db_task(
-            context=kwargs.pop('context') or False,
+            context=kwargs.pop('context', False),
             delay=_delay,
             eta=_eta,
-            expires=kwargs.pop('expires') or None,
+            expires=kwargs.pop('expires', None),
             name=_name,
             priority=_priority,
             queue=queue,
-            retries=kwargs.pop('retries') or 0,
+            retries=kwargs.pop('retries', 0),
             retry_delay=_retry_delay,
         )
         return _huey_decorator
