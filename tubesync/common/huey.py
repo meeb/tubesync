@@ -1,3 +1,14 @@
+from huey import Huey, TaskWrapper
+
+
+class CompatibleTaskWrapper(TaskWrapper):
+    pass
+CompatibleTaskWrapper.now = CompatibleTaskWrapper.call_local
+
+
+def get_task_wrapper_class(self):
+    return CompatibleTaskWrapper
+Huey.get_task_wrapper_class = get_task_wrapper_class
 
 
 def sqlite_tasks(key, /, prefix=None):
