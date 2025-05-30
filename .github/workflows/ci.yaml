@@ -103,6 +103,7 @@ jobs:
             pip install --system --strict --requirements requirements.txt
       - name: Set up Django environment
         run: |
+          mkdir -v -p /config/tasks
           cp -v -p tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/background_task/ patches/background_task/*
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/yt_dlp/ patches/yt_dlp/*
