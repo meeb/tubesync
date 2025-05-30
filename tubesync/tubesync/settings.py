@@ -58,6 +58,11 @@ DJANGO_HUEY = {
         'network': sqlite_tasks('network'),
     },
 }
+for django_huey_queue in DJANGO_HUEY['queues'].items():
+    connection = django_huey_queue.get('connection')
+    if connection:
+        filepath = Path('/.' + connection.get('filename') or '').resolve(strict=False)
+        filepath.parent.mkdir(exist_ok=True, parents=True)
 
 
 TEMPLATES = [
