@@ -1,4 +1,5 @@
 from huey import Huey, TaskWrapper
+from huey.storage import SqliteStorage
 
 
 class CompatibleTaskWrapper(TaskWrapper):
@@ -6,9 +7,13 @@ class CompatibleTaskWrapper(TaskWrapper):
 CompatibleTaskWrapper.now = CompatibleTaskWrapper.call_local
 
 
-def get_task_wrapper_class(self):
-    return CompatibleTaskWrapper
-Huey.get_task_wrapper_class = get_task_wrapper_class
+class BGTaskHuey(Huey):
+    def get_task_wrapper_class(self):
+        return CompatibleTaskWrapper
+
+
+class SqliteBGTaskHuey(BGTaskHuey):
+    storage_class = SqliteStorage
 
 
 def sqlite_tasks(key, /, prefix=None):
@@ -19,7 +24,7 @@ def sqlite_tasks(key, /, prefix=None):
         name_fmt = f'huey_{prefix}_' + '{}'
     name = name_fmt.format(key)
     return dict(
-        huey_class='huey.SqliteHuey',
+        huey_class='common.huey.SqliteBGTaskHuey',
         name=name,
         immediate=False,
         results=True,
