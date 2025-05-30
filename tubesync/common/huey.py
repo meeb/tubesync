@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from huey import Huey, TaskWrapper
 from huey.storage import SqliteStorage
 from django_huey import db_task, task # noqa
@@ -18,9 +19,17 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
         fn = name
         name = None
     _background_args = (name, schedule, queue, remove_existing_tasks,)
+    _delay = None
+    _eta = None
     _priority = None
     if isinstance(schedule, dict):
+        _delay = schedule.get('run_at')
         _priority = schedule.get('priority')
+    elif isinstance(schedule, (int, timedelta, datetime)):
+        _delay = schedule
+    if isinstance(_delay, datetime):
+        _eta = _delay
+        _delay = None
     if _priority and kwargs.pop('nice_priority_ordering'):
         _priority = 1_000_000 - _priority
     _retry_delay = max(
@@ -36,6 +45,8 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
         # name=None, expires=None,
         _huey_decorator = db_task(
             context=kwargs.pop('context') or False,
+            delay=_delay,
+            eta=_eta,
             expires=kwargs.pop('expires') or None,
             name=_name,
             priority=_priority,
