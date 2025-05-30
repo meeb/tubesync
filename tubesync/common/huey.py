@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
-from huey import Huey, TaskWrapper
+from huey import Huey
+from huey.api import TaskWrapper
 from huey.storage import SqliteStorage
 from django_huey import db_task, task # noqa
 
