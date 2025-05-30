@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from huey import Huey
 from huey.api import TaskWrapper
 from huey.storage import SqliteStorage
-from django_huey import db_task, task # noqa
 
 
 class CompatibleTaskWrapper(TaskWrapper):
@@ -43,6 +42,7 @@ class BGTaskHuey(Huey):
         return CompatibleTaskWrapper
 
 def background(name=None, schedule=None, queue=None, remove_existing_tasks=False, **kwargs):
+    from django_huey import db_task, task # noqa
     fn = None
     if name and callable(name):
         fn = name
