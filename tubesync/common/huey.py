@@ -68,9 +68,6 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
         kwargs.pop('retry_delay', 0),
     )
     def _decorator(fn):
-        _name = name
-        if not _name:
-            _name = '%s.%s' % (fn.__module__, fn.__name__)
         # retries=0, retry_delay=0,
         # priority=None, context=False,
         # name=None, expires=None,
@@ -79,7 +76,7 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
             delay=_delay,
             eta=_eta,
             expires=kwargs.pop('expires', None),
-            name=_name,
+            name=name,
             priority=_priority,
             queue=queue,
             retries=kwargs.pop('retries', 0),
