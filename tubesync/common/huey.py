@@ -74,7 +74,7 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
         # retries=0, retry_delay=0,
         # priority=None, context=False,
         # name=None, expires=None,
-        _huey_decorator = db_task(
+        return db_task(
             context=kwargs.pop('context', False),
             delay=_delay,
             eta=_eta,
@@ -84,18 +84,13 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
             queue=queue,
             retries=kwargs.pop('retries', 0),
             retry_delay=_retry_delay,
-        )
-        return _huey_decorator
+        )(fn)
     if fn:
-        ret_func = _decorator(fn)
-        wrapper = ret_func(fn)
+        wrapper = _decorator(fn)
         wrapper.now = wrapper.call_local
         wrapper._background_args = _background_args
         wrapper._nice_priority_ordering = _nice_priority_ordering
         return wrapper
-    elif name:
-        ret_func = _decorator(None)
-        return ret_func
     return _decorator
 
 
