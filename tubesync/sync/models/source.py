@@ -393,7 +393,7 @@ class Source(db.models.Model):
             return arg_dt + timezone.timedelta(hours=delta_hours)
 
         def advance_day(arg_dt, target_weekday, /):
-            delta_days = ((7 + target_weekday) - arg_dt.weekday) % 7
+            delta_days = ((7 + target_weekday) - arg_dt.weekday()) % 7
             return arg_dt + timezone.timedelta(days=delta_days)
 
         if self.target_schedule is None:
@@ -412,7 +412,7 @@ class Source(db.models.Model):
             return self.target_schedule
 
         when = advance_hour(when, self.target_schedule.hour)
-        when = advance_day(when, self.target_schedule.weekday)
+        when = advance_day(when, self.target_schedule.weekday())
         self.target_schedule = when
         return when
 
