@@ -25,6 +25,7 @@ ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND="noninteractive" \
     APT_KEEP_ARCHIVES=1 \
+    EDITOR="editor" \
     HOME="/root" \
     LANGUAGE="en_US.UTF-8" \
     LANG="en_US.UTF-8" \
