@@ -133,15 +133,24 @@ def original_background(*args, **kwargs):
     return tasks.background(*args, **kwargs)
 
 
-def sqlite_tasks(key, /, prefix=None):
-    name_fmt = 'huey_{}'
-    if prefix is None:
-        prefix = ''
-    if prefix:
-        name_fmt = f'huey_{prefix}_' + '{}'
+def sqlite_tasks(
+    key, /, directory='/config/tasks',
+    huey_class='SqliteBGTaskHuey', prefix=None,
+):
+    cls_name = huey_class
+    if '.' not in cls_name and cls_name in globals().keys():
+        from inspect import getmodule
+        _module = getmodule(eval(cls_name))
+        if _module and hasattr(_module, '__name__'):
+            if '__main__' != _module.__name__:
+                cls_name = f'{_module.__name__}.{huey_class}'
+    name_fmt = 'huey'
+    if prefix is not None:
+        name_fmt += f'_{prefix}'
+    name_fmt += '_{}'
     name = name_fmt.format(key)
     return dict(
-        huey_class='common.huey.SqliteBGTaskHuey',
+        huey_class=cls_name,
         name=name,
         immediate=False,
         results=True,
@@ -149,7 +158,7 @@ def sqlite_tasks(key, /, prefix=None):
         utc=True,
         compression=True,
         connection=dict(
-            filename=f'/config/tasks/{name}.db',
+            filename=f'{directory}/{name}.db',
             fsync=True,
             strict_fifo=True,
         ),
