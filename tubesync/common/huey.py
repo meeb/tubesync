@@ -5,6 +5,8 @@ from huey.storage import SqliteStorage
 
 
 class CompatibleTaskWrapper(TaskWrapper):
+    registry = dict()
+
     def backoff(self, attempt, /):
         return (5+(attempt**4))
 
@@ -12,6 +14,41 @@ class CompatibleTaskWrapper(TaskWrapper):
         if not self._backoff_list:
             self._backoff_list = [ self.backoff(a) for a in range(retries, -1, -1) ]
         return self._backoff_list
+
+    # TODO: tcely: generate a slot in the class level dictionary
+    # for each function + args store key/value pairs:
+    #     repeat=3600
+    # Generate a function that accesses the slot to read any needed values
+    # registry[ (fn.__module__, fn.__name__, tuple(task_args.items()),) ]
+    # possibly use the huey storage for this instead
+    # use functools.partial
+    def make_validate_datetime_function(self):
+        kv_storage = dict()
+
+        def validate_datetime(timestamp):
+            seconds = kv_storage.get('repeat', 0)
+            posix_seconds = (timestamp - timestamp.fromtimestamp(0)).total_seconds()
+            if seconds > 0:
+                return ((posix_seconds % seconds) < 60)
+            return False
+
+        def method_validate(self, timestamp):
+            wrapper = self
+            key = (
+                wrapper.func.__module__,
+                wrapper.func.__name__,
+                tuple(dict(
+                    context=wrapper.context,
+                    name=wrapper.name,
+                    retries=wrapper.retries,
+                    retry_delay=wrapper.retry_delay,
+                    **wrapper.settings,
+                )),
+            )
+            kv_storage = wrapper.huey.get(key, peek=True)
+            return validate_datetime(timestamp)
+
+        return method_validate
 
     def __call__(self, *args, **kwargs):
         kwargs.pop('creator', None)
@@ -51,7 +88,10 @@ class CompatibleTaskWrapper(TaskWrapper):
             retries=None if _retries <= 0 else _retries,
             retry_delay=_retry_delay,
         ))
-        return self.huey.enqueue(self.s(*args, **kwargs))
+        task = self.s(*args, **kwargs)
+        if hasattr(task, 'validate_datetime'):
+            task.validate_datetime = self.make_validate_datetime_function()
+        return self.huey.enqueue(task)
     pass
 CompatibleTaskWrapper.now = CompatibleTaskWrapper.call_local
 
@@ -62,7 +102,7 @@ class BGTaskHuey(Huey):
 
 def background(name=None, schedule=None, queue=None, remove_existing_tasks=False, **kwargs):
     from django.conf import settings
-    from django_huey import db_task, task # noqa
+    from django_huey import db_task, db_periodic_task, get_queue
     def backoff(attempt, /):
         return (5+(attempt**4))
     def backoff_list(retries, /):
@@ -93,35 +133,45 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
         # but we can just use our lowest value instead.
         if _priority < 0:
             _priority = 0
+    repeats = kwargs.pop('repeats', False)
     _retries = kwargs.pop('retries', 0)
     _retry_delay = max(
         backoff_list(_retries)[_retries],
         kwargs.pop('retry_delay', 0),
     )
+    # retries=0, retry_delay=0,
+    # priority=None, context=False,
+    # name=None, expires=None,
+    task_args = dict(
+        context=kwargs.pop('context', False),
+        delay=_delay,
+        eta=_eta,
+        expires=kwargs.pop('expires', None),
+        name=name,
+        priority=_priority,
+        queue=queue,
+        retries=None if _retries <= 0 else _retries,
+        retry_delay=_retry_delay,
+    )
+    TaskWrapper = get_queue(queue).get_task_wrapper_class()
     def _decorator(fn):
-        # retries=0, retry_delay=0,
-        # priority=None, context=False,
-        # name=None, expires=None,
-        return db_task(
-            context=kwargs.pop('context', False),
-            delay=_delay,
-            eta=_eta,
-            expires=kwargs.pop('expires', None),
-            name=name,
-            priority=_priority,
-            queue=queue,
-            retries=None if _retries <= 0 else _retries,
-            retry_delay=_retry_delay,
-        )(fn)
+        return db_task(**task_args)(fn)
+    def _periodic_decorator(fn):
+        when_to_run_function = TaskWrapper.register_function(fn, task_args)
+        return db_periodic_task(when_to_run_function, **task_args)(fn)
     if fn:
-        wrapper = _decorator(fn)
+        if repeats:
+            wrapper = _periodic_decorator(fn)
+            TaskWrapper.register_instance(fn, task_args, wrapper)
+        else:
+            wrapper = _decorator(fn)
         wrapper.now = wrapper.call_local
         wrapper._background_args = _background_args
         wrapper._backoff_list = backoff_list(_retries)
         wrapper._max_attempts = _max_attempts
         wrapper._nice_priority_ordering = _nice_priority_ordering
         return wrapper
-    return _decorator
+    return _periodic_decorator if repeats else _decorator
 
 
 class SqliteBGTaskHuey(BGTaskHuey):
