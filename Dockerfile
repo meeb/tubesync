@@ -321,6 +321,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   apt-get -y autoclean && \
   rm -v -f /var/cache/debconf/*.dat-old
 
+# The preference for openresty over nginx,
+# is for the newer version.
 FROM tubesync-openresty AS tubesync
 
 ARG S6_VERSION
@@ -352,7 +354,12 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   python3-pip-whl \
   python3-socks \
   curl \
+  indent \
   less \
+  lua-lpeg \
+  tre-agrep \
+  vis \
+  xxd \
   && \
   # Link to the current python3 version
   ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
