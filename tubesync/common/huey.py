@@ -5,11 +5,20 @@ from huey.storage import SqliteStorage
 
 
 class CompatibleTaskWrapper(TaskWrapper):
+    def backoff(self, attempt, /):
+        return (5+(attempt**4))
+
+    def backoff_list(self, retries, /):
+        if not self._backoff_list:
+            self._backoff_list = [ self.backoff(a) for a in range(retries, -1, -1) ]
+        return self._backoff_list
+
     def __call__(self, *args, **kwargs):
         kwargs.pop('creator', None)
         kwargs.pop('queue', None)
-        kwargs.pop('repeat', None)
-        repeat_until = kwargs.pop('repeat_until', None)
+        # TODO: tcely: actually implement repeat using the scheduler
+        self.repeat = kwargs.pop('repeat', None)
+        self.repeat_until = kwargs.pop('repeat_until', None)
         schedule = kwargs.pop('schedule', None)
         _ret_saved = None if not hasattr(self, '_background_args') else self._background_args[3]
         self.remove_existing_tasks = kwargs.pop('remove_existing_tasks', _ret_saved)
@@ -18,7 +27,9 @@ class CompatibleTaskWrapper(TaskWrapper):
         _eta = None
         _priority = kwargs.pop('priority', None)
         if _priority and self._nice_priority_ordering:
-            _priority = 1_000_000 - _priority
+            _priority = 1_000_000_000 - _priority
+            if _priority < 0:
+                _priority = 0
         if isinstance(schedule, dict):
             _delay = schedule.get('run_at')
             _priority = schedule.get('priority')
@@ -27,11 +38,18 @@ class CompatibleTaskWrapper(TaskWrapper):
         if isinstance(_delay, datetime):
             _eta = _delay
             _delay = None
+        _retries = kwargs.pop('retries', 0)
+        _retry_delay = max(
+            self.backoff_list(_retries)[_retries],
+            kwargs.pop('retry_delay', 0),
+        )
         kwargs.update(dict(
             eta=_eta,
-            expires=kwargs.get('expires', repeat_until),
+            expires=kwargs.get('expires', self.repeat_until),
             delay=_delay,
             priority=_priority,
+            retries=None if _retries <= 0 else _retries,
+            retry_delay=_retry_delay,
         ))
         return self.huey.enqueue(self.s(*args, **kwargs))
     pass
@@ -43,7 +61,12 @@ class BGTaskHuey(Huey):
         return CompatibleTaskWrapper
 
 def background(name=None, schedule=None, queue=None, remove_existing_tasks=False, **kwargs):
+    from django.conf import settings
     from django_huey import db_task, task # noqa
+    def backoff(attempt, /):
+        return (5+(attempt**4))
+    def backoff_list(retries, /):
+        return [ backoff(a) for a in range(retries, -1, -1) ]
     fn = None
     if name and callable(name):
         fn = name
@@ -60,11 +83,19 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
     if isinstance(_delay, datetime):
         _eta = _delay
         _delay = None
-    _nice_priority_ordering = kwargs.pop('nice_priority_ordering', None)
+    _max_attempts = getattr(settings, 'MAX_ATTEMPTS', 25)
+    _nice_priority_ordering = (
+        'ASC' == getattr(settings, 'BACKGROUND_TASK_PRIORITY_ORDERING', 'DESC')
+    )
     if _priority and _nice_priority_ordering:
-        _priority = 1_000_000 - _priority
+        _priority = 1_000_000_000 - _priority
+        # This was a crazy low priority to set,
+        # but we can just use our lowest value instead.
+        if _priority < 0:
+            _priority = 0
+    _retries = kwargs.pop('retries', 0)
     _retry_delay = max(
-        (5+(2**4)),
+        backoff_list(_retries)[_retries],
         kwargs.pop('retry_delay', 0),
     )
     def _decorator(fn):
@@ -79,13 +110,15 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
             name=name,
             priority=_priority,
             queue=queue,
-            retries=kwargs.pop('retries', 0),
+            retries=None if _retries <= 0 else _retries,
             retry_delay=_retry_delay,
         )(fn)
     if fn:
         wrapper = _decorator(fn)
         wrapper.now = wrapper.call_local
         wrapper._background_args = _background_args
+        wrapper._backoff_list = backoff_list(_retries)
+        wrapper._max_attempts = _max_attempts
         wrapper._nice_priority_ordering = _nice_priority_ordering
         return wrapper
     return _decorator
