@@ -364,12 +364,14 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   # Link to the current python3 version
   update-alternatives --install /usr/local/lib/python3 python3-lib \
     "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" 100 && \
-  # Configure the editor and nano alternatives
-  touch /usr/local/bin/babi /bin/nano && \
+  # Configure the editor alternatives
+  touch /usr/local/bin/babi /bin/nano /usr/bin/vim.tiny && \
+  update-alternatives --install /usr/bin/editor editor /usr/local/bin/babi 50 && \
   update-alternatives --install /usr/local/bin/nano nano /bin/nano 10 && \
   update-alternatives --install /usr/local/bin/nano nano /usr/local/bin/babi 20 && \
-  update-alternatives --install /usr/bin/editor editor /usr/local/bin/babi 50 && \
-  rm -v /usr/local/bin/babi /bin/nano && \
+  update-alternatives --install /usr/local/bin/vim vim /usr/bin/vim.tiny 15 && \
+  rm -v /usr/local/bin/babi /bin/nano /usr/bin/vim.tiny && \
+  update-alternatives --install /usr/local/bin/vim vim /usr/bin/vis 35 && \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
