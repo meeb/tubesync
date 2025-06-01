@@ -31,6 +31,7 @@ jobs:
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
       ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
       missing-tags: ${{ steps.tagged.outputs.missing }}
+      missing-tags-image: ${{ steps.tagged.outputs.image }}
     steps:
       - name: Pull tagged releases
         id: tagged
@@ -39,6 +40,7 @@ jobs:
           missing=''
           set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
           set -eux
+          set_sl_var image "${image}" >> "${GITHUB_OUTPUT}"
           # v0.14.1 = ghcr.io/meeb/tubesync:latest@sha256:63fffee3411bda395c526087d7107f76834141bb0c1443a0bd6bed5533e5a85f
           tag_tried='v0.14.1'
           tag_image_digest='latest@sha256:63fffee3411bda395c526087d7107f76834141bb0c1443a0bd6bed5533e5a85f'
@@ -199,7 +201,7 @@ jobs:
         if: ${{ github.actor == github.repository_owner && '' != needs.info.outputs.missing-tags }}
         run: |
           missing='${{ needs.info.outputs.missing-tags }}'
-          image='ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}'
+          image='${{ needs.info.outputs.missing-tags-image }}'
           printf -- '%s\n' "${missing}" | tr '|' '\n' | \
             while read SPEC
             do
