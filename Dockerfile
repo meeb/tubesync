@@ -371,8 +371,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   update-alternatives --install /usr/local/bin/nano nano /bin/nano 10 && \
   update-alternatives --install /usr/local/bin/nano nano /usr/local/bin/babi 20 && \
   update-alternatives --install /usr/local/bin/vim vim /usr/bin/vim.tiny 15 && \
-  rm -v /usr/local/bin/babi /bin/nano /usr/bin/vim.tiny && \
   update-alternatives --install /usr/local/bin/vim vim /usr/bin/vis 35 && \
+  rm -v /usr/local/bin/babi /bin/nano /usr/bin/vim.tiny && \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
