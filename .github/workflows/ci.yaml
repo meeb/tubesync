@@ -30,7 +30,33 @@ jobs:
       lowercase-github-repository_owner: ${{ steps.github-repository_owner.outputs.lowercase }}
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
       ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
+      missing-tags: ${{ steps.tagged.outputs.missing }}
     steps:
+      - name: Pull tagged releases
+        id: tagged
+        run: |
+          set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
+          missing=''
+          image='ghcr.io/meeb/tubesync'
+          # v0.14.1 = ghcr.io/meeb/tubesync:latest@sha256:63fffee3411bda395c526087d7107f76834141bb0c1443a0bd6bed5533e5a85f
+          tag_tried='v0.14.1'
+          tag_image_digest='latest@sha256:63fffee3411bda395c526087d7107f76834141bb0c1443a0bd6bed5533e5a85f'
+          docker pull "${image}:${tag_image_digest}"
+          docker pull "${image}:${tag_tried}" && tag_found=1 || {
+            tag_found=0
+            missing="${missing}${missing:+|}${tag_tried}=${image}:${tag_image_digest}"
+          }
+          set_sl_var "${tag_tried}" "${tag_found}" >> "${GITHUB_OUTPUT}"
+          # v0.15.1 = ghcr.io/meeb/tubesync:latest@sha256:7303b2d8854aac15f94dbbfdd0ee66ca598ade1af6ac2d9e3d886c93ffa2d596
+          tag_tried='v0.15.1'
+          tag_image_digest='latest@sha256:7303b2d8854aac15f94dbbfdd0ee66ca598ade1af6ac2d9e3d886c93ffa2d596'
+          docker pull "${image}:${tag_image_digest}"
+          docker pull "${image}:${tag_tried}" && tag_found=1 || {
+            tag_found=0
+            missing="${missing}${missing:+|}${tag_tried}=${image}:${tag_image_digest}"
+          }
+          set_sl_var "${tag_tried}" "${tag_found}" >> "${GITHUB_OUTPUT}"
+          set_sl_var missing "${missing}" >> "${GITHUB_OUTPUT}"
       - uses: actions/checkout@v4
       - name: Lowercase github username
         id: github-actor
