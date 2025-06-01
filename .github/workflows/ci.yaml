@@ -198,7 +198,7 @@ jobs:
           DOCKER_TOKEN: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
         run: echo "${DOCKER_TOKEN}" | docker login --password-stdin --username "${DOCKER_USERNAME}" "${DOCKER_REGISTRY}"
       - name: Push missing release tags
-        if: ${{ github.actor == github.repository_owner && '' != needs.info.outputs.missing-tags }}
+        if: ${{ 'meeb' == github.actor && github.actor == github.repository_owner && '' != needs.info.outputs.missing-tags }}
         run: |
           missing='${{ needs.info.outputs.missing-tags }}'
           image='${{ needs.info.outputs.missing-tags-image }}'
