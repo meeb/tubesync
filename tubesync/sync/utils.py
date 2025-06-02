@@ -7,6 +7,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 import requests
 from PIL import Image
+from common.utils import list_of_dictionaries
 from django.conf import settings
 from urllib.parse import urlsplit, parse_qs
 from django.forms import ValidationError
@@ -176,17 +177,6 @@ def normalize_codec(codec_str):
         prefix = result.rstrip('0123456789')
         result = prefix + str(int(result[len(prefix):]))
     return result
-
-
-def list_of_dictionaries(arg_list, arg_function=lambda x: x):
-    assert callable(arg_function)
-    if isinstance(arg_list, list):
-        def _call_func_with_dict(arg_dict):
-            if isinstance(arg_dict, dict):
-                return arg_function(arg_dict)
-            return arg_dict
-        return (True, list(map(_call_func_with_dict, arg_list)),)
-    return (False, arg_list,)
 
 
 def _url_keys(arg_dict, filter_func):
