@@ -10,6 +10,7 @@ from django.utils.translation import gettext_lazy as _
 from background_task.signals import task_failed
 from background_task.models import Task
 from common.logger import log
+from common.utils import glob_quote, mkdir_p
 from .models import Source, Media, Metadata
 from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
                     download_media_thumbnail, download_media_metadata,
@@ -17,7 +18,7 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     download_media, download_source_images,
                     delete_all_media_for_source, save_all_media_for_source,
                     rename_media, get_media_metadata_task, get_media_download_task)
-from .utils import delete_file, glob_quote, mkdir_p
+from .utils import delete_file
 from .filtering import filter_media
 from .choices import Val, YouTube_SourceType
 

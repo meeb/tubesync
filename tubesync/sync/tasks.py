@@ -31,11 +31,11 @@ from common.errors import ( NoFormatException, NoMediaException,
                             NoThumbnailException,
                             DownloadFailedException, )
 from common.utils import (  django_queryset_generator as qs_gen,
-                            remove_enclosed, )
+                            remove_enclosed, seconds_to_timestr, )
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer
 from .utils import ( get_remote_image, resize_image_to_height,
-                    write_text_file, filter_response, seconds_to_timestr, )
+                    write_text_file, filter_response, )
 from .youtube import YouTubeError
 
 db_vendor = db.connection.vendor
