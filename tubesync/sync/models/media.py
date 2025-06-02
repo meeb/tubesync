@@ -17,8 +17,8 @@ from common.logger import log
 from common.errors import NoFormatException
 from common.json import JSONEncoder
 from common.utils import (
-    clean_filename, clean_emoji, glob_quote,
-    seconds_to_timestr,
+    clean_filename, clean_emoji, directory_and_stem,
+    glob_quote, seconds_to_timestr,
 )
 from ..youtube import (
     get_media_info as get_youtube_media_info,
@@ -39,7 +39,7 @@ from ..choices import (
 from ._migrations import (
     media_file_storage, get_media_thumb_path, get_media_file_path,
 )
-from ._private import _srctype_dict, _nfo_element, directory_and_stem
+from ._private import _srctype_dict, _nfo_element
 from .media__tasks import (
     download_checklist, download_finished, wait_for_premiere,
 )
