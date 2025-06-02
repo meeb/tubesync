@@ -17,7 +17,7 @@ from common.logger import log
 from common.errors import NoFormatException
 from common.json import JSONEncoder
 from common.utils import (
-    clean_filename, clean_emoji,
+    clean_filename, clean_emoji, glob_quote,
 )
 from ..youtube import (
     get_media_info as get_youtube_media_info,
@@ -25,7 +25,7 @@ from ..youtube import (
 )
 from ..utils import (
     seconds_to_timestr, parse_media_format, filter_response,
-    write_text_file, mkdir_p, glob_quote, multi_key_sort,
+    write_text_file, mkdir_p, multi_key_sort,
 )
 from ..matching import (
     get_best_combined_format,
