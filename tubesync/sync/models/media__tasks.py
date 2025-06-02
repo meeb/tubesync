@@ -121,7 +121,7 @@ def copy_thumbnail(self):
     return copyfile(self.thumb.path, self.thumbpath)
 
 
-def write_nfo(self):
+def write_nfo_file(self):
     media = self
     if not self.source.write_nfo:
         return
