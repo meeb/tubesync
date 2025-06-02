@@ -70,7 +70,7 @@ def glob_quote(filestr, /):
     return filestr.translate(str.maketrans(_glob_specials))
 
 
-def list_of_dictionaries(arg_list, /, *, arg_function=lambda x: x):
+def list_of_dictionaries(arg_list, /, arg_function=lambda x: x):
     assert callable(arg_function)
     if isinstance(arg_list, list):
         _map_func = partial(lambda f, d: f(d) if isinstance(d, dict) else d, arg_function)
