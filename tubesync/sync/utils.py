@@ -141,21 +141,6 @@ def delete_file(filepath):
     return False
 
 
-def multi_key_sort(iterable, specs, /, use_reversed=False, *, item=False, attr=False, key_func=None):
-    result = list(iterable)
-    if key_func is None:
-        # itemgetter is the default
-        if item or not (item or attr):
-            key_func = itemgetter
-        elif attr:
-            key_func = attrgetter
-    for key, reverse in reversed(specs):
-        result.sort(key=key_func(key), reverse=reverse)
-    if use_reversed:
-        return list(reversed(result))
-    return result
-
-
 def normalize_codec(codec_str):
     result = str(codec_str).upper()
     parts = result.split('.')
