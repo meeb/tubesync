@@ -692,7 +692,7 @@ def download_media(media_id, override=False):
         media.download_finished(format_str, container, filepath)
         save_model(media)
         media.copy_thumbnail()
-        media.write_nfo()
+        media.write_nfo_file()
         # Schedule a task to update media servers
         schedule_media_servers_update()
 
