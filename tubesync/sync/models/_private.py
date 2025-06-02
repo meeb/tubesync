@@ -1,4 +1,3 @@
-from pathlib import Path
 from ..choices import Val, YouTube_SourceType # noqa
 
 
