@@ -103,7 +103,7 @@ def copy_thumbnail(self):
     if not self.source.copy_thumbnails:
         return
     if not self.thumb_file_exists:
-        from ..tasks import delete_task_by_media
+        from sync.tasks import delete_task_by_media
         args = ( str(self.pk), self.thumbnail, )
         if not args[1]:
             return
@@ -122,7 +122,6 @@ def copy_thumbnail(self):
 
 
 def write_nfo_file(self):
-    media = self
     if not self.source.write_nfo:
         return
     log.info('Writing media NFO file to: {}', self.nfopath)
