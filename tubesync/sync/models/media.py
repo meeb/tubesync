@@ -41,7 +41,7 @@ from ._migrations import (
 from ._private import _srctype_dict, _nfo_element, directory_and_stem
 from .media__tasks import (
     copy_thumbnail, download_checklist, download_finished,
-    wait_for_premiere, write_nfo,
+    wait_for_premiere, write_nfo as write_nfo_file,
 )
 from .source import Source
 
@@ -1227,5 +1227,5 @@ Media.copy_thumbnail = copy_thumbnail
 Media.download_checklist = download_checklist
 Media.download_finished = download_finished
 Media.wait_for_premiere = wait_for_premiere
-Media.write_nfo = write_nfo
+Media.write_nfo_file = write_nfo_file
 
