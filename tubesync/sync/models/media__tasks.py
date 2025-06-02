@@ -8,7 +8,6 @@ from common.errors import (
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from ..choices import Val, SourceResolution
-from ..tasks import delete_task_by_media
 from ..utils import write_text_file
 
 
@@ -104,6 +103,7 @@ def copy_thumbnail(self):
     if not self.source.copy_thumbnails:
         return
     if not self.thumb_file_exists:
+        from ..tasks import delete_task_by_media
         args = ( str(self.pk), self.thumbnail, )
         if not args[1]:
             return
