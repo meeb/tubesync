@@ -2,7 +2,6 @@ import os
 import re
 import math
 from copy import deepcopy
-from operator import attrgetter, itemgetter
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 import requests
