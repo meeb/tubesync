@@ -126,6 +126,11 @@ class BGTaskHuey(Huey):
     def get_task_wrapper_class(self):
         return CompatibleTaskWrapper
 
+
+class SqliteBGTaskHuey(BGTaskHuey):
+    storage_class = SqliteStorage
+
+
 def background(name=None, schedule=None, queue=None, remove_existing_tasks=False, **kwargs):
     from django.conf import settings
     from django_huey import db_task, db_periodic_task, get_queue
@@ -198,10 +203,6 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
         wrapper._nice_priority_ordering = _nice_priority_ordering
         return wrapper
     return _periodic_decorator if repeats else _decorator
-
-
-class SqliteBGTaskHuey(BGTaskHuey):
-    storage_class = SqliteStorage
 
 
 def original_background(*args, **kwargs):
