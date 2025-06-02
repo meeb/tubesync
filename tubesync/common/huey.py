@@ -10,8 +10,19 @@ from huey.storage import SqliteStorage
 class CompatibleTaskWrapper(TaskWrapper):
     registry = defaultdict(dict)
 
-    def backoff(self, attempt, /):
+    @staticmethod
+    def backoff(attempt, /):
         return (5+(attempt**4))
+
+    @classmethod
+    def register_function(cls, fn, /, *args, **kwargs):
+        def validate_datetime(timestamp):
+            return False
+        return partialmethod(validate_datetime)
+
+    @classmethod
+    def register_instance(cls, fn, wrapper, /, *args, **kwargs):
+        pass
 
     def backoff_list(self, retries, /):
         if not self._backoff_list:
@@ -188,12 +199,12 @@ def background(name=None, schedule=None, queue=None, remove_existing_tasks=False
     def _decorator(fn):
         return db_task(**task_args)(fn)
     def _periodic_decorator(fn):
-        when_to_run_function = TaskWrapper.register_function(fn, task_args)
+        when_to_run_function = TaskWrapper.register_function(fn, **task_args)
         return db_periodic_task(when_to_run_function, **task_args)(fn)
     if fn:
         if repeats:
             wrapper = _periodic_decorator(fn)
-            TaskWrapper.register_instance(fn, task_args, wrapper)
+            TaskWrapper.register_instance(fn, wrapper, **task_args)
         else:
             wrapper = _decorator(fn)
         wrapper.now = wrapper.call_local
