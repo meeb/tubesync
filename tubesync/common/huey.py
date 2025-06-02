@@ -1,11 +1,14 @@
+from collections import defaultdict
 from datetime import datetime, timedelta
+from functools import partialmethod
+from hashlib import sha256
 from huey import Huey
 from huey.api import TaskWrapper
 from huey.storage import SqliteStorage
 
 
 class CompatibleTaskWrapper(TaskWrapper):
-    registry = dict()
+    registry = defaultdict(dict)
 
     def backoff(self, attempt, /):
         return (5+(attempt**4))
@@ -15,26 +18,11 @@ class CompatibleTaskWrapper(TaskWrapper):
             self._backoff_list = [ self.backoff(a) for a in range(retries, -1, -1) ]
         return self._backoff_list
 
-    # TODO: tcely: generate a slot in the class level dictionary
-    # for each function + args store key/value pairs:
-    #     repeat=3600
-    # Generate a function that accesses the slot to read any needed values
-    # registry[ (fn.__module__, fn.__name__, tuple(task_args.items()),) ]
-    # possibly use the huey storage for this instead
-    # use functools.partial
     def make_validate_datetime_function(self):
-        kv_storage = dict()
-
-        def validate_datetime(timestamp):
-            seconds = kv_storage.get('repeat', 0)
-            posix_seconds = (timestamp - timestamp.fromtimestamp(0)).total_seconds()
-            if seconds > 0:
-                return ((posix_seconds % seconds) < 60)
-            return False
-
-        def method_validate(self, timestamp):
-            wrapper = self
-            key = (
+        wrapper = self
+        wrapper_id = id(wrapper)
+        if not hasattr(wrapper, '_registry_key'):
+            key_data = (
                 wrapper.func.__module__,
                 wrapper.func.__name__,
                 tuple(dict(
@@ -45,10 +33,48 @@ class CompatibleTaskWrapper(TaskWrapper):
                     **wrapper.settings,
                 )),
             )
-            kv_storage = wrapper.huey.get(key, peek=True)
-            return validate_datetime(timestamp)
+            wrapper._registry_key = 'repeats-' + sha256(
+                str(key_data).encode(),
+                usedforsecurity=False,
+            ).hexdigest()
+        key = wrapper._registry_key
+        slot = wrapper.registry[key]
+        kv_storage = slot.get(wrapper_id, dict())
+        slot[wrapper_id] = kv_storage
+        wrapper.huey.put(key, slot)
 
-        return method_validate
+        def validate_datetime(timestamp, *, key, wrapper, wrapper_id):
+            slot = wrapper.huey.get(key, peek=True)
+            kv_storage = slot.get(wrapper_id, dict())
+
+            # With huey, periodic tasks don't normally have this
+            # feature. That is why all this is needed above
+            # supporting `repeats` in the `background` task decorator.
+            ran_once = kv_storage.get('ran_once', True)
+            run_once = kv_storage.get('run_once', False)
+            if run_once and not ran_once:
+                # update the storage slot
+                kv_storage['ran_once'] = True
+                slot[wrapper_id] = kv_storage
+                wrapper.huey.put(key, slot)
+                # pull the slot from storage again
+                slot = wrapper.huey.get(key, peek=True)
+                kv_storage = slot.get(wrapper_id, dict())
+                # schedule only if the update worked
+                return kv_storage.get('ran_once', False)
+
+            # Use a `repeat` based schedule.
+            # This is only a 'good enough` approximation of the
+            # `background_task` way that the `run_at` was calculated
+            # from the current time + `repeat` seconds.
+            seconds = kv_storage.get('repeat', 0)
+            posix_seconds = (timestamp - timestamp.fromtimestamp(0)).total_seconds()
+            if seconds > 0:
+                return ((posix_seconds % seconds) < 60)
+            
+            return False
+
+        return partialmethod(validate_datetime, key=key, wrapper=wrapper, wrapper_id=wrapper_id)
 
     def __call__(self, *args, **kwargs):
         kwargs.pop('creator', None)
