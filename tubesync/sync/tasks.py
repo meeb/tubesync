@@ -691,27 +691,8 @@ def download_media(media_id, override=False):
         # Media has been downloaded successfully
         media.download_finished(format_str, container, filepath)
         save_model(media)
-        # If selected, copy the thumbnail over as well
-        if media.source.copy_thumbnails:
-            if not media.thumb_file_exists:
-                thumbnail_url = media.thumbnail
-                if thumbnail_url:
-                    args = ( str(media.pk), thumbnail_url, )
-                    delete_task_by_media('sync.tasks.download_media_thumbnail', args)
-                    if download_media_thumbnail.now(*args):
-                        media.refresh_from_db()
-            if media.thumb_file_exists:
-                log.info(f'Copying media thumbnail from: {media.thumb.path} '
-                         f'to: {media.thumbpath}')
-                copyfile(media.thumb.path, media.thumbpath)
-        # If selected, write an NFO file
-        if media.source.write_nfo:
-            log.info(f'Writing media NFO file to: {media.nfopath}')
-            try:
-                write_text_file(media.nfopath, media.nfoxml)
-            except PermissionError as e:
-                log.warn(f'A permissions problem occured when writing the new media NFO file: {e.msg}')
-                pass
+        media.copy_thumbnail()
+        media.write_nfo()
         # Schedule a task to update media servers
         schedule_media_servers_update()
 
