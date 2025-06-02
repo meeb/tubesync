@@ -167,6 +167,28 @@ class TaskQueue(models.TextChoices):
     NET = 'network', _('Networking')
 
 
+class WeekDay(models.IntegerChoices):
+    MON = 0, _('Monday')
+    TUE = 1, _('Tuesday')
+    WED = 2, _('Wednesday')
+    THU = 3, _('Thursday')
+    FRI = 4, _('Friday')
+    SAT = 5, _('Saturday')
+    SUN = 6, _('Sunday')
+
+    @classmethod
+    def get(cls, wdn, /):
+        return cls[cls.names[wdn]]
+
+    @classmethod
+    def _from_iso(cls, wdn, /):
+        return cls[cls.names[wdn - 1]]
+
+    @classmethod
+    def _to_iso(cls, choice, /):
+        return 1 + choice.value
+
+
 class YouTube_SourceType(models.TextChoices):
     CHANNEL = 'c', _('YouTube channel')
     CHANNEL_ID = 'i', _('YouTube channel by ID')
