@@ -41,7 +41,7 @@ from ._migrations import (
 from ._private import _srctype_dict, _nfo_element, directory_and_stem
 from .media__tasks import (
     copy_thumbnail, download_checklist, download_finished,
-    wait_for_premiere, write_nfo as write_nfo_file,
+    wait_for_premiere, write_nfo_file,
 )
 from .source import Source
 
