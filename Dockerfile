@@ -597,13 +597,14 @@ COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.
 # Build app
 RUN set -x && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
-  rm -rf /app/db.sqlite3 && \
+  test '!' -e /app/db.sqlite3 && \
   # Run any required app commands
   /usr/bin/python3 -B /app/manage.py compilescss && \
   /usr/bin/python3 -B /app/manage.py collectstatic --no-input --link && \
+  rm -rf /config /downloads /run/app && \
   # Create config, downloads and run dirs
   mkdir -v -p /run/app && \
-  mkdir -v -p /config/media && \
+  mkdir -v -p /config/media /config/tasks && \
   mkdir -v -p /config/cache/pycache && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video && \
