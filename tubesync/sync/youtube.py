@@ -7,6 +7,7 @@
 import os
 
 from common.logger import log
+from common.utils import mkdir_p
 from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -15,7 +16,6 @@ from urllib.parse import urlsplit, parse_qs
 from django.conf import settings
 from .choices import Val, FileExtension
 from .hooks import postprocessor_hook, progress_hook
-from .utils import mkdir_p
 import yt_dlp
 import yt_dlp.patch.check_thumbnails
 import yt_dlp.patch.fatal_http_errors
