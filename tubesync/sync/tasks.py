@@ -31,11 +31,11 @@ from common.errors import ( NoFormatException, NoMediaException,
                             NoThumbnailException,
                             DownloadFailedException, )
 from common.utils import (  django_queryset_generator as qs_gen,
-                            remove_enclosed, )
+                            remove_enclosed, seconds_to_timestr, )
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer
 from .utils import (get_remote_image, resize_image_to_height,
-                    filter_response, seconds_to_timestr, )
+                    filter_response, )
 from .youtube import YouTubeError
 
 db_vendor = db.connection.vendor
@@ -376,6 +376,7 @@ def index_source_task(source_id):
             if published_dt:
                 media.published = published_dt
         try:
+            # save_model(media)
             media.save()
         except IntegrityError as e:
             log.error(f'Index media failed: {source} / {media} with "{e}"')

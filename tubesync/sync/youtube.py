@@ -7,6 +7,7 @@
 import os
 
 from common.logger import log
+from common.utils import mkdir_p
 from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -15,7 +16,6 @@ from urllib.parse import urlsplit, parse_qs
 from django.conf import settings
 from .choices import Val, FileExtension
 from .hooks import postprocessor_hook, progress_hook
-from .utils import mkdir_p
 import yt_dlp
 import yt_dlp.patch.check_thumbnails
 import yt_dlp.patch.fatal_http_errors
@@ -213,6 +213,16 @@ def get_media_info(url, /, *, days=None, info_json=None):
         opts.update({
             'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
         })
+    try:
+        info_json_path = Path(info_json).resolve(strict=False)
+    except:
+        pass
+    else:
+        opts['paths'].update({
+            'infojson': user_set('infojson', opts['paths'], str(info_json_path))
+        })
+    if 'infojson' not in opts['paths'].keys():
+        opts.update({'writeinfojson': False})
     if start:
         log.debug(f'get_media_info: used date range: {opts["daterange"]} for URL: {url}')
     response = {}
