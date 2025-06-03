@@ -8,7 +8,9 @@ autopep8 = "*"
 
 [packages]
 django = "~=5.2.1"
+django-huey = "*"
 django-sass-processor = {extras = ["management-command"], version = "*"}
+libsass = "*"
 pillow = "*"
 whitenoise = "*"
 gunicorn = "*"
@@ -25,3 +27,4 @@ emoji = "*"
 brotli = "*"
 html5lib = "*"
 bgutil-ytdlp-pot-provider = "*"
+babi = "*"

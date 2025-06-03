@@ -1,0 +1,56 @@
+# https://editorconfig.org/
+
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+end_of_line = lf
+charset = utf-8
+
+# rc.d files should be unchanged
+[config/root/etc/s6-overlay/s6-rc.d/**]
+indent_style = unset
+indent_size = tab
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+# Docstrings and comments use max_line_length = 79
+[*.py]
+max_line_length = 88
+
+# Use 2 spaces for the YAML files
+[*.y{,a}ml]
+indent_size = 2
+
+# Use 2 spaces for the HTML files
+[*.html]
+indent_size = 2
+
+# Use 2 spaces for the SCSS files
+[*.scss]
+indent_size = 2
+
+[**/admin/js/vendor/**]
+indent_style = unset
+indent_size = unset
+
+# Minified JavaScript files shouldn't be changed
+[**.min.js]
+indent_style = unset
+indent_size = unset
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+# Makefiles always use tabs for indentation
+[Makefile]
+indent_style = tab
+
+# Batch files use tabs for indentation
+[*.bat]
+indent_style = tab
+
+[docs/**.txt]
+max_line_length = 79
