@@ -40,7 +40,8 @@ from ._migrations import (
 )
 from ._private import _srctype_dict, _nfo_element
 from .media__tasks import (
-    download_checklist, download_finished, wait_for_premiere,
+    copy_thumbnail, download_checklist, download_finished,
+    wait_for_premiere, write_nfo_file,
 )
 from .source import Source
 
@@ -1222,7 +1223,9 @@ class Media(models.Model):
 
 
 # add imported functions
+Media.copy_thumbnail = copy_thumbnail
 Media.download_checklist = download_checklist
 Media.download_finished = download_finished
 Media.wait_for_premiere = wait_for_premiere
+Media.write_nfo_file = write_nfo_file
 
