@@ -386,6 +386,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   # Install required distro packages
   apt-get -y --no-install-recommends install \
   libmariadb3 \
+  libonig5 \
   pkgconf \
   python3 \
   python3-libsass \
