@@ -467,8 +467,13 @@ RUN --mount=type=tmpfs,target=/cache \
     >| /cache/python-shared-objects 2>&1 && \
   rm -v -f /var/cache/debconf/*.dat-old && \
   rm -v -rf /tmp/* ; \
-  grep >/dev/null -Fe ' => not found' /cache/python-shared-objects && \
-  cat -v /cache/python-shared-objects || :
+  if grep >/dev/null -Fe ' => not found' /cache/python-shared-objects ; \
+  then \
+      cat -v /cache/python-shared-objects ; \
+      printf -- 1>&2 '%s\n' \
+        ERROR: '    An unresolved shared object was found.' ; \
+      exit 1 ; \
+  fi
 
 # Copy root
 COPY config/root /
