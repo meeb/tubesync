@@ -385,17 +385,12 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   # Install dependencies we keep
   # Install required distro packages
   apt-get -y --no-install-recommends install \
-  libjpeg62-turbo \
-  libmariadb3 \
-  libpq5 \
-  libwebp7 \
   pkgconf \
   python3 \
   python3-libsass \
   python3-pip-whl \
   python3-socks \
   curl \
-  indent \
   less \
   lua-lpeg \
   tre-agrep \
