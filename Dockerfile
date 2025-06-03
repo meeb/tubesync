@@ -581,7 +581,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   rm -v -f Pipfile.lock /var/cache/debconf/*.dat-old && \
   rm -v -rf /tmp/* ; \
   grep >/dev/null -Fe ' => not found' "${CACHE_PATH}"/python-shared-objects && \
-  cat -v "${CACHE_PATH}"/python-shared-objects || :
+  cat -v "${CACHE_PATH}"/python-shared-objects && exit 1 || :
 
 # Copy root
 COPY config/root /
