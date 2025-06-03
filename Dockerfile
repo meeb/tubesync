@@ -347,6 +347,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   apt-get -y --no-install-recommends install \
   libjpeg62-turbo \
   libmariadb3 \
+  libonig5 \
   libpq5 \
   libwebp7 \
   pkgconf \
