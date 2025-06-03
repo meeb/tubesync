@@ -485,6 +485,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   g++ \
   gcc \
   libjpeg-dev \
+  libonig-dev \
   libpq-dev \
   libwebp-dev \
   make \
@@ -525,6 +526,7 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   g++ \
   gcc \
   libjpeg-dev \
+  libonig-dev \
   libpq-dev \
   libwebp-dev \
   make \
