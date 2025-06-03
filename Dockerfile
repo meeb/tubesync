@@ -25,6 +25,7 @@ ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND="noninteractive" \
     APT_KEEP_ARCHIVES=1 \
+    EDITOR="editor" \
     HOME="/root" \
     LANGUAGE="en_US.UTF-8" \
     LANG="en_US.UTF-8" \
@@ -321,6 +322,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   apt-get -y autoclean && \
   rm -v -f /var/cache/debconf/*.dat-old
 
+# The preference for openresty over nginx,
+# is for the newer version.
 FROM tubesync-openresty AS tubesync
 
 ARG S6_VERSION
@@ -344,6 +347,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   apt-get -y --no-install-recommends install \
   libjpeg62-turbo \
   libmariadb3 \
+  libonig5 \
   libpq5 \
   libwebp7 \
   pkgconf \
@@ -352,10 +356,23 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   python3-pip-whl \
   python3-socks \
   curl \
+  indent \
   less \
+  lua-lpeg \
+  tre-agrep \
+  vis \
+  xxd \
   && \
   # Link to the current python3 version
   ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
+  # Configure the editor alternatives
+  touch /usr/local/bin/babi /bin/nano /usr/bin/vim.tiny && \
+  update-alternatives --install /usr/bin/editor editor /usr/local/bin/babi 50 && \
+  update-alternatives --install /usr/local/bin/nano nano /bin/nano 10 && \
+  update-alternatives --install /usr/local/bin/nano nano /usr/local/bin/babi 20 && \
+  update-alternatives --install /usr/local/bin/vim vim /usr/bin/vim.tiny 15 && \
+  update-alternatives --install /usr/local/bin/vim vim /usr/bin/vis 35 && \
+  rm -v /usr/local/bin/babi /bin/nano /usr/bin/vim.tiny && \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
@@ -407,6 +424,7 @@ RUN --mount=type=tmpfs,target=/cache \
   g++ \
   gcc \
   libjpeg-dev \
+  libonig-dev \
   libpq-dev \
   libwebp-dev \
   make \
@@ -450,6 +468,7 @@ RUN --mount=type=tmpfs,target=/cache \
   g++ \
   gcc \
   libjpeg-dev \
+  libonig-dev \
   libpq-dev \
   libwebp-dev \
   make \
