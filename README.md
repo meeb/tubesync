@@ -265,15 +265,7 @@ and less common features:
 
 # Warnings
 
-### 1. Automated file renaming
-> [!IMPORTANT]
-> Currently, file renaming is not enabled by default.
-> Enabling this feature by default is planned in an upcoming release, after `2025-006-01`.
-> 
-> To prevent your installation from scheduling media file renaming tasks,
-> you must set [`TUBESYNC_RENAME_ALL_SOURCES=False`](#advanced-configuration) in the environment variables or `RENAME_ALL_SOURCES = False` in [`settings.py`](../1fc0462c11741621350053144ab19cba5f266cb2/tubesync/tubesync/settings.py#L183).
-
-### 2. Index frequency
+### 1. Index frequency
 
 It's a good idea to add sources with as long of an index frequency as possible. This is
 the duration between indexes of the source. An index is when TubeSync checks to see
@@ -281,7 +273,7 @@ what videos available on a channel or playlist to find new media. Try and keep t
 long as possible, up to 24 hours.
 
 
-### 3. Indexing massive channels
+### 2. Indexing massive channels
 
 If you add a massive channel (one with several thousand videos) to TubeSync and choose "index
 every hour" or a similarly short interval; it's entirely possible that your TubeSync install may

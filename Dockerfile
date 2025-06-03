@@ -72,6 +72,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y autoclean && \
     rm -f /var/cache/debconf/*.dat-old
 
+FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
+
 FROM alpine:${ALPINE_VERSION} AS openresty-debian
 ARG TARGETARCH
 ARG DEBIAN_VERSION
@@ -293,6 +295,9 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
+FROM tubesync-base AS tubesync-uv
+COPY --from=uv-binaries /uv /uvx /usr/local/bin/
+
 FROM oven/bun:${BUN_VERSION} AS bun-base
 
 FROM debian:${DEBIAN_VERSION} AS bun
@@ -313,11 +318,6 @@ FROM denoland/deno:bin AS deno-binary
 FROM debian:${DEBIAN_VERSION} AS deno
 COPY --from=deno-binary /deno /usr/local/bin/
 
-FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
-
-FROM debian:${DEBIAN_VERSION} AS uv
-COPY --from=uv-binaries /uv /uvx /usr/local/bin/
-
 FROM alpine:${ALPINE_VERSION} AS populate-uv-cache-dir
 RUN --mount=type=bind,from=cache-tubesync,target=/restored \
     set -x ; \
@@ -335,7 +335,10 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
   set -x && \
   apt-get update && \
-  apt-get -y --no-install-recommends install nginx-common openresty && \
+  apt-get -y --no-install-recommends install \
+    nginx-common \
+    openresty \
+  && \
   # Clean up
   apt-get -y autopurge && \
   apt-get -y autoclean && \
@@ -347,7 +350,10 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \
   set -x && \
   apt-get update && \
-  apt-get -y --no-install-recommends install nginx-light libnginx-mod-http-lua && \
+  apt-get -y --no-install-recommends install \
+    nginx-light \
+    libnginx-mod-http-lua \
+  && \
   # openresty binary should still work
   ln -v -s -T ../sbin/nginx /usr/bin/openresty && \
   # Clean up
@@ -382,6 +388,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libwebp7 \
   pkgconf \
   python3 \
+  python3-libsass \
+  python3-pip-whl \
   python3-socks \
   curl \
   less \
@@ -402,7 +410,7 @@ COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 #COPY --from=bun /usr/local/bun/ /usr/local/bun/
 #COPY --from=bun /usr/local/bin/ /usr/local/bin/
 #COPY --from=deno /usr/local/bin/ /usr/local/bin/
-#COPY --from=uv /usr/local/bin/ /usr/local/bin/
+#COPY --from=tubesync-uv /usr/local/bin/ /usr/local/bin/
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt,source=/apt-lib-cache,from=populate-apt-cache-dirs \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt,source=/apt-cache-cache,from=populate-apt-cache-dirs \

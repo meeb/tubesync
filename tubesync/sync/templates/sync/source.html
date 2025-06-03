@@ -93,6 +93,10 @@
         <td class="hide-on-small-only">Last crawl</td>
         <td><span class="hide-on-med-and-up">Last crawl<br></span><strong>{% if source.last_crawl %}{{ source.last_crawl|date:'Y-m-d H:i:s' }}{% else %}Never{% endif %}</strong></td>
       </tr>
+      <tr title="When the source should be next checked for available media">
+        <td class="hide-on-small-only">Target schedule</td>
+        <td><span class="hide-on-med-and-up">Target schedule<br></span><strong>{% if source.target_schedule %}{{ source.target_schedule|date:'l, h:00 A (c)' }}{% else %}Not set{% endif %}</strong></td>
+      </tr>
       <tr title="Quality and type of media the source will attempt to sync">
         <td class="hide-on-small-only">Source resolution</td>
         <td><span class="hide-on-med-and-up">Source resolution<br></span><strong>{{ source.get_source_resolution_display }}</strong></td>

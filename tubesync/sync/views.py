@@ -25,7 +25,7 @@ from background_task.models import Task, CompletedTask
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
-                    ConfirmDeleteMediaServerForm)
+                    ConfirmDeleteMediaServerForm, SourceForm)
 from .utils import validate_url, delete_file, multi_key_sort, mkdir_p
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
@@ -276,15 +276,7 @@ class ValidateSourceView(FormView):
 
 class EditSourceMixin:
     model = Source
-    # manual ordering
-    fields = ('source_type', 'key', 'name', 'directory', 'filter_text', 'filter_text_invert', 'filter_seconds', 'filter_seconds_min',
-              'media_format', 'index_schedule', 'index_videos', 'index_streams', 'download_media', 'download_cap', 'delete_old_media',
-              'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
-              'prefer_60fps', 'prefer_hdr', 'fallback',
-              'delete_removed_media', 'delete_files_on_disk', 'copy_channel_images',
-              'copy_thumbnails', 'write_nfo', 'write_json', 'embed_metadata', 'embed_thumbnail',
-              'enable_sponsorblock', 'sponsorblock_categories', 'write_subtitles',
-              'auto_subtitles', 'sub_langs')
+    form_class = SourceForm
     errors = {
         'invalid_media_format': _('Invalid media format, the media format contains '
                                   'errors or is empty. Check the table at the end of '
@@ -357,6 +349,9 @@ class AddSourceView(EditSourceMixin, CreateView):
 
     def get_initial(self):
         initial = super().get_initial()
+        initial['target_schedule'] = timezone.now().replace(
+            second=0, microsecond=0,
+        )
         for k, v in self.prepopulated_data.items():
             initial[k] = v
         return initial
@@ -402,6 +397,12 @@ class SourceView(DetailView):
 class UpdateSourceView(EditSourceMixin, UpdateView):
 
     template_name = 'sync/source-update.html'
+
+    def get_initial(self):
+        initial = super().get_initial()
+        when = getattr(self.object, 'target_schedule') or timezone.now()
+        initial['target_schedule'] = when.replace(second=0, microsecond=0)
+        return initial
 
     def get_success_url(self):
         url = reverse_lazy('sync:source', kwargs={'pk': self.object.pk})
@@ -1003,6 +1004,7 @@ class ResetTasks(FormView):
             index_source_task(
                 str(source.pk),
                 repeat=source.index_schedule,
+                schedule=source.task_run_at_dt,
                 verbose_name=verbose_name.format(source.name)
             )
             # This also chains down to call each Media objects .save() as well
