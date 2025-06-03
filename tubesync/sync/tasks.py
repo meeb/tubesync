@@ -10,6 +10,7 @@ import random
 import requests
 import time
 import uuid
+from collections import deque as queue
 from io import BytesIO
 from hashlib import sha1
 from pathlib import Path
@@ -19,7 +20,7 @@ from django import db
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import DatabaseError, IntegrityError
+from django.db import DatabaseError
 from django.db.transaction import atomic
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -33,7 +34,7 @@ from common.errors import ( NoFormatException, NoMediaException,
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, seconds_to_timestr, )
 from .choices import Val, TaskQueue
-from .models import Source, Media, MediaServer
+from .models import Source, Media, MediaServer, Metadata
 from .utils import (get_remote_image, resize_image_to_height,
                     filter_response, )
 from .youtube import YouTubeError
@@ -302,6 +303,61 @@ def cleanup_removed_media(source, video_keys):
     schedule_media_servers_update()
 
 
+def save_db_batch(qs, objs, fields, /):
+    assert hasattr(qs, 'bulk_update')
+    assert callable(qs.bulk_update)
+    assert hasattr(objs, '__len__')
+    assert callable(objs.__len__)
+    assert isinstance(fields, (tuple, list, set, frozenset))
+
+    num_updated = 0
+    num_objs = len(objs)
+    with atomic(durable=False):
+        num_updated = qs.bulk_update(objs=objs, fields=fields)
+    if num_objs == num_updated:
+        # this covers at least: list, set, deque
+        if hasattr(objs, 'clear') and callable(objs.clear):
+            objs.clear()
+    return num_updated
+
+
+@background(schedule=dict(priority=20, run_at=60), queue=Val(TaskQueue.DB), remove_existing_tasks=True)
+def migrate_to_metadata(media_id):
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist as e:
+        # Task triggered but the media no longer exists, do nothing
+        log.error(f'Task migrate_to_metadata(pk={media_id}) called but no '
+                  f'media exists with ID: {media_id}')
+        raise InvalidTaskError(_('no such media')) from e
+
+    try:
+        data = Metadata.objects.get(
+            media__isnull=True,
+            source=media.source,
+            key=media.key,
+        )
+    except Metadata.DoesNotExist as e:
+        raise InvalidTaskError(_('no indexed data to migrate to metadata')) from e
+
+    video = data.value
+    fields = lambda f, m: m.get_metadata_field(f)
+    timestamp = video.get(fields('timestamp', media), None)
+    for key in ('epoch', 'availability', 'extractor_key',):
+        field = fields(key, media)
+        value = video.get(field)
+        existing_value = media.get_metadata_first_value(key)
+        if value is None:
+            if 'epoch' == key:
+                value = timestamp
+            elif 'extractor_key' == key:
+                value = data.site
+        if value is not None:
+            if existing_value and ('epoch' == key or value == existing_value):
+                continue
+            media.save_to_metadata(field, value)
+
+
 @background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def index_source_task(source_id):
     '''
@@ -322,13 +378,12 @@ def index_source_task(source_id):
     # update the target schedule column
     source.task_run_at_dt
     # Reset any errors
-    # TODO: determine if this affects anything
     source.has_failed = False
-    save_model(source)
     # Index the source
     videos = source.index_media()
     if not videos:
-        # TODO: Record this error in source.has_failed ?
+        source.has_failed = True
+        save_model(source)
         raise NoMediaException(f'Source "{source}" (ID: {source_id}) returned no '
                                f'media to index, is the source key valid? Check the '
                                f'source configuration is correct and that the source '
@@ -336,8 +391,22 @@ def index_source_task(source_id):
     # Got some media, update the last crawl timestamp
     source.last_crawl = timezone.now()
     save_model(source)
+    delete_task_by_source('sync.tasks.save_all_media_for_source', source.pk)
     num_videos = len(videos)
     log.info(f'Found {num_videos} media items for source: {source}')
+    tvn_format = '{:,}' + f'/{num_videos:,}'
+    db_batch_data = queue(list(), maxlen=50)
+    db_fields_data = frozenset((
+        'retrieved',
+        'site',
+        'value',
+    ))
+    db_batch_media = queue(list(), maxlen=10)
+    db_fields_media = frozenset((
+        'duration',
+        'published',
+        'title',
+    ))
     fields = lambda f, m: m.get_metadata_field(f)
     task = get_source_index_task(source_id)
     if task:
@@ -346,7 +415,6 @@ def index_source_task(source_id):
             valid='0123456789/,',
             end=task.verbose_name.find('Index'),
         )
-    tvn_format = '{:,}' + f'/{num_videos:,}'
     vn = 0
     video_keys = set()
     while len(videos) > 0:
@@ -358,15 +426,17 @@ def index_source_task(source_id):
             # Video has no unique key (ID), it can't be indexed
             continue
         video_keys.add(key)
+        if len(db_batch_data) == db_batch_data.maxlen:
+            save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
+        if len(db_batch_media) == db_batch_media.maxlen:
+            save_db_batch(Media.objects, db_batch_media, db_fields_media)
         update_task_status(task, tvn_format.format(vn))
-        # media, new_media = Media.objects.get_or_create(key=key, source=source)
-        try:
-            media = Media.objects.get(key=key, source=source)
-        except Media.DoesNotExist:
-            media = Media(key=key)
-        media.source = source
-        media.duration = float(video.get(fields('duration', media), None) or 0) or None
-        media.title = str(video.get(fields('title', media), ''))[:200]
+        media_defaults = dict()
+        # create a dummy instance to use its functions
+        media = Media(source=source, key=key)
+        media_defaults['duration'] = float(video.get(fields('duration', media), None) or 0) or None
+        media_defaults['title'] = str(video.get(fields('title', media), ''))[:200]
+        site = video.get(fields('ie_key', media), None)
         timestamp = video.get(fields('timestamp', media), None)
         try:
             published_dt = media.ts_to_dt(timestamp)
@@ -374,47 +444,71 @@ def index_source_task(source_id):
             pass
         else:
             if published_dt:
-                media.published = published_dt
-        try:
-            # save_model(media)
-            media.save()
-        except IntegrityError as e:
-            log.error(f'Index media failed: {source} / {media} with "{e}"')
-        else:
+                media_defaults['published'] = published_dt
+        # Retrieve or create the actual media instance
+        media, new_media = source.media_source.only(
+            'uuid',
+            'source',
+            'key',
+            *db_fields_media,
+        ).get_or_create(defaults=media_defaults, source=source, key=key)
+        db_batch_media.append(media)
+        data, new_data = source.videos.defer('value').filter(
+            media__isnull=True,
+        ).get_or_create(source=source, key=key)
+        if site:
+            data.site = site
+        data.retrieved = source.last_crawl
+        data.value = video
+        db_batch_data.append(data)
+        migrate_to_metadata(str(media.pk))
+        if not new_media:
+            # update the existing media
+            for key, value in media_defaults.items():
+                setattr(media, key, value)
             log.debug(f'Indexed media: {vn}: {source} / {media}')
+        else:
             # log the new media instances
-            new_media_instance = (
-                # new_media or
-                media.created and
-                source.last_crawl and
-                media.created >= source.last_crawl
-            )
-            if new_media_instance:
-                log.info(f'Indexed new media: {source} / {media}')
-                log.info(f'Scheduling tasks to download thumbnail for: {media.key}')
-                thumbnail_fmt = 'https://i.ytimg.com/vi/{}/{}default.jpg'
-                vn_fmt = _('Downloading {} thumbnail for: "{}": {}')
-                for prefix in ('hq', 'sd', 'maxres',):
-                    thumbnail_url = thumbnail_fmt.format(
-                        media.key,
-                        prefix,
-                    )
-                    download_media_thumbnail(
-                        str(media.pk),
-                        thumbnail_url,
-                        verbose_name=vn_fmt.format(prefix, media.key, media.name),
-                    )
-                log.info(f'Scheduling task to download metadata for: {media.url}')
-                verbose_name = _('Downloading metadata for: "{}": {}')
-                download_media_metadata(
-                    str(media.pk),
-                    verbose_name=verbose_name.format(media.key, media.name),
+            log.info(f'Indexed new media: {source} / {media}')
+            log.info(f'Scheduling tasks to download thumbnail for: {media.key}')
+            thumbnail_fmt = 'https://i.ytimg.com/vi/{}/{}default.jpg'
+            vn_fmt = _('Downloading {} thumbnail for: "{}": {}')
+            for num, prefix in enumerate(('hq', 'sd', 'maxres',)):
+                thumbnail_url = thumbnail_fmt.format(
+                    media.key,
+                    prefix,
                 )
+                download_media_thumbnail(
+                    str(media.pk),
+                    thumbnail_url,
+                    schedule=dict(run_at=10+(300*num)),
+                    verbose_name=vn_fmt.format(prefix, media.key, media.name),
+                )
+            log.info(f'Scheduling task to download metadata for: {media.url}')
+            verbose_name = _('Downloading metadata for: "{}": {}')
+            download_media_metadata(
+                str(media.pk),
+                schedule=dict(priority=35),
+                verbose_name=verbose_name.format(media.key, media.name),
+            )
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
+    # Update any remaining items in the batches
+    save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
+    save_db_batch(Media.objects, db_batch_media, db_fields_media)
     # Cleanup of media no longer available from the source
     cleanup_removed_media(source, video_keys)
+    # Clear references to indexed data
     videos = video = None
+    db_batch_data.clear()
+    db_batch_media.clear()
+    # Trigger any signals that we skipped with batched updates
+    vn_fmt = _('Checking all media for "{}"')
+    save_all_media_for_source(
+        str(source.pk),
+        schedule=dict(run_at=60),
+        verbose_name=vn_fmt.format(source.name),
+    )
 
 
 @background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.FS))

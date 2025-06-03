@@ -430,6 +430,7 @@ def media_post_delete(sender, instance, **kwargs):
         # Re-use the old metadata if it exists
         instance_qs = Metadata.objects.filter(
             media__isnull=True,
+            source__isnull=True,
             site=old_metadata.get(site_field) or 'Youtube',
             key=skipped_media.key,
         )
