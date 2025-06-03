@@ -531,6 +531,12 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
   && \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
+  LD_LIBRARY_PATH=/usr/local/lib/python3/dist-packages/pillow.libs:/usr/local/lib/python3/dist-packages/psycopg_binary.libs \
+    find /usr/local/lib/python3/dist-packages/ \
+      -name '*.so*' -print \
+      -exec du -h '{}' ';' \
+      -exec ldd '{}' ';' \
+    >| "${CACHE_PATH}"/python-shared-objects 2>&1 && \
   # Save our saved directory to the cache directory on the runner
   ( set -x ; \
     test -n "${WORMHOLE_CODE}" || exit 0 ; \
@@ -573,7 +579,9 @@ RUN --mount=type=tmpfs,target=${CACHE_PATH} \
     fi ; \
   ) && \
   rm -v -f Pipfile.lock /var/cache/debconf/*.dat-old && \
-  rm -v -rf /tmp/*
+  rm -v -rf /tmp/* ; \
+  grep >/dev/null -Fe ' => not found' "${CACHE_PATH}"/python-shared-objects && \
+  cat -v "${CACHE_PATH}"/python-shared-objects || :
 
 # Copy root
 COPY config/root /
