@@ -459,8 +459,16 @@ RUN --mount=type=tmpfs,target=/cache \
   && \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
+  LD_LIBRARY_PATH=/usr/local/lib/python3/dist-packages/pillow.libs:/usr/local/lib/python3/dist-packages/psycopg_binary.libs \
+    find /usr/local/lib/python3/dist-packages/ \
+      -name '*.so*' -print \
+      -exec du -h '{}' ';' \
+      -exec ldd '{}' ';' \
+    >| /cache/python-shared-objects 2>&1 && \
   rm -v -f /var/cache/debconf/*.dat-old && \
-  rm -v -rf /tmp/*
+  rm -v -rf /tmp/* ; \
+  grep >/dev/null -Fe ' => not found' /cache/python-shared-objects && \
+  cat -v /cache/python-shared-objects || :
 
 # Copy root
 COPY config/root /
