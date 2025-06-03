@@ -403,8 +403,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   xxd \
   && \
   # Link to the current python3 version
-  update-alternatives --install /usr/local/lib/python3 python3-lib \
-    "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" 100 && \
+  ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
   # Configure the editor alternatives
   touch /usr/local/bin/babi /bin/nano /usr/bin/vim.tiny && \
   update-alternatives --install /usr/bin/editor editor /usr/local/bin/babi 50 && \
