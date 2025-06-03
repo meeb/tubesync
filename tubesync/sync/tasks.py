@@ -321,6 +321,43 @@ def save_db_batch(qs, objs, fields, /):
     return num_updated
 
 
+@background(schedule=dict(priority=20, run_at=60), queue=Val(TaskQueue.DB), remove_existing_tasks=True)
+def migrate_to_metadata(media_id):
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist as e:
+        # Task triggered but the media no longer exists, do nothing
+        log.error(f'Task migrate_to_metadata(pk={media_id}) called but no '
+                  f'media exists with ID: {media_id}')
+        raise InvalidTaskError(_('no such media')) from e
+
+    try:
+        data = Metadata.objects.get(
+            media__isnull=True,
+            source=media.source,
+            key=media.key,
+        )
+    except Metadata.DoesNotExist as e:
+        raise InvalidTaskError(_('no indexed data to migrate to metadata')) from e
+
+    video = data.value
+    fields = lambda f, m: m.get_metadata_field(f)
+    timestamp = video.get(fields('timestamp', media), None)
+    for key in ('epoch', 'availability', 'extractor_key',):
+        field = fields(key, media)
+        value = video.get(field)
+        existing_value = media.get_metadata_first_value(key)
+        if value is None:
+            if 'epoch' == key:
+                value = timestamp
+            elif 'extractor_key' == key:
+                value = data.site
+        if value is not None:
+            if existing_value and ('epoch' == key or value == existing_value):
+                continue
+            media.save_to_metadata(field, value)
+
+
 @background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def index_source_task(source_id):
     '''
@@ -415,19 +452,6 @@ def index_source_task(source_id):
             'key',
             *db_fields_media,
         ).get_or_create(defaults=media_defaults, source=source, key=key)
-        for key in ('epoch', 'availability', 'extractor_key',):
-            field = fields(key, media)
-            value = video.get(field)
-            existing_value = media.get_metadata_first_value(key)
-            if value is None:
-                if 'epoch' == key:
-                    value = timestamp
-                elif 'extractor_key' == key:
-                    value = site
-            if value is not None:
-                if existing_value and ('epoch' == key or value == existing_value):
-                    continue
-                media.save_to_metadata(field, value)
         db_batch_media.append(media)
         data, new_data = source.videos.defer('value').filter(
             media__isnull=True,
@@ -437,6 +461,7 @@ def index_source_task(source_id):
         data.retrieved = source.last_crawl
         data.value = video
         db_batch_data.append(data)
+        migrate_to_metadata(str(media.pk))
         if not new_media:
             # update the existing media
             for key, value in media_defaults.items():
