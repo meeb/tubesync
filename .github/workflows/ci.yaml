@@ -198,29 +198,13 @@ jobs:
             do
               # jq_arg="$( eval printf -- "'%s\n'" "$(printf -- '"${%s}"' "${var}")" )" ;
               jq_arg="$( eval printf -- "'%s\n'" '"${'"${var}"'}"' )" ;
-              delim='"'"${var}"'_EOF"' ;
-              printf -- '%s<<%s\n' "${var}" "${delim}" ;
+              delim="$(mk_delim "${var}")" ;
+              open_ml_var "${delim}" "${var}" ;
               jq -r --arg previous "${previous_value-}" "${jq_arg}" -- .ffmpeg.releases.json ;
-              printf -- '%s\n' "${delim}" ;
+              close_ml_var "${delim}" "${var}" ;
               previous_value="$( jq -r --arg previous "${previous_value-}" "${jq_arg}" -- .ffmpeg.releases.json )" ;
             done ;
 
-            var='FFMPEG_DATE' ;
-            delim="$(mk_delim "${var}")" ;
-            open_ml_var "${delim}" "${var}" ;
-            jq_arg='[foreach .[] as $release ([{}, []]; [ .[0] + {($release.commit): ([ $release.date ] + (.[0][($release.commit)] // []) ) }, [ .[1][0] // $release.commit ] ] ; .[0][(.[1][0])] ) ][-1][0]' ;
-            jq -r "${jq_arg}" -- .ffmpeg.releases.json ;
-            close_ml_var "${delim}" "${var}" ;
-
-            ffmpeg_date="$( jq -r "${jq_arg}" -- .ffmpeg.releases.json )"
-            
-            var='FFMPEG_VERSION' ;
-            delim="$(mk_delim "${var}")" ;
-            open_ml_var "${delim}" "${var}" ;
-            jq_arg='.[]|select(.date == $date)|.versions[]|select(startswith("N-"))' ;
-            jq -r --arg date "${ffmpeg_date}" "${jq_arg}" -- .ffmpeg.releases.json ;
-            close_ml_var "${delim}" "${var}" ;
-  
             unset -v delim jq_arg previous_value var ;
           } >> "${GITHUB_ENV}"
           rm -v -f .ffmpeg.releases.json
