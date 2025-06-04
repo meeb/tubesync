@@ -226,10 +226,10 @@ jobs:
             do
               # jq_arg="$( eval printf -- "'%s\n'" "$(printf -- '"${%s}"' "${var}")" )" ;
               jq_arg="$( eval printf -- "'%s\n'" '"${'"${var}"'}"' )" ;
-              delim='"'"${var}"'_EOF"' ;
-              printf -- '%s<<%s\n' "${var}" "${delim}" ;
+              delim="$(mk_delim "${var}")" ;
+              open_ml_var "${delim}" "${var}" ;
               gh api "repos/${GITHUB_REPOSITORY}" --cache 1h --jq "${jq_arg}" ;
-              printf -- '%s\n' "${delim}" ;
+              close_ml_var "${delim}" "${var}" ;
             done ;
             unset -v delim jq_arg var ;
           } >> "${GITHUB_ENV}"
@@ -244,16 +244,20 @@ jobs:
         id: upstream
         run: |
           user_lowercase="$(printf -- '%s\n' "${GH_UPSTREAM_OWNER}" | awk '{print tolower($0);}')" ;
-          printf >> "$GITHUB_OUTPUT" -- '%s=ghcr.io/%s/%s:latest\n' \
-            ref "${user_lowercase}" "${IMAGE_NAME}" \
-            tag "${user_lowercase}" "${IMAGE_NAME}" ;
+          repo_image="ghcr.io/${user_lowercase}/${IMAGE_NAME}"
+          set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
+          set_sl_var >> "${GITHUB_OUTPUT}" \
+            ref "${repo_image}:latest" \
+            tag "${repo_image}:latest" ;
       - name: Registry ref
         id: origin
         run: |
           user_lowercase="$(printf -- '%s\n' "${GITHUB_ACTOR}" | awk '{print tolower($0);}')" ;
-          printf >> "$GITHUB_OUTPUT" -- '%s=ghcr.io/%s/%s:%s\n' \
-            'ref' "${user_lowercase}" "${IMAGE_NAME}" 'cache' \
-            'tag' "${user_lowercase}" "${IMAGE_NAME}" 'latest' ;
+          repo_image="ghcr.io/${user_lowercase}/${IMAGE_NAME}"
+          set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
+          set_sl_var >> "${GITHUB_OUTPUT}" \
+            ref "${repo_image}:cache" \
+            tag "${repo_image}:latest" ;
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
