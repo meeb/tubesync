@@ -57,6 +57,7 @@ def map_task_to_instance(task):
         because UUID's are incompatible with background_task's "creator" feature.
     '''
     TASK_MAP = {
+        'sync.tasks.migrate_to_metadata': Media,
         'sync.tasks.index_source_task': Source,
         'sync.tasks.check_source_directory_exists': Source,
         'sync.tasks.download_media_thumbnail': Media,
@@ -358,6 +359,12 @@ def migrate_to_metadata(media_id):
             media.save_to_metadata(field, value)
 
 
+@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+def wait_for_database_queue():
+    while Task.objects.unlocked(timezone.now()).filter(queue=Val(TaskQueue.DB)).count() > 0:
+        time.sleep(5)
+
+
 @background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def index_source_task(source_id):
     '''
@@ -391,6 +398,9 @@ def index_source_task(source_id):
     # Got some media, update the last crawl timestamp
     source.last_crawl = timezone.now()
     save_model(source)
+    wait_for_database_queue(
+        verbose_name=_('Waiting for database tasks to complete'),
+    )
     delete_task_by_source('sync.tasks.save_all_media_for_source', source.pk)
     num_videos = len(videos)
     log.info(f'Found {num_videos} media items for source: {source}')
@@ -461,7 +471,11 @@ def index_source_task(source_id):
         data.retrieved = source.last_crawl
         data.value = video
         db_batch_data.append(data)
-        migrate_to_metadata(str(media.pk))
+        vn_fmt = _('Updating metadata from indexing results for: "{}": {}')
+        migrate_to_metadata(
+            str(media.pk),
+            verbose_name=vn_fmt.format(media.key, media.name),
+        )
         if not new_media:
             # update the existing media
             for key, value in media_defaults.items():
