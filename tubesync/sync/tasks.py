@@ -399,7 +399,13 @@ def index_source_task(source_id):
     source.last_crawl = timezone.now()
     save_model(source)
     wait_for_database_queue(
+        priority=19, # the indexing task uses 20
         verbose_name=_('Waiting for database tasks to complete'),
+    )
+    wait_for_database_queue(
+        priority=29, # the checking task uses 30
+        queue=Val(TaskQueue.FS),
+        verbose_name=_('Delaying checking all media for database tasks'),
     )
     delete_task_by_source('sync.tasks.save_all_media_for_source', source.pk)
     num_videos = len(videos)
