@@ -359,7 +359,7 @@ def migrate_to_metadata(media_id):
             media.save_to_metadata(field, value)
 
 
-@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=False)
 def wait_for_database_queue():
     while Task.objects.unlocked(timezone.now()).filter(queue=Val(TaskQueue.DB)).count() > 0:
         time.sleep(5)
