@@ -399,6 +399,7 @@ def index_source_task(source_id):
     source.last_crawl = timezone.now()
     save_model(source)
     wait_for_database_queue(
+        priority=19, # the indexing task uses 20
         verbose_name=_('Waiting for database tasks to complete'),
     )
     wait_for_database_queue(
