@@ -28,9 +28,9 @@ from background_task import background
 from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from common.logger import log
-from common.errors import ( NoFormatException, NoMediaException,
-                            NoThumbnailException,
-                            DownloadFailedException, )
+from common.errors import ( BgTaskWorkerError, DownloadFailedException,
+                            NoFormatException, NoMediaException,
+                            NoThumbnailException, )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, )
 from .choices import Val, TaskQueue
@@ -365,7 +365,7 @@ def wait_for_database_queue():
     while Task.objects.unlocked(timezone.now()).filter(queue=Val(TaskQueue.DB)).count() > 0:
         time.sleep(5)
         if worker_down_path.exists() and worker_down_path.is_file():
-            raise Exception(_('queue worker stopped'))
+            raise BgTaskWorkerError(_('queue worker stopped'))
 
 
 @background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
