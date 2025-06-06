@@ -28,9 +28,9 @@ from background_task import background
 from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from common.logger import log
-from common.errors import ( NoFormatException, NoMediaException,
-                            NoThumbnailException,
-                            DownloadFailedException, )
+from common.errors import ( BgTaskWorkerError, DownloadFailedException,
+                            NoFormatException, NoMediaException,
+                            NoThumbnailException, )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, seconds_to_timestr, )
 from .choices import Val, TaskQueue
@@ -359,10 +359,13 @@ def migrate_to_metadata(media_id):
             media.save_to_metadata(field, value)
 
 
-@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=False)
 def wait_for_database_queue():
+    worker_down_path = Path('/run/service/tubesync-db-worker/down')
     while Task.objects.unlocked(timezone.now()).filter(queue=Val(TaskQueue.DB)).count() > 0:
         time.sleep(5)
+        if worker_down_path.exists() and worker_down_path.is_file():
+            raise BgTaskWorkerError(_('queue worker stopped'))
 
 
 @background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
