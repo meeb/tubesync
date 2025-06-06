@@ -354,6 +354,7 @@ class FrontEndTestCase(TestCase):
         # Add some media
         test_minimal_metadata = '''
             {
+                "channel_id":"testkey",
                 "thumbnail":"https://example.com/thumb.jpg",
                 "formats": [{
                     "format_id":"251",

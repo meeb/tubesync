@@ -42,3 +42,8 @@ class DatabaseConnectionError(Exception):
         Raised when parsing or initially connecting to a database.
     '''
     pass
+
+
+class BgTaskWorkerError(Exception):
+    # Raised when the worker process is not in a normal working state.
+    pass

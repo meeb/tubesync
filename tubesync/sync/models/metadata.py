@@ -3,8 +3,9 @@ from common.json import JSONEncoder
 from common.timestamp import timestamp_to_datetime
 from common.utils import django_queryset_generator as qs_gen
 from django import db
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from .media import Media
+from .media import Media, Source
 
 
 class Metadata(db.models.Model):
@@ -17,6 +18,7 @@ class Metadata(db.models.Model):
         verbose_name_plural = _('Metadata about Media')
         unique_together = (
             ('media', 'site', 'key'),
+            ('source', 'site', 'key', ),
         )
         get_latest_by = ["-retrieved", "-created"]
 
@@ -27,12 +29,22 @@ class Metadata(db.models.Model):
         default=uuid.uuid4,
         help_text=_('UUID of the metadata'),
     )
+    source = db.models.ForeignKey(
+        Source,
+        on_delete=db.models.CASCADE,
+        related_name="videos",
+        related_query_name="video",
+        help_text=_('Source from which the video was retrieved'),
+        blank=True,
+        null=True,
+    )
     media = db.models.OneToOneField(
         Media,
         # on_delete=models.DO_NOTHING,
         on_delete=db.models.SET_NULL,
         related_name='new_metadata',
         help_text=_('Media the metadata belongs to'),
+        blank=True,
         null=True,
         parent_link=False,
     )
@@ -62,8 +74,8 @@ class Metadata(db.models.Model):
     )
     retrieved = db.models.DateTimeField(
         _('retrieved'),
-        auto_now_add=True,
         db_index=True,
+        default=timezone.now,
         help_text=_('Date and time the metadata was retrieved'),
     )
     uploaded = db.models.DateTimeField(
