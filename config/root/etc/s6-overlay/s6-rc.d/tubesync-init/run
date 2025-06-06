@@ -4,6 +4,21 @@
 groupmod -o -g "${PGID:=911}" app
 usermod -o -u "${PUID:=911}" app
 
+# Ensure /config directories exist
+mkdir -v -p /config/{cache,media,tasks,tubesync}
+
+# Copy local_settings.py for the user
+if [ -f /config/tubesync/local_settings.py ]
+then
+    # from the image for an example or comparison
+    cp -v -p /app/tubesync/local_settings.py \
+        /config/tubesync/local_settings.py.image
+
+    # to the image to apply the user's settings
+    cp -v -p /config/tubesync/local_settings.py \
+        /app/tubesync/local_settings.py
+fi
+
 # Reset permissions
 chown -R app:app /run/app
 chmod -R 0700 /run/app
@@ -24,6 +39,21 @@ then
     chown -R app:app /downloads
     chmod -R 0755 /downloads
 fi
+
+# Prepare for nginx logging into /config/log/nginx
+mkdir -p /config/log
+rm -rf /config/log/nginx.9
+for n in $(seq 8 -1 0)
+do
+    test '!' -d "/config/log/nginx.${n}" ||
+    mv "/config/log/nginx.${n}" "/config/log/nginx.$((1 + n))"
+done ; unset -v n ;
+rm -rf /config/log/nginx.0
+test '!' -d /config/log/nginx ||
+mv /config/log/nginx /config/log/nginx.0
+rm -rf /config/log/nginx
+cp -a /var/log/nginx /config/log/
+cp -p /config/log/nginx/access.log /config/log/nginx/access.log.gz
 
 if [ 'True' = "${TUBESYNC_DEBUG:-False}" ]
 then
