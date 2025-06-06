@@ -361,8 +361,11 @@ def migrate_to_metadata(media_id):
 
 @background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=False)
 def wait_for_database_queue():
+    worker_down_path = Path('/run/service/tubesync-db-worker/down')
     while Task.objects.unlocked(timezone.now()).filter(queue=Val(TaskQueue.DB)).count() > 0:
         time.sleep(5)
+        if worker_down_path.exists() and worker_down_path.is_file():
+            raise Exception(_('queue worker stopped'))
 
 
 @background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
