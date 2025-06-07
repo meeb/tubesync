@@ -435,14 +435,33 @@ def media_post_delete(sender, instance, **kwargs):
         try:
             if instance_qs.count():
                 with atomic(durable=False):
-                    instance_qs.update(media=skipped_media)
+                    # clear the link to a media instance
+                    Metadata.objects.filter(media=skipped_media).update(media=None)
+                    # choose the oldest metadata for our key
+                    md = instance_qs.filter(
+                        key=skipped_media.key,
+                    ).order_by(
+                        'key',
+                        'created',
+                    ).first()
+                    # set the link to a media instance only on our selected metadata
+                    log.info('Reusing old metadata for "{}": {}', skipped_media.key, skipped_media.name)
+                    instance_qs.filter(uuid=md.uuid).update(media=skipped_media)
+                    # delete any metadata that we are no longer using
+                    instance_qs.exclude(uuid=md.uuid).delete()
+                    
         except IntegrityError:
+            # this probably won't happen, but try it without a transaction
             try:
-                with atomic(durable=False):
-                    # Delete the new metadata
-                    Metadata.objects.filter(media=skipped_media).delete()
-                    instance_qs.update(media=skipped_media)
+                # clear the link to a media instance
+                Metadata.objects.filter(media=skipped_media).update(media=None)
+                # keep one metadata
+                md = instance_qs.order_by('created').first()
+                instance_qs.filter(uuid=md.uuid).update(media=skipped_media)
+            except IntegrityError as e:
+                log.exception('media_post_delete: could not update selected metadata: {}', e)
             finally:
-                # Delete the old metadata, if it wasn't used
+                log.debug('Deleting metadata for "{}": {}', skipped_media.key, skipped_media.pk)
+                # delete the old metadata
                 instance_qs.delete()
 
