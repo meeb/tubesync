@@ -35,9 +35,10 @@ def timedelta(value, arg=None, /, *, fmt_2=None):
         seconds_total = value
 
     if arg is None:
-        arg = '{days_total} days, {hours2}:{minutes2}:{seconds2}'
         if seconds_total < 1.0:
-            arg = f'{seconds_total:.6f} seconds'
+            return f'{seconds_total:.6f} seconds'
+        dynamic_arg = True
+        arg = '{hours2}:{minutes2}:{seconds2}'
 
     if fmt_2 is None:
         fmt_2 = '{:02d}'
@@ -56,6 +57,16 @@ def timedelta(value, arg=None, /, *, fmt_2=None):
 
     years_total = days_total // 365
     years = years_total
+
+    if dynamic_arg:
+        prefix_years = prefix_days = ''
+        if years_total > 0:
+            prefix_years = '{years_total} years, '
+        if prefix_years and days_total > 0:
+            prefix_days = '{days} days, '
+        elif days_total > 0:
+            prefix_days = '{total_days} days, '
+        arg = prefix_years + prefix_days + arg
 
     return arg.format(**{
         'seconds': seconds,
