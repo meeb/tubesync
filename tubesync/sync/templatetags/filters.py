@@ -41,7 +41,7 @@ def timedelta(value, arg=None, /, *, fmt_2=None):
 
     if fmt_2 is None:
         fmt_2 = '{:02d}'
- 
+
     seconds_total = ceil(seconds_total)
     seconds = seconds_total % 60
 
