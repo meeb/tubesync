@@ -1,5 +1,6 @@
 from django import template
 from django.template.defaultfilters import filesizeformat
+from math import ceil
 
 
 register = template.Library()
@@ -22,4 +23,53 @@ def sub(value, arg):
             return value - arg
         except Exception:
             return ""
+
+
+@register.filter
+def timedelta(value, arg=None, /, *, fmt_2=None):
+    if hasattr(value, 'total_seconds') and callable(value.total_seconds):
+        seconds_total = value.total_seconds()
+    elif hasattr(value, 'seconds'):
+        seconds_total = value.seconds + (value.days * 24 * 60 * 60)
+    else:
+        seconds_total = value
+
+    if arg is None:
+        arg = '{days_total} days, {hours2}:{minutes2}:{seconds2}'
+        if seconds_total < 1.0:
+            arg = f'{seconds_total:.6f} seconds'
+
+    if fmt_2 is None:
+        fmt_2 = '{:02d}'
+ 
+    seconds_total = ceil(seconds_total)
+    seconds = seconds_total % 60
+
+    minutes_total = seconds_total // 60
+    minutes = minutes_total % 60
+
+    hours_total = minutes_total // 60
+    hours = hours_total % 24
+
+    days_total = hours_total // 24
+    days = days_total % 365
+
+    years_total = days_total // 365
+    years = years_total
+
+    return arg.format(**{
+        'seconds': seconds,
+        'seconds2': fmt_2.format(seconds),
+        'minutes': minutes,
+        'minutes2': fmt_2.format(minutes),
+        'hours': hours,
+        'hours2': fmt_2.format(hours),
+        'days': days,
+        'years': years,
+        'seconds_total': seconds_total,
+        'minutes_total': minutes_total,
+        'hours_total': hours_total,
+        'days_total': days_total,
+        'years_total': years_total,
+    })
 
