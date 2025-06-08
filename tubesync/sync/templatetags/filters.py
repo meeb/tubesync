@@ -66,7 +66,7 @@ def timedelta(value, arg=None, /, *, fmt_2=None):
         if prefix_years and days_total > 0:
             prefix_days = '{days} days, '
         elif days_total > 0:
-            prefix_days = '{total_days} days, '
+            prefix_days = '{days_total} days, '
         arg = prefix_years + prefix_days + arg
 
     return arg.format(**{
