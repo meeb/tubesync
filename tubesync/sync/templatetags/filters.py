@@ -34,6 +34,7 @@ def timedelta(value, arg=None, /, *, fmt_2=None):
     else:
         seconds_total = value
 
+    dynamic_arg = False
     if arg is None:
         if seconds_total < 1.0:
             return f'{seconds_total:.6f} seconds'
