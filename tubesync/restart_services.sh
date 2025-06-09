@@ -39,7 +39,7 @@ do
     fi
     for service in $(svc_path ${_svcs})
     do
-        printf -- 'Restarting %-28s' "${service#${dir}/}..."
+        printf -- 'Restarting %-28s' "${service#${_dir}/}..."
         _began="$( date '+%s' )"
         /command/s6-svc -wr -r "${service}"
         _ended="$( date '+%s' )"
