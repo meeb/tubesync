@@ -445,7 +445,7 @@ def media_post_delete(sender, instance, **kwargs):
                         'created',
                     ).first()
                     # set the link to a media instance only on our selected metadata
-                    log.info('Reusing old metadata for "{}": {}', skipped_media.key, skipped_media.name)
+                    log.info(f'Reusing old metadata for "{skipped_media.key}": {skipped_media.name}')
                     instance_qs.filter(uuid=md.uuid).update(media=skipped_media)
                     # delete any metadata that we are no longer using
                     instance_qs.exclude(uuid=md.uuid).delete()
@@ -459,9 +459,9 @@ def media_post_delete(sender, instance, **kwargs):
                 md = instance_qs.order_by('created').first()
                 instance_qs.filter(uuid=md.uuid).update(media=skipped_media)
             except IntegrityError as e:
-                log.exception('media_post_delete: could not update selected metadata: {}', e)
+                log.exception(f'media_post_delete: could not update selected metadata: {e}')
             finally:
-                log.debug('Deleting metadata for "{}": {}', skipped_media.key, skipped_media.pk)
+                log.debug(f'Deleting metadata for "{skipped_media.key}": {skipped_media.pk}')
                 # delete the old metadata
                 instance_qs.delete()
 
