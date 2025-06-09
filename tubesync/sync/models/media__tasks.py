@@ -113,9 +113,9 @@ def copy_thumbnail(self):
     if not self.thumb_file_exists:
         return
     log.info(
-        'Copying media thumbnail from: {} to: {}',
-        self.thumb.path,
-        self.thumbpath,
+        'Copying media thumbnail'
+        f' from: {self.thumb.path}'
+        f' to: {self.thumbpath}'
     )
     # copyfile returns the destination, so we may as well pass that along
     return copyfile(self.thumb.path, self.thumbpath)
@@ -124,7 +124,7 @@ def copy_thumbnail(self):
 def write_nfo_file(self):
     if not self.source.write_nfo:
         return
-    log.info('Writing media NFO file to: {}', self.nfopath)
+    log.info(f'Writing media NFO file to: {self.nfopath}')
     try:
         # write_text_file returns bytes written
         return write_text_file(self.nfopath, self.nfoxml)
