@@ -2,11 +2,11 @@ import os
 import re
 import math
 from copy import deepcopy
-from operator import attrgetter, itemgetter
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 import requests
 from PIL import Image
+from common.utils import list_of_dictionaries
 from django.conf import settings
 from urllib.parse import urlsplit, parse_qs
 from django.forms import ValidationError
@@ -95,20 +95,6 @@ def resize_image_to_height(image, width, height):
     return image
 
 
-def glob_quote(filestr):
-    _glob_specials = {
-        '?': '[?]',
-        '*': '[*]',
-        '[': '[[]',
-        ']': '[]]', # probably not needed, but it won't hurt
-    }
-
-    if not isinstance(filestr, str):
-        raise TypeError(f'filestr must be a str, got "{type(filestr)}"')
-
-    return filestr.translate(str.maketrans(_glob_specials))
-
-
 def file_is_editable(filepath):
     '''
         Checks that a file exists and the file is in an allowed predefined tuple of
@@ -128,14 +114,6 @@ def file_is_editable(filepath):
         if str(allowed_path) == os.path.commonpath([allowed_path, filepath]):
             return True
     return False
-
-
-def mkdir_p(arg_path, mode=0o777):
-    '''
-        Reminder: mode only affects the last directory
-    '''
-    dirpath = Path(arg_path)
-    return dirpath.mkdir(mode=mode, parents=True, exist_ok=True)
 
 
 def write_text_file(filepath, filedata):
@@ -162,30 +140,6 @@ def delete_file(filepath):
     return False
 
 
-def seconds_to_timestr(seconds):
-   seconds = seconds % (24 * 3600)
-   hour = seconds // 3600
-   seconds %= 3600
-   minutes = seconds // 60
-   seconds %= 60
-   return '{:02d}:{:02d}:{:02d}'.format(hour, minutes, seconds)
-
-
-def multi_key_sort(iterable, specs, /, use_reversed=False, *, item=False, attr=False, key_func=None):
-    result = list(iterable)
-    if key_func is None:
-        # itemgetter is the default
-        if item or not (item or attr):
-            key_func = itemgetter
-        elif attr:
-            key_func = attrgetter
-    for key, reverse in reversed(specs):
-        result.sort(key=key_func(key), reverse=reverse)
-    if use_reversed:
-        return list(reversed(result))
-    return result
-
-
 def normalize_codec(codec_str):
     result = str(codec_str).upper()
     parts = result.split('.')
@@ -199,17 +153,6 @@ def normalize_codec(codec_str):
         prefix = result.rstrip('0123456789')
         result = prefix + str(int(result[len(prefix):]))
     return result
-
-
-def list_of_dictionaries(arg_list, arg_function=lambda x: x):
-    assert callable(arg_function)
-    if isinstance(arg_list, list):
-        def _call_func_with_dict(arg_dict):
-            if isinstance(arg_dict, dict):
-                return arg_function(arg_dict)
-            return arg_dict
-        return (True, list(map(_call_func_with_dict, arg_list)),)
-    return (False, arg_list,)
 
 
 def _url_keys(arg_dict, filter_func):

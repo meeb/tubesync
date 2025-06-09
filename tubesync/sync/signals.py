@@ -4,12 +4,13 @@ from tempfile import TemporaryDirectory
 from django.conf import settings
 from django.db import IntegrityError
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
-from django.db.transaction import on_commit
+from django.db.transaction import atomic, on_commit
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from background_task.signals import task_failed
 from background_task.models import Task
 from common.logger import log
+from common.utils import glob_quote, mkdir_p
 from .models import Source, Media, Metadata
 from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
                     download_media_thumbnail, download_media_metadata,
@@ -17,7 +18,7 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     download_media, download_source_images,
                     delete_all_media_for_source, save_all_media_for_source,
                     rename_media, get_media_metadata_task, get_media_download_task)
-from .utils import delete_file, glob_quote, mkdir_p
+from .utils import delete_file
 from .filtering import filter_media
 from .choices import Val, YouTube_SourceType
 
@@ -429,17 +430,40 @@ def media_post_delete(sender, instance, **kwargs):
         # Re-use the old metadata if it exists
         instance_qs = Metadata.objects.filter(
             media__isnull=True,
+            source__isnull=True,
             site=old_metadata.get(site_field) or 'Youtube',
             key=skipped_media.key,
         )
         try:
-            instance_qs.update(media=skipped_media)
+            if instance_qs.count():
+                with atomic(durable=False):
+                    # clear the link to a media instance
+                    Metadata.objects.filter(media=skipped_media).update(media=None)
+                    # choose the oldest metadata for our key
+                    md = instance_qs.filter(
+                        key=skipped_media.key,
+                    ).order_by(
+                        'key',
+                        'created',
+                    ).first()
+                    # set the link to a media instance only on our selected metadata
+                    log.info(f'Reusing old metadata for "{skipped_media.key}": {skipped_media.name}')
+                    instance_qs.filter(uuid=md.uuid).update(media=skipped_media)
+                    # delete any metadata that we are no longer using
+                    instance_qs.exclude(uuid=md.uuid).delete()
+                    
         except IntegrityError:
-            # Delete the new metadata
-            Metadata.objects.filter(media=skipped_media).delete()
+            # this probably won't happen, but try it without a transaction
             try:
-                instance_qs.update(media=skipped_media)
-            except IntegrityError:
-                # Delete the old metadata if it still failed
+                # clear the link to a media instance
+                Metadata.objects.filter(media=skipped_media).update(media=None)
+                # keep one metadata
+                md = instance_qs.order_by('created').first()
+                instance_qs.filter(uuid=md.uuid).update(media=skipped_media)
+            except IntegrityError as e:
+                log.exception(f'media_post_delete: could not update selected metadata: {e}')
+            finally:
+                log.debug(f'Deleting metadata for "{skipped_media.key}": {skipped_media.pk}')
+                # delete the old metadata
                 instance_qs.delete()
 

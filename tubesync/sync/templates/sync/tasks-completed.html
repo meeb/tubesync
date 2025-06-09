@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'base.html' %}{% load filters %}
 
 {% block headtitle %}Tasks - Completed{% endblock %}
 
@@ -14,20 +14,18 @@
     <div class="collection">
     {% for task in tasks %}
       
-      {% if task.has_error %}
       <span class="collection-item">
+      {% if task.has_error %}
         <i class="fas fa-exclamation-triangle"></i> <strong>{{ task.verbose_name }}</strong><br>
         Queue: &quot;{{ task.queue }}&quot;<br>
         Error: &quot;{{ task.error_message }}&quot;<br>
-        <i class="far fa-clock"></i> Task ran at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
-      </span>
       {% else %}
-      <span class="collection-item">
         <i class="fas fa-check"></i> <strong>{{ task.verbose_name }}</strong><br>
         Queue: &quot;{{ task.queue }}&quot;<br>
-        <i class="far fa-clock"></i> Task ran at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
-      </span>
       {% endif %}
+        Task locked for: {{ task.run_at|sub:task.locked_at|timedelta }}<br>
+        <i class="far fa-clock"></i> Task locked at <strong>{{ task.locked_at|date:'Y-m-d H:i:s' }}</strong><br>
+        <i class="fas fa-hourglass-end"></i> Task ended at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
       </span>
     {% empty %}
       <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There have been no completed tasks{% if source %} that match the specified source filter{% endif %}.</span>
