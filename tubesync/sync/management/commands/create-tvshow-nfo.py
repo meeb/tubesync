@@ -25,7 +25,7 @@ class Command(BaseCommand):
                     'The matching source is not configured to write ".nfo" files.'
                     f' ({source=})'
                 )
-            return
+                return
             nfo_path = source.directory_path / self.filename
             if nfo_path.exists():
                 log.debug(
