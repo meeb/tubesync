@@ -165,6 +165,7 @@ class TaskQueue(models.TextChoices):
     DB = 'database', _('Database')
     FS = 'filesystem', _('Filesystem')
     NET = 'network', _('Networking')
+    LIMIT = 'limited', _('Limited Networking')
 
 
 class WeekDay(models.IntegerChoices):

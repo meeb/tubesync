@@ -17,15 +17,15 @@ from common.logger import log
 from common.errors import NoFormatException
 from common.json import JSONEncoder
 from common.utils import (
-    clean_filename, clean_emoji,
+    clean_filename, clean_emoji, directory_and_stem,
+    glob_quote, mkdir_p, multi_key_sort, seconds_to_timestr,
 )
 from ..youtube import (
     get_media_info as get_youtube_media_info,
     download_media as download_youtube_media,
 )
 from ..utils import (
-    seconds_to_timestr, parse_media_format, filter_response,
-    write_text_file, mkdir_p, glob_quote, multi_key_sort,
+    filter_response, parse_media_format, write_text_file,
 )
 from ..matching import (
     get_best_combined_format,
@@ -38,7 +38,7 @@ from ..choices import (
 from ._migrations import (
     media_file_storage, get_media_thumb_path, get_media_file_path,
 )
-from ._private import _srctype_dict, _nfo_element, directory_and_stem
+from ._private import _srctype_dict, _nfo_element
 from .media__tasks import (
     download_checklist, download_finished, wait_for_premiere,
 )
@@ -566,7 +566,11 @@ class Media(models.Model):
 
     @property
     def has_metadata(self):
-        return self.metadata is not None
+        result = self.metadata is not None
+        if not result:
+            return False
+        value = self.get_metadata_first_value(('id', 'display_id', 'channel_id', 'uploader_id',))
+        return value is not None
 
 
     def metadata_clear(self, /, *, save=False):
@@ -600,8 +604,10 @@ class Media(models.Model):
             arg_dict=data,
         )
         md_model = self._meta.fields_map.get('new_metadata').related_model
-        md, created = md_model.objects.get_or_create(
-            media_id=self.pk,
+        md, created = md_model.objects.filter(
+            source__isnull=True,
+        ).get_or_create(
+            media=self,
             site=site,
             key=self.key,
         )
@@ -697,8 +703,7 @@ class Media(models.Model):
         data = self.loaded_metadata
         metadata_seconds = data.get('epoch', None)
         if not metadata_seconds:
-            self.metadata = None
-            self.save(update_fields={'metadata'})
+            self.metadata_clear(save=True)
             return False
 
         now = timezone.now()
