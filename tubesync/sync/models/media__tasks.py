@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from shutil import copyfile
 from common.logger import log
 from common.errors import (
     NoMetadataException,
@@ -7,6 +8,7 @@ from common.errors import (
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from ..choices import Val, SourceResolution
+from ..utils import write_text_file
 
 
 def download_checklist(self, skip_checks=False):
@@ -95,6 +97,43 @@ def download_finished(self, format_str, container, downloaded_filepath=None):
             media.downloaded_hdr = cformat['is_hdr']
         else:
             self.downloaded_format = Val(SourceResolution.AUDIO)
+
+
+def copy_thumbnail(self):
+    if not self.source.copy_thumbnails:
+        return
+    if not self.thumb_file_exists:
+        from sync.tasks import delete_task_by_media, download_media_thumbnail
+        args = ( str(self.pk), self.thumbnail, )
+        if not args[1]:
+            return
+        delete_task_by_media('sync.tasks.download_media_thumbnail', args)
+        if download_media_thumbnail.now(*args):
+            self.refresh_from_db()
+    if not self.thumb_file_exists:
+        return
+    log.info(
+        'Copying media thumbnail'
+        f' from: {self.thumb.path}'
+        f' to: {self.thumbpath}'
+    )
+    # copyfile returns the destination, so we may as well pass that along
+    return copyfile(self.thumb.path, self.thumbpath)
+
+
+def write_nfo_file(self):
+    if not self.source.write_nfo:
+        return
+    log.info(f'Writing media NFO file to: {self.nfopath}')
+    try:
+        # write_text_file returns bytes written
+        return write_text_file(self.nfopath, self.nfoxml)
+    except PermissionError as e:
+        msg = (
+            'A permissions problem occured when writing'
+            ' the new media NFO file: {}'
+        )
+        log.exception(msg, e)
 
 
 def wait_for_premiere(self):
