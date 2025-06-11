@@ -404,7 +404,7 @@ class Source(db.models.Model):
             )
         elif Val(IndexSchedule.EVERY_7_DAYS) > self.index_schedule:
             self.target_schedule = advance_hour(
-                when.replace(hour=1+when.hour),
+                when + timezone.timedelta(hours=1),
                 self.target_schedule.hour,
             )
 
