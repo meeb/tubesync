@@ -41,24 +41,6 @@ jobs:
           set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
           set -eux
           set_sl_var image "${image}" >> "${GITHUB_OUTPUT}"
-          # v0.14.1 = ghcr.io/meeb/tubesync:latest@sha256:63fffee3411bda395c526087d7107f76834141bb0c1443a0bd6bed5533e5a85f
-          tag_tried='v0.14.1'
-          tag_image_digest='latest@sha256:63fffee3411bda395c526087d7107f76834141bb0c1443a0bd6bed5533e5a85f'
-          docker pull "${image}:${tag_image_digest}"
-          docker pull "${image}:${tag_tried}" && tag_found=1 || {
-            tag_found=0
-            missing="${missing}${missing:+|}${tag_tried}=${image}:${tag_image_digest}"
-          }
-          set_sl_var "${tag_tried}" "${tag_found}" >> "${GITHUB_OUTPUT}"
-          # v0.15.1 = ghcr.io/meeb/tubesync:latest@sha256:7303b2d8854aac15f94dbbfdd0ee66ca598ade1af6ac2d9e3d886c93ffa2d596
-          tag_tried='v0.15.1'
-          tag_image_digest='latest@sha256:7303b2d8854aac15f94dbbfdd0ee66ca598ade1af6ac2d9e3d886c93ffa2d596'
-          docker pull "${image}:${tag_image_digest}"
-          docker pull "${image}:${tag_tried}" && tag_found=1 || {
-            tag_found=0
-            missing="${missing}${missing:+|}${tag_tried}=${image}:${tag_image_digest}"
-          }
-          set_sl_var "${tag_tried}" "${tag_found}" >> "${GITHUB_OUTPUT}"
           set_sl_var missing "${missing}" >> "${GITHUB_OUTPUT}"
       - uses: actions/checkout@v4
       - name: Lowercase github username
@@ -132,6 +114,8 @@ jobs:
             pip install --system --strict --requirements requirements.txt
       - name: Set up Django environment
         run: |
+          mkdir -v -p ~/.config/TubeSync/config
+          sudo ln -v -s -f -T ~/.config/TubeSync/config /config
           cp -v -p tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/background_task/ patches/background_task/*
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/yt_dlp/ patches/yt_dlp/*
@@ -198,7 +182,7 @@ jobs:
           DOCKER_TOKEN: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
         run: echo "${DOCKER_TOKEN}" | docker login --password-stdin --username "${DOCKER_USERNAME}" "${DOCKER_REGISTRY}"
       - name: Push missing release tags
-        if: ${{ 'meeb' == github.actor && github.actor == github.repository_owner && '' != needs.info.outputs.missing-tags }}
+        if: ${{ false && 'meeb' == github.actor && github.actor == github.repository_owner && '' != needs.info.outputs.missing-tags }}
         run: |
           missing='${{ needs.info.outputs.missing-tags }}'
           image='${{ needs.info.outputs.missing-tags-image }}'

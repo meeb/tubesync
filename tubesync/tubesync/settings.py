@@ -1,5 +1,6 @@
 from django import VERSION as DJANGO_VERSION
 from pathlib import Path
+from common.huey import sqlite_tasks
 from common.utils import getenv
 
 
@@ -24,6 +25,7 @@ INSTALLED_APPS = [
     'django.contrib.humanize',
     'sass_processor',
     'background_task',
+    'django_huey',
     'common',
     'sync',
 ]
@@ -45,6 +47,22 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'tubesync.urls'
 FORCE_SCRIPT_NAME = None
+
+
+DJANGO_HUEY = {
+    'default': 'network',
+    'queues': {
+        'database': sqlite_tasks('database'),
+        'filesystem': sqlite_tasks('filesystem'),
+        'limited': sqlite_tasks('limited', prefix='net'),
+        'network': sqlite_tasks('network'),
+    },
+}
+for django_huey_queue in DJANGO_HUEY['queues'].values():
+    connection = django_huey_queue.get('connection')
+    if connection:
+        filepath = Path('/.' + connection.get('filename') or '').resolve(strict=False)
+        filepath.parent.mkdir(exist_ok=True, parents=True)
 
 
 TEMPLATES = [

@@ -259,6 +259,7 @@ and less common features:
  * [Sync or create missing metadata files](https://github.com/meeb/tubesync/blob/main/docs/create-missing-metadata.md)
  * [Reset tasks from the command line](https://github.com/meeb/tubesync/blob/main/docs/reset-tasks.md)
  * [Using PostgreSQL, MySQL or MariaDB as database backends](https://github.com/meeb/tubesync/blob/main/docs/other-database-backends.md)
+ * [YouTube Proof-of-Origin Tokens](https://github.com/meeb/tubesync/blob/main/docs/youtube-pot.md)
  * [Using cookies](https://github.com/meeb/tubesync/blob/main/docs/using-cookies.md)
  * [Reset metadata](https://github.com/meeb/tubesync/blob/main/docs/reset-metadata.md)
 

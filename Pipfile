@@ -8,6 +8,7 @@ autopep8 = "*"
 
 [packages]
 django = "~=5.2.1"
+django-huey = "*"
 django-sass-processor = {extras = ["management-command"], version = "*"}
 pillow = "*"
 whitenoise = "*"
@@ -24,4 +25,5 @@ yt-dlp = {extras = ["default", "curl-cffi"], version = "*"}
 emoji = "*"
 brotli = "*"
 html5lib = "*"
-bgutil-ytdlp-pot-provider = "*"
+bgutil-ytdlp-pot-provider = "~=1.0"
+babi = "*"

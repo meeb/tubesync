@@ -7,8 +7,18 @@ import pstats
 import string
 import time
 from django.core.paginator import Paginator
+from functools import partial
+from operator import attrgetter, itemgetter
+from pathlib import Path
 from urllib.parse import urlunsplit, urlencode, urlparse
 from .errors import DatabaseConnectionError
+
+def directory_and_stem(arg_path, /, all_suffixes=False):
+    filepath = Path(arg_path)
+    stem = Path(filepath.stem)
+    while all_suffixes and stem.suffixes and '' != stem.suffix:
+        stem = Path(stem.stem)
+    return (filepath.parent, str(stem),)
 
 
 def getenv(key, default=None, /, *, integer=False, string=True):
@@ -44,6 +54,51 @@ def getenv(key, default=None, /, *, integer=False, string=True):
     elif integer:
         r = int(float(r))
     return r
+
+
+def glob_quote(filestr, /):
+    _glob_specials = {
+        '?': '[?]',
+        '*': '[*]',
+        '[': '[[]',
+        ']': '[]]', # probably not needed, but it won't hurt
+    }
+
+    if not isinstance(filestr, str):
+        raise TypeError(f'expected a str, got "{type(filestr)}"')
+
+    return filestr.translate(str.maketrans(_glob_specials))
+
+
+def list_of_dictionaries(arg_list, /, arg_function=lambda x: x):
+    assert callable(arg_function)
+    if isinstance(arg_list, list):
+        _map_func = partial(lambda f, d: f(d) if isinstance(d, dict) else d, arg_function)
+        return (True, list(map(_map_func, arg_list)),)
+    return (False, arg_list,)
+
+
+def mkdir_p(arg_path, /, *, mode=0o777):
+    '''
+        Reminder: mode only affects the last directory
+    '''
+    dirpath = Path(arg_path)
+    return dirpath.mkdir(mode=mode, parents=True, exist_ok=True)
+
+
+def multi_key_sort(iterable, specs, /, use_reversed=False, *, item=False, attr=False, key_func=None):
+    result = list(iterable)
+    if key_func is None:
+        # itemgetter is the default
+        if item or not (item or attr):
+            key_func = itemgetter
+        elif attr:
+            key_func = attrgetter
+    for key, reverse in reversed(specs):
+        result.sort(key=key_func(key), reverse=reverse)
+    if use_reversed:
+        return list(reversed(result))
+    return result
 
 
 def parse_database_connection_string(database_connection_string):
@@ -165,6 +220,15 @@ def clean_emoji(s):
     if not isinstance(s, str):
         raise ValueError(f'parameter must be a str, got {type(s)}')
     return emoji.replace_emoji(s)
+
+
+def seconds_to_timestr(seconds):
+    seconds = seconds % (24 * 3600)
+    hour = seconds // 3600
+    seconds %= 3600
+    minutes = seconds // 60
+    seconds %= 60
+    return '{:02d}:{:02d}:{:02d}'.format(hour, minutes, seconds)
 
 
 def time_func(func):
