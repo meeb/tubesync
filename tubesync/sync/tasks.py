@@ -35,9 +35,7 @@ from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, seconds_to_timestr, )
 from .choices import Val, TaskQueue
 from .models import Source, Media, MediaServer, Metadata
-from .utils import (
-    get_remote_image, resize_image_to_height, filter_response, seconds_to_timestr, write_text_file,
-)
+from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
 
 db_vendor = db.connection.vendor
