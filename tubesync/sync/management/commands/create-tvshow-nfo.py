@@ -1,3 +1,5 @@
+import base64
+import binascii
 from common.logger import log
 from django.utils.translation import gettext_lazy as _
 from sync.models import Source
@@ -5,16 +7,50 @@ from sync.utils import write_text_file
 from django.core.management.base import BaseCommand, CommandError
 
 
+def validYoutubeID(arg, /):
+    arg_str = str(arg).strip()
+    valid_beginning = ( arg_str[0:2] in frozenset(('PL','UC','UU',)) )
+    # channels end in one of these: A, Q, g, w,
+    # playlists are, of course, different.
+    valid_ending = (
+        ( arg_str[0:2] in frozenset(('PL',)) ) or
+        ( arg_str[-1] in frozenset('AQgw') )
+    )
+    valid_length = len(arg_str) in {24, 34}
+    if not ( valid_beginning and valid_ending and valid_length ):
+        raise ValueError('not a channel or playlist ID')
+    try:
+        base64.b64decode(arg_str[2:] + '==', altchars='-_', validate=True)
+    except binascii.Error as e:
+        raise ValueError('not a channel or playlist ID') from e
+    return arg_str
+
+_filename = 'tvshow.nfo'
 class Command(BaseCommand):
 
-    filename = 'tvshow.nfo'
-    help = 'Creates a "tvshow.nfo" file for a source during the indexing process'
+    filename = _filename
+    help = f'Creates a "{_filename}" file for a source during the indexing process'
 
     def add_arguments(self, parser):
-        parser.add_argument('id', type=str)
+        parser.add_argument('id')
+        parser.add_argument('channel_id', nargs='?')
+        parser.add_argument('--name', default=list(), nargs='*')
 
     def handle(self, *args, **options):
+        channel_id = options['channel_id']
+        channel_name = ' '.join(options['name']]).strip()
         key = options['id']
+        try:
+            key = validYoutubeID(key)
+        except ValueError as e:
+            raise CommandError(_(f'not a valid YouTube ID: {key=}')) from e
+        try:
+            if channel_id is not None:
+                channel_id = validYoutubeID(channel_id)
+        except ValueError as e:
+            log.exception(f'{e}')
+            log.info('Continuing without a channel_id')
+            channel_id = None
         try:
             source = Source.objects.get(key=key)
         except Source.DoesNotExist as e:
@@ -36,8 +72,19 @@ class Command(BaseCommand):
 <tvshow>
     <title>{source.name}</title>
     <uniqueid type="Youtube" default="true">{source.key}</uniqueid>
+    <studio>{channel_name}</studio>
+    <tag>Youtube</tag>
+    <tag>{channel_id or ''}</tag>
 </tvshow>
 '''
+            content = '\n'.join(filter(
+                lambda s: s.replace(
+                    '<studio></studio>', '',
+                ).replace(
+                    '<tag></tag>', '',
+                ).lstrip(' '),
+                content.splitlines(),
+            ))
             log.debug(
                 f'Writing new content to: {nfo_path}',
             )
