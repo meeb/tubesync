@@ -111,10 +111,7 @@ def source_post_save(sender, instance, created, **kwargs):
             verbose_name=verbose_name.format(instance.name),
         )
         if instance.source_type != Val(YouTube_SourceType.PLAYLIST) and instance.copy_channel_images:
-            download_source_images(
-                str(instance.pk),
-                verbose_name=verbose_name.format(instance.name),
-            )
+            download_source_images(str(instance.pk))
         if instance.index_schedule > 0:
             delete_task_by_source('sync.tasks.index_source_task', instance.pk)
             log.info(f'Scheduling first media indexing for source: {instance.name}')
