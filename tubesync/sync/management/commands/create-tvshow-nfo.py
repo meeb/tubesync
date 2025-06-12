@@ -17,11 +17,14 @@ def validYoutubeID(arg, /):
         ( arg_str[0:2] in frozenset(('PL',)) ) or
         ( arg_str[-1] in frozenset('AQgw') )
     )
-    valid_length = len(arg_str) in {24, 34}
+    valid_length = len(arg_str) in {18, 24, 26, 34}
     if not ( valid_beginning and valid_ending and valid_length ):
         raise ValueError('not a channel or playlist ID')
     try:
-        base64.b64decode(arg_str[2:] + '==', altchars='-_', validate=True)
+        value = arg_str[2:] + '=='
+        if 26 == len(arg_str) and 'UULV' == arg_str[0:4]:
+            value = value[2:]
+        base64.b64decode(value, altchars='-_', validate=True)
     except binascii.Error as e:
         raise ValueError('not a channel or playlist ID') from e
     return arg_str
