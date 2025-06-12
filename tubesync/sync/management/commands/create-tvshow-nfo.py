@@ -1,5 +1,6 @@
 import base64
 import binascii
+import os
 from common.logger import log
 from django.utils.translation import gettext_lazy as _
 from sync.models import Source
@@ -38,7 +39,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         channel_id = options['channel_id']
-        channel_name = ' '.join(options['name']]).strip()
+        channel_name = ' '.join(options['name']).strip()
         key = options['id']
         try:
             key = validYoutubeID(key)
@@ -77,14 +78,14 @@ class Command(BaseCommand):
     <tag>{channel_id or ''}</tag>
 </tvshow>
 '''
-            content = '\n'.join(filter(
+            content = os.linesep.join(filter(
                 lambda s: s.replace(
                     '<studio></studio>', '',
                 ).replace(
                     '<tag></tag>', '',
                 ).lstrip(' '),
                 content.splitlines(),
-            ))
+            )) + os.linesep
             log.debug(
                 f'Writing new content to: {nfo_path}',
             )
