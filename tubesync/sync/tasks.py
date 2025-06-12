@@ -810,7 +810,7 @@ def download_media(media_id, override=False):
         schedule_media_servers_update()
 
 
-@db_task(delay=30, expire=60, priority=100, queue=Val(TaskQueue.NET))
+@db_task(delay=30, expires=210, priority=100, queue=Val(TaskQueue.NET))
 def rescan_media_server(mediaserver_id):
     '''
         Attempts to request a media rescan on a remote media server.
