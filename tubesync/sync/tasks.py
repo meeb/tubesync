@@ -25,7 +25,7 @@ from django.db.transaction import atomic
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from background_task import background
-from django_huey import db_periodic_task, db_task, task # noqa
+from django_huey import db_periodic_task, db_task, task as huey_task # noqa
 from huey import CancelExecution
 from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
