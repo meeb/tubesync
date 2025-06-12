@@ -1,6 +1,5 @@
 import base64
 import binascii
-import os
 from common.logger import log
 from django.utils.translation import gettext_lazy as _
 from sync.models import Source
@@ -81,14 +80,15 @@ class Command(BaseCommand):
     <tag>{channel_id or ''}</tag>
 </tvshow>
 '''
-            content = os.linesep.join(filter(
+            tfmt = '<{t}></{t}>'
+            content = ''.join(filter(
                 lambda s: s.replace(
-                    '<studio></studio>', '',
+                    tfmt.format(t='studio'), '', 1,
                 ).replace(
-                    '<tag></tag>', '',
-                ).lstrip(' '),
-                content.splitlines(),
-            )) + os.linesep
+                    tfmt.format(t='tag'), '', 1,
+                ).lstrip(),
+                content.splitlines(keepends=True),
+            ))
             log.debug(
                 f'Writing new content to: {nfo_path}',
             )
