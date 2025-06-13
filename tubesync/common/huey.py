@@ -1,5 +1,20 @@
 
 
+def h_q_dict(q, /):
+    return dict(
+        scheduled=(q.scheduled_count(), q.scheduled(),),
+        pending=(q.pending_count(), q.pending(),),
+        result=(q.result_count(), q.all_results(),),
+    )
+
+
+def h_q_tuple(q, /):
+    return (
+        q.name,
+        h_q_dict(q),
+    )
+
+
 def sqlite_tasks(key, /, prefix=None):
     name_fmt = 'huey_{}'
     if prefix is None:
