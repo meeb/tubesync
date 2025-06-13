@@ -279,10 +279,14 @@ RUN set -eu ; \
     set +x ; \
     unset -v f ;
 
-FROM scratch AS s6-overlay-old
-COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
+FROM ghcr.io/tcely/s6-overlay:v${S6_VERSION} AS s6-overlay-img
 
-FROM ghcr.io/tcely/s6-overlay:v${S6_VERSION} AS s6-overlay
+FROM tubesync-base AS s6-overlay
+COPY --from=s6-overlay-extracted /s6-overlay-rootfs /old
+COPY --from=s6-overlay-img / /new
+RUN echo Old tar: && tar -C /old -c . | sha256sum ; \
+    echo New tar: && tar -C /new -c . | sha256sum ; \
+    diff -r /old /new
 
 FROM tubesync-base AS tubesync-uv
 COPY --from=uv-binaries /uv /uvx /usr/local/bin/
@@ -381,7 +385,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   rm -v -f /var/cache/debconf/*.dat-old
 
 # Install third party software
-COPY --from=s6-overlay / /
+COPY --from=s6-overlay /old /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
