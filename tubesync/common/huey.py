@@ -9,6 +9,9 @@ def h_q_dict(q, /):
 
 
 def h_q_tuple(q, /):
+    if isinstance(q, str):
+        from django_huey import get_queue
+        q = get_queue(q)
     return (
         q.name,
         h_q_dict(q),
