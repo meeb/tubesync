@@ -279,8 +279,10 @@ RUN set -eu ; \
     set +x ; \
     unset -v f ;
 
-FROM scratch AS s6-overlay
+FROM scratch AS s6-overlay-old
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
+
+FROM ghcr.io/tcely/s6-overlay:v${S6_VERSION} AS s6-overlay
 
 FROM tubesync-base AS tubesync-uv
 COPY --from=uv-binaries /uv /uvx /usr/local/bin/
