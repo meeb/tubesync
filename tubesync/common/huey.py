@@ -74,10 +74,13 @@ def exponential_backoff(task_func=None, /, *args, **kwargs):
             try:
                 return fn(*a, **kwa)
             except Exception as exc:
-                attempt = 1
-                while task.retry_delay <= backoff(attempt):
-                    attempt += 1
-                task.retry_delay = backoff(attempt)
+                for attempt in range(1, 1_001):
+                    if backoff(attempt) > task.retry_delay:
+                        task.retry_delay = backoff(attempt)
+                        break
+                    # insanity, but handle it anyway
+                    if 1_000 == attempt:
+                        task.retry_delay = backoff(attempt)
                 raise exc
         kwargs.update(dict(
             context=True,
