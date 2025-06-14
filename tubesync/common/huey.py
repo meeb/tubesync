@@ -1,3 +1,28 @@
+from functools import wraps
+
+
+def delay_to_eta(delay, /):
+    from huey.utils import normalize_time
+    return normalize_time(delay=delay)
+
+
+def h_q_dict(q, /):
+    return dict(
+        scheduled=(q.scheduled_count(), q.scheduled(),),
+        pending=(q.pending_count(), q.pending(),),
+        result=(q.result_count(), q.all_results(),),
+    )
+
+
+def h_q_tuple(q, /):
+    if isinstance(q, str):
+        from django_huey import get_queue
+        q = get_queue(q)
+    return (
+        q.name,
+        list(q._registry._registry.keys()),
+        h_q_dict(q),
+    )
 
 
 def sqlite_tasks(key, /, prefix=None):
@@ -34,4 +59,33 @@ def sqlite_tasks(key, /, prefix=None):
             verbose=False,
         ),
     )
+
+
+def exponential_backoff(task_func=None, /, *args, **kwargs):
+    if task_func is None:
+        from django_huey import task as huey_task
+        task_func = huey_task
+    def backoff(attempt, /):
+        return (5+(attempt**4))
+    def deco(fn):
+        @wraps(fn)
+        def inner(*a, **kwa):
+            task = kwa.pop('task')
+            try:
+                return fn(*a, **kwa)
+            except Exception as exc:
+                for attempt in range(1, 1_001):
+                    if backoff(attempt) > task.retry_delay:
+                        task.retry_delay = backoff(attempt)
+                        break
+                    # insanity, but handle it anyway
+                    if 1_000 == attempt:
+                        task.retry_delay = backoff(attempt)
+                raise exc
+        kwargs.update(dict(
+            context=True,
+            retry_delay=backoff(1),
+        ))
+        return task_func(*args, **kwargs)(inner)
+    return deco
 

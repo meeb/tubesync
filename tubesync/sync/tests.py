@@ -1833,7 +1833,7 @@ class TasksTestCase(TestCase):
         self.assertEqual(src1.media_source.all().count(), 3)
         self.assertEqual(src2.media_source.all().count(), 3)
 
-        cleanup_old_media()
+        cleanup_old_media.call_local(durable=False)
 
         self.assertEqual(src1.media_source.all().count(), 3)
         self.assertEqual(src2.media_source.all().count(), 3)
