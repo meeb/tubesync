@@ -1,5 +1,10 @@
 
 
+def delay_to_eta(delay, /):
+    from huey.utils import normalize_time
+    return normalize_time(delay=delay)
+
+
 def h_q_dict(q, /):
     return dict(
         scheduled=(q.scheduled_count(), q.scheduled(),),
