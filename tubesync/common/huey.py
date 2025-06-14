@@ -19,6 +19,7 @@ def h_q_tuple(q, /):
         q = get_queue(q)
     return (
         q.name,
+        list(q._registry._registry.keys()),
         h_q_dict(q),
     )
 
