@@ -1,3 +1,4 @@
+from functools import wraps
 
 
 def delay_to_eta(delay, /):
@@ -58,4 +59,30 @@ def sqlite_tasks(key, /, prefix=None):
             verbose=False,
         ),
     )
+
+
+def exponential_backoff(task_func=None, /, *args, *, **kwargs):
+    if task_func is None:
+        from django_huey import task as huey_task
+        task_func = huey_task
+    def backoff(attempt, /):
+        return (5+(attempt**4))
+    def deco(fn):
+        @wraps(fn)
+        def inner(*a, **kwa):
+            task = kwa.pop('task')
+            try:
+                return fn(*a, **kwa)
+            except Exception as exc:
+                attempt = 1
+                while task.retry_delay <= backoff(attempt):
+                    attempt += 1
+                task.retry_delay = backoff(attempt)
+                raise exc
+        kwargs.update(dict(
+            context=True,
+            retry_delay=backoff(1),
+        ))
+        return task_func(*args, **kwargs)(inner)
+    return deco
 
