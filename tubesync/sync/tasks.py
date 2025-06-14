@@ -555,7 +555,7 @@ def check_source_directory_exists(source_id):
         source.make_directory()
 
 
-@db_task(delay=10, priority=90, queue=Val(TaskQueue.NET))
+@exponential_backoff(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.NET))
 def download_source_images(source_id):
     '''
         Downloads an image and save it as a local thumbnail attached to a
@@ -901,13 +901,9 @@ def refresh_formats(media_id):
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
         raise CancelExecution(_('no such media'), retry=False) from e
-    try:
-        media.refresh_formats
-    except YouTubeError as e:
-        log.debug(f'Failed to refresh formats for: {media.source} / {media.key}: {e!s}')
-        pass
     else:
-        save_model(media)
+        if media.refresh_formats:
+            save_model(media)
 
 
 @background(schedule=dict(priority=20, run_at=60), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
