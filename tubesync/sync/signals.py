@@ -12,12 +12,13 @@ from background_task.models import Task
 from common.logger import log
 from common.utils import glob_quote, mkdir_p
 from .models import Source, Media, Metadata
-from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
-                    download_media_thumbnail, download_media_metadata,
-                    map_task_to_instance, check_source_directory_exists,
-                    download_media, download_source_images,
-                    delete_all_media_for_source, save_all_media_for_source,
-                    rename_media, get_media_metadata_task, get_media_download_task)
+from .tasks import (
+    map_task_to_instance, rename_media, save_all_media_for_source,
+    delete_task_by_source, delete_task_by_media, delete_all_media_for_source,
+    check_source_directory_exists, download_source_images, index_source_task,
+    download_media, download_media_metadata, download_media_thumbnail,
+    get_media_download_task, get_media_metadata_task, get_media_thumbnail_task,
+)
 from .utils import delete_file
 from .filtering import filter_media
 from .choices import Val, YouTube_SourceType
@@ -200,6 +201,7 @@ def media_post_save(sender, instance, created, **kwargs):
     # Reset the skip flag if the download cap has changed if the media has not
     # already been downloaded
     downloaded = instance.downloaded
+    existing_media_thumbnail_task = get_media_thumbnail_task(str(instance.pk))
     existing_media_metadata_task = get_media_metadata_task(str(instance.pk))
     existing_media_download_task = get_media_download_task(str(instance.pk))
     if not downloaded:
@@ -238,27 +240,27 @@ def media_post_save(sender, instance, created, **kwargs):
 
     # If the media is missing metadata schedule it to be downloaded
     if not (media.skip or media.has_metadata or existing_media_metadata_task):
-        log.info(f'Scheduling task to download metadata for: {instance.url}')
+        log.info(f'Scheduling task to download metadata for: {media.url}')
         verbose_name = _('Downloading metadata for: {}: "{}"')
         download_media_metadata(
-            str(instance.pk),
+            str(media.pk),
             verbose_name=verbose_name.format(media.key, media.name),
         )
     # If the media is missing a thumbnail schedule it to be downloaded (unless we are skipping this media)
-    if not instance.thumb_file_exists:
-        instance.thumb = None
-    if not instance.thumb and not instance.skip:
-        thumbnail_url = instance.thumbnail
+    if not media.thumb_file_exists:
+        media.thumb = None
+    if not (media.skip or media.thumb or existing_media_thumbnail_task):
+        thumbnail_url = media.thumbnail
         if thumbnail_url:
             log.info(
                 'Scheduling task to download thumbnail'
-                f' for: {instance.name} from: {thumbnail_url}'
+                f' for: {media.name} from: {thumbnail_url}'
             )
             verbose_name = _('Downloading thumbnail for "{}"')
             download_media_thumbnail(
-                str(instance.pk),
+                str(media.pk),
                 thumbnail_url,
-                verbose_name=verbose_name.format(instance.name),
+                verbose_name=verbose_name.format(media.name),
             )
     media_file_exists = False
     try:

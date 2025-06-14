@@ -164,6 +164,9 @@ def get_media_download_task(media_id):
 def get_media_metadata_task(media_id):
     return get_first_task('sync.tasks.download_media_metadata', media_id)
 
+def get_media_thumbnail_task(media_id):
+    return get_first_task('sync.tasks.download_media_thumbnail', media_id)
+
 def get_media_premiere_task(media_id):
     return get_first_task('sync.tasks.wait_for_media_premiere', media_id)
 
