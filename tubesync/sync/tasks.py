@@ -235,7 +235,7 @@ def schedule_indexing():
         index_schedule__gt=Val(IndexSchedule.NEVER),
     )
     for source in qs_gen(qs):
-        previous_run = now - timezone.timedelta(
+        previous_run = next_hour - timezone.timedelta(
             seconds=source.index_schedule
         )
         skip_source = (
