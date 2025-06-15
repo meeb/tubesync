@@ -233,7 +233,7 @@ def schedule_indexing():
     qs = Source.objects.filter(
         index_schedule__gt=Val(IndexSchedule.NEVER),
     )
-    for source in qs:
+    for source in qs_gen(qs):
         previous_run = now - timezone.timedelta(
             seconds=source.index_schedule
         )
