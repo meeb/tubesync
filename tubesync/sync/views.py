@@ -994,11 +994,7 @@ class ResetTasks(FormView):
         Task.objects.all().delete()
         # Iter all tasks
         for source in Source.objects.all():
-            verbose_name = _('Check download directory exists for source "{}"')
-            check_source_directory_exists(
-                str(source.pk),
-                verbose_name=verbose_name.format(source.name),
-            )
+            check_source_directory_exists(str(source.pk))
             # Recreate the initial indexing task
             verbose_name = _('Index media from source "{}"')
             index_source_task(

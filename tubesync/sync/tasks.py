@@ -61,7 +61,6 @@ def map_task_to_instance(task):
     TASK_MAP = {
         'sync.tasks.migrate_to_metadata': Media,
         'sync.tasks.index_source_task': Source,
-        'sync.tasks.check_source_directory_exists': Source,
         'sync.tasks.download_media_thumbnail': Media,
         'sync.tasks.download_media': Media,
         'sync.tasks.download_media_metadata': Media,
@@ -536,7 +535,7 @@ def index_source_task(source_id):
     )
 
 
-@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.FS))
+@dynamic_retry(db_task, priority=100, retries=15, queue=Val(TaskQueue.FS))
 def check_source_directory_exists(source_id):
     '''
         Checks the output directory for a source exists and is writable, if it does
@@ -547,7 +546,7 @@ def check_source_directory_exists(source_id):
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist as e:
         # Task triggered but the Source has been deleted, delete the task
-        raise InvalidTaskError(_('no such source')) from e
+        raise CancelExecution(_('no such source'), retry=False) from e
     # Check the source output directory exists
     if not source.directory_exists():
         # Try to create it

@@ -57,12 +57,16 @@ DJANGO_HUEY = {
         'limited': sqlite_tasks('limited', prefix='net'),
         'network': sqlite_tasks('network'),
     },
+    'verbose': None if 'true' == getenv('TUBESYNC_DEBUG', False).strip().lower() else False,
 }
 for django_huey_queue in DJANGO_HUEY['queues'].values():
     connection = django_huey_queue.get('connection')
     if connection:
         filepath = Path('/.' + connection.get('filename') or '').resolve(strict=False)
         filepath.parent.mkdir(exist_ok=True, parents=True)
+    consumer = django_huey_queue.get('consumer')
+    if consumer:
+        consumer['verbose'] = DJANGO_HUEY.get('verbose', False)
 
 
 TEMPLATES = [
