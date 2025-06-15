@@ -251,7 +251,6 @@ def schedule_indexing():
             schedule=600,
             verbose_name=vn_fmt.format(source.name),
         )
-    pass
 
 
 def schedule_media_servers_update():
