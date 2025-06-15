@@ -61,7 +61,7 @@ def sqlite_tasks(key, /, prefix=None):
     )
 
 
-def exponential_backoff(task_func=None, /, *args, **kwargs):
+def dynamic_retry(task_func=None, /, *args, **kwargs):
     if task_func is None:
         from django_huey import task as huey_task
         task_func = huey_task

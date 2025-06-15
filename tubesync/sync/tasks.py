@@ -29,7 +29,7 @@ from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from django_huey import db_periodic_task, db_task, task as huey_task # noqa
 from huey import CancelExecution
-from common.huey import exponential_backoff
+from common.huey import dynamic_retry
 from common.logger import log
 from common.errors import ( BgTaskWorkerError, DownloadFailedException,
                             NoFormatException, NoMediaException,
@@ -555,7 +555,7 @@ def check_source_directory_exists(source_id):
         source.make_directory()
 
 
-@exponential_backoff(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.NET))
+@dynamic_retry(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.NET))
 def download_source_images(source_id):
     '''
         Downloads an image and save it as a local thumbnail attached to a
@@ -895,7 +895,7 @@ def save_all_media_for_source(source_id):
     update_task_status(task, None)
 
 
-@exponential_backoff(db_task, priority=50, retries=15, queue=Val(TaskQueue.LIMIT))
+@dynamic_retry(db_task, backoff_func=lambda n: (n*3600)+600, priority=50, retries=15, queue=Val(TaskQueue.LIMIT))
 def refresh_formats(media_id):
     try:
         media = Media.objects.get(pk=media_id)
