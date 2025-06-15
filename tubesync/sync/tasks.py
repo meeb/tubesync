@@ -226,6 +226,7 @@ def save_model(instance):
     huey_crontab(minute=59, strict=True,),
     priority=100,
     expires=30*60,
+    queue=Val(TaskQueue.DB),
 )
 def schedule_indexing():
     now = timezone.now()
