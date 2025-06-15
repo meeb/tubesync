@@ -22,6 +22,8 @@ from django.utils.translation import gettext_lazy as _
 from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params, mkdir_p, multi_key_sort
 from background_task.models import Task, CompletedTask
+from django_huey import DJANGO_HUEY
+from common.huey import h_q_reset_tasks
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
@@ -992,6 +994,8 @@ class ResetTasks(FormView):
     def form_valid(self, form):
         # Delete all tasks
         Task.objects.all().delete()
+        for queue_name in (DJANGO_HUEY or {}).get('queues', {}):
+            h_q_reset_tasks(queue_name)
         # Iter all tasks
         for source in Source.objects.all():
             verbose_name = _('Check download directory exists for source "{}"')
