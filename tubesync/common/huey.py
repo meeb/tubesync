@@ -25,6 +25,42 @@ def h_q_tuple(q, /):
     )
 
 
+def h_q_reset_tasks(q, /, *, maint_func=None):
+    # revoke to prevent pending tasks from executing
+    for t in q._registry._registry:
+        q.revoke_all(t, revoke_until=delay_to_eta(600))
+    # clear scheduled tasks
+    q.storage.flush_schedule()
+    # clear pending tasks
+    q.storage.flush_queue()
+    # run the maintenance function
+    def default_maint_func(queue, /, exception=None, status=None):
+        if status is None:
+            return
+        if 'exception' == status and exception is not None:
+            # log, but do not raise an exception
+            from huey import logger
+            logger.error(
+                f'{queue.name}: maintenance function exception: {exception}'
+            )
+            return
+        return True
+    maint_result = None
+    if maint_func is None:
+        maint_func = default_maint_func
+    if maint_func and callable(maint_func):
+        try:
+            maint_result = maint_func(q, status='started')
+        except Exception as exc:
+            maint_result = maint_func(q, exc=exc, status='exception')
+            pass
+        finally:
+            maint_func(q, status='finished')
+    # clear everything now that we are done
+    q.storage.flush_all()
+    q.flush()
+
+
 def sqlite_tasks(key, /, prefix=None):
     name_fmt = 'huey_{}'
     if prefix is None:
