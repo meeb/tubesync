@@ -26,6 +26,9 @@ def h_q_tuple(q, /):
 
 
 def h_q_reset_tasks(q, /, *, maint_func=None):
+    if isinstance(q, str):
+        from django_huey import get_queue
+        q = get_queue(q)
     # revoke to prevent pending tasks from executing
     for t in q._registry._registry:
         q.revoke_all(t, revoke_until=delay_to_eta(600))
