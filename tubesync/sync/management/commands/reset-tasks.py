@@ -1,6 +1,5 @@
 from django.core.management.base import BaseCommand, CommandError # noqa
 from django.db.transaction import atomic
-from django.utils.translation import gettext_lazy as _
 from background_task.models import Task
 from common.logger import log
 from sync.models import Source
