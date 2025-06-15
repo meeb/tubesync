@@ -30,7 +30,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
         from django_huey import get_queue
         q = get_queue(q)
     # revoke to prevent pending tasks from executing
-    for t in q._registry._registry:
+    for t in q._registry._registry.values():
         q.revoke_all(t, revoke_until=delay_to_eta(600))
     # clear scheduled tasks
     q.storage.flush_schedule()
