@@ -55,7 +55,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
         try:
             maint_result = maint_func(q, status='started')
         except Exception as exc:
-            maint_result = maint_func(q, exc=exc, status='exception')
+            maint_result = maint_func(q, exception=exc, status='exception')
             pass
         finally:
             maint_func(q, status='finished')
