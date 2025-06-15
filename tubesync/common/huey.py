@@ -59,6 +59,8 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     # clear everything now that we are done
     q.storage.flush_all()
     q.flush()
+    # return the results from the maintenance function
+    return maint_result
 
 
 def sqlite_tasks(key, /, prefix=None):
