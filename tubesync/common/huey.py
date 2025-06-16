@@ -4,7 +4,7 @@ from huey import CancelExecution
 
 def CancelExecution_init(self, *args, retry=None, **kwargs):
     self.retry = retry
-    super().__init__(*args, **kwargs)
+    super(CancelExecution, self).__init__(*args, **kwargs)
 CancelExecution.__init__ = CancelExecution_init
 
 
