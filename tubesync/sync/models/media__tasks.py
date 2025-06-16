@@ -103,7 +103,7 @@ def copy_thumbnail(self):
     if not self.source.copy_thumbnails:
         return
     if not self.thumb_file_exists:
-        from sync.tasks import delete_task_by_media, download_media_thumbnail
+        from sync.tasks import delete_task_by_media, download_media_image
         args = ( str(self.pk), self.thumbnail, )
         if not args[1]:
             return
