@@ -702,8 +702,8 @@ def download_media_metadata(media_id):
              f'{source} / {media}: {media_id}')
 
 
-@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
-def download_media_thumbnail(media_id, url):
+@dynamic_retry(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.NET))
+def download_media_image(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
         Media instance.
@@ -712,7 +712,7 @@ def download_media_thumbnail(media_id, url):
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
         # Task triggered but the media no longer exists, do nothing
-        raise InvalidTaskError(_('no such media')) from e
+        raise CancelExecution(_('no such media'), retry=False) from e
     if media.skip or media.manual_skip:
         # Media was toggled to be skipped after the task was scheduled
         log.warn(f'Download task triggered for media: {media} (UUID: {media.pk}) but '
@@ -728,7 +728,7 @@ def download_media_thumbnail(media_id, url):
                 raise
             raise NoThumbnailException(re.response.reason) from re
     except NoThumbnailException as e:
-        raise InvalidTaskError(str(e.__cause__)) from e
+        raise CancelExecution(str(e.__cause__), retry=False) from e
     if (i.width > width) and (i.height > height):
         log.info(f'Resizing {i.width}x{i.height} thumbnail to '
                  f'{width}x{height}: {url}')
@@ -759,6 +759,12 @@ def download_media_thumbnail(media_id, url):
         copyfile(media.thumb.path, media.thumbpath)        
     return True
 
+@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
+def download_media_thumbnail(media_id, url):
+    try:
+        return download_media_image.call_local(media_id, url)
+    except CancelExecution as e:
+        raise InvalidTaskError(str(e)) from e
 
 @background(schedule=dict(priority=30, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def download_media(media_id, override=False):
