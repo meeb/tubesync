@@ -227,11 +227,7 @@ def media_post_save(sender, instance, created, **kwargs):
             settings.RENAME_ALL_SOURCES
         )
         if create_rename_task:
-            verbose_name = _('Renaming media for: {}: "{}"')
-            rename_media(
-                str(media.pk),
-                verbose_name=verbose_name.format(media.key, media.name),
-            )
+            rename_media(str(media.pk))
 
     # If the media is missing metadata schedule it to be downloaded
     if not (media.skip or media.has_metadata or existing_media_metadata_task):
@@ -291,7 +287,6 @@ def media_pre_delete(sender, instance, **kwargs):
     log.info(f'Deleting tasks for media: {instance.name}')
     delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
     delete_task_by_media('sync.tasks.download_media_metadata', (str(instance.pk),))
-    delete_task_by_media('sync.tasks.rename_media', (str(instance.pk),))
     delete_task_by_media('sync.tasks.wait_for_media_premiere', (str(instance.pk),))
     thumbnail_url = instance.thumbnail
     if thumbnail_url:
