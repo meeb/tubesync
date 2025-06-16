@@ -108,7 +108,7 @@ def copy_thumbnail(self):
         if not args[1]:
             return
         delete_task_by_media('sync.tasks.download_media_thumbnail', args)
-        if download_media_thumbnail.now(*args):
+        if download_media_image.call_local(*args):
             self.refresh_from_db()
     if not self.thumb_file_exists:
         return
