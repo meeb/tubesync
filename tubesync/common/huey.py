@@ -1,6 +1,11 @@
 from functools import wraps
 
 
+def CancelExecution(*args, *, retry=None, **kwargs):
+    from huey import CancelExecution as cancel
+    return cancel(retry, *args, **kwargs)
+
+
 def delay_to_eta(delay, /):
     from huey.utils import normalize_time
     return normalize_time(delay=delay)
