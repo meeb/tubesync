@@ -1,7 +1,7 @@
 from functools import wraps
 
 
-def CancelExecution(*args, *, retry=None, **kwargs):
+def CancelExecution(*args, retry=None, **kwargs):
     from huey import CancelExecution as cancel
     return cancel(retry, *args, **kwargs)
 
