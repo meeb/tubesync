@@ -28,8 +28,7 @@ from background_task import background
 from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from django_huey import db_periodic_task, db_task, task as huey_task # noqa
-from huey import CancelExecution
-from common.huey import dynamic_retry
+from common.huey import CancelExecution, dynamic_retry
 from common.logger import log
 from common.errors import ( BgTaskWorkerError, DownloadFailedException,
                             NoFormatException, NoMediaException,
