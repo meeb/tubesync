@@ -232,7 +232,7 @@ def schedule_media_servers_update():
 def contains_http429(q, task_id, /):
     from huey.exceptions import TaskException
     try:
-        result = q.result(preserve=True, id=task_id)
+        q.result(preserve=True, id=task_id)
     except TaskException as e:
         return True if 'HTTPError 429: Too Many Requests' in str(e) else False
     return False
