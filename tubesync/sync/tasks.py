@@ -245,6 +245,7 @@ def schedule_indexing():
         )
         if skip_source:
             continue
+        log.info(f'Scheduling an indexing task for source "{source.name}": {source.pk}')
         vn_fmt = _('Index media from source "{}"')
         index_source_task(
             str(source.pk),
