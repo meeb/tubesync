@@ -1,9 +1,11 @@
 from functools import wraps
+from huey import CancelExecution
 
 
-def CancelExecution(*args, retry=None, **kwargs):
-    from huey import CancelExecution as cancel
-    return cancel(retry, *args, **kwargs)
+def CancelExecution_init(self, *args, retry=None, **kwargs):
+    self.retry = retry
+    super().__init__(*args, **kwargs)
+CancelExecution.__init__ = CancelExecution_init
 
 
 def delay_to_eta(delay, /):
