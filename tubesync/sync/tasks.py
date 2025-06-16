@@ -497,17 +497,15 @@ def index_source_task(source_id):
             log.info(f'Indexed new media: {source} / {media}')
             log.info(f'Scheduling tasks to download thumbnail for: {media.key}')
             thumbnail_fmt = 'https://i.ytimg.com/vi/{}/{}default.jpg'
-            vn_fmt = _('Downloading {} thumbnail for: "{}": {}')
-            for num, prefix in enumerate(('hq', 'sd', 'maxres',)):
+            for num, prefix in enumerate(reversed(('hq', 'sd', 'maxres',))):
                 thumbnail_url = thumbnail_fmt.format(
                     media.key,
                     prefix,
                 )
-                download_media_thumbnail(
-                    str(media.pk),
-                    thumbnail_url,
-                    schedule=dict(run_at=10+(300*num)),
-                    verbose_name=vn_fmt.format(prefix, media.key, media.name),
+                download_media_image.schedule(
+                    (str(media.pk), thumbnail_url,),
+                    priority=10+(5*num),
+                    delay=65-(30*num),
                 )
             log.info(f'Scheduling task to download metadata for: {media.url}')
             verbose_name = _('Downloading metadata for: "{}": {}')
