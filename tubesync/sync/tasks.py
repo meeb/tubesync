@@ -905,13 +905,11 @@ def refresh_formats(media_id):
         save, retry, msg = media.refresh_formats()
         if save is not True:
             log.warning(f'Refreshing formats for "{media.key}" failed: {msg}')
-            raise CancelExecution(
-                _('failed to refresh formats'),
-                media=str(media.pk),
-                key=media.key,
-                reason=msg,
-                retry=retry,
-            )
+            exc = CancelExecution(_('failed to refresh formats for: ') + str(media.pk), retry=retry)
+            exc.key = media.key
+            exc.pk = str(media.pk)
+            exc.reason = msg
+            raise exc
         log.info(f'Saving refreshed formats for "{media.key}": {msg}')
         save_model(media)
 
