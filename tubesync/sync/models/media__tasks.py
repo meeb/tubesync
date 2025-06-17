@@ -169,6 +169,7 @@ def refresh_formats(self):
     field = self.get_metadata_field('thumbnails')
     self.save_to_metadata(field, thumbnails)
     fmt_dict['t'] = 'thumbnails'
+    fmt_dict['s'] = ' and '
 
     # select and save our best thumbnail url
     try:
@@ -182,6 +183,7 @@ def refresh_formats(self):
         field = self.get_metadata_field('thumbnail')
         self.save_to_metadata(field, thumbnail)
         fmt_dict['j'] = ', and '
+        fmt_dict['s'] = '; '
         fmt_dict['t'] = 'thumbnail' + fmt_dict['j'] + fmt_dict['t']
         fmt_dict['j'] = ', '
 
@@ -192,7 +194,8 @@ def refresh_formats(self):
         self.save_to_metadata('availability', response.get('availability', 'public'))
         fmt_dict['a'] = 'availability'
         fmt_dict['j'] = ', and ' if 'thumbnails' == fmt_dict['t'] else ', '
-    return (True, False, 'updated formats; {a}{j}{t}'.format(**fmt_dict))
+        fmt_dict['s'] = '; '
+    return (True, False, 'updated formats{s}{a}{j}{t}'.format(**fmt_dict))
 
 
 def wait_for_premiere(self):
