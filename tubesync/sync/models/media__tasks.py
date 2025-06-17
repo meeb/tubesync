@@ -7,6 +7,7 @@ from common.errors import (
     NoMetadataException,
 )
 from common.utils import multi_key_sort
+from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from ..choices import Val, SourceResolution
@@ -191,7 +192,7 @@ def refresh_formats(self):
         self.save_to_metadata('availability', response.get('availability', 'public'))
         fmt_dict['a'] = 'availability'
         fmt_dict['j'] = ', and ' if 'thumbnails' == fmt_dict['t'] else ', '
-    return (True, False, 'updated formats; {a}{j}{t}'.format(fmt_dict))
+    return (True, False, 'updated formats; {a}{j}{t}'.format(**fmt_dict))
 
 
 def wait_for_premiere(self):
