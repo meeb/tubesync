@@ -1097,6 +1097,7 @@ class Media(models.Model):
                 log.info(f'Collected {len(other_paths)} other paths for: {self!s}')
 
                 # adopt orphaned files, if possible
+                fuzzy_paths = list()
                 media_format = str(self.source.media_format)
                 top_dir_path = Path(self.source.directory_path)
                 if '{key}' in media_format:
