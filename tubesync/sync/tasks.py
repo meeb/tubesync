@@ -365,17 +365,15 @@ def wait_for_database_queue():
     from common.huey import h_q_tuple
     queue_name = Val(TaskQueue.DB)
     consumer_down_path = Path(f'/run/service/huey-{queue_name}/down')
-    worker_down_path = Path('/run/service/tubesync-db-worker/down')
     total_count = 1
     while 0 < total_count:
         if consumer_down_path.exists() and consumer_down_path.is_file():
             raise BgTaskWorkerError(_('queue consumer stopped'))
-        if worker_down_path.exists() and worker_down_path.is_file():
-            raise BgTaskWorkerError(_('queue worker stopped'))
         time.sleep(5)
         status_dict = h_q_tuple(queue_name)[2]
-        total_count = Task.objects.unlocked(timezone.now()).filter(queue=queue_name).count()
-        total_count += status_dict.get('pending', (0,))[0]
+        total_count = status_dict.get('pending', (0,))[0]
+        # TODO: we maybe don't want to count scheduled tasks
+        # especially after waiting for upcoming streams is in the queue
         total_count += status_dict.get('scheduled', (0,))[0]
 
 
