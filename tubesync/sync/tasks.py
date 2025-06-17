@@ -270,9 +270,19 @@ def wait_for_errors(model, /, *, queue_name=None, task_name=None):
     delay = 10 * total_count
     time_str = seconds_to_timestr(delay)
     log.info(f'waiting for errors: 429 ({time_str}): {model}')
-    time.sleep(delay)
+    db_down_path = Path('/run/service/tubesync-db-worker/down')
+    fs_down_path = Path('/run/service/tubesync-fs-worker/down')
+    while delay > 0:
+        # this happenes when the container is shutting down
+        # do not prevent that while we are delaying a task
+        if db_down_path.exists() and fs_down_path.exists():
+            break
+        time.sleep(5)
+        delay -= 5
     for task in tasks:
         update_task_status(task, None)
+    if delay > 0:
+        raise BgTaskWorkerError(_('queue worker stopped'))
 
 
 @db_task(queue=Val(TaskQueue.FS))
