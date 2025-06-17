@@ -908,11 +908,17 @@ def refresh_formats(media_id):
     except Media.DoesNotExist as e:
         raise InvalidTaskError(_('no such media')) from e
     try:
-        media.refresh_formats
+        save, retry, msg = media.refresh_formats()
     except YouTubeError as e:
         log.debug(f'Failed to refresh formats for: {media.source} / {media.key}: {e!s}')
         pass
     else:
+        if save is not True:
+            log.warning(f'Refreshing formats for "{media.key}" failed: {msg}')
+            if retry is False:
+                raise InvalidTaskError(_('not retrying'))
+            return
+        log.info(f'Saving refreshed formats for "{media.key}": {msg}')
         save_model(media)
 
 

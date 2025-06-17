@@ -41,7 +41,7 @@ from ._migrations import (
 from ._private import _srctype_dict, _nfo_element
 from .media__tasks import (
     copy_thumbnail, download_checklist, download_finished,
-    wait_for_premiere, write_nfo_file,
+    refresh_formats, wait_for_premiere, write_nfo_file,
 )
 from .source import Source
 
@@ -698,71 +698,6 @@ class Media(models.Model):
 
 
     @property
-    def refresh_formats(self):
-        if not self.has_metadata:
-            return
-        data = self.loaded_metadata
-        metadata_seconds = data.get('epoch', None)
-        if not metadata_seconds:
-            self.metadata_clear(save=True)
-            return False
-
-        now = timezone.now()
-        attempted_key = '_refresh_formats_attempted'
-        attempted_seconds = data.get(attempted_key)
-        if attempted_seconds:
-            # skip for recent unsuccessful refresh attempts also
-            attempted_dt = self.ts_to_dt(attempted_seconds)
-            if (now - attempted_dt) < timedelta(seconds=self.source.index_schedule):
-                return False
-        # skip for recent successful formats refresh
-        refreshed_key = 'formats_epoch'
-        formats_seconds = data.get(refreshed_key, metadata_seconds)
-        metadata_dt = self.ts_to_dt(formats_seconds)
-        if (now - metadata_dt) < timedelta(seconds=self.source.index_schedule):
-            return False
-
-        last_attempt = round((now - self.posix_epoch).total_seconds())
-        self.save_to_metadata(attempted_key, last_attempt)
-        self.skip = False
-        metadata = self.index_metadata()
-        if self.skip:
-            return False
-
-        response = metadata
-        if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
-            response = filter_response(metadata, True)
-
-        # save the new list of thumbnails
-        thumbnails = self.get_metadata_first_value(
-            'thumbnails',
-            self.get_metadata_first_value('thumbnails', []),
-            arg_dict=response,
-        )
-        field = self.get_metadata_field('thumbnails')
-        self.save_to_metadata(field, thumbnails)
-
-        # select and save our best thumbnail url
-        try:
-            thumbnail = [ thumb.get('url') for thumb in multi_key_sort(
-                thumbnails,
-                [('preference', True,)],
-            ) if thumb.get('url', '').endswith('.jpg') ][0]
-        except IndexError:
-            pass
-        else:
-            field = self.get_metadata_field('thumbnail')
-            self.save_to_metadata(field, thumbnail)
-
-        field = self.get_metadata_field('formats')
-        self.save_to_metadata(field, response.get(field, []))
-        self.save_to_metadata(refreshed_key, response.get('epoch', formats_seconds))
-        if data.get('availability', 'public') != response.get('availability', 'public'):
-            self.save_to_metadata('availability', response.get('availability', 'public'))
-        return True
-
-
-    @property
     def url(self):
         url = self.URLS.get(self.source.source_type, '')
         return url.format(key=self.key)
@@ -1231,6 +1166,7 @@ class Media(models.Model):
 Media.copy_thumbnail = copy_thumbnail
 Media.download_checklist = download_checklist
 Media.download_finished = download_finished
+Media.refresh_formats = refresh_formats
 Media.wait_for_premiere = wait_for_premiere
 Media.write_nfo_file = write_nfo_file
 
