@@ -28,6 +28,7 @@ from background_task import background
 from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from django_huey import db_periodic_task, db_task, task as huey_task # noqa
+from huey import crontab as huey_crontab
 from common.huey import CancelExecution, dynamic_retry, register_huey_signals
 from common.logger import log
 from common.errors import ( BgTaskWorkerError, DownloadFailedException,
@@ -35,7 +36,7 @@ from common.errors import ( BgTaskWorkerError, DownloadFailedException,
                             NoThumbnailException, )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, seconds_to_timestr, )
-from .choices import Val, TaskQueue
+from .choices import Val, IndexSchedule, TaskQueue
 from .models import Source, Media, MediaServer, Metadata
 from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
@@ -59,7 +60,6 @@ def map_task_to_instance(task):
         because UUID's are incompatible with background_task's "creator" feature.
     '''
     TASK_MAP = {
-        'sync.tasks.migrate_to_metadata': Media,
         'sync.tasks.index_source_task': Source,
         'sync.tasks.download_media_thumbnail': Media,
         'sync.tasks.download_media': Media,
@@ -223,6 +223,39 @@ def save_model(instance):
     time.sleep(random.expovariate(arg))
 
 
+@db_periodic_task(
+    huey_crontab(minute=59, strict=True,),
+    priority=100,
+    expires=30*60,
+    queue=Val(TaskQueue.DB),
+)
+def schedule_indexing():
+    now = timezone.now()
+    next_hour = now + timezone.timedelta(hours=1, minutes=1)
+    qs = Source.objects.filter(
+        index_schedule__gt=Val(IndexSchedule.NEVER),
+    )
+    for source in qs_gen(qs):
+        previous_run = next_hour - timezone.timedelta(
+            seconds=source.index_schedule
+        )
+        skip_source = (
+            not source.is_active or
+            source.target_schedule >= next_hour or
+            source.last_crawl >= previous_run
+        )
+        if skip_source:
+            continue
+        log.info(f'Scheduling an indexing task for source "{source.name}": {source.pk}')
+        vn_fmt = _('Index media from source "{}"')
+        index_source_task(
+            str(source.pk),
+            repeat=0,
+            schedule=600,
+            verbose_name=vn_fmt.format(source.name),
+        )
+
+
 def schedule_media_servers_update():
     # Schedule a task to update media servers
     log.info('Scheduling media server updates')
@@ -349,7 +382,7 @@ def save_db_batch(qs, objs, fields, /):
     return num_updated
 
 
-@background(schedule=dict(priority=20, run_at=60), queue=Val(TaskQueue.DB), remove_existing_tasks=True)
+@db_task(delay=60, priority=80, retries=10, retry_delay=60, queue=Val(TaskQueue.DB))
 def migrate_to_metadata(media_id):
     try:
         media = Media.objects.get(pk=media_id)
@@ -357,7 +390,7 @@ def migrate_to_metadata(media_id):
         # Task triggered but the media no longer exists, do nothing
         log.error(f'Task migrate_to_metadata(pk={media_id}) called but no '
                   f'media exists with ID: {media_id}')
-        raise InvalidTaskError(_('no such media')) from e
+        raise CancelExecution(_('no such media'), retry=False) from e
 
     try:
         data = Metadata.objects.get(
@@ -366,7 +399,7 @@ def migrate_to_metadata(media_id):
             key=media.key,
         )
     except Metadata.DoesNotExist as e:
-        raise InvalidTaskError(_('no indexed data to migrate to metadata')) from e
+        raise CancelExecution(_('no indexed data to migrate to metadata'), retry=False) from e
 
     video = data.value
     fields = lambda f, m: m.get_metadata_field(f)
@@ -388,11 +421,21 @@ def migrate_to_metadata(media_id):
 
 @background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=False)
 def wait_for_database_queue():
-    worker_down_path = Path('/run/service/tubesync-db-worker/down')
-    while Task.objects.unlocked(timezone.now()).filter(queue=Val(TaskQueue.DB)).count() > 0:
+    from common.huey import h_q_tuple
+    queue_name = Val(TaskQueue.DB)
+    consumer_down_path = Path(f'/run/service/huey-{queue_name}/down')
+    included_names = frozenset(('migrate_to_metadata',))
+    total_count = 1
+    while 0 < total_count:
+        if consumer_down_path.exists() and consumer_down_path.is_file():
+            raise BgTaskWorkerError(_('queue consumer stopped'))
         time.sleep(5)
-        if worker_down_path.exists() and worker_down_path.is_file():
-            raise BgTaskWorkerError(_('queue worker stopped'))
+        status_dict = h_q_tuple(queue_name)[2]
+        total_count = status_dict.get('pending', (0,))[0]
+        scheduled_tasks = status_dict.get('scheduled', (0,[]))[1] 
+        total_count += sum(
+            [ 1 for t in scheduled_tasks if t.name.rsplit('.', 1)[-1] in included_names ],
+        )
 
 
 @background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
@@ -507,11 +550,7 @@ def index_source_task(source_id):
         data.retrieved = source.last_crawl
         data.value = video
         db_batch_data.append(data)
-        vn_fmt = _('Updating metadata from indexing results for: "{}": {}')
-        migrate_to_metadata(
-            str(media.pk),
-            verbose_name=vn_fmt.format(media.key, media.name),
-        )
+        migrate_to_metadata(str(media.pk))
         if not new_media:
             # update the existing media
             for key, value in media_defaults.items():
@@ -943,8 +982,29 @@ def refresh_formats(media_id):
             media,
             queue_name=Val(TaskQueue.LIMIT),
         )
-        if media.refresh_formats:
-            save_model(media)
+        save, retry, msg = media.refresh_formats()
+        if save is not True:
+            log.warning(f'Refreshing formats for "{media.key}" failed: {msg}')
+            exc = CancelExecution(
+                _('failed to refresh formats for:'),
+                f'{media.key} / {media.uuid}:',
+                msg,
+                retry=retry,
+            )
+            # combine the strings
+            exc.args = (' '.join(exc.args),)
+            # store instance details
+            exc.instance = dict(
+                key=media.key,
+                model='Media',
+                uuid=str(media.pk),
+            )
+            # store the function results
+            exc.reason = msg
+            exc.save = save
+            raise exc
+        log.info(f'Saving refreshed formats for "{media.key}": {msg}')
+        save_model(media)
 
 
 @db_task(delay=60, priority=80, retries=5, retry_delay=60, queue=Val(TaskQueue.FS))
