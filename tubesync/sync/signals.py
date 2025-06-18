@@ -96,7 +96,7 @@ def source_pre_save(sender, instance, **kwargs):
         verbose_name = _('Index media from source "{}"')
         index_source_task(
             str(instance.pk),
-            repeat=instance.index_schedule,
+            repeat=0,
             schedule=instance.task_run_at_dt,
             verbose_name=verbose_name.format(instance.name),
         )
@@ -115,7 +115,7 @@ def source_post_save(sender, instance, created, **kwargs):
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(instance.pk),
-                repeat=instance.index_schedule,
+                repeat=0,
                 schedule=600,
                 verbose_name=verbose_name.format(instance.name),
             )

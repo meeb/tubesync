@@ -999,14 +999,6 @@ class ResetTasks(FormView):
         # Iter all tasks
         for source in Source.objects.all():
             check_source_directory_exists(str(source.pk))
-            # Recreate the initial indexing task
-            verbose_name = _('Index media from source "{}"')
-            index_source_task(
-                str(source.pk),
-                repeat=source.index_schedule,
-                schedule=source.task_run_at_dt,
-                verbose_name=verbose_name.format(source.name)
-            )
             # This also chains down to call each Media objects .save() as well
             source.save()
         return super().form_valid(form)

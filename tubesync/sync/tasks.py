@@ -28,6 +28,7 @@ from background_task import background
 from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from django_huey import db_periodic_task, db_task, task as huey_task # noqa
+from huey import crontab as huey_crontab
 from common.huey import CancelExecution, dynamic_retry
 from common.logger import log
 from common.errors import ( BgTaskWorkerError, DownloadFailedException,
@@ -35,7 +36,7 @@ from common.errors import ( BgTaskWorkerError, DownloadFailedException,
                             NoThumbnailException, )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, seconds_to_timestr, )
-from .choices import Val, TaskQueue
+from .choices import Val, IndexSchedule, TaskQueue
 from .models import Source, Media, MediaServer, Metadata
 from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
@@ -220,6 +221,39 @@ def save_model(instance):
     # "database is locked" errors
     arg = getattr(settings, 'SQLITE_DELAY_FLOAT', 1.5)
     time.sleep(random.expovariate(arg))
+
+
+@db_periodic_task(
+    huey_crontab(minute=59, strict=True,),
+    priority=100,
+    expires=30*60,
+    queue=Val(TaskQueue.DB),
+)
+def schedule_indexing():
+    now = timezone.now()
+    next_hour = now + timezone.timedelta(hours=1, minutes=1)
+    qs = Source.objects.filter(
+        index_schedule__gt=Val(IndexSchedule.NEVER),
+    )
+    for source in qs_gen(qs):
+        previous_run = next_hour - timezone.timedelta(
+            seconds=source.index_schedule
+        )
+        skip_source = (
+            not source.is_active or
+            source.target_schedule >= next_hour or
+            source.last_crawl >= previous_run
+        )
+        if skip_source:
+            continue
+        log.info(f'Scheduling an indexing task for source "{source.name}": {source.pk}')
+        vn_fmt = _('Index media from source "{}"')
+        index_source_task(
+            str(source.pk),
+            repeat=0,
+            schedule=600,
+            verbose_name=vn_fmt.format(source.name),
+        )
 
 
 def schedule_media_servers_update():
