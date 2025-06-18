@@ -1,6 +1,15 @@
 import os
 from functools import wraps
-from huey import CancelExecution
+from huey import (
+    CancelExecution, SqliteHuey as huey_SqliteHuey,
+    signals, utils,
+)
+
+
+class SqliteHuey(huey_SqliteHuey):
+    def _emit(self, signal, task, *args, **kwargs):
+        kwargs['huey'] = self
+        super()._emit(signal, task, *args, **kwargs)
 
 
 def CancelExecution_init(self, *args, retry=None, **kwargs):
@@ -10,8 +19,7 @@ CancelExecution.__init__ = CancelExecution_init
 
 
 def delay_to_eta(delay, /):
-    from huey.utils import normalize_time
-    return normalize_time(delay=delay)
+    return utils.normalize_time(delay=delay)
 
 
 def h_q_dict(q, /):
@@ -32,6 +40,7 @@ def h_q_tuple(q, /):
         h_q_dict(q),
     )
 
+# Configuration convenience helpers
 
 def h_q_reset_tasks(q, /, *, maint_func=None):
     if isinstance(q, str):
@@ -90,7 +99,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
         elif 1 == workers:
             thread = False
     return dict(
-        huey_class='huey.SqliteHuey',
+        huey_class='common.huey.SqliteHuey',
         name=name,
         immediate=False,
         results=True,
@@ -117,6 +126,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
         ),
     )
 
+# Decorators
 
 def dynamic_retry(task_func=None, /, *args, **kwargs):
     if task_func is None:
@@ -159,4 +169,20 @@ def dynamic_retry(task_func=None, /, *args, **kwargs):
         ))
         return task_func(*args, **kwargs)(inner)
     return deco
+
+# Signal handlers shared between queues
+
+def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
+    if signals.SIGNAL_INTERRUPTED != signal_name:
+        return
+    assert exception_obj is None
+    assert hasattr(huey, 'enqueue') and callable(huey.enqueue)
+    huey.enqueue(task_obj)
+
+# Registration of shared signal handlers
+
+def register_huey_signals():
+    from django_huey import DJANGO_HUEY, signal
+    for qn in DJANGO_HUEY.get('queues', dict()):
+        signal(signals.SIGNAL_INTERRUPTED, queue=qn)(on_interrupted)
 

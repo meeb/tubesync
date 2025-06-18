@@ -29,7 +29,7 @@ from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from django_huey import db_periodic_task, db_task, task as huey_task # noqa
 from huey import crontab as huey_crontab
-from common.huey import CancelExecution, dynamic_retry
+from common.huey import CancelExecution, dynamic_retry, register_huey_signals
 from common.logger import log
 from common.errors import ( BgTaskWorkerError, DownloadFailedException,
                             NoFormatException, NoMediaException,
@@ -42,6 +42,7 @@ from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
 
 db_vendor = db.connection.vendor
+register_huey_signals()
 
 
 def get_hash(task_name, pk):
