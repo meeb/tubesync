@@ -992,7 +992,7 @@ def refresh_formats(media_id):
                 retry=retry,
             )
             # combine the strings
-            exc.args = (' '.join(exc.args),)
+            exc.args = (' '.join(map(str, exc.args)),)
             # store instance details
             exc.instance = dict(
                 key=media.key,
