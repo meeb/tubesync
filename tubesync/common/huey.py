@@ -1,5 +1,12 @@
 import os
 from functools import wraps
+from huey import CancelExecution
+
+
+def CancelExecution_init(self, *args, retry=None, **kwargs):
+    self.retry = retry
+    super(CancelExecution, self).__init__(*args, **kwargs)
+CancelExecution.__init__ = CancelExecution_init
 
 
 def delay_to_eta(delay, /):
@@ -24,6 +31,47 @@ def h_q_tuple(q, /):
         list(q._registry._registry.keys()),
         h_q_dict(q),
     )
+
+
+def h_q_reset_tasks(q, /, *, maint_func=None):
+    if isinstance(q, str):
+        from django_huey import get_queue
+        q = get_queue(q)
+    # revoke to prevent pending tasks from executing
+    for t in q._registry._registry.values():
+        q.revoke_all(t, revoke_until=delay_to_eta(600))
+    # clear scheduled tasks
+    q.storage.flush_schedule()
+    # clear pending tasks
+    q.storage.flush_queue()
+    # run the maintenance function
+    def default_maint_func(queue, /, exception=None, status=None):
+        if status is None:
+            return
+        if 'exception' == status and exception is not None:
+            # log, but do not raise an exception
+            from huey import logger
+            logger.error(
+                f'{queue.name}: maintenance function exception: {exception}'
+            )
+            return
+        return True
+    maint_result = None
+    if maint_func is None:
+        maint_func = default_maint_func
+    if maint_func and callable(maint_func):
+        try:
+            maint_result = maint_func(q, status='started')
+        except Exception as exc:
+            maint_result = maint_func(q, exception=exc, status='exception')
+            pass
+        finally:
+            maint_func(q, status='finished')
+    # clear everything now that we are done
+    q.storage.flush_all()
+    q.flush()
+    # return the results from the maintenance function
+    return maint_result
 
 
 def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
