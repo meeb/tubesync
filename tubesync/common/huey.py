@@ -1,3 +1,4 @@
+import os
 from functools import wraps
 from huey import CancelExecution
 
@@ -75,11 +76,19 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
 
 def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
     name_fmt = 'huey_{}'
-    if prefix is None:
-        prefix = ''
     if prefix:
         name_fmt = f'huey_{prefix}_' + '{}'
     name = name_fmt.format(key)
+    thread = thread is True
+    try:
+        workers = int(workers)
+    except TypeError:
+        workers = 2
+    finally:
+        if 0 >= workers:
+            workers = os.cpu_count()
+        elif 1 == workers:
+            thread = False
     return dict(
         huey_class='huey.SqliteHuey',
         name=name,
@@ -94,8 +103,8 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
             strict_fifo=True,
         ),
         consumer=dict(
-            workers=1,
-            worker_type='process',
+            workers=workers if thread else 1,
+            worker_type='thread' if thread else 'process',
             max_delay=20.0,
             flush_locks=True,
             scheduler_interval=10,
