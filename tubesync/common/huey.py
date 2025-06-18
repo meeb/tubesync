@@ -1,5 +1,12 @@
 from functools import wraps
-from huey import CancelExecution
+from huey import CancelExecution, SqliteHuey as huey_SqliteHuey
+
+
+class SqliteHuey(huey_SqliteHuey):
+    def _emit(self, signal, task, *args, **kwargs):
+        #kwargs = kwargs or dict()
+        kwargs['huey'] = self
+        super()._emit(signal, task, *args, **kwargs)
 
 
 def CancelExecution_init(self, *args, retry=None, **kwargs):
@@ -40,7 +47,7 @@ def sqlite_tasks(key, /, prefix=None):
         name_fmt = f'huey_{prefix}_' + '{}'
     name = name_fmt.format(key)
     return dict(
-        huey_class='huey.SqliteHuey',
+        huey_class='common.SqliteHuey',
         name=name,
         immediate=False,
         results=True,
@@ -116,22 +123,6 @@ def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     if SIGNAL_INTERRUPTED != signal_name:
         return
     assert exception_obj is None
-    # TODO: pass the correct huey instance instead
-    # this is horrifying
-    if huey is None:
-        q_objs = set()
-        from django_huey import DJANGO_HUEY, get_queue
-        t_fmt = '{}.{}'
-        for queue_name in DJANGO_HUEY.get('queues', dict()):
-            q = get_queue(queue_name)
-            t_registry_name = t_fmt.format(task.__module__, task.name)
-            if t_registry_name in q._registry._registry:
-                q_objs.add(q)
-        try:
-            while 0 < len(q_objs):
-                on_interrupted(signal_name, task_obj, huey=q_objs.pop())
-        except KeyError:
-            pass
     assert hasattr(huey, 'enqueue') and callable(huey.enqueue)
     huey.enqueue(task_obj)
 
