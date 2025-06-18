@@ -73,7 +73,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     return maint_result
 
 
-def sqlite_tasks(key, /, prefix=None):
+def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
     name_fmt = 'huey_{}'
     if prefix is None:
         prefix = ''
