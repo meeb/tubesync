@@ -64,7 +64,6 @@ def map_task_to_instance(task):
         'sync.tasks.download_media': Media,
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
-        'sync.tasks.rename_media': Media,
         'sync.tasks.rename_all_media_for_source': Source,
         'sync.tasks.wait_for_media_premiere': Media,
         'sync.tasks.delete_all_media_for_source': Source,
@@ -907,12 +906,12 @@ def refresh_formats(media_id):
             save_model(media)
 
 
-@background(schedule=dict(priority=20, run_at=60), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
+@db_task(delay=60, priority=80, retries=5, retry_delay=60, queue=Val(TaskQueue.FS))
 def rename_media(media_id):
     try:
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
-        raise InvalidTaskError(_('no such media')) from e
+        raise CancelExecution(_('no such media'), retry=False) from e
     else:
         with atomic():
             media.rename_files()
