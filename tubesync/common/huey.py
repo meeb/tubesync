@@ -1,5 +1,8 @@
 from functools import wraps
-from huey import CancelExecution, SqliteHuey as huey_SqliteHuey
+from huey import (
+    CancelExecution, SqliteHuey as huey_SqliteHuey,
+    signals, utils,
+)
 
 
 class SqliteHuey(huey_SqliteHuey):
@@ -16,8 +19,7 @@ CancelExecution.__init__ = CancelExecution_init
 
 
 def delay_to_eta(delay, /):
-    from huey.utils import normalize_time
-    return normalize_time(delay=delay)
+    return utils.normalize_time(delay=delay)
 
 
 def h_q_dict(q, /):
@@ -38,6 +40,7 @@ def h_q_tuple(q, /):
         h_q_dict(q),
     )
 
+# Configuration convenience helpers
 
 def sqlite_tasks(key, /, prefix=None):
     name_fmt = 'huey_{}'
@@ -74,6 +77,7 @@ def sqlite_tasks(key, /, prefix=None):
         ),
     )
 
+# Decorators
 
 def dynamic_retry(task_func=None, /, *args, **kwargs):
     if task_func is None:
@@ -117,12 +121,19 @@ def dynamic_retry(task_func=None, /, *args, **kwargs):
         return task_func(*args, **kwargs)(inner)
     return deco
 
+# Signal handlers shared between queues
 
 def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
-    from huey.signals import SIGNAL_INTERRUPTED
-    if SIGNAL_INTERRUPTED != signal_name:
+    if signals.SIGNAL_INTERRUPTED != signal_name:
         return
     assert exception_obj is None
     assert hasattr(huey, 'enqueue') and callable(huey.enqueue)
     huey.enqueue(task_obj)
+
+# Registration of shared signal handlers
+
+def register_huey_signals():
+    from django_huey import DJANGO_HUEY, signal
+    for qn in DJANGO_HUEY.get('queues', dict()):
+        signal(signals.SIGNAL_INTERRUPTED, queue=qn)(on_interrupted)
 
