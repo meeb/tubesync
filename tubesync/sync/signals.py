@@ -20,15 +20,7 @@ from .tasks import (delete_task_by_source, delete_task_by_media, index_source_ta
                     rename_media, get_media_metadata_task, get_media_download_task)
 from .utils import delete_file
 from .filtering import filter_media
-from .choices import Val, TaskQueue, YouTube_SourceType
-
-
-def register_huey_signals():
-    from huey import signals
-    from django_huey import signal
-    from common.huey import on_interrupted
-    for qn in TaskQueue.values:
-        signal(signals.SIGNAL_INTERRUPTED, queue=qn)(on_interrupted)
+from .choices import Val, YouTube_SourceType
 
 
 @receiver(pre_save, sender=Source)
