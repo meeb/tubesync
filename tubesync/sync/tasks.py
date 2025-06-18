@@ -981,8 +981,29 @@ def refresh_formats(media_id):
             media,
             queue_name=Val(TaskQueue.LIMIT),
         )
-        if media.refresh_formats:
-            save_model(media)
+        save, retry, msg = media.refresh_formats()
+        if save is not True:
+            log.warning(f'Refreshing formats for "{media.key}" failed: {msg}')
+            exc = CancelExecution(
+                _('failed to refresh formats for:'),
+                f'{media.key} / {media.uuid}:',
+                msg,
+                retry=retry,
+            )
+            # combine the strings
+            exc.args = (' '.join(exc.args),)
+            # store instance details
+            exc.instance = dict(
+                key=media.key,
+                model='Media',
+                uuid=str(media.pk),
+            )
+            # store the function results
+            exc.reason = msg
+            exc.save = save
+            raise exc
+        log.info(f'Saving refreshed formats for "{media.key}": {msg}')
+        save_model(media)
 
 
 @db_task(delay=60, priority=80, retries=5, retry_delay=60, queue=Val(TaskQueue.FS))
