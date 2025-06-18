@@ -7,7 +7,6 @@ from huey import (
 
 class SqliteHuey(huey_SqliteHuey):
     def _emit(self, signal, task, *args, **kwargs):
-        #kwargs = kwargs or dict()
         kwargs['huey'] = self
         super()._emit(signal, task, *args, **kwargs)
 
