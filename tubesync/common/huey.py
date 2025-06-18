@@ -47,7 +47,7 @@ def sqlite_tasks(key, /, prefix=None):
         name_fmt = f'huey_{prefix}_' + '{}'
     name = name_fmt.format(key)
     return dict(
-        huey_class='common.SqliteHuey',
+        huey_class='common.huey.SqliteHuey',
         name=name,
         immediate=False,
         results=True,
