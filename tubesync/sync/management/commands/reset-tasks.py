@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError # noqa
 from django.db.transaction import atomic
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _ # noqa
 from background_task.models import Task
 from common.logger import log
 from sync.models import Source
@@ -18,11 +18,7 @@ class Command(BaseCommand):
             Task.objects.all().delete()
             # Iter all sources, creating new tasks
             for source in Source.objects.all():
-                verbose_name = _('Check download directory exists for source "{}"')
-                check_source_directory_exists(
-                    str(source.pk),
-                    verbose_name=verbose_name.format(source.name),
-                )
+                check_source_directory_exists(str(source.pk))
                 # Recreate the initial indexing task
                 log.info(f'Resetting tasks for source: {source}')
                 verbose_name = _('Index media from source "{}"')

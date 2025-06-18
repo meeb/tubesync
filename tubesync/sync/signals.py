@@ -35,7 +35,7 @@ def source_pre_save(sender, instance, **kwargs):
         return
 
     args = ( str(instance.pk), )
-    check_source_directory_exists.now(*args)
+    check_source_directory_exists.call_local(*args)
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
     new_dirpath = instance.directory_path.resolve(strict=False)
     if existing_dirpath != new_dirpath:
@@ -106,11 +106,7 @@ def source_pre_save(sender, instance, **kwargs):
 def source_post_save(sender, instance, created, **kwargs):
     # Check directory exists and create an indexing task for newly created sources
     if created:
-        verbose_name = _('Check download directory exists for source "{}"')
-        check_source_directory_exists(
-            str(instance.pk),
-            verbose_name=verbose_name.format(instance.name),
-        )
+        check_source_directory_exists(str(instance.pk))
         if instance.source_type != Val(YouTube_SourceType.PLAYLIST) and instance.copy_channel_images:
             download_source_images(str(instance.pk))
         if instance.index_schedule > 0:
@@ -140,7 +136,6 @@ def source_pre_delete(sender, instance, **kwargs):
     instance.deactivate()
     log.info(f'Deleting tasks for source: {instance.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
-    delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
 
@@ -167,7 +162,6 @@ def source_post_delete(sender, instance, **kwargs):
     source = instance
     log.info(f'Deleting tasks for removed source: {source.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
-    delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
 
