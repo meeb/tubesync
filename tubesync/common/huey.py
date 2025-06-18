@@ -110,3 +110,28 @@ def dynamic_retry(task_func=None, /, *args, **kwargs):
         return task_func(*args, **kwargs)(inner)
     return deco
 
+
+def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
+    from huey.signals import SIGNAL_INTERRUPTED
+    if SIGNAL_INTERRUPTED != signal_name:
+        return
+    assert exception_obj is None
+    # TODO: pass the correct huey instance instead
+    # this is horrifying
+    if huey is None:
+        q_objs = set()
+        from django_huey import DJANGO_HUEY, get_queue
+        t_fmt = '{}.{}'
+        for queue_name in DJANGO_HUEY.get('queues', dict()):
+            q = get_queue(queue_name)
+            t_registry_name = t_fmt.format(task.__module__, task.name)
+            if t_registry_name in q._registry._registry:
+                q_objs.add(q)
+        try:
+            while 0 < len(q_objs):
+                on_interrupted(signal_name, task_obj, huey=q_objs.pop())
+        except KeyError:
+            pass
+    assert hasattr(huey, 'enqueue') and callable(huey.enqueue)
+    huey.enqueue(task_obj)
+
