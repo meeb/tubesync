@@ -21,7 +21,7 @@ app_logger.setLevel(logging_level)
 if (
     hasattr(settings, 'database_dict') and
     '_msg' in settings.database_dict.keys() and
-    _msg := settings.database_dict.pop('_msg', False)
+    ( _msg := settings.database_dict.pop('_msg', False) )
 ):
     app_logger.info(_msg)
 
