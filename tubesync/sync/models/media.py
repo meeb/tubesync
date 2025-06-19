@@ -723,7 +723,6 @@ class Media(models.Model):
     @property
     def slugtitle(self):
         transtab = str.maketrans({
-            '_': '-',
             '&': 'and', '+': 'and',
         })
         slugified = slugify(
