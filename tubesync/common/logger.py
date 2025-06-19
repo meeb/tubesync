@@ -21,10 +21,11 @@ app_logger.setLevel(logging_level)
 if (
     hasattr(settings, 'DATABASES') and
     'default' in settings.DATABASES.keys() and
-    '_msg' in settings.DATABASES.get('default', dict()).keys() and
-    ( _msg := settings.DATABASES.get('default', dict()).pop('_msg', False) )
+    '_msgs' in settings.DATABASES.get('default', dict()).keys() and
+    ( _msgs := settings.DATABASES.get('default', dict()).pop('_msgs', False) )
 ):
-    app_logger.info(_msg)
+    for _msg in _msgs:
+        app_logger.info(_msg)
 
 class NoWaitingForTasksFilter(logging.Filter):
     def filter(self, record):
