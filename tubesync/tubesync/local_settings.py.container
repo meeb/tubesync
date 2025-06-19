@@ -36,10 +36,10 @@ if database_dict:
         'default': database_dict,
     }
     DATABASES['default']['_msgs'] = database_dict.get('_msgs', list())
-    DATABASES['default']['_msgs'].append((20,
+    DATABASES['default']['_msgs'].append((
         f'Using database connection: {database_dict["DRIVER"]}://'
         f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
-        f'{database_dict["PORT"]}/{database_dict["NAME"]}'
+        f'{database_dict["PORT"]}/{database_dict["NAME"]}',
     ))
     DATABASE_CONNECTION_STR = (f'{database_dict["DRIVER"]} at "{database_dict["HOST"]}:'
                                f'{database_dict["PORT"]}" database '
