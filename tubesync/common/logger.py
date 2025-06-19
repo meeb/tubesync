@@ -18,6 +18,12 @@ log = app_logger = logging.getLogger(first_part)
 app_logger.addHandler(default_sh)
 app_logger.setLevel(logging_level)
 
+if (
+    hasattr(settings, 'database_dict') and
+    '_msg' in settings.database_dict.keys() and
+    _msg := settings.database_dict.pop('_msg', False)
+):
+    app_logger.info(_msg)
 
 class NoWaitingForTasksFilter(logging.Filter):
     def filter(self, record):
