@@ -72,7 +72,7 @@ BACKGROUND_TASK_ASYNC_THREADS = getenv('TUBESYNC_WORKERS', DEFAULT_THREADS, inte
 if BACKGROUND_TASK_ASYNC_THREADS > 1:
     print(
         'WARNING: Using more than 1 worker is generally a bad idea.',
-        file=sys.stderr, flush=True)
+        file=sys.stderr, flush=True,
     )
     BACKGROUND_TASK_RUN_ASYNC = True
 
