@@ -28,7 +28,7 @@ if (
         try:
             _level, _msg = _spec
         except ValueError:
-            _level, _msg = 20, next(iter(_spec))
+            _level, _msg = logging.INFO, next(iter(_spec))
         app_logger.log(_level, _msg)
 
 class NoWaitingForTasksFilter(logging.Filter):
