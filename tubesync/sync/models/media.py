@@ -722,9 +722,11 @@ class Media(models.Model):
 
     @property
     def slugtitle(self):
-        no_underscores = self.title.replace('_', '-')
-        to_and = no_underscores.replace('&', 'and').replace('+', 'and')
-        slugified = slugify(to_and, allow_unicode=True)
+        transtab = str.maketrans({
+            '_': '-',
+            '&': 'and', '+': 'and',
+        })
+        slugified = slugify(self.title.translate(transtab), allow_unicode=True)
         decoded = slugified.encode(errors=''ignore').decode()
         return decoded[:80]
 
