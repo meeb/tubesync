@@ -28,8 +28,8 @@ from background_task import background
 from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
 from django_huey import lock_task as huey_lock_task, task as huey_task # noqa
-from django_huey import db_periodic_task, db_task
-from huey import crontab as huey_crontab
+from django_huey import db_periodic_task, db_task, signal as huey_signal
+from huey import crontab as huey_crontab, signals as huey_signals
 from common.huey import CancelExecution, dynamic_retry, register_huey_signals
 from common.logger import log
 from common.errors import ( BgTaskWorkerError, DownloadFailedException,
@@ -829,6 +829,17 @@ def download_media_image(media_id, url):
                  f'to: {media.thumbpath}')
         copyfile(media.thumb.path, media.thumbpath)        
     return True
+
+@huey_signal(huey_signals.SIGNAL_COMPLETE, queue=Val(TaskQueue.NET))
+def on_complete_download_media_image(signal_name, task_obj, exception_obj=None, /, *, huey=None):
+    assert huey_signals.SIGNAL_COMPLETE == signal_name
+    assert huey is not None
+    if 'download_media_image' != task_obj.name:
+        return
+    result = huey.result(preserve=True, id=task_obj.id)
+    # clear True from the results storage
+    if result is True:
+        huey.result(preserve=False, id=task_obj.id)
 
 @background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
 def download_media_thumbnail(media_id, url):
