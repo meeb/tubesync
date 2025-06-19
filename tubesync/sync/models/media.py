@@ -726,8 +726,11 @@ class Media(models.Model):
             '_': '-',
             '&': 'and', '+': 'and',
         })
-        slugified = slugify(self.title.translate(transtab), allow_unicode=True)
-        decoded = slugified.encode(errors=''ignore').decode()
+        slugified = slugify(
+            self.title.translate(transtab),
+            allow_unicode=True,
+        )
+        decoded = slugified.encode(errors='ignore').decode()
         return decoded[:80]
 
     @property
