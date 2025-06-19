@@ -19,9 +19,10 @@ app_logger.addHandler(default_sh)
 app_logger.setLevel(logging_level)
 
 if (
-    hasattr(settings, 'database_dict') and
-    '_msg' in settings.database_dict.keys() and
-    ( _msg := settings.database_dict.pop('_msg', False) )
+    hasattr(settings, 'DATABASES') and
+    'default' in settings.DATABASES.keys() and
+    '_msg' in settings.DATABASES.get('default', dict()).keys() and
+    ( _msg := settings.DATABASES.get('default', dict()).pop('_msg', False) )
 ):
     app_logger.info(_msg)
 
