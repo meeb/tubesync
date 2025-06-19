@@ -723,7 +723,7 @@ class Media(models.Model):
     @property
     def slugtitle(self):
         replaced = self.title.replace('_', '-').replace('&', 'and').replace('+', 'and')
-        return slugify(replaced)[:80]
+        return slugify(replaced, allow_unicode=True)[:80]
 
     @property
     def thumbnail(self):
