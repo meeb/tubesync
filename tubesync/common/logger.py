@@ -24,8 +24,12 @@ if (
     '_msgs' in settings.DATABASES.get('default', dict()).keys() and
     ( _msgs := settings.DATABASES.get('default', dict()).pop('_msgs', False) )
 ):
-    for _msg in _msgs:
-        app_logger.info(_msg)
+    for _spec in _msgs:
+        try:
+            _level, _msg = _spec
+        except ValueError:
+            _level, _msg = 20, next(iter(_spec))
+        app_logger.log(_level, _msg)
 
 class NoWaitingForTasksFilter(logging.Filter):
     def filter(self, record):
