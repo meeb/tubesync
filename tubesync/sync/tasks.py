@@ -27,7 +27,7 @@ from django.utils.translation import gettext_lazy as _
 from background_task import background
 from background_task.exceptions import InvalidTaskError
 from background_task.models import Task, CompletedTask
-from django_huey import task as huey_task # noqa
+from django_huey import lock_task as huey_lock_task, task as huey_task # noqa
 from django_huey import db_periodic_task, db_task, signal as huey_signal
 from huey import crontab as huey_crontab, signals as huey_signals
 from common.huey import CancelExecution, dynamic_retry, register_huey_signals
@@ -402,22 +402,26 @@ def migrate_to_metadata(media_id):
     except Metadata.DoesNotExist as e:
         raise CancelExecution(_('no indexed data to migrate to metadata'), retry=False) from e
 
-    video = data.value
-    fields = lambda f, m: m.get_metadata_field(f)
-    timestamp = video.get(fields('timestamp', media), None)
-    for key in ('epoch', 'availability', 'extractor_key',):
-        field = fields(key, media)
-        value = video.get(field)
-        existing_value = media.get_metadata_first_value(key)
-        if value is None:
-            if 'epoch' == key:
-                value = timestamp
-            elif 'extractor_key' == key:
-                value = data.site
-        if value is not None:
-            if existing_value and ('epoch' == key or value == existing_value):
-                continue
-            media.save_to_metadata(field, value)
+    with huey_lock_task(
+        f'media:{media.uuid}',
+        queue=Val(TaskQueue.DB),
+    ):
+        video = data.value
+        fields = lambda f, m: m.get_metadata_field(f)
+        timestamp = video.get(fields('timestamp', media), None)
+        for key in ('epoch', 'availability', 'extractor_key',):
+            field = fields(key, media)
+            value = video.get(field)
+            existing_value = media.get_metadata_first_value(key)
+            if value is None:
+                if 'epoch' == key:
+                    value = timestamp
+                elif 'extractor_key' == key:
+                    value = data.site
+            if value is not None:
+                if existing_value and ('epoch' == key or value == existing_value):
+                    continue
+                media.save_to_metadata(field, value)
 
 
 @background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=False)
@@ -1004,7 +1008,7 @@ def refresh_formats(media_id):
                 retry=retry,
             )
             # combine the strings
-            exc.args = (' '.join(exc.args),)
+            exc.args = (' '.join(map(str, exc.args)),)
             # store instance details
             exc.instance = dict(
                 key=media.key,
@@ -1020,17 +1024,21 @@ def refresh_formats(media_id):
 
 
 @db_task(delay=60, priority=80, retries=5, retry_delay=60, queue=Val(TaskQueue.FS))
+@atomic(durable=True)
 def rename_media(media_id):
     try:
         media = Media.objects.get(pk=media_id)
     except Media.DoesNotExist as e:
         raise CancelExecution(_('no such media'), retry=False) from e
     else:
-        with atomic():
+        with huey_lock_task(
+            f'media:{media.uuid}',
+            queue=Val(TaskQueue.DB),
+        ):
             media.rename_files()
 
 
-@background(schedule=dict(priority=20, run_at=300), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
+@db_task(delay=300, priority=80, retries=5, retry_delay=600, queue=Val(TaskQueue.FS))
 @atomic(durable=True)
 def rename_all_media_for_source(source_id):
     try:
@@ -1039,7 +1047,7 @@ def rename_all_media_for_source(source_id):
         # Task triggered but the source no longer exists, do nothing
         log.error(f'Task rename_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
-        raise InvalidTaskError(_('no such source')) from e
+        raise CancelExecution(_('no such source'), retry=False) from e
     # Check that the settings allow renaming
     rename_sources_setting = getattr(settings, 'RENAME_SOURCES') or list()
     create_rename_tasks = (
@@ -1050,14 +1058,18 @@ def rename_all_media_for_source(source_id):
         getattr(settings, 'RENAME_ALL_SOURCES', False)
     )
     if not create_rename_tasks:
-        return
+        return None
     mqs = Media.objects.all().filter(
         source=source,
         downloaded=True,
     )
     for media in qs_gen(mqs):
-        with atomic():
-            media.rename_files()
+        with huey_lock_task(
+            f'media:{media.uuid}',
+            queue=Val(TaskQueue.DB),
+        ):
+            with atomic():
+                media.rename_files()
 
 
 @background(schedule=dict(priority=0, run_at=60), queue=Val(TaskQueue.DB), remove_existing_tasks=True)
