@@ -553,7 +553,7 @@ def index_source_task(source_id):
         if site:
             data.site = site
         data.retrieved = source.last_crawl
-        data.value = video
+        data.value = { k: v for k,v in video.items() if v is not None }
         db_batch_data.append(data)
         migrate_to_metadata(str(media.pk))
         if not new_media:
