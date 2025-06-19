@@ -1,3 +1,4 @@
+import logging
 import sys
 from pathlib import Path
 from urllib.parse import urljoin
@@ -72,7 +73,7 @@ DEFAULT_THREADS = 1
 BACKGROUND_TASK_ASYNC_THREADS = getenv('TUBESYNC_WORKERS', DEFAULT_THREADS, integer=True)
 if BACKGROUND_TASK_ASYNC_THREADS > 1:
     DATABASES['default']['_msgs'] = database_dict.get('_msgs', list())
-    DATABASES['default']['_msgs'].append((30,
+    DATABASES['default']['_msgs'].append((logging.WARNING,
         'Using more than 1 worker is generally a bad idea.',
     ))
     BACKGROUND_TASK_RUN_ASYNC = True
