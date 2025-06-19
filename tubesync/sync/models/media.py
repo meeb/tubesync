@@ -730,7 +730,11 @@ class Media(models.Model):
             self.title.translate(transtab),
             allow_unicode=True,
         )
-        decoded = slugified.encode(errors='ignore').decode()
+        encoding = os.sys.getfilesystemencoding()
+        decoded = slugified.encode(
+            encoding=encoding,
+            errors='ignore',
+        ).decode(encoding=encoding)
         return decoded[:80]
 
     @property
