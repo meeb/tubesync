@@ -542,6 +542,7 @@ class Media(models.Model):
         return {
             'yyyymmdd': dateobj.strftime('%Y%m%d'),
             'yyyy_mm_dd': dateobj.strftime('%Y-%m-%d'),
+            'yyyy_0mm_dd': dateobj.strftime('%Y-0%m-%d'),
             'yyyy': dateobj.strftime('%Y'),
             'mm': dateobj.strftime('%m'),
             'dd': dateobj.strftime('%d'),
