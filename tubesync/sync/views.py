@@ -863,6 +863,7 @@ class TasksView(ListView):
         data['scheduled'] = list()
         data['total_scheduled'] = scheduled_qs.count()
         data['migrated'] = migrate_queues()
+        data['wait_for_database_queue'] = False
 
         def add_to_task(task):
             obj, url = map_task_to_instance(task)
@@ -893,6 +894,8 @@ class TasksView(ListView):
                 task.save()
             if locked_by_pid_running and add_to_task(task):
                 data['running'].append(task)
+            elif locked_by_pid_running and 'wait_for_database_queue' in task.task_name:
+                data['wait_for_database_queue'] = True
 
         # show all the errors when they fit on one page
         if (data['total_errors'] + len(data['running'])) < self.paginate_by:
