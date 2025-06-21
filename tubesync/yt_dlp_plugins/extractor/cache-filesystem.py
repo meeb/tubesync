@@ -20,7 +20,7 @@ class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must e
 
     def _make_filename(self, key: str, expires_at: int) -> str:
         result = sha256(key.encode(), usedforsecurity=False)
-        return f'{expires_at or '*'}-{result.hexdigest()}'
+        return f'{expires_at or "*"}-{result.hexdigest()}'
         
     def is_available(self) -> bool:
         """
