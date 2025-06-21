@@ -209,10 +209,6 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'verbose': True if settings.DEBUG else False,
         'writeinfojson': True,
     })
-    if settings.BACKGROUND_TASK_RUN_ASYNC:
-        opts.update({
-            'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
-        })
     if start:
         log.debug(f'get_media_info: used date range: {opts["daterange"]} for URL: {url}')
     response = {}
@@ -353,8 +349,8 @@ def download_media(
         'overwrites': None,
         'skip_unavailable_fragments': False,
         'sleep_interval': 10,
-        'max_sleep_interval': min(20*60, max(60, settings.DOWNLOAD_MEDIA_DELAY)),
-        'sleep_interval_requests': 1 + (2 * settings.BACKGROUND_TASK_ASYNC_THREADS),
+        'max_sleep_interval': min(15*60, max(60, settings.DOWNLOAD_MEDIA_DELAY)),
+        'sleep_interval_requests': 3,
         'extractor_args': opts.get('extractor_args', dict()),
         'paths': opts.get('paths', dict()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),
