@@ -1,3 +1,4 @@
+from collections.abc import Generator
 from common.utils import getenv
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,7 +27,7 @@ class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must e
     def _expires(self, expires_at: int) -> datetime:
         return datetime.utcfromtimestamp(expires_at).astimezone(timezone.utc)
 
-    def _files(self, key: str) -> generator:
+    def _files(self, key: str) -> Generator[Path]:
         return Path(self._storage_directory).glob(self._make_filename(key, 0))
 
     def is_available(self) -> bool:
