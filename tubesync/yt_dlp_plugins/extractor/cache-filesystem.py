@@ -93,6 +93,6 @@ class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must e
 # Your cache provider should be lower than this.
 
 
-@register_preference(MyCacheProviderPCP)
-def my_cache_preference(provider: PoTokenCacheProvider, request: PoTokenRequest) -> int:
+@register_preference(TubeSyncFileSystemPCP)
+def filesystem_cache_preference(provider: PoTokenCacheProvider, request: PoTokenRequest) -> int:
     return 10
