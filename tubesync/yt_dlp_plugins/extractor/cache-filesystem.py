@@ -1,6 +1,5 @@
 from common.utils import getenv
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 from yt_dlp.extractor.youtube.pot.cache import (
     PoTokenCacheProvider,
@@ -18,10 +17,18 @@ class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must e
     PROVIDER_NAME = 'TubeSync-fs'
     BUG_REPORT_LOCATION = 'https://github.com/meeb/tubesync/issues'
 
+    def _now(self) -> datetime:
+        return datetime.now(timezone.utc)
+
     def _make_filename(self, key: str, expires_at: int) -> str:
-        result = sha256(key.encode(), usedforsecurity=False)
-        return f'{expires_at or "*"}-{result.hexdigest()}'
+        return f'{expires_at or "*"}-{key}'
         
+    def _expires(self, expires_at: int) -> datetime:
+        return datetime.utcfromtimestamp(expires_at).astimezone(timezone.utc)
+
+    def _files(self, key: str) -> generator:
+        return Path(self._storage_directory).glob(self._make_filename(key, 0))
+
     def is_available(self) -> bool:
         """
         Check if the provider is available (e.g. all required dependencies are available)
@@ -45,9 +52,8 @@ class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must e
         # are passed down extractor args matching key youtubepot-<PROVIDER_KEY>.
         # some_setting = self._configuration_arg('some_setting', default=['default_value'])[0]
         found = None
-        now = datetime.utcnow().astimezone(timezone.utc)
-        files = Path(self._storage_directory).glob(self._make_filename(key, 0))
-        for file in files:
+        now = self._now()
+        for file in self._files(key):
             if not file.is_file():
                 continue
             try:
@@ -55,8 +61,7 @@ class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must e
             except ValueError:
                 continue
             else:
-                expired = datetime.utcfromtimestamp(expires_at).astimezone(timezone.utc)
-                if expired < now:
+                if self._expires(expires_at) < now:
                     file.unlink()
                 else:
                     found = file
@@ -66,15 +71,12 @@ class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must e
     def store(self, key: str, value: str, expires_at: int):
         # ⚠ expires_at MUST be respected. 
         # Cache entries should not be returned if they have expired.
-        dst = Path(self._storage_directory) / self._make_filename(key, expires_at)
-        now = datetime.utcnow().astimezone(timezone.utc)
-        expires = datetime.utcfromtimestamp(expires_at).astimezone(timezone.utc)
-        if expires > now:
+        if self._expires(expires_at) > self._now():
+            dst = Path(self._storage_directory) / self._make_filename(key, expires_at)
             dst.write_bytes(value.encode())
 
     def delete(self, key: str):
-        files = Path(self._storage_directory).glob(self._make_filename(key, 0))
-        for file in files:
+        for file in self._files(key):
             if not file.is_file():
                 continue
             file.unlink()
