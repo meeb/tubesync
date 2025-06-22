@@ -247,6 +247,14 @@ def schedule_indexing():
         )
         if skip_source:
             continue
+        # clear all existing media locks
+        media_qs = Media.objects.filter(source=source).only('uuid')
+        for media in qs_gen(media_qs):
+            huey_lock_task(
+                f'media:{media.uuid}',
+                queue=Val(TaskQueue.DB),
+            ).clear()
+        # schedule a new indexing task
         log.info(f'Scheduling an indexing task for source "{source.name}": {source.pk}')
         vn_fmt = _('Index media from source "{}"')
         index_source_task(
