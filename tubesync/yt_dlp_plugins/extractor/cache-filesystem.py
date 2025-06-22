@@ -43,7 +43,7 @@ class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must e
         if not cache_home:
             return False
         # TODO: check the actual setting: cookiefile
-        cookie_file = cache_home / '../cookies.txt'
+        cookie_file = Path(cache_home) / '../cookies.txt'
         if not cookie_file.is_file():
             return False
         directory = Path(cache_home) / 'yt-dlp/youtube-pot'
