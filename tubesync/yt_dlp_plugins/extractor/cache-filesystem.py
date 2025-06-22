@@ -42,14 +42,12 @@ class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must e
         cache_home = getenv('XDG_CACHE_HOME')
         if not cache_home:
             return False
+        # TODO: check the actual setting: cookiefile
+        cookie_file = cache_home / '../cookies.txt'
+        if not cookie_file.is_file():
+            return False
         directory = Path(cache_home) / 'yt-dlp/youtube-pot'
         if directory.exists() and directory.is_dir():
-            cookiejar = self._configuration_arg(
-                'cookies',
-                default=['cookies.txt'],
-            )[0]
-            if not Path(cookiejar).is_file():
-                return False
             self._storage_directory = directory
             return True
         return False
