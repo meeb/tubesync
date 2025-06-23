@@ -16,6 +16,7 @@ class TubeSyncHueyPCP(PoTokenCacheProvider):
     PROVIDER_VERSION = '0.0.1'
     PROVIDER_NAME = 'TubeSync-huey'
     BUG_REPORT_LOCATION = 'https://github.com/meeb/tubesync/issues'
+    HUEY_QUEUE_NAME = Val(TaskQueue.LIMIT)
 
     def _now(self) -> datetime:
         return datetime.now(timezone.utc)
@@ -39,14 +40,16 @@ class TubeSyncHueyPCP(PoTokenCacheProvider):
         if cookie_file is None or not Path(cookie_file).is_file():
             return False
         try:
-            huey = get_queue(Val(TaskQueue.LIMIT))
+            huey = get_queue(str(self.HUEY_QUEUE_NAME))
+        except KeyError:
+            self.logger.error(f'no such queue: {self.HUEY_QUEUE_NAME}')
+            pass
         except Exception as exc:
             self.logger.debug(str(exc))
             pass
         else:
-            if huey:
-                self.huey = huey
-                return True
+            self.huey = huey
+            return True
         return False
 
     def get(self, key: str):
