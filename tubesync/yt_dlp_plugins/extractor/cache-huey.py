@@ -51,7 +51,7 @@ class TubeSyncHueyPCP(PoTokenCacheProvider):
 
     def get(self, key: str):
         self.logger.trace(f'huey-get: {key=}')
-        data = huey.get(peek=True, key=self._huey_key(key))
+        data = self.huey.get(peek=True, key=self._huey_key(key))
         if data is None:
             return None
         expires_at, value = data
