@@ -166,9 +166,6 @@ HEALTHCHECK_ALLOWED_IPS = ('127.0.0.1',)
 
 MAX_ATTEMPTS = 15                           # Number of times tasks will be retried
 MAX_RUN_TIME = 12*(60*60)                   # Maximum amount of time in seconds a task can run
-BACKGROUND_TASK_RUN_ASYNC = False           # Run tasks async in the background
-BACKGROUND_TASK_ASYNC_THREADS = 1           # Number of async tasks to run at once
-MAX_BACKGROUND_TASK_ASYNC_THREADS = 8       # For sanity reasons
 BACKGROUND_TASK_PRIORITY_ORDERING = 'ASC'   # Use 'niceness' task priority ordering
 COMPLETED_TASKS_DAYS_TO_KEEP = 7            # Number of days to keep completed tasks
 MAX_ENTRIES_PROCESSING = 0                  # Number of videos to process on source refresh (0 for no limit)
@@ -249,8 +246,9 @@ if MAX_RUN_TIME < 600:
 
 DOWNLOAD_MEDIA_DELAY = 1 + round(MAX_RUN_TIME / 100)
 
-if BACKGROUND_TASK_ASYNC_THREADS > MAX_BACKGROUND_TASK_ASYNC_THREADS:
-    BACKGROUND_TASK_ASYNC_THREADS = MAX_BACKGROUND_TASK_ASYNC_THREADS
+BACKGROUND_TASK_RUN_ASYNC = False
+BACKGROUND_TASK_ASYNC_THREADS = 1
+# MAX_BACKGROUND_TASK_ASYNC_THREADS = 1
 
 
 from .dbutils import patch_ensure_connection # noqa
