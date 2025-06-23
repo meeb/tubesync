@@ -59,7 +59,7 @@ class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must e
         # some_setting = self._configuration_arg('some_setting', default=['default_value'])[0]
         found = None
         now = self._now()
-        for file in self._files(key):
+        for file in sorted(self._files(key)):
             if not file.is_file():
                 continue
             try:
