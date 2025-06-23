@@ -29,6 +29,12 @@
         </a>
       {% empty %}
         <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no running tasks.</span>
+        {% if wait_for_database_queue %}
+        <span class="collection-item">
+          No tasks are running because another task has requested a pause of the queue.<br>
+          While the database tasks are still running, additional tasks will remain scheduled.
+        </span>
+        {% endif %}
       {% endfor %}
     </div>
   </div>
