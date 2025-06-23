@@ -38,15 +38,15 @@ class TubeSyncHueyPCP(PoTokenCacheProvider):
         cookie_file = self.ie.get_param('cookiefile')
         if cookie_file is None or not Path(cookie_file).is_file():
             return False
-        huey = None
         try:
             huey = get_queue(Val(TaskQueue.LIMIT))
         except Exception as exc:
             self.logger.debug(str(exc))
             pass
-        if huey:
-            self.huey = huey
-            return True
+        else:
+            if huey:
+                self.huey = huey
+                return True
         return False
 
     def get(self, key: str):
