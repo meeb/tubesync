@@ -199,7 +199,7 @@ YOUTUBE_DL_TEMPDIR = None
 YOUTUBE_DEFAULTS = {
     'color': 'never',       # Do not use colours in output
     'age_limit': 99,        # 'Age in years' to spoof
-    'ignoreerrors': True,   # Skip on errors (such as unavailable videos in playlists)
+    'ignoreerrors': False,  # When true, yt-dlp does not raise descriptive exceptions
     'cachedir': False,      # Disable on-disk caching
     'addmetadata': True,    # Embed metadata during postprocessing where available
     'geo_verification_proxy': getenv('geo_verification_proxy').strip() or None,
