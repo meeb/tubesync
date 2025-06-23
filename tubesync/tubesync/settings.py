@@ -205,6 +205,11 @@ YOUTUBE_DEFAULTS = {
     'geo_verification_proxy': getenv('geo_verification_proxy').strip() or None,
     'max_sleep_interval': (60)*5,
     'sleep_interval': 0.25,
+    'extractor_args': {
+        'youtubepot-bgutilhttp': {
+            'baseurl': ['http://127.0.0.1:4416'],
+        },
+    },
 }
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 
