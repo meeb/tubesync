@@ -973,15 +973,6 @@ def download_media_file(media_id, override=False):
         return True
 
 
-@background(schedule=dict(priority=30, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def download_media(media_id, override=False):
-    try:
-        res = download_media_file(media_id, override)
-        return res.get(blocking=True)
-    except CancelExecution as e:
-        raise InvalidTaskError(str(e)) from e
-
-
 @db_task(delay=30, expires=210, priority=100, queue=Val(TaskQueue.NET))
 def rescan_media_server(mediaserver_id):
     '''
@@ -1070,6 +1061,15 @@ def rename_all_media_for_source(source_id):
 from background_task import background # noqa: E402
 from background_task.exceptions import InvalidTaskError # noqa: E402
 from background_task.models import Task, CompletedTask # noqa: E402
+
+
+@background(schedule=dict(priority=30, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+def download_media(media_id, override=False):
+    try:
+        res = download_media_file(media_id, override)
+        return res.get(blocking=True)
+    except CancelExecution as e:
+        raise InvalidTaskError(str(e)) from e
 
 
 @background(schedule=dict(priority=30, run_at=600), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
