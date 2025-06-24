@@ -461,15 +461,6 @@ def index_source(source_id):
     # Got some media, update the last crawl timestamp
     source.last_crawl = timezone.now()
     save_model(source)
-    wait_for_database_queue(
-        priority=19, # the indexing task uses 20
-        verbose_name=_('Waiting for database tasks to complete'),
-    )
-    wait_for_database_queue(
-        priority=29, # the checking task uses 30
-        queue=Val(TaskQueue.FS),
-        verbose_name=_('Delaying checking all media for database tasks'),
-    )
     delete_task_by_source('sync.tasks.save_all_media_for_source', source.pk)
     num_videos = len(videos)
     log.info(f'Found {num_videos} media items for source: {source}')
@@ -1019,7 +1010,7 @@ from background_task.exceptions import InvalidTaskError # noqa: E402
 from background_task.models import Task, CompletedTask # noqa: E402
 
 
-@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=False)
+@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
 def wait_for_database_queue():
     from common.huey import h_q_tuple
     queue_name = Val(TaskQueue.DB)
@@ -1042,9 +1033,23 @@ def wait_for_database_queue():
 def index_source_task(source_id):
     try:
         res = index_source(source_id)
-        return res.get(blocking=True)
+        retval = res.get(blocking=True)
     except CancelExecution as e:
         raise InvalidTaskError(str(e)) from e
+    else:
+        if retval is not True:
+            return retval
+        wait_for_database_queue(
+            priority=29, # the checking task uses 30
+            queue=Val(TaskQueue.FS),
+            verbose_name=_('Delaying checking all media for database tasks'),
+        )
+        wait_for_database_queue(
+            priority=19, # the indexing task uses 20
+            queue=Val(TaskQueue.NET),
+            verbose_name=_('Waiting for database tasks to complete'),
+        )
+        return True
 
 
 @background(schedule=dict(priority=40, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
@@ -1056,7 +1061,7 @@ def download_media_metadata(media_id):
         raise InvalidTaskError(str(e)) from e
 
 
-@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
+@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def download_media_thumbnail(media_id, url):
     try:
         return download_media_image.call_local(media_id, url)
