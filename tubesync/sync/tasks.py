@@ -608,15 +608,6 @@ def index_source(source_id):
     return True
 
 
-@background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def index_source_task(source_id):
-    try:
-        res = index_source(source_id)
-        return res.get(blocking=True)
-    except CancelExecution as e:
-        raise InvalidTaskError(str(e)) from e
-
-
 @dynamic_retry(db_task, priority=100, retries=15, queue=Val(TaskQueue.FS))
 def check_source_directory_exists(source_id):
     '''
@@ -1045,6 +1036,15 @@ def rename_all_media_for_source(source_id):
 from background_task import background # noqa: E402
 from background_task.exceptions import InvalidTaskError # noqa: E402
 from background_task.models import Task, CompletedTask # noqa: E402
+
+
+@background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+def index_source_task(source_id):
+    try:
+        res = index_source(source_id)
+        return res.get(blocking=True)
+    except CancelExecution as e:
+        raise InvalidTaskError(str(e)) from e
 
 
 @background(schedule=dict(priority=40, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
