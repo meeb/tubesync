@@ -997,6 +997,81 @@ def rescan_media_server(mediaserver_id):
     mediaserver.update()
 
 
+@dynamic_retry(db_task, backoff_func=lambda n: (n*3600)+600, priority=50, retries=15, queue=Val(TaskQueue.LIMIT))
+def refresh_formats(media_id):
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist as e:
+        raise CancelExecution(_('no such media'), retry=False) from e
+    else:
+        wait_for_errors(
+            media,
+            queue_name=Val(TaskQueue.LIMIT),
+        )
+        save, retry, msg = media.refresh_formats()
+        if save is not True:
+            log.warning(f'Refreshing formats for "{media.key}" failed: {msg}')
+            exc = CancelExecution(
+                _('failed to refresh formats for:'),
+                f'{media.key} / {media.uuid}:',
+                msg,
+                retry=retry,
+            )
+            # combine the strings
+            exc.args = (' '.join(map(str, exc.args)),)
+            # store instance details
+            exc.instance = dict(
+                key=media.key,
+                model='Media',
+                uuid=str(media.pk),
+            )
+            # store the function results
+            exc.reason = msg
+            exc.save = save
+            raise exc
+        log.info(f'Saving refreshed formats for "{media.key}": {msg}')
+        save_model(media)
+
+
+@db_task(delay=300, priority=80, retries=5, retry_delay=600, queue=Val(TaskQueue.FS))
+@atomic(durable=True)
+def rename_all_media_for_source(source_id):
+    try:
+        source = Source.objects.get(pk=source_id)
+    except Source.DoesNotExist as e:
+        # Task triggered but the source no longer exists, do nothing
+        log.error(f'Task rename_all_media_for_source(pk={source_id}) called but no '
+                  f'source exists with ID: {source_id}')
+        raise CancelExecution(_('no such source'), retry=False) from e
+    # Check that the settings allow renaming
+    rename_sources_setting = getattr(settings, 'RENAME_SOURCES') or list()
+    create_rename_tasks = (
+        (
+            source.directory and
+            source.directory in rename_sources_setting
+        ) or
+        getattr(settings, 'RENAME_ALL_SOURCES', False)
+    )
+    if not create_rename_tasks:
+        return None
+    mqs = Media.objects.filter(
+        source=source,
+        downloaded=True,
+    )
+    for media in qs_gen(mqs):
+        with huey_lock_task(
+            f'media:{media.uuid}',
+            queue=Val(TaskQueue.DB),
+        ):
+            with atomic(durable=False):
+                media.rename_files()
+
+# Old tasks system
+from background_task import background # noqa: E402
+from background_task.exceptions import InvalidTaskError # noqa: E402
+from background_task.models import Task, CompletedTask # noqa: E402
+
+
 @background(schedule=dict(priority=30, run_at=600), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
 def save_all_media_for_source(source_id):
     '''
@@ -1069,81 +1144,6 @@ def save_all_media_for_source(source_id):
     # wait for tasks to complete
     res = save_media.map(saved_now)
     res.get(blocking=True)
-
-
-@dynamic_retry(db_task, backoff_func=lambda n: (n*3600)+600, priority=50, retries=15, queue=Val(TaskQueue.LIMIT))
-def refresh_formats(media_id):
-    try:
-        media = Media.objects.get(pk=media_id)
-    except Media.DoesNotExist as e:
-        raise CancelExecution(_('no such media'), retry=False) from e
-    else:
-        wait_for_errors(
-            media,
-            queue_name=Val(TaskQueue.LIMIT),
-        )
-        save, retry, msg = media.refresh_formats()
-        if save is not True:
-            log.warning(f'Refreshing formats for "{media.key}" failed: {msg}')
-            exc = CancelExecution(
-                _('failed to refresh formats for:'),
-                f'{media.key} / {media.uuid}:',
-                msg,
-                retry=retry,
-            )
-            # combine the strings
-            exc.args = (' '.join(map(str, exc.args)),)
-            # store instance details
-            exc.instance = dict(
-                key=media.key,
-                model='Media',
-                uuid=str(media.pk),
-            )
-            # store the function results
-            exc.reason = msg
-            exc.save = save
-            raise exc
-        log.info(f'Saving refreshed formats for "{media.key}": {msg}')
-        save_model(media)
-
-
-@db_task(delay=300, priority=80, retries=5, retry_delay=600, queue=Val(TaskQueue.FS))
-@atomic(durable=True)
-def rename_all_media_for_source(source_id):
-    try:
-        source = Source.objects.get(pk=source_id)
-    except Source.DoesNotExist as e:
-        # Task triggered but the source no longer exists, do nothing
-        log.error(f'Task rename_all_media_for_source(pk={source_id}) called but no '
-                  f'source exists with ID: {source_id}')
-        raise CancelExecution(_('no such source'), retry=False) from e
-    # Check that the settings allow renaming
-    rename_sources_setting = getattr(settings, 'RENAME_SOURCES') or list()
-    create_rename_tasks = (
-        (
-            source.directory and
-            source.directory in rename_sources_setting
-        ) or
-        getattr(settings, 'RENAME_ALL_SOURCES', False)
-    )
-    if not create_rename_tasks:
-        return None
-    mqs = Media.objects.filter(
-        source=source,
-        downloaded=True,
-    )
-    for media in qs_gen(mqs):
-        with huey_lock_task(
-            f'media:{media.uuid}',
-            queue=Val(TaskQueue.DB),
-        ):
-            with atomic(durable=False):
-                media.rename_files()
-
-# Old tasks system
-from background_task import background
-from background_task.exceptions import InvalidTaskError
-from background_task.models import Task, CompletedTask
 
 
 @background(schedule=dict(priority=0, run_at=60), queue=Val(TaskQueue.DB), remove_existing_tasks=True)
