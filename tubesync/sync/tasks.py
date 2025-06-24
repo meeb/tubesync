@@ -24,9 +24,6 @@ from django.db import DatabaseError
 from django.db.transaction import atomic
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from background_task import background
-from background_task.exceptions import InvalidTaskError
-from background_task.models import Task, CompletedTask
 from django_huey import lock_task as huey_lock_task, task as huey_task # noqa
 from django_huey import db_periodic_task, db_task, signal as huey_signal
 from huey import crontab as huey_crontab, signals as huey_signals
@@ -1143,6 +1140,11 @@ def rename_all_media_for_source(source_id):
         ):
             with atomic(durable=False):
                 media.rename_files()
+
+# Old tasks system
+from background_task import background
+from background_task.exceptions import InvalidTaskError
+from background_task.models import Task, CompletedTask
 
 
 @background(schedule=dict(priority=0, run_at=60), queue=Val(TaskQueue.DB), remove_existing_tasks=True)
