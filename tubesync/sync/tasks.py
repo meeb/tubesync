@@ -833,15 +833,6 @@ def download_metadata(media_id):
     return True
 
 
-@background(schedule=dict(priority=40, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def download_media_metadata(media_id):
-    try:
-        res = download_metadata(media_id)
-        return res.get(blocking=True)
-    except CancelExecution as e:
-        raise InvalidTaskError(str(e)) from e
-
-
 @dynamic_retry(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.NET))
 def download_media_image(media_id, url):
     '''
@@ -1054,6 +1045,15 @@ def rename_all_media_for_source(source_id):
 from background_task import background # noqa: E402
 from background_task.exceptions import InvalidTaskError # noqa: E402
 from background_task.models import Task, CompletedTask # noqa: E402
+
+
+@background(schedule=dict(priority=40, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+def download_media_metadata(media_id):
+    try:
+        res = download_metadata(media_id)
+        return res.get(blocking=True)
+    except CancelExecution as e:
+        raise InvalidTaskError(str(e)) from e
 
 
 @background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
