@@ -204,7 +204,11 @@ def cleanup_completed_tasks():
 @atomic(durable=False)
 def migrate_queues():
     tqs = Task.objects.all()
-    qs = tqs.exclude(queue__in=TaskQueue.values)
+    remaining_queues = list((
+        Val(TaskQueue.FS),
+        Val(TaskQueue.NET),
+    ))
+    qs = tqs.exclude(queue__in=remaining_queues)
     return qs.update(queue=Val(TaskQueue.NET))
 
 
