@@ -13,7 +13,7 @@ from yt_dlp.extractor.youtube.pot.provider import PoTokenRequest
 
 @register_provider
 class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must end with "PCP"
-    PROVIDER_VERSION = '0.0.1'
+    PROVIDER_VERSION = '0.0.2'
     # Define a unique display name for the provider
     PROVIDER_NAME = 'TubeSync-fs'
     BUG_REPORT_LOCATION = 'https://github.com/meeb/tubesync/issues'
@@ -42,9 +42,8 @@ class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must e
         cache_home = getenv('XDG_CACHE_HOME')
         if not cache_home:
             return False
-        # TODO: check the actual setting: cookiefile
-        cookie_file = Path(cache_home) / '../cookies.txt'
-        if not cookie_file.is_file():
+        cookie_file = self.ie.get_param('cookiefile')
+        if cookie_file is None or not Path(cookie_file).is_file():
             return False
         directory = Path(cache_home) / 'yt-dlp/youtube-pot'
         if directory.exists() and directory.is_dir():
