@@ -20,8 +20,6 @@ from django import db
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import DatabaseError
-from django.db.transaction import atomic
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_huey import lock_task as huey_lock_task, task as huey_task # noqa
@@ -39,6 +37,7 @@ from .models import Source, Media, MediaServer, Metadata
 from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
 
+atomic = db.transaction.atomic
 db_vendor = db.connection.vendor
 register_huey_signals()
 
@@ -129,7 +128,7 @@ def update_task_status(task, status):
         task.verbose_name = f'[{status}] {task._verbose_name}'
     try:
         task.save(update_fields={'verbose_name'})
-    except DatabaseError as e:
+    except db.DatabaseError as e:
         if 'Save with update_fields did not affect any rows.' == str(e):
             pass
         else:
