@@ -221,6 +221,38 @@ def save_model(instance):
 
 
 @db_periodic_task(
+    huey_crontab(minute=40, strict=True,),
+    priority=100,
+    expires=15*60,
+    queue=Val(TaskQueue.DB),
+)
+def upcoming_media():
+    now = timezone.now()
+    next_hour = now + timezone.timedelta(hours=1, minutes=3)
+    previous_hour = now - timezone.timedelta(hours=1, minutes=1)
+    qs = Media.objects.filter(
+        manual_skip=True,
+        metadata__isnull=False,
+        published__isnull=False,
+        published__gte=previous_hour,
+    )
+    for media in qs_gen(qs):
+        valid, hours = media.wait_for_premiere()
+        if valid:
+            save_model(media)
+        vn_fmt = _('Waiting for the premiere of "{}" at: {}')
+        wait_for_media_premiere(
+            str(media.pk),
+            run_at=next_hour,
+            verbose_name=vn_fmt.format(
+                media.key,
+                media.published.isoformat(' ', 'seconds'),
+            ),
+        )
+        log.debug(f'upcoming_media: wait_for_premiere: {media.key}: {valid=} {hours=}')
+
+
+@db_periodic_task(
     huey_crontab(minute=59, strict=True,),
     priority=100,
     expires=30*60,
@@ -747,13 +779,6 @@ def download_metadata(media_id):
                 media.published = published_datetime
                 media.manual_skip = True
                 media.save()
-                verbose_name = _('Waiting for the premiere of "{}" at: {}')
-                wait_for_media_premiere(
-                    str(media.pk),
-                    repeat=Task.HOURLY,
-                    repeat_until = published_datetime + timedelta(hours=1),
-                    verbose_name=verbose_name.format(media.key, published_datetime.isoformat(' ', 'seconds')),
-                )
                 raise_exception = False
         if raise_exception:
             raise
@@ -1151,7 +1176,7 @@ def save_all_media_for_source(source_id):
     res.get(blocking=True)
 
 
-@background(schedule=dict(priority=0, run_at=60), queue=Val(TaskQueue.DB), remove_existing_tasks=True)
+@background(schedule=dict(priority=0, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def wait_for_media_premiere(media_id):
     try:
         media = Media.objects.get(pk=media_id)
