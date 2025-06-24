@@ -914,7 +914,7 @@ def on_complete_download_media_image(signal_name, task_obj, exception_obj=None, 
     if result is True:
         huey.result(preserve=False, id=task_obj.id)
 
-@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.FS), remove_existing_tasks=True)
+@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def download_media_thumbnail(media_id, url):
     try:
         return download_media_image.call_local(media_id, url)
