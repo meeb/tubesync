@@ -428,25 +428,6 @@ def migrate_to_metadata(media_id):
                 media.save_to_metadata(field, value)
 
 
-@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=False)
-def wait_for_database_queue():
-    from common.huey import h_q_tuple
-    queue_name = Val(TaskQueue.DB)
-    consumer_down_path = Path(f'/run/service/huey-{queue_name}/down')
-    included_names = frozenset(('migrate_to_metadata',))
-    total_count = 1
-    while 0 < total_count:
-        if consumer_down_path.exists() and consumer_down_path.is_file():
-            raise BgTaskWorkerError(_('queue consumer stopped'))
-        time.sleep(5)
-        status_dict = h_q_tuple(queue_name)[2]
-        total_count = status_dict.get('pending', (0,))[0]
-        scheduled_tasks = status_dict.get('scheduled', (0,[]))[1] 
-        total_count += sum(
-            [ 1 for t in scheduled_tasks if t.name.rsplit('.', 1)[-1] in included_names ],
-        )
-
-
 @db_task(delay=30, priority=80, queue=Val(TaskQueue.LIMIT))
 def index_source(source_id):
     '''
@@ -1036,6 +1017,25 @@ def rename_all_media_for_source(source_id):
 from background_task import background # noqa: E402
 from background_task.exceptions import InvalidTaskError # noqa: E402
 from background_task.models import Task, CompletedTask # noqa: E402
+
+
+@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=False)
+def wait_for_database_queue():
+    from common.huey import h_q_tuple
+    queue_name = Val(TaskQueue.DB)
+    consumer_down_path = Path(f'/run/service/huey-{queue_name}/down')
+    included_names = frozenset(('migrate_to_metadata',))
+    total_count = 1
+    while 0 < total_count:
+        if consumer_down_path.exists() and consumer_down_path.is_file():
+            raise BgTaskWorkerError(_('queue consumer stopped'))
+        time.sleep(5)
+        status_dict = h_q_tuple(queue_name)[2]
+        total_count = status_dict.get('pending', (0,))[0]
+        scheduled_tasks = status_dict.get('scheduled', (0,[]))[1] 
+        total_count += sum(
+            [ 1 for t in scheduled_tasks if t.name.rsplit('.', 1)[-1] in included_names ],
+        )
 
 
 @background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
