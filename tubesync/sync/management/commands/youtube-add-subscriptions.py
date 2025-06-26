@@ -2,6 +2,7 @@ import json
 import urllib
 from django.core.management.base import BaseCommand, CommandError # noqa
 from common.json import JSONEncoder
+from sync.models import Source
 
 
 class Command(BaseCommand):
@@ -13,6 +14,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         url = options['url']
+        existing_sources = set()
+        for source in Source.objects.all().only('uuid', 'key'):
+            existing_sources.add(source.key)
         self.stderr.write(f'Showing information for URL: {url}')
         info = dict()
         try:
@@ -21,7 +25,10 @@ class Command(BaseCommand):
                 info = json.loads(response.read().decode())
         except urllib.error.HTTPError as e:
             self.stderr.write(e)
-        d = json.dumps(info, indent=4, sort_keys=True, cls=JSONEncoder)
+        subscriptions = info.get('subscriptions', [])
+        keys = ('channelId', 'title',)
+        sources = [ {k:v for k,v in s.get('snippet', {}).items() if k in keys and v not in existing_sources} for s in subscriptions ]
+        d = json.dumps(sources, indent=4, sort_keys=True, cls=JSONEncoder)
         self.stdout.write(d)
         self.stderr.write('Done')
 
