@@ -1,4 +1,18 @@
-### Integrating with Plex
+## Integrating with Plex
+
+#### Requirements:
+- Plex
+- ZeroQI's [YouTube-Agent](https://github.com/ZeroQI/YouTube-Agent.bundle)
+- ZeroQI's [Absolute Series Scanner](https://github.com/ZeroQI/Absolute-Series-Scanner)
+
+#### TubeSync settings for the source:
+- directory ends with ` [youtube2-UCxxxxx]`
+- media format ends with `[{key}].{ext}`
+- write JSON (`.info.json`) files
+- write NFO
+- copy thumbnail
+
+#### An example
 
 > I recommend ZeroQI's [YouTube-Agent](https://github.com/ZeroQI/YouTube-Agent.bundle) and [Absolute Series Scanner](https://github.com/ZeroQI/Absolute-Series-Scanner). It downloads descriptions and tags and does a nice job of title recognition. Takes a bit more setup in Tubesync. You will need to rename folders to be `Channel Name [youtube-UCXXXXX]`. If your channels upload more than once a day, I recommend `Channel Name [youtube2-UCXXXXX]`. I default to "youtube2" for safety. Playlists should use `[youtube-PLXXXXX]` It will organize your episodes into seasons by Year. Episodes are numbered MDDMMSS (no leading 0 for month). For an episode today, `S2025E6251035`. I also recommend changing your file naming scheme to be `{uploader} - {yyyy_mm_dd} - {title_full} [{key}].{ext}`. The `[key]` part is required for metadata recognition. Your scheme may vary if on Windows. I am using Linux.
 > 
