@@ -27,7 +27,13 @@ class Command(BaseCommand):
             self.stderr.write(e)
         subscriptions = info.get('subscriptions', [])
         keys = ('channelId', 'title',)
-        sources = [ {k:v for k,v in s.get('snippet', {}).items() if k in keys and v not in existing_sources} for s in subscriptions ]
+        sources = [
+            {
+                k:v for k,v in s.get('snippet', {}).items() \
+                if k in keys
+            } for s in subscriptions \
+            if s.get('snippet', {}).get(keys[0]) not in existing_sources
+        ]
         d = json.dumps(sources, indent=4, sort_keys=True, cls=JSONEncoder)
         self.stdout.write(d)
         self.stderr.write('Done')
