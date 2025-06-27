@@ -27,18 +27,18 @@ class Command(BaseCommand):
         except urllib.error.HTTPError as e:
             self.stderr.write(e)
         subscriptions = info.get('subscriptions', [])
-        keys = ('channelId', 'title',)
+        keys = ('channelId', 'resourceId', 'title',)
         sources = [
             {
                 k:v for k,v in s.get('snippet', {}).items() \
                 if k in keys
             } for s in subscriptions \
-            if s.get('snippet', {}).get(keys[0]) not in existing_sources
+            if s.get('snippet', {}).get(keys[1], {}).get(keys[0]) not in existing_sources
         ]
         d = json.dumps(sources, indent=4, sort_keys=True, cls=JSONEncoder)
         self.stdout.write(d)
         source_objs = [
-            Source(key=s[keys[0]], name=s[keys[1]]) for s in sources
+            Source(key=s[keys[1]][keys[0]], name=s[keys[2]]) for s in sources
         ]
         for source in source_objs:
             source.source_type = YouTube_SourceType.CHANNEL_ID
