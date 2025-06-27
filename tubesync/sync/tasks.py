@@ -275,7 +275,7 @@ def schedule_indexing():
         skip_source = (
             not source.is_active or
             source.target_schedule >= next_hour or
-            source.last_crawl >= previous_run
+            (source.last_crawl and source.last_crawl >= previous_run)
         )
         if skip_source:
             continue
