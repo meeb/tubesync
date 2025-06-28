@@ -255,6 +255,7 @@ docker logs -t tubesync > TubeSync.logs.txt 2>&1
 Once you're happy using TubeSync there are some advanced usage guides for more complex
 and less common features:
 
+ * [Using Plex](https://github.com/meeb/tubesync/blob/main/docs/plex-notes.md)
  * [Import existing media into TubeSync](https://github.com/meeb/tubesync/blob/main/docs/import-existing-media.md)
  * [Sync or create missing metadata files](https://github.com/meeb/tubesync/blob/main/docs/create-missing-metadata.md)
  * [Reset tasks from the command line](https://github.com/meeb/tubesync/blob/main/docs/reset-tasks.md)
