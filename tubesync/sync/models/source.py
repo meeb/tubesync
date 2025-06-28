@@ -10,6 +10,7 @@ from django.core.validators import RegexValidator
 from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
+from yt_dlp import DownloadError
 from ..choices import (Val,
     SponsorBlock_Category, YouTube_SourceType, IndexSchedule,
     CapChoices, Fallback, FileExtension, FilterSeconds,
@@ -436,21 +437,21 @@ class Source(db.models.Model):
             return Val(FileExtension.MKV)
 
     @classmethod
-    def create_url(cls, source_type, key):
+    def create_url(cls, source_type, url_key):
         url = cls.URLS.get(source_type)
-        return url.format(key=key)
+        return url.format(key=url_key)
 
     @classmethod
-    def create_index_url(cls, source_type, key, type):
+    def create_index_url(cls, source_type, url_key, url_type):
         url = cls.INDEX_URLS.get(source_type)
-        return url.format(key=key, type=type)
+        return url.format(key=url_key, type=url_type)
 
     @property
     def url(self):
         return self.__class__.create_url(self.source_type, self.key)
 
-    def get_index_url(self, type):
-        return self.__class__.create_index_url(self.source_type, self.key, type)
+    def get_index_url(self, url_type, /):
+        return self.__class__.create_index_url(self.source_type, url_key=self.key, url_type=url_type)
 
     @property
     def format_summary(self):
@@ -560,17 +561,24 @@ class Source(db.models.Model):
             return True
         return bool(re.search(self.filter_text, media_item_title))
 
-    def get_index(self, type):
+    def get_index(self, url_type, /):
         indexer = self.INDEXERS.get(self.source_type, None)
         if not callable(indexer):
             raise Exception(f'Source type f"{self.source_type}" has no indexer')
         days = None
         if self.download_cap_date:
             days = timezone.timedelta(seconds=self.download_cap).days
-        response = indexer(self.get_index_url(type=type), days=days)
-        if not isinstance(response, dict):
-            return list()
-        entries = response.get('entries', list()) 
+        entries = list()
+        try:
+            response = indexer(self.get_index_url(url_type), days=days)
+        except DownloadError as e:
+            if str(e).endswith(f': This channel does not have a {url_type} tab'):
+                return entries
+            raise
+        else:
+            if not isinstance(response, dict):
+                return entries
+            entries = response.get('entries', list())
         return entries
 
     def index_media(self):
@@ -579,7 +587,8 @@ class Source(db.models.Model):
         '''
         entries = queue(list(), getattr(settings, 'MAX_ENTRIES_PROCESSING', 0) or None)
         if self.index_videos:
-            entries.extend(reversed(self.get_index('videos')))
+            videos = self.get_index('videos')
+            entries.extend(reversed(videos))
 
         # Playlists do something different that I have yet to figure out
         if not self.is_playlist:
