@@ -431,6 +431,7 @@ class DeleteSourceView(DeleteView, FormMixin):
             index_videos=False,
             index_streams=False,
             filter_text=str(source.pk),
+            target_schedule=source.target_schedule or timezone.now(),
         )
         copy_fields = set(map(lambda f: f.name, source._meta.fields)) - set(media_source.keys())
         for k, v in source.__dict__.items():
