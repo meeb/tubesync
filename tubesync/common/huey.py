@@ -180,10 +180,54 @@ def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     assert hasattr(huey, 'enqueue') and callable(huey.enqueue)
     huey.enqueue(task_obj)
 
+def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
+    signal_time = utils.time_clock()
+
+    add_to_elapsed_signals = frozenset((
+        signals.SIGNAL_INTERRUPTED,
+        signals.SIGNAL_ERROR,
+        signals.SIGNAL_CANCELED,
+        signals.SIGNAL_COMPLETE,
+    ))
+    recorded_signals = frozenset((
+        signals.SIGNAL_REVOKED,
+        signals.SIGNAL_EXPIRED,
+        signals.SIGNAL_LOCKED,
+        signals.SIGNAL_EXECUTING,
+        signals.SIGNAL_RETRYING,
+    )) | add_to_elapsed_signals
+    storage_key = f'task_history:{task_obj.id}'
+    task_obj_attr = '_signals_history'
+
+    history = getattr(task_obj, task_obj_attr, None)
+    if history is None:
+        # pull it from storage, or initialize it
+        history = huey.get(
+            key=storage_key,
+            peek=True,
+        ) or dict(
+            data=task_obj.data,
+            elapsed=0,
+            module=task_obj.__module__,
+            name=task_obj.name,
+        )
+        setattr(task_obj, task_obj_attr, history)
+    assert history is not None
+
+    if signal_name in recorded_signals:
+        history[signal_name] = signal_time
+    if signal_name in add_to_elapsed_signals and signals.SIGNAL_EXECUTING in history:
+        history['elapsed'] += signal_time - history[signals.SIGNAL_EXECUTING]
+    if signals.SIGNAL_COMPLETE in history:
+        huey.get(key=storage_key)
+    else:
+        huey.put(key=storage_key, data=history)
+
 # Registration of shared signal handlers
 
 def register_huey_signals():
     from django_huey import DJANGO_HUEY, signal
     for qn in DJANGO_HUEY.get('queues', dict()):
         signal(signals.SIGNAL_INTERRUPTED, queue=qn)(on_interrupted)
+        signal(queue=qn)(historical_task)
 
