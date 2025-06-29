@@ -185,16 +185,16 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 
     add_to_elapsed_signals = frozenset((
         signals.SIGNAL_INTERRUPTED,
-        signals.SIGNAL_CANCELED,
-        signals.SIGNAL_LOCKED,
         signals.SIGNAL_ERROR,
-        signals.SIGNAL_RETRYING,
+        signals.SIGNAL_CANCELED,
         signals.SIGNAL_COMPLETE,
     ))
     recorded_signals = frozenset((
         signals.SIGNAL_REVOKED,
         signals.SIGNAL_EXPIRED,
+        signals.SIGNAL_LOCKED,
         signals.SIGNAL_EXECUTING,
+        signals.SIGNAL_RETRYING,
     )) | add_to_elapsed_signals
     storage_key = f'task_history:{task_obj.id}'
     task_obj_attr = '_signals_history'
