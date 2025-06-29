@@ -1,23 +1,7 @@
-
-
 from datetime import timedelta
-from hashlib import sha1
-import json
-import logging
-import os
-import traceback
 
-from io import StringIO
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.db.models import Q
 from django.utils import timezone
-
-from background_task.exceptions import InvalidTaskError
-from background_task.settings import app_settings
-from background_task.signals import task_failed
-from background_task.signals import task_rescheduled
 
 from ..json import JSONEncoder
 # from common.json import JSONEncoder
