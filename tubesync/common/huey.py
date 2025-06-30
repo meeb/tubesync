@@ -8,15 +8,25 @@ from huey import (
 
 class SqliteHuey(huey_SqliteHuey):
     begin_sql = 'BEGIN IMMEDIATE'
+    auto_vacuum = 'INCREMENTAL'
+    vacuum_pages = 10
 
     def _create_connection(self):
         conn = super()._create_connection()
-        conn.execute('pragma synchronous=%s' % (2 if self._fsync else 1))
+        conn.execute(f'PRAGMA incremental_vacuum({self.vacuum_pages})')
+        # copied from huey_SqliteHuey to use EXTRA or NORMAL
+        # instead of FULL or OFF
+        conn.execute('pragma synchronous=%s' % (3 if self._fsync else 1))
         return conn
 
     def _emit(self, signal, task, *args, **kwargs):
         kwargs['huey'] = self
         super()._emit(signal, task, *args, **kwargs)
+
+    def initialize_schema(self):
+        self.ddl.insert(0, f'PRAGMA auto_vacuum = {self.auto_vacuum}')
+        self.ddl.append('VACUUM')
+        super().initialize_schema()
 
 
 def CancelExecution_init(self, *args, retry=None, **kwargs):
