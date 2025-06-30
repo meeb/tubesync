@@ -1,3 +1,4 @@
+import datetime
 import os
 from functools import wraps
 from huey import (
@@ -182,7 +183,7 @@ def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 
 def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     signal_time = utils.time_clock()
-    signal_ts = huey._get_timestamp()
+    signal_dt = datetime.datetime.now(datetime.timezone.utc)
 
     from common.models import TaskHistory
     add_to_elapsed_signals = frozenset((
@@ -236,8 +237,8 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     ))
     if signal_name == signals.SIGNAL_EXECUTING:
         th.attempts += 1
-        th.start_at = signal_ts
-    th.end_at = signal_ts
+        th.start_at = signal_dt
+    th.end_at = signal_dt
     th.save()
 
 # Registration of shared signal handlers
