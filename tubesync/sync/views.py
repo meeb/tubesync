@@ -22,6 +22,8 @@ from django.utils.translation import gettext_lazy as _
 from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params, mkdir_p, multi_key_sort
 from background_task.models import Task, CompletedTask
+from django_huey import DJANGO_HUEY
+from common.huey import h_q_reset_tasks
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
@@ -861,6 +863,7 @@ class TasksView(ListView):
         data['scheduled'] = list()
         data['total_scheduled'] = scheduled_qs.count()
         data['migrated'] = migrate_queues()
+        data['wait_for_database_queue'] = False
 
         def add_to_task(task):
             obj, url = map_task_to_instance(task)
@@ -891,6 +894,8 @@ class TasksView(ListView):
                 task.save()
             if locked_by_pid_running and add_to_task(task):
                 data['running'].append(task)
+            elif locked_by_pid_running and 'wait_for_database_queue' in task.task_name:
+                data['wait_for_database_queue'] = True
 
         # show all the errors when they fit on one page
         if (data['total_errors'] + len(data['running'])) < self.paginate_by:
@@ -992,21 +997,11 @@ class ResetTasks(FormView):
     def form_valid(self, form):
         # Delete all tasks
         Task.objects.all().delete()
+        for queue_name in (DJANGO_HUEY or {}).get('queues', {}):
+            h_q_reset_tasks(queue_name)
         # Iter all tasks
         for source in Source.objects.all():
-            verbose_name = _('Check download directory exists for source "{}"')
-            check_source_directory_exists(
-                str(source.pk),
-                verbose_name=verbose_name.format(source.name),
-            )
-            # Recreate the initial indexing task
-            verbose_name = _('Index media from source "{}"')
-            index_source_task(
-                str(source.pk),
-                repeat=source.index_schedule,
-                schedule=source.task_run_at_dt,
-                verbose_name=verbose_name.format(source.name)
-            )
+            check_source_directory_exists(str(source.pk))
             # This also chains down to call each Media objects .save() as well
             source.save()
         return super().form_valid(form)

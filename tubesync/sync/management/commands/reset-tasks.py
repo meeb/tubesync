@@ -1,10 +1,12 @@
 from django.core.management.base import BaseCommand, CommandError # noqa
 from django.db.transaction import atomic
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _ # noqa
 from background_task.models import Task
+from django_huey import DJANGO_HUEY
+from common.huey import h_q_reset_tasks
 from common.logger import log
 from sync.models import Source
-from sync.tasks import index_source_task, check_source_directory_exists
+from sync.tasks import check_source_directory_exists
 
 
 class Command(BaseCommand):
@@ -13,25 +15,15 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         log.info('Resettings all tasks...')
+        for queue_name in (DJANGO_HUEY or {}).get('queues', {}):
+            h_q_reset_tasks(queue_name)
         with atomic(durable=True):
             # Delete all tasks
             Task.objects.all().delete()
             # Iter all sources, creating new tasks
             for source in Source.objects.all():
-                verbose_name = _('Check download directory exists for source "{}"')
-                check_source_directory_exists(
-                    str(source.pk),
-                    verbose_name=verbose_name.format(source.name),
-                )
-                # Recreate the initial indexing task
                 log.info(f'Resetting tasks for source: {source}')
-                verbose_name = _('Index media from source "{}"')
-                index_source_task(
-                    str(source.pk),
-                    repeat=source.index_schedule,
-                    schedule=source.task_run_at_dt,
-                    verbose_name=verbose_name.format(source.name),
-                )
+                check_source_directory_exists(str(source.pk))
                 # This also chains down to call each Media objects .save() as well
                 source.save()
 

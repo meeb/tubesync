@@ -526,6 +526,7 @@ class Source(db.models.Model):
         return {
             'yyyymmdd': now.strftime('%Y%m%d'),
             'yyyy_mm_dd': now.strftime('%Y-%m-%d'),
+            'yyyy_0mm_dd': now.strftime('%Y-0%m-%d'),
             'yyyy': now.strftime('%Y'),
             'mm': now.strftime('%m'),
             'dd': now.strftime('%d'),
