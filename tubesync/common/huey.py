@@ -1,4 +1,5 @@
 import os
+from common.models import TaskHistory
 from functools import wraps
 from huey import (
     CancelExecution, SqliteHuey as huey_SqliteHuey,
@@ -182,6 +183,7 @@ def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 
 def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     signal_time = utils.time_clock()
+    signal_ts = huey._get_timestamp()
 
     add_to_elapsed_signals = frozenset((
         signals.SIGNAL_INTERRUPTED,
@@ -222,6 +224,21 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         huey.get(key=storage_key)
     else:
         huey.put(key=storage_key, data=history)
+    th, created = TaskHistory.objects.get_or_create(
+        task_id=str(task_obj.id),
+        name=f"{history['module']}.{history['name']}",
+        queue=huey.name,
+    )
+    th.priority = task_obj.priority
+    th.task_params = list(
+        list(task_obj.args),
+        task_obj.kwargs,
+    )
+    if signal_name == signals.SIGNAL_EXECUTING:
+        th.attempts += 1
+        th.start_at = signal_ts
+    th.end_at = signal_ts
+    th.save()
 
 # Registration of shared signal handlers
 
