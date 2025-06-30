@@ -1,5 +1,4 @@
 import os
-from common.models import TaskHistory
 from functools import wraps
 from huey import (
     CancelExecution, SqliteHuey as huey_SqliteHuey,
@@ -185,6 +184,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     signal_time = utils.time_clock()
     signal_ts = huey._get_timestamp()
 
+    from common.models import TaskHistory
     add_to_elapsed_signals = frozenset((
         signals.SIGNAL_INTERRUPTED,
         signals.SIGNAL_ERROR,
