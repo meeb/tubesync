@@ -166,6 +166,7 @@ def source_post_delete(sender, instance, **kwargs):
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
 
 
+# TODO: add completed_task to task history for both success and failure
 @receiver(task_failed, sender=Task)
 def task_task_failed(sender, task_id, completed_task, **kwargs):
     # Triggered after a task fails by reaching its max retry attempts
