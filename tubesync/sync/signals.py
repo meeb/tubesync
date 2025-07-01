@@ -11,6 +11,7 @@ from django.utils.translation import gettext_lazy as _
 from background_task.signals import task_started, task_failed
 from background_task.models import Task
 from common.logger import log
+from common.models import TaskHistory
 from common.utils import glob_quote, mkdir_p
 from .models import Source, Media, Metadata
 from .tasks import (
@@ -167,8 +168,8 @@ def source_post_delete(sender, instance, **kwargs):
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
 
 
-@receiver(task_started, sender=Task)
-def task_task_started(sender, /, **kwargs):
+@receiver(task_started, dispatch_uid='sync.signals.task_task_started')
+def task_task_started(sender, **kwargs):
     locked_tasks = Task.objects.locked(timezone.now())
     for task_obj in locked_tasks:
         th, created = TaskHistory.objects.get_or_create(
