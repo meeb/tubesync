@@ -6,8 +6,9 @@ from django.db import IntegrityError
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
 from django.db.transaction import atomic, on_commit
 from django.dispatch import receiver
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from background_task.signals import task_failed
+from background_task.signals import task_started, task_failed
 from background_task.models import Task
 from common.logger import log
 from common.utils import glob_quote, mkdir_p
@@ -164,6 +165,27 @@ def source_post_delete(sender, instance, **kwargs):
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
+
+
+@receiver(task_started, sender=Task)
+def task_task_started(sender, /, **kwargs):
+    locked_tasks = Task.objects.locked(timezone.now())
+    for task_obj in locked_tasks:
+        th, created = TaskHistory.objects.get_or_create(
+            task_id=str(task_obj.pk),
+            name=task_obj.task_name,
+            queue=task_obj.queue,
+        )
+        th.attempts += 1
+        th.priority = (100 - task_obj.priority)
+        th.repeat = task_obj.repeat
+        th.repeat_until = task_obj.repeat_until
+        th.start_at = task_obj.locked_at
+        th.task_params = list(task_obj.params())
+        th.verbose_name = task_obj.verbose_name
+        th.save()
+        if created:
+            log.debug(f'Created a new task history record: {th.pk}: {th.verbose_mame}')
 
 
 # TODO: add completed_task to task history for both success and failure
