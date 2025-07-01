@@ -252,7 +252,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     th.priority = task_obj.priority
     th.task_params = list((
         list(task_obj.args),
-        task_obj.kwargs,
+        repr(task_obj.kwargs),
     ))
     if signal_name == signals.SIGNAL_EXECUTING:
         th.attempts += 1
