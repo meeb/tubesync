@@ -245,7 +245,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     else:
         huey.put(key=storage_key, data=history)
     th, created = TaskHistory.objects.get_or_create(
-        task_id=str(task_obj.id),
+        task_id=str(task_obj.pk),
         name=f"{history['module']}.{history['name']}",
         queue=huey.name,
     )
@@ -257,7 +257,11 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     if signal_name == signals.SIGNAL_EXECUTING:
         th.attempts += 1
         th.start_at = signal_dt
+    elif exception_obj is not None:
+        th.failed_at = signal_dt
+        th.last_error = str(exception_obj)
     th.end_at = signal_dt
+    # TODO: failed_at, last_error, verbose_name
     th.save()
 
 # Registration of shared signal handlers
