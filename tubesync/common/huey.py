@@ -266,7 +266,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         th.last_error = str(exception_obj)
     elif signal_name == signals.SIGNAL_ENQUEUED:
         from sync.models import Media, Source
-        if not th.verbose_name:
+        if not th.verbose_name and task_obj.args:
             key = task_obj.args[0]
             for model in (Media, Source,):
                 try:
