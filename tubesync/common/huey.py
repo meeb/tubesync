@@ -228,6 +228,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
             key=storage_key,
             peek=True,
         ) or dict(
+            created=signal_dt,
             data=task_obj.data,
             elapsed=0,
             module=task_obj.__module__,
@@ -235,6 +236,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         )
         setattr(task_obj, task_obj_attr, history)
     assert history is not None
+    history['modified'] = signal_dt
 
     if signal_name in recorded_signals:
         history[signal_name] = signal_time
