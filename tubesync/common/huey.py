@@ -246,7 +246,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         huey.put(key=storage_key, data=history)
     th, created = TaskHistory.objects.get_or_create(
         task_id=str(task_obj.pk),
-        name=f"{history['module']}.{history['name']}",
+        name=f"{task_obj.__module__}.{task_obj.name}",
         queue=huey.name,
     )
     th.priority = task_obj.priority
@@ -260,8 +260,19 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     elif exception_obj is not None:
         th.failed_at = signal_dt
         th.last_error = str(exception_obj)
+    elif signal_name == signals.SIGNAL_ENQUEUED:
+        from sync.models import Media, Source
+        if not th.verbose_name:
+            key = task_obj.args[0]
+            for model in (Media, Source,):
+                try:
+                    model_instance = model.objects.get(pk=key)
+                except model.DoesNotExist:
+                    pass
+                else:
+                    if hasattr(model_instance, 'name'):
+                        th.verbose_name = f'{th.name} with: {model_instance.name}'
     th.end_at = signal_dt
-    # TODO: failed_at, last_error, verbose_name
     th.save()
 
 # Registration of shared signal handlers
