@@ -27,6 +27,7 @@ from django_huey import db_periodic_task, db_task, signal as huey_signal
 from huey import crontab as huey_crontab, signals as huey_signals
 from common.huey import CancelExecution, dynamic_retry, register_huey_signals
 from common.logger import log
+from common.models import TaskHistory
 from common.errors import ( BgTaskWorkerError, DownloadFailedException,
                             NoFormatException, NoMediaException,
                             NoThumbnailException, )
@@ -199,6 +200,7 @@ def cleanup_completed_tasks():
     log.info(f'Deleting completed tasks older than {days_to_keep} days '
              f'(run_at before {delta})')
     CompletedTask.objects.filter(run_at__lt=delta).delete()
+    TaskHistory.objects.filter(end_at__lt=delta).delete()
 
 
 @atomic(durable=False)
