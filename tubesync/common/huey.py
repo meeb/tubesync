@@ -200,6 +200,8 @@ def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     assert hasattr(huey, 'enqueue') and callable(huey.enqueue)
     huey.enqueue(task_obj)
 
+storage_key_prefix = 'task_history:'
+
 def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     signal_time = utils.time_clock()
     signal_dt = datetime.datetime.now(datetime.timezone.utc)
@@ -218,7 +220,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         signals.SIGNAL_EXECUTING,
         signals.SIGNAL_RETRYING,
     )) | add_to_elapsed_signals
-    storage_key = f'task_history:{task_obj.id}'
+    storage_key = f'{storage_key_prefix}{task_obj.id}'
     task_obj_attr = '_signals_history'
 
     history = getattr(task_obj, task_obj_attr, None)
@@ -282,8 +284,23 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 # Registration of shared signal handlers
 
 def register_huey_signals():
-    from django_huey import DJANGO_HUEY, signal
+    from django_huey import DJANGO_HUEY, get_queue, signal
     for qn in DJANGO_HUEY.get('queues', dict()):
         signal(signals.SIGNAL_INTERRUPTED, queue=qn)(on_interrupted)
         signal(queue=qn)(historical_task)
+
+        # clean up old history and results from storage
+        q = get_queue(qn)
+        now_time = utils.time_clock()
+        for key in q.all_results().keys():
+            if not key.startswith(storage_key_prefix):
+                continue
+            history = q.get(peek=True, key=key)
+            age = datetime.timedelta(
+                seconds=(now_time - history.get(signals.SIGNAL_EXECUTING, now_time)),
+            )
+            if age > datetime.timedelta(days=7):
+                result_key = key[len(storage_key_prefix) :]
+                q.get(peek=False, key=result_key)
+                q.get(peek=False, key=key)
 
