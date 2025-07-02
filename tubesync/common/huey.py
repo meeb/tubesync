@@ -296,6 +296,8 @@ def register_huey_signals():
             if not key.startswith(storage_key_prefix):
                 continue
             history = q.get(peek=True, key=key)
+            if not isinstance(history, dict):
+                continue
             age = datetime.timedelta(
                 seconds=(now_time - history.get(signals.SIGNAL_EXECUTING, now_time)),
             )
