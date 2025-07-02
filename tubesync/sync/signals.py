@@ -188,7 +188,7 @@ def task_task_started(sender, **kwargs):
         th.verbose_name = task_obj.verbose_name
         th.save()
         if created:
-            log.debug(f'Created a new task history record: {th.pk}: {th.verbose_mame}')
+            log.debug(f'Created a new task history record: {th.pk}: {th.verbose_name}')
 
 
 def merge_completed_task_into_history(task_id, task_obj):
