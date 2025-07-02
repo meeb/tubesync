@@ -43,7 +43,6 @@ def h_q_dict(q, /):
     return dict(
         scheduled=(q.scheduled_count(), q.scheduled(),),
         pending=(q.pending_count(), q.pending(),),
-        running=q._tasks_in_flight,
         results=(q.result_count(), list(q.all_results().keys()),),
     )
 
