@@ -83,7 +83,7 @@ class TaskHistory(models.Model):
 
     def __str__(self):
         return u'{} - {}'.format(
-            self.verbose_name or self.task_name,
+            self.verbose_name or self.name,
             self.end_at,
         )
 
