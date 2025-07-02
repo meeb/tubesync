@@ -270,8 +270,10 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
                 except model.DoesNotExist:
                     pass
                 else:
-                    if hasattr(model_instance, 'name'):
-                        th.verbose_name = f'{th.name} with: {model_instance.name}'
+                    if hasattr(model_instance, 'key'):
+                        th.verbose_name = f'{th.name} with: {model_instance.key}'
+                        if hasattr(model_instance, 'name'):
+                            th.verbose_name += f' / {model_instance.name}'
     th.end_at = signal_dt
     th.save()
 
