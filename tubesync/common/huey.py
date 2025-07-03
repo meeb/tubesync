@@ -278,6 +278,8 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
                         if hasattr(model_instance, 'name'):
                             th.verbose_name += f' / {model_instance.name}'
     th.end_at = signal_dt
+    if signal_name == signals.SIGNAL_SCHEDULED:
+        th.end_at = task_obj.eta.replace(tzinfo=datetime.timezone.utc)
     th.save()
 
 # Registration of shared signal handlers
