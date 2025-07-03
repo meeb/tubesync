@@ -242,7 +242,7 @@ def task_task_successful(sender, task_id, completed_task, **kwargs):
 def task_task_failed(sender, task_id, completed_task, **kwargs):
     merge_completed_task_into_history(task_id, completed_task)
     # Triggered after a task fails by reaching its max retry attempts
-    obj, url = map_task_to_instance(completed_task)
+    obj, url = map_task_to_instance(completed_task, using_history=False)
     if isinstance(obj, Source):
         log.error(f'Permanent failure for source: {obj} task: {completed_task}')
         obj.has_failed = True
