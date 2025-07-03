@@ -13,16 +13,17 @@ from django.core.exceptions import SuspiciousFileOperation
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.db import connection, IntegrityError
-from django.db.models import Q, Count, Sum, When, Case
+from django.db.models import F, Q, Count, Sum, When, Case
 from django.forms import Form, ValidationError
 from django.utils.text import slugify
 from django.utils._os import safe_join
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params, mkdir_p, multi_key_sort
 from background_task.models import Task, CompletedTask
-from django_huey import DJANGO_HUEY
+from django_huey import DJANGO_HUEY, get_queue
 from common.huey import h_q_reset_tasks
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
@@ -62,8 +63,27 @@ class DashboardView(TemplateView):
         data['num_media'] = Media.objects.all().count()
         data['num_downloaded_media'] = Media.objects.filter(downloaded=True).count()
         # Tasks
-        data['num_tasks'] = Task.objects.all().count()
-        data['num_completed_tasks'] = CompletedTask.objects.all().count()
+        completed_qs = TaskHistory.objects.filter(
+            start_at__isnull=False,
+            end_at__gt=F('start_at'),
+        )
+        background_task_ids = {
+            str(t.pk) for t in Task.objects.all()
+        }
+        huey_queues = list(map(get_queue, DJANGO_HUEY.get('queues', dict())))
+        huey_task_ids = {
+            str(t.id) for q in huey_queues for t in set(
+                q.pending()
+            ).union(
+                q.scheduled()
+            )
+        }
+        waiting_qs = TaskHistory.objects.filter(
+            start_at__isnull=True,
+            task_id__in=huey_task_ids.union(background_task_ids),
+        )
+        data['num_tasks'] = waiting_qs.count()
+        data['num_completed_tasks'] = completed_qs.count()
         # Disk usage
         disk_usage = Media.objects.filter(
             downloaded=True, downloaded_filesize__isnull=False
