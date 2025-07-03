@@ -185,7 +185,6 @@ def task_task_created(sender, task=None, **kwargs):
     th.priority = (100 - task_obj.priority)
     th.repeat = task_obj.repeat
     th.repeat_until = task_obj.repeat_until
-    th.start_at = task_obj.run_at
     th.task_params = list(task_obj.params())
     th.verbose_name = task_obj.verbose_name
     th.save()
