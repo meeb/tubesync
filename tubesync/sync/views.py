@@ -42,6 +42,24 @@ from . import signals # noqa
 from . import youtube
 
 
+def get_waiting_tasks():
+    background_task_ids = {
+        str(t.pk) for t in Task.objects.all()
+    }
+    huey_queues = list(map(get_queue, DJANGO_HUEY.get('queues', dict())))
+    huey_task_ids = {
+        str(t.id) for q in huey_queues for t in set(
+            q.pending()
+        ).union(
+            q.scheduled()
+        )
+    }
+    return TaskHistory.objects.filter(
+        start_at__isnull=True,
+        task_id__in=huey_task_ids.union(background_task_ids),
+    )
+
+
 class DashboardView(TemplateView):
     '''
         The dashboard shows non-interactive totals and summaries.
@@ -67,21 +85,7 @@ class DashboardView(TemplateView):
             start_at__isnull=False,
             end_at__gt=F('start_at'),
         )
-        background_task_ids = {
-            str(t.pk) for t in Task.objects.all()
-        }
-        huey_queues = list(map(get_queue, DJANGO_HUEY.get('queues', dict())))
-        huey_task_ids = {
-            str(t.id) for q in huey_queues for t in set(
-                q.pending()
-            ).union(
-                q.scheduled()
-            )
-        }
-        waiting_qs = TaskHistory.objects.filter(
-            start_at__isnull=True,
-            task_id__in=huey_task_ids.union(background_task_ids),
-        )
+        waiting_qs = get_waiting_tasks()
         data['num_tasks'] = waiting_qs.count()
         data['num_completed_tasks'] = completed_qs.count()
         # Disk usage
@@ -850,18 +854,12 @@ class TasksView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        qs = Task.objects.all()
+        qs = get_waiting_tasks()
         if self.filter_source:
             params_prefix=f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
-        order = getattr(settings,
-            'BACKGROUND_TASK_PRIORITY_ORDERING',
-            'DESC'
-        )
-        prefix = '-' if 'ASC' != order else ''
-        _priority = f'{prefix}priority'
         return qs.order_by(
-            _priority,
+            'priority',
             'run_at',
         )
 
