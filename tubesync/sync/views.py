@@ -860,7 +860,7 @@ class TasksView(ListView):
             qs = qs.filter(task_params__istartswith=params_prefix)
         return qs.order_by(
             'priority',
-            'run_at',
+            'end_at',
         )
 
     def get_context_data(self, *args, **kwargs):
