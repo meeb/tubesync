@@ -868,7 +868,7 @@ class TasksView(ListView):
         now = timezone.now()
         qs = Task.objects.all()
         running_qs = qs.filter(locked_by__isnull=False)
-        scheduled_qs = qs.filter(locked_by__isnull=True)
+        scheduled_qs = get_waiting_tasks()
         errors_qs = scheduled_qs.filter(
             attempts__gt=0
         ).exclude(last_error__exact='')
@@ -916,39 +916,49 @@ class TasksView(ListView):
             elif locked_by_pid_running and 'wait_for_database_queue' in task.task_name:
                 data['wait_for_database_queue'] = True
 
+        running_task_ids = { str(t.pk) for t in data['running'] }
         # show all the errors when they fit on one page
         if (data['total_errors'] + len(data['running'])) < self.paginate_by:
             for task in errors_qs:
-                if task in data['running']:
+                if task.task_id in running_task_ids:
                     continue
-                mapped = add_to_task(task)
-                if 'error' == mapped:
+                obj, url = map_task_to_instance(task)
+                if obj:
+                    setattr(task, 'instance', obj)
+                    setattr(task, 'url', url)
+                setattr(task, 'run_now', task.end_at < now)
+                if task.has_error():
+                    error_message = get_error_message(task)
+                    setattr(task, 'error_message', error_message)
                     data['errors'].append(task)
-                elif mapped:
+                elif obj:
                     data['scheduled'].append(task)
 
         for task in data['tasks']:
             already_added = (
+                task.task_id in running_task_ids or
                 task in data['running'] or
                 task in data['errors'] or
                 task in data['scheduled']
             )
             if already_added:
                 continue
-            mapped = add_to_task(task)
-            if 'error' == mapped:
+            obj, url = map_task_to_instance(task)
+            if obj:
+                setattr(task, 'instance', obj)
+                setattr(task, 'url', url)
+            setattr(task, 'run_now', task.end_at < now)
+            if task.has_error():
+                error_message = get_error_message(task)
+                setattr(task, 'error_message', error_message)
                 data['errors'].append(task)
-            elif mapped:
+            elif obj:
                 data['scheduled'].append(task)
 
-        order = getattr(settings,
-            'BACKGROUND_TASK_PRIORITY_ORDERING',
-            'DESC'
-        )
         sort_keys = (
             # key, reverse
-            ('run_at', False),
-            ('priority', 'ASC' != order),
+            ('end_at', False),
+            ('priority', True),
             ('run_now', True),
         )
         data['errors'] = multi_key_sort(data['errors'], sort_keys, attr=True)
