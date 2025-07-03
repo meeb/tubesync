@@ -50,6 +50,8 @@ class TaskHistory(models.Model):
     verbose_name = models.CharField(max_length=255, null=True, blank=True)
 
     start_at = models.DateTimeField(db_index=True, null=True, blank=True)
+    # when the task was scheduled to run
+    scheduled_at = models.DateTimeField(default=timezone.now, db_index=True)
     # when the task was completed
     end_at = models.DateTimeField(default=timezone.now, db_index=True)
 
@@ -59,13 +61,14 @@ class TaskHistory(models.Model):
     queue = models.CharField(max_length=190, db_index=True, null=True, blank=True)
 
     # how many times the task has been tried
-    attempts = models.IntegerField(default=0, db_index=True)
+    attempts = models.IntegerField(default=int, db_index=True)
     # when the task last failed
     failed_at = models.DateTimeField(db_index=True, null=True, blank=True)
     # details of the error that occurred
     last_error = models.TextField(blank=True)
 
-    repeat = models.BigIntegerField(default=0)
+    elapsed = models.FloatField(default=float)
+    repeat = models.BigIntegerField(default=int)
     repeat_until = models.DateTimeField(null=True, blank=True)
 
     objects = TaskHistoryQuerySet.as_manager()
