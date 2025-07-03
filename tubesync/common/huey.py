@@ -1,3 +1,4 @@
+import datetime
 import os
 from functools import wraps
 from huey import (
@@ -198,9 +199,13 @@ def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     assert hasattr(huey, 'enqueue') and callable(huey.enqueue)
     huey.enqueue(task_obj)
 
+storage_key_prefix = 'task_history:'
+
 def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     signal_time = utils.time_clock()
+    signal_dt = datetime.datetime.now(datetime.timezone.utc)
 
+    from common.models import TaskHistory
     add_to_elapsed_signals = frozenset((
         signals.SIGNAL_INTERRUPTED,
         signals.SIGNAL_ERROR,
@@ -214,7 +219,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         signals.SIGNAL_EXECUTING,
         signals.SIGNAL_RETRYING,
     )) | add_to_elapsed_signals
-    storage_key = f'task_history:{task_obj.id}'
+    storage_key = f'{storage_key_prefix}{task_obj.id}'
     task_obj_attr = '_signals_history'
 
     history = getattr(task_obj, task_obj_attr, None)
@@ -224,6 +229,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
             key=storage_key,
             peek=True,
         ) or dict(
+            created=signal_dt,
             data=task_obj.data,
             elapsed=0,
             module=task_obj.__module__,
@@ -231,6 +237,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         )
         setattr(task_obj, task_obj_attr, history)
     assert history is not None
+    history['modified'] = signal_dt
 
     if signal_name in recorded_signals:
         history[signal_name] = signal_time
@@ -240,12 +247,61 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         huey.get(key=storage_key)
     else:
         huey.put(key=storage_key, data=history)
+    th, created = TaskHistory.objects.get_or_create(
+        task_id=str(task_obj.id),
+        name=f"{task_obj.__module__}.{task_obj.name}",
+        queue=huey.name,
+    )
+    th.priority = task_obj.priority
+    th.task_params = list((
+        list(task_obj.args),
+        repr(task_obj.kwargs),
+    ))
+    if signal_name == signals.SIGNAL_EXECUTING:
+        th.attempts += 1
+        th.start_at = signal_dt
+    elif exception_obj is not None:
+        th.failed_at = signal_dt
+        th.last_error = str(exception_obj)
+    elif signal_name == signals.SIGNAL_ENQUEUED:
+        from sync.models import Media, Source
+        if not th.verbose_name and task_obj.args:
+            key = task_obj.args[0]
+            for model in (Media, Source,):
+                try:
+                    model_instance = model.objects.get(pk=key)
+                except model.DoesNotExist:
+                    pass
+                else:
+                    if hasattr(model_instance, 'key'):
+                        th.verbose_name = f'{th.name} with: {model_instance.key}'
+                        if hasattr(model_instance, 'name'):
+                            th.verbose_name += f' / {model_instance.name}'
+    th.end_at = signal_dt
+    th.save()
 
 # Registration of shared signal handlers
 
 def register_huey_signals():
-    from django_huey import DJANGO_HUEY, signal
+    from django_huey import DJANGO_HUEY, get_queue, signal
     for qn in DJANGO_HUEY.get('queues', dict()):
         signal(signals.SIGNAL_INTERRUPTED, queue=qn)(on_interrupted)
         signal(queue=qn)(historical_task)
+
+        # clean up old history and results from storage
+        q = get_queue(qn)
+        now_time = utils.time_clock()
+        for key in q.all_results().keys():
+            if not key.startswith(storage_key_prefix):
+                continue
+            history = q.get(peek=True, key=key)
+            if not isinstance(history, dict):
+                continue
+            age = datetime.timedelta(
+                seconds=(now_time - history.get(signals.SIGNAL_EXECUTING, now_time)),
+            )
+            if age > datetime.timedelta(days=7):
+                result_key = key[len(storage_key_prefix) :]
+                q.get(peek=False, key=result_key)
+                q.get(peek=False, key=key)
 
