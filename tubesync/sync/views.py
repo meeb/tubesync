@@ -885,7 +885,7 @@ class TasksView(ListView):
         data['wait_for_database_queue'] = False
 
         def add_to_task(task):
-            obj, url = map_task_to_instance(task)
+            obj, url = map_task_to_instance(task, using_history=False)
             if not obj:
                 return False
             setattr(task, 'instance', obj)
