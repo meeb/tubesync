@@ -5,6 +5,7 @@ from huey import (
     CancelExecution, SqliteHuey as huey_SqliteHuey,
     signals, utils,
 )
+from .timestamp import datetime_to_timestamp, timestamp_to_datetime
 
 
 class SqliteHuey(huey_SqliteHuey):
@@ -279,7 +280,12 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
                             th.verbose_name += f' / {model_instance.name}'
     th.end_at = signal_dt
     if signal_name == signals.SIGNAL_SCHEDULED:
-        th.end_at = task_obj.eta.replace(tzinfo=datetime.timezone.utc)
+        if huey.utc:
+            th.end_at = task_obj.eta.replace(tzinfo=datetime.UTC)
+        else: # this path is unlikely
+            th.end_at = timestamp_to_datetime(
+                datetime_to_timestamp(task_obj.eta, integer=False),
+            ).astimezone(tz=datetime.UTC)
     th.save()
 
 # Registration of shared signal handlers
