@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from common.timestamp import timestamp_to_datetime
 from common.utils import getenv
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,19 +14,20 @@ from yt_dlp.extractor.youtube.pot.provider import PoTokenRequest
 
 @register_provider
 class TubeSyncFileSystemPCP(PoTokenCacheProvider):  # Provider class name must end with "PCP"
-    PROVIDER_VERSION = '0.0.2'
+    PROVIDER_VERSION = '0.0.3'
     # Define a unique display name for the provider
     PROVIDER_NAME = 'TubeSync-fs'
     BUG_REPORT_LOCATION = 'https://github.com/meeb/tubesync/issues'
 
     def _now(self) -> datetime:
-        return datetime.now(timezone.utc)
+        return datetime.now(tz=timezone.utc)
 
     def _make_filename(self, key: str, expires_at: int) -> str:
         return f'{expires_at or "*"}-{key}'
         
     def _expires(self, expires_at: int) -> datetime:
-        return datetime.utcfromtimestamp(expires_at).astimezone(timezone.utc)
+        #return datetime.fromtimestamp(expires_at, tz=timezone.utc)
+        return timestamp_to_datetime(expires_at)
 
     def _files(self, key: str) -> Generator[Path]:
         return Path(self._storage_directory).glob(self._make_filename(key, 0))
