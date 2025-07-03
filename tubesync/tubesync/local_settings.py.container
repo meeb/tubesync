@@ -51,8 +51,12 @@ else:
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': CONFIG_BASE_DIR / 'db.sqlite3',
             "OPTIONS": {
+                "timeout": 10,
                 "transaction_mode": "IMMEDIATE",
+                # PRAGMA journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
                 "init_command": """
+                    PRAGMA journal_mode = TRUNCATE;
+                    PRAGMA journal_size_limit = 67108864;
                     PRAGMA legacy_alter_table = OFF;
                     PRAGMA auto_vacuum = INCREMENTAL;
                     PRAGMA incremental_vacuum(100);
