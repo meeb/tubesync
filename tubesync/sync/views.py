@@ -55,7 +55,6 @@ def get_waiting_tasks():
         )
     }
     return TaskHistory.objects.filter(
-        start_at__isnull=True,
         task_id__in=huey_task_ids.union(background_task_ids),
     )
 
