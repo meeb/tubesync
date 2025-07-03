@@ -8,7 +8,9 @@ from django.db.transaction import atomic, on_commit
 from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from background_task.signals import task_started, task_successful, task_failed
+from background_task.signals import (
+    task_created, task_started, task_successful, task_failed,
+)
 from background_task.models import Task
 from common.logger import log
 from common.models import TaskHistory
@@ -168,6 +170,29 @@ def source_post_delete(sender, instance, **kwargs):
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
 
 
+@receiver(task_created, dispatch_uid='sync.signals.task_task_created')
+@atomic(durable=False)
+def task_task_created(sender, task=None, **kwargs):
+    if task is None:
+        return
+    task_obj = task
+    th, created = TaskHistory.objects.get_or_create(
+        task_id=str(task_obj.pk),
+        name=task_obj.task_name,
+        queue=task_obj.queue,
+    )
+    th.end_at = task_obj.run_at
+    th.priority = (100 - task_obj.priority)
+    th.repeat = task_obj.repeat
+    th.repeat_until = task_obj.repeat_until
+    th.start_at = task_obj.run_at
+    th.task_params = list(task_obj.params())
+    th.verbose_name = task_obj.verbose_name
+    th.save()
+    if created:
+        log.debug(f'Created a new task history record: {th.pk}: {th.verbose_name}')
+
+
 @receiver(task_started, dispatch_uid='sync.signals.task_task_started')
 @atomic(durable=False)
 def task_task_started(sender, **kwargs):
@@ -188,7 +213,7 @@ def task_task_started(sender, **kwargs):
         th.verbose_name = task_obj.verbose_name
         th.save()
         if created:
-            log.debug(f'Created a new task history record: {th.pk}: {th.verbose_name}')
+            log.debug(f'Started a new task history record: {th.pk}: {th.verbose_name}')
 
 
 def merge_completed_task_into_history(task_id, task_obj):
