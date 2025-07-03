@@ -9,7 +9,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from background_task.signals import (
-    task_created, task_started, task_successful, task_failed,
+    task_created, task_started, task_successful, task_rescheduled, task_failed,
 )
 from background_task.models import Task
 from common.logger import log
@@ -181,7 +181,7 @@ def task_task_created(sender, task=None, **kwargs):
         name=task_obj.task_name,
         queue=task_obj.queue,
     )
-    th.end_at = task_obj.run_at
+    th.scheduled_at = task_obj.run_at
     th.priority = (100 - task_obj.priority)
     th.repeat = task_obj.repeat
     th.repeat_until = task_obj.repeat_until
@@ -215,12 +215,33 @@ def task_task_started(sender, **kwargs):
             log.debug(f'Started a new task history record: {th.pk}: {th.verbose_name}')
 
 
+@receiver(task_rescheduled, dispatch_uid='sync.signals.task_task_rescheduled')
+@atomic(durable=False)
+def task_task_rescheduled(sender, task=None, **kwargs):
+    if task is None:
+        return
+    now_dt = timezone.now()
+    task_obj = task
+    th, created = TaskHistory.objects.get_or_create(
+        task_id=str(task_obj.pk),
+        name=task_obj.task_name,
+        queue=task_obj.queue,
+    )
+    th.elapsed += (now_dt - task_obj.locked_at)
+    th.end_at = now_dt
+    th.scheduled_at = task_obj.run_at
+    th.start_at = task_obj.locked_at
+    th.save()
+    if created:
+        log.debug(f'Rescheduled a new task history record: {th.pk}: {th.verbose_name}')
+
 def merge_completed_task_into_history(task_id, task_obj):
     th, created = TaskHistory.objects.get_or_create(
         task_id=str(task_id),
         name=task_obj.task_name,
         queue=task_obj.queue,
     )
+    th.elapsed += ((task_obj.failed_at or task_obj.run_at) - task_obj.locked_at)
     th.end_at = task_obj.run_at
     th.failed_at = task_obj.failed_at
     th.last_error = task_obj.last_error
