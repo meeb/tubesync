@@ -866,12 +866,11 @@ class TasksView(ListView):
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
         now_dt = timezone.now()
-        running_qs = TaskHistory.objects.filter(
+        scheduled_qs = get_waiting_tasks()
+        running_qs = scheduled_qs.filter(
             start_at__isnull=False,
-            end_at__gt=now_dt-timezone.timedelta(days=1),
             end_at__lte=F('start_at'),
         )
-        scheduled_qs = get_waiting_tasks()
         errors_qs = scheduled_qs.filter(
             attempts__gt=0
         ).exclude(last_error__exact='')
