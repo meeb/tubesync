@@ -868,6 +868,7 @@ class TasksView(ListView):
         now_dt = timezone.now()
         running_qs = TaskHistory.objects.filter(
             start_at__isnull=False,
+            end_at__gt=now_dt-timezone.timedelta(days=1),
             end_at__lte=F('start_at'),
         )
         scheduled_qs = get_waiting_tasks()
@@ -887,17 +888,16 @@ class TasksView(ListView):
         data['wait_for_database_queue'] = False
 
         def add_to_task(task):
-            obj, url = map_task_to_instance(task, using_history=False)
-            if not obj:
-                return False
-            setattr(task, 'instance', obj)
-            setattr(task, 'url', url)
-            setattr(task, 'run_now', task.run_at < now_dt)
+            setattr(task, 'run_now', task.scheduled_at < now_dt)
+            obj, url = map_task_to_instance(task)
+            if obj:
+                setattr(task, 'instance', obj)
+                setattr(task, 'url', url)
             if task.has_error():
                 error_message = get_error_message(task)
                 setattr(task, 'error_message', error_message)
                 return 'error'
-            return True
+            return True and obj
                     
         for task in Task.objects.filter(locked_by__isnull=False):
             # There was broken logic in `Task.objects.locked()`, work around it.
@@ -928,11 +928,7 @@ class TasksView(ListView):
         for task in running_qs:
             if task in data['running']:
                     continue
-            setattr(task, 'run_now', task.end_at < now_dt)
-            obj, url = map_task_to_instance(task)
-            if obj:
-                setattr(task, 'instance', obj)
-                setattr(task, 'url', url)
+            add_to_task(task)
             data['running'].append(task)
             
         # show all the errors when they fit on one page
@@ -940,16 +936,10 @@ class TasksView(ListView):
             for task in errors_qs:
                 if task in data['running']:
                     continue
-                obj, url = map_task_to_instance(task)
-                if obj:
-                    setattr(task, 'instance', obj)
-                    setattr(task, 'url', url)
-                setattr(task, 'run_now', task.end_at < now_dt)
-                if task.has_error():
-                    error_message = get_error_message(task)
-                    setattr(task, 'error_message', error_message)
+                mapped = add_to_task(task)
+                if 'error' == mapped:
                     data['errors'].append(task)
-                elif obj:
+                elif mapped:
                     data['scheduled'].append(task)
 
         for task in data['tasks']:
@@ -960,16 +950,10 @@ class TasksView(ListView):
             )
             if already_added:
                 continue
-            obj, url = map_task_to_instance(task)
-            if obj:
-                setattr(task, 'instance', obj)
-                setattr(task, 'url', url)
-            setattr(task, 'run_now', task.end_at < now_dt)
-            if task.has_error():
-                error_message = get_error_message(task)
-                setattr(task, 'error_message', error_message)
+            mapped = add_to_task(task)
+            if 'error' == mapped:
                 data['errors'].append(task)
-            elif obj:
+            elif mapped:
                 data['scheduled'].append(task)
 
         sort_keys = (
