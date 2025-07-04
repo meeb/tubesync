@@ -129,7 +129,6 @@ def source_post_save(sender, instance, created, **kwargs):
     set_verbose_name(
         save_all_media_for_source,
         str(source.pk),
-        delay=60,
         vn_fmt = _('Checking all media for "{}"'),
         vn_args=(
             source.name,
