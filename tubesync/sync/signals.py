@@ -137,7 +137,6 @@ def source_pre_delete(sender, instance, **kwargs):
     log.info(f'Deleting tasks for source: {instance.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
-    delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
 
     # Fetch the media source
     sqs = Source.objects.filter(filter_text=str(source.pk))
@@ -163,7 +162,6 @@ def source_post_delete(sender, instance, **kwargs):
     log.info(f'Deleting tasks for removed source: {source.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
-    delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
 
 
 @receiver(task_created, dispatch_uid='sync.signals.task_task_created')
