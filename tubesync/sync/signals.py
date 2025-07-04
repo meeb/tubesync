@@ -19,7 +19,7 @@ from .models import Source, Media, Metadata
 from .tasks import (
     delete_task_by_media, delete_task_by_source,
     get_media_download_task, get_media_metadata_task, get_media_thumbnail_task,
-    map_task_to_instance, set_verbose_name,
+    map_task_to_instance,
     delete_all_media_for_source, rename_media, save_all_media_for_source,
     check_source_directory_exists, download_source_images, index_source_task,
     download_media, download_media_metadata, download_media_thumbnail,
@@ -126,7 +126,7 @@ def source_post_save(sender, instance, created, **kwargs):
             )
 
     source = instance
-    set_verbose_name(
+    TaskHistory.schedule(
         save_all_media_for_source,
         str(source.pk),
         vn_fmt = _('Checking all media for "{}"'),
