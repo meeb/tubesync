@@ -227,7 +227,9 @@ def task_task_rescheduled(sender, task=None, **kwargs):
         name=task_obj.task_name,
         queue=task_obj.queue,
     )
-    th.elapsed += (now_dt - task_obj.locked_at)
+    th.elapsed += (
+        now_dt - task_obj.locked_at
+    ).total_seconds()
     th.end_at = now_dt
     th.scheduled_at = task_obj.run_at
     th.start_at = task_obj.locked_at
@@ -241,7 +243,9 @@ def merge_completed_task_into_history(task_id, task_obj):
         name=task_obj.task_name,
         queue=task_obj.queue,
     )
-    th.elapsed += ((task_obj.failed_at or task_obj.run_at) - task_obj.locked_at)
+    th.elapsed += (
+        (task_obj.failed_at or task_obj.run_at) - task_obj.locked_at
+    ).total_seconds()
     th.end_at = task_obj.run_at
     th.failed_at = task_obj.failed_at
     th.last_error = task_obj.last_error
