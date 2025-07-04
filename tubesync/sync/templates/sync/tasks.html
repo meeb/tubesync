@@ -54,7 +54,7 @@
             <i class="fas fa-exclamation-triangle"></i> <strong>{{ task }}</strong>, attempted {{ task.attempts }} time{{ task.attempts|pluralize }}<br>
             Error: &quot;{{ task.error_message }}&quot;<br>
           </a>
-          <i class="fas fa-history"></i> Task will be retried at <strong>{{ task.end_at|date:'Y-m-d H:i:s' }}</strong>
+          <i class="fas fa-history"></i> Task will be retried at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong>
           <a href="{% url 'sync:run-task' pk=task.task_id %}" class="error-text">
             <i class="fas fa-undo"></i>
           </a>
@@ -73,7 +73,7 @@
     <p>
       Tasks which are scheduled to run in the future or are waiting in a queue to be
       processed. They can be waiting for an available worker to run immediately, or
-      run in the future at the specified &quot;run at&quot; time.
+      run in the future at the specified &quot;scheduled at&quot; time.
     </p>
     <div class="collection">
       {% for task in scheduled %}
@@ -81,7 +81,7 @@
           <a href="{% url task.url pk=task.instance.pk %}">
             <i class="fas fa-hourglass-start"></i> <strong>{{ task }}</strong><br>
             {% if task.instance.is_active and 'once' not in task.verbose_name %}Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>{% endif %}
-            <i class="far fa-clock"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.end_at|date:'Y-m-d H:i:s' }}</strong>
+            <i class="far fa-clock"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong>
           {% if '-' not in task.task_id %}
           </a>
           <a href="{% url 'sync:run-task' pk=task.task_id %}">
