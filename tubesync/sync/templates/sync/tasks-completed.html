@@ -16,11 +16,11 @@
       
       <span class="collection-item">
       {% if task.has_error %}
-        <i class="fas fa-exclamation-triangle"></i> <strong>{{ task.verbose_name }}</strong><br>
+        <i class="fas fa-exclamation-triangle"></i> <strong>{% if task.verbose_name %}{{ task.verbose_name }}{% else %}{{ task.name }}{% endif %}</strong><br>
         Queue: &quot;{{ task.queue }}&quot;<br>
         Error: &quot;{{ task.error_message }}&quot;<br>
       {% else %}
-        <i class="fas fa-check"></i> <strong>{{ task.verbose_name }}</strong><br>
+        <i class="fas fa-check"></i> <strong>{% if task.verbose_name %}{{ task.verbose_name }}{% else %}{{ task.name }}{% endif %}</strong><br>
         Queue: &quot;{{ task.queue }}&quot;<br>
       {% endif %}
         Task locked for: {{ task.end_at|sub:task.start_at|timedelta }}<br>
