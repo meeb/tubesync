@@ -897,7 +897,8 @@ class TasksView(ListView):
                 setattr(task, 'error_message', error_message)
                 return 'error'
             return True and obj
-                    
+
+        verbose_names = dict()
         for task in Task.objects.filter(locked_by__isnull=False):
             # There was broken logic in `Task.objects.locked()`, work around it.
             # With that broken logic, the tasks never resume properly.
@@ -913,6 +914,7 @@ class TasksView(ListView):
                 task.locked_at = None
                 task.save()
             task_id = str(task.pk)
+            verbose_names[task_id] = task.verbose_name
             try:
                 task = TaskHistory.objects.get(task_id=task_id)
             except TaskHistory.DoesNotExist:
@@ -920,9 +922,12 @@ class TasksView(ListView):
                 pass
             else:
                 if locked_by_pid_running and add_to_task(task):
+                    # Use the status if it is available
+                    task.verbose_name = verbose_names.get(task_id) or task.verbose_name
                     data['running'].append(task)
                 elif locked_by_pid_running and 'wait_for_database_queue' in task.name:
                     data['wait_for_database_queue'] = True
+        verbose_names = None
 
         for task in running_qs:
             if task in data['running']:
