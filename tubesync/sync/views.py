@@ -46,7 +46,8 @@ def get_waiting_tasks():
     background_task_ids = {
         str(t.pk) for t in Task.objects.all()
     }
-    huey_queues = list(map(get_queue, DJANGO_HUEY.get('queues', dict())))
+    huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+    huey_queues = list(map(get_queue, huey_queue_names))
     huey_task_ids = {
         str(t.id) for q in huey_queues for t in set(
             q.pending()
@@ -864,9 +865,11 @@ class TasksView(ListView):
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        now = timezone.now()
-        qs = Task.objects.all()
-        running_qs = qs.filter(locked_by__isnull=False)
+        now_dt = timezone.now()
+        running_qs = TaskHistory.objects.filter(
+            start_at__isnull=False,
+            end_at__lte=F('start_at'),
+        )
         scheduled_qs = get_waiting_tasks()
         errors_qs = scheduled_qs.filter(
             attempts__gt=0
@@ -889,14 +892,14 @@ class TasksView(ListView):
                 return False
             setattr(task, 'instance', obj)
             setattr(task, 'url', url)
-            setattr(task, 'run_now', task.run_at < now)
+            setattr(task, 'run_now', task.run_at < now_dt)
             if task.has_error():
                 error_message = get_error_message(task)
                 setattr(task, 'error_message', error_message)
                 return 'error'
             return True
                     
-        for task in running_qs:
+        for task in Task.objects.filter(locked_by__isnull=False):
             # There was broken logic in `Task.objects.locked()`, work around it.
             # With that broken logic, the tasks never resume properly.
             # This check unlocks the tasks without a running process.
@@ -910,22 +913,38 @@ class TasksView(ListView):
                 # do not wait for the task to expire
                 task.locked_at = None
                 task.save()
-            if locked_by_pid_running and add_to_task(task):
-                data['running'].append(task)
-            elif locked_by_pid_running and 'wait_for_database_queue' in task.task_name:
-                data['wait_for_database_queue'] = True
+            task_id = str(task.pk)
+            try:
+                task = TaskHistory.objects.get(task_id=task_id)
+            except TaskHistory.DoesNotExist:
+                # possibly create a new instance?
+                pass
+            else:
+                if locked_by_pid_running and add_to_task(task):
+                    data['running'].append(task)
+                elif locked_by_pid_running and 'wait_for_database_queue' in task.name:
+                    data['wait_for_database_queue'] = True
 
-        running_task_ids = { str(t.pk) for t in data['running'] }
+        for task in running_qs:
+            if task in data['running']:
+                    continue
+            setattr(task, 'run_now', task.end_at < now_dt)
+            obj, url = map_task_to_instance(task)
+            if obj:
+                setattr(task, 'instance', obj)
+                setattr(task, 'url', url)
+            data['running'].append(task)
+            
         # show all the errors when they fit on one page
         if (data['total_errors'] + len(data['running'])) < self.paginate_by:
             for task in errors_qs:
-                if task.task_id in running_task_ids:
+                if task in data['running']:
                     continue
                 obj, url = map_task_to_instance(task)
                 if obj:
                     setattr(task, 'instance', obj)
                     setattr(task, 'url', url)
-                setattr(task, 'run_now', task.end_at < now)
+                setattr(task, 'run_now', task.end_at < now_dt)
                 if task.has_error():
                     error_message = get_error_message(task)
                     setattr(task, 'error_message', error_message)
@@ -935,7 +954,6 @@ class TasksView(ListView):
 
         for task in data['tasks']:
             already_added = (
-                task.task_id in running_task_ids or
                 task in data['running'] or
                 task in data['errors'] or
                 task in data['scheduled']
@@ -946,7 +964,7 @@ class TasksView(ListView):
             if obj:
                 setattr(task, 'instance', obj)
                 setattr(task, 'url', url)
-            setattr(task, 'run_now', task.end_at < now)
+            setattr(task, 'run_now', task.end_at < now_dt)
             if task.has_error():
                 error_message = get_error_message(task)
                 setattr(task, 'error_message', error_message)
@@ -956,7 +974,7 @@ class TasksView(ListView):
 
         sort_keys = (
             # key, reverse
-            ('end_at', False),
+            ('scheduled_at', False),
             ('priority', True),
             ('run_now', True),
         )
@@ -992,11 +1010,11 @@ class CompletedTasksView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        qs = CompletedTask.objects.all()
+        qs = TaskHistory.objects.all()
         if self.filter_source:
             params_prefix=f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
-        return qs.order_by('-run_at')
+        return qs.order_by('-end_at')
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
@@ -1025,7 +1043,8 @@ class ResetTasks(FormView):
     def form_valid(self, form):
         # Delete all tasks
         Task.objects.all().delete()
-        for queue_name in (DJANGO_HUEY or {}).get('queues', {}):
+        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+        for queue_name in huey_queue_names:
             h_q_reset_tasks(queue_name)
         # Iter all tasks
         for source in Source.objects.all():
