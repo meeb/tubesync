@@ -43,6 +43,22 @@ db_vendor = db.connection.vendor
 register_huey_signals()
 
 
+def set_verbose_name(task_wrapper, /, *args, vn_args=(), vn_fmt=None, **kwargs):
+    assert vn_fmt is not None, 'vn_fmt is required'
+    if vn_fmt is None:
+        return False
+    result = task_wrapper.schedule(*args, **kwargs)
+    try:
+        task_history = TaskHistory.objects.get(task_id=str(result.id))
+    except TaskHistory.DoesNotExist:
+        pass
+    else:
+        task_history.verbose_name = str(vn_fmt).format(*vn_args)
+        task_history.save()
+        return True
+    return False
+
+
 def get_hash(task_name, pk):
     '''
         Create a background_task compatible hash for a Task or CompletedTask.
@@ -172,9 +188,6 @@ def get_media_thumbnail_task(media_id):
 
 def get_media_premiere_task(media_id):
     return get_first_task('sync.tasks.wait_for_media_premiere', media_id)
-
-def get_source_check_task(source_id):
-    return get_first_task('sync.tasks.save_all_media_for_source', source_id)
 
 def get_source_index_task(source_id):
     return get_first_task('sync.tasks.index_source_task', source_id)
@@ -488,6 +501,10 @@ def index_source(source_id):
     # An inactive Source would return an empty list for videos anyway
     if not source.is_active:
         return False
+    indexing_lock = huey_lock_task(
+        f'source:{source.uuid}',
+        queue=Val(TaskQueue.FS),
+    )
     # update the target schedule column
     source.task_run_at_dt
     # Reset any errors
@@ -497,6 +514,7 @@ def index_source(source_id):
     if not videos:
         source.has_failed = True
         save_model(source)
+        indexing_lock.clear()
         raise NoMediaException(f'Source "{source}" (ID: {source_id}) returned no '
                                f'media to index, is the source key valid? Check the '
                                f'source configuration is correct and that the source '
@@ -504,7 +522,6 @@ def index_source(source_id):
     # Got some media, update the last crawl timestamp
     source.last_crawl = timezone.now()
     save_model(source)
-    delete_task_by_source('sync.tasks.save_all_media_for_source', source.pk)
     num_videos = len(videos)
     log.info(f'Found {num_videos} media items for source: {source}')
     tvn_format = '{:,}' + f'/{num_videos:,}'
@@ -613,12 +630,17 @@ def index_source(source_id):
     videos = video = None
     db_batch_data.clear()
     db_batch_media.clear()
+    # Let the checking task run
+    indexing_lock.clear()
     # Trigger any signals that we skipped with batched updates
-    vn_fmt = _('Checking all media for "{}"')
-    save_all_media_for_source(
+    set_verbose_name(
+        save_all_media_for_source,
         str(source.pk),
-        schedule=dict(run_at=60),
-        verbose_name=vn_fmt.format(source.name),
+        delay=60,
+        vn_fmt = _('Checking all media for "{}"'),
+        vn_args=(
+            source.name,
+        ),
     )
     return True
 
@@ -1061,10 +1083,12 @@ def save_all_media_for_source(source_id):
     # Keep out of the way of the index task!
     # SQLite will be locked for a while if we start
     # a large source, which reschedules a more costly task.
-    if 'sqlite' == db_vendor:
-        index_task = get_source_index_task(source_id)
-        if index_task and index_task.locked_by_pid_running():
-            raise Exception(_('Indexing not completed'))
+    indexing_lock = huey_lock_task(
+        f'source:{source.uuid}',
+        queue=Val(TaskQueue.FS),
+    )
+    if indexing_lock.is_locked():
+        raise CancelExecution(_('Indexing not completed'))
 
     refresh_qs = Media.objects.all().only(
         'pk',
