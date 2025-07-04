@@ -1010,7 +1010,10 @@ class CompletedTasksView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        qs = TaskHistory.objects.all()
+        qs = TaskHistory.objects.filter(
+            start_at__isnull=False,
+            end_at__gt=F('start_at'),
+        )
         if self.filter_source:
             params_prefix=f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
