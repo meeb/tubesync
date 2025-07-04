@@ -50,14 +50,16 @@
     <div class="collection">
       {% for task in errors %}
         <div class="collection-item error-text">
-          <a href="{% url task.url pk=task.instance.pk %}" class="error-text">
+          <a href="{%if task.instance.pk %}{% url task.url pk=task.instance.pk %}{% else %}#{{ task.task_id }}{% endif %}" class="error-text">
             <i class="fas fa-exclamation-triangle"></i> <strong>{{ task }}</strong>, attempted {{ task.attempts }} time{{ task.attempts|pluralize }}<br>
             Error: &quot;{{ task.error_message }}&quot;<br>
           </a>
           <i class="fas fa-history"></i> Task will be retried at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong>
+          {% if '-' not in task.task_id %}
           <a href="{% url 'sync:run-task' pk=task.task_id %}" class="error-text">
             <i class="fas fa-undo"></i>
           </a>
+          {% endif %}
         </div>
       {% empty %}
         <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no tasks with errors on this page.</span>
@@ -78,7 +80,7 @@
     <div class="collection">
       {% for task in scheduled %}
         <div class="collection-item">
-          <a href="{% url task.url pk=task.instance.pk %}">
+          <a href="{%if task.instance.pk %}{% url task.url pk=task.instance.pk %}{% else %}#{{ task.task_id }}{% endif %}">
             <i class="fas fa-hourglass-start"></i> <strong>{{ task }}</strong><br>
             {% if task.instance.is_active and 'once' not in task.verbose_name %}Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>{% endif %}
             <i class="far fa-clock"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong>
