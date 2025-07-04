@@ -235,14 +235,13 @@ def save_model(instance):
     queue=Val(TaskQueue.DB),
 )
 def upcoming_media():
-    now = timezone.now()
-    next_hour = now + timezone.timedelta(hours=1, minutes=3)
-    previous_hour = now - timezone.timedelta(hours=1, minutes=1)
     qs = Media.objects.filter(
         manual_skip=True,
-        metadata__isnull=False,
         published__isnull=False,
-        published__gte=previous_hour,
+        published__gte=(
+            # previous hour
+            timezone.now() - timezone.timedelta(hours=1, minutes=1),
+        ),
     )
     for media in qs_gen(qs):
         media_id = str(media.pk)
