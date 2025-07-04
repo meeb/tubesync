@@ -23,9 +23,9 @@
         <i class="fas fa-check"></i> <strong>{{ task.verbose_name }}</strong><br>
         Queue: &quot;{{ task.queue }}&quot;<br>
       {% endif %}
-        Task locked for: {{ task.run_at|sub:task.locked_at|timedelta }}<br>
-        <i class="far fa-clock"></i> Task locked at <strong>{{ task.locked_at|date:'Y-m-d H:i:s' }}</strong><br>
-        <i class="fas fa-hourglass-end"></i> Task ended at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+        Task locked for: {{ task.end_at|sub:task.start_at|timedelta }}<br>
+        <i class="far fa-clock"></i> Task locked at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong><br>
+        <i class="fas fa-hourglass-end"></i> Task ended at <strong>{{ task.end_at|date:'Y-m-d H:i:s' }}</strong>
       </span>
     {% empty %}
       <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There have been no completed tasks{% if source %} that match the specified source filter{% endif %}.</span>
@@ -33,5 +33,5 @@
     </div>
   </div>
 </div>
-{% include 'pagination.html' with pagination=sources.paginator filter=source.pk %}
+{% include 'pagination.html' with filter=source.pk %}
 {% endblock %}
