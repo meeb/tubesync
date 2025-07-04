@@ -124,11 +124,7 @@ def source_post_save(sender, instance, created, **kwargs):
                 verbose_name=verbose_name.format(instance.name),
             )
 
-    verbose_name = _('Checking all media for source "{}"')
-    save_all_media_for_source(
-        str(instance.pk),
-        verbose_name=verbose_name.format(instance.name),
-    )
+    save_all_media_for_source(str(instance.pk))
 
 
 @receiver(pre_delete, sender=Source)
