@@ -1,3 +1,4 @@
+from common.timestamp import timestamp_to_datetime
 from datetime import datetime, timezone
 from django_huey import get_queue
 from pathlib import Path
@@ -13,16 +14,17 @@ from yt_dlp.extractor.youtube.pot.provider import PoTokenRequest
 
 @register_provider
 class TubeSyncHueyPCP(PoTokenCacheProvider):
-    PROVIDER_VERSION = '0.0.1'
+    PROVIDER_VERSION = '0.0.2'
     PROVIDER_NAME = 'TubeSync-huey'
     BUG_REPORT_LOCATION = 'https://github.com/meeb/tubesync/issues'
     HUEY_QUEUE_NAME = Val(TaskQueue.LIMIT)
 
     def _now(self) -> datetime:
-        return datetime.now(timezone.utc)
+        return datetime.now(tz=timezone.utc)
 
     def _expires(self, expires_at: int) -> datetime:
-        return datetime.utcfromtimestamp(expires_at).astimezone(timezone.utc)
+        #return datetime.fromtimestamp(expires_at, tz=timezone.utc)
+        return timestamp_to_datetime(expires_at)
 
     def _huey_key(self, key: str) -> str:
         return f'{self.huey.name}.youtube-pot.{key}'
