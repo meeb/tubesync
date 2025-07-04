@@ -22,7 +22,7 @@ from django.utils.translation import gettext_lazy as _
 from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params, mkdir_p, multi_key_sort
-from background_task.models import Task, CompletedTask
+from background_task.models import Task
 from django_huey import DJANGO_HUEY, get_queue
 from common.huey import h_q_reset_tasks
 from .models import Source, Media, MediaServer
