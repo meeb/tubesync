@@ -42,9 +42,6 @@ atomic = db.transaction.atomic
 db_vendor = db.connection.vendor
 register_huey_signals()
 
-# TODO: tcely: remove this
-set_verbose_name = TaskHistory.schedule
-
 
 def get_hash(task_name, pk):
     '''
