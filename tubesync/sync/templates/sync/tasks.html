@@ -23,9 +23,9 @@
     </p>
     <div class="collection">
       {% for task in running %}
-        <a href="{% url task.url pk=task.instance.pk %}" class="collection-item">
+        <a href="{%if task.instance.pk %}{% url task.url pk=task.instance.pk %}{% else %}#{% endif %}" class="collection-item">
           <i class="fas fa-running"></i> <strong>{{ task }}</strong><br>
-          <i class="far fa-clock"></i> Task started at <strong>{{ task.locked_at|date:'Y-m-d H:i:s' }}</strong>
+          <i class="far fa-clock"></i> Task started at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong>
         </a>
       {% empty %}
         <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no running tasks.</span>
