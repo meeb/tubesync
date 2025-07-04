@@ -51,7 +51,7 @@ def get_hash(task_name, pk):
     return sha1(f'{task_name}{task_params}'.encode('utf-8')).hexdigest()
 
 
-def map_task_to_instance(task):
+def map_task_to_instance(task, using_history=True):
     '''
         Reverse-maps a scheduled backgrond task to an instance. Requires the task name
         to be a known task function and the first argument to be a UUID. This is used
@@ -72,7 +72,12 @@ def map_task_to_instance(task):
         Media: 'sync:media-item',
     }
     # Unpack
-    task_func, task_args_str = task.task_name, task.task_params
+    task_args = None
+    if using_history:
+        task_func = task.name
+        task_args = task.task_params
+    else:
+        task_func, task_args_str = task.task_name, task.task_params
     model = TASK_MAP.get(task_func, None)
     if not model:
         return None, None
@@ -80,7 +85,7 @@ def map_task_to_instance(task):
     if not url:
         return None, None
     try:
-        task_args = json.loads(task_args_str)
+        task_args = task_args or json.loads(task_args_str)
     except (TypeError, ValueError, AttributeError):
         return None, None
     if len(task_args) != 2:

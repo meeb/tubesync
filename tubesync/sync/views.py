@@ -13,16 +13,17 @@ from django.core.exceptions import SuspiciousFileOperation
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.db import connection, IntegrityError
-from django.db.models import Q, Count, Sum, When, Case
+from django.db.models import F, Q, Count, Sum, When, Case
 from django.forms import Form, ValidationError
 from django.utils.text import slugify
 from django.utils._os import safe_join
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params, mkdir_p, multi_key_sort
-from background_task.models import Task, CompletedTask
-from django_huey import DJANGO_HUEY
+from background_task.models import Task
+from django_huey import DJANGO_HUEY, get_queue
 from common.huey import h_q_reset_tasks
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
@@ -39,6 +40,24 @@ from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         youtube_help, youtube_validation_urls)
 from . import signals # noqa
 from . import youtube
+
+
+def get_waiting_tasks():
+    background_task_ids = {
+        str(t.pk) for t in Task.objects.all()
+    }
+    huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+    huey_queues = list(map(get_queue, huey_queue_names))
+    huey_task_ids = {
+        str(t.id) for q in huey_queues for t in set(
+            q.pending()
+        ).union(
+            q.scheduled()
+        )
+    }
+    return TaskHistory.objects.filter(
+        task_id__in=huey_task_ids.union(background_task_ids),
+    )
 
 
 class DashboardView(TemplateView):
@@ -62,8 +81,13 @@ class DashboardView(TemplateView):
         data['num_media'] = Media.objects.all().count()
         data['num_downloaded_media'] = Media.objects.filter(downloaded=True).count()
         # Tasks
-        data['num_tasks'] = Task.objects.all().count()
-        data['num_completed_tasks'] = CompletedTask.objects.all().count()
+        completed_qs = TaskHistory.objects.filter(
+            start_at__isnull=False,
+            end_at__gt=F('start_at'),
+        )
+        waiting_qs = get_waiting_tasks()
+        data['num_tasks'] = waiting_qs.count()
+        data['num_completed_tasks'] = completed_qs.count()
         # Disk usage
         disk_usage = Media.objects.filter(
             downloaded=True, downloaded_filesize__isnull=False
@@ -830,27 +854,23 @@ class TasksView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        qs = Task.objects.all()
+        qs = get_waiting_tasks()
         if self.filter_source:
             params_prefix=f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
-        order = getattr(settings,
-            'BACKGROUND_TASK_PRIORITY_ORDERING',
-            'DESC'
-        )
-        prefix = '-' if 'ASC' != order else ''
-        _priority = f'{prefix}priority'
         return qs.order_by(
-            _priority,
-            'run_at',
+            'priority',
+            'end_at',
         )
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        now = timezone.now()
-        qs = Task.objects.all()
-        running_qs = qs.filter(locked_by__isnull=False)
-        scheduled_qs = qs.filter(locked_by__isnull=True)
+        now_dt = timezone.now()
+        scheduled_qs = get_waiting_tasks()
+        running_qs = scheduled_qs.filter(
+            start_at__isnull=False,
+            end_at__lte=F('start_at'),
+        )
         errors_qs = scheduled_qs.filter(
             attempts__gt=0
         ).exclude(last_error__exact='')
@@ -867,19 +887,19 @@ class TasksView(ListView):
         data['wait_for_database_queue'] = False
 
         def add_to_task(task):
+            setattr(task, 'run_now', task.scheduled_at < now_dt)
             obj, url = map_task_to_instance(task)
-            if not obj:
-                return False
-            setattr(task, 'instance', obj)
-            setattr(task, 'url', url)
-            setattr(task, 'run_now', task.run_at < now)
+            if obj:
+                setattr(task, 'instance', obj)
+                setattr(task, 'url', url)
             if task.has_error():
                 error_message = get_error_message(task)
                 setattr(task, 'error_message', error_message)
                 return 'error'
-            return True
-                    
-        for task in running_qs:
+            return True and obj
+
+        verbose_names = dict()
+        for task in Task.objects.filter(locked_by__isnull=False):
             # There was broken logic in `Task.objects.locked()`, work around it.
             # With that broken logic, the tasks never resume properly.
             # This check unlocks the tasks without a running process.
@@ -893,11 +913,28 @@ class TasksView(ListView):
                 # do not wait for the task to expire
                 task.locked_at = None
                 task.save()
-            if locked_by_pid_running and add_to_task(task):
-                data['running'].append(task)
-            elif locked_by_pid_running and 'wait_for_database_queue' in task.task_name:
-                data['wait_for_database_queue'] = True
+            task_id = str(task.pk)
+            verbose_names[task_id] = task.verbose_name
+            try:
+                task = TaskHistory.objects.get(task_id=task_id)
+            except TaskHistory.DoesNotExist:
+                # possibly create a new instance?
+                pass
+            else:
+                if locked_by_pid_running and add_to_task(task):
+                    # Use the status if it is available
+                    task.verbose_name = verbose_names.get(task_id) or task.verbose_name
+                    data['running'].append(task)
+                elif locked_by_pid_running and 'wait_for_database_queue' in task.name:
+                    data['wait_for_database_queue'] = True
+        verbose_names = None
 
+        for task in running_qs:
+            if task in data['running']:
+                    continue
+            add_to_task(task)
+            data['running'].append(task)
+            
         # show all the errors when they fit on one page
         if (data['total_errors'] + len(data['running'])) < self.paginate_by:
             for task in errors_qs:
@@ -923,14 +960,10 @@ class TasksView(ListView):
             elif mapped:
                 data['scheduled'].append(task)
 
-        order = getattr(settings,
-            'BACKGROUND_TASK_PRIORITY_ORDERING',
-            'DESC'
-        )
         sort_keys = (
             # key, reverse
-            ('run_at', False),
-            ('priority', 'ASC' != order),
+            ('scheduled_at', False),
+            ('priority', True),
             ('run_now', True),
         )
         data['errors'] = multi_key_sort(data['errors'], sort_keys, attr=True)
@@ -965,11 +998,14 @@ class CompletedTasksView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        qs = CompletedTask.objects.all()
+        qs = TaskHistory.objects.filter(
+            start_at__isnull=False,
+            end_at__gt=F('start_at'),
+        )
         if self.filter_source:
             params_prefix=f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
-        return qs.order_by('-run_at')
+        return qs.order_by('-end_at')
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
@@ -998,7 +1034,8 @@ class ResetTasks(FormView):
     def form_valid(self, form):
         # Delete all tasks
         Task.objects.all().delete()
-        for queue_name in (DJANGO_HUEY or {}).get('queues', {}):
+        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+        for queue_name in huey_queue_names:
             h_q_reset_tasks(queue_name)
         # Iter all tasks
         for source in Source.objects.all():
