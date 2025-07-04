@@ -23,7 +23,7 @@
     </p>
     <div class="collection">
       {% for task in running %}
-        <a href="{%if task.instance.pk %}{% url task.url pk=task.instance.pk %}{% else %}#{% endif %}" class="collection-item">
+        <a href="{%if task.instance.pk %}{% url task.url pk=task.instance.pk %}{% else %}#{{ task.task_id }}{% endif %}" class="collection-item">
           <i class="fas fa-running"></i> <strong>{{ task }}</strong><br>
           <i class="far fa-clock"></i> Task started at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong>
         </a>
