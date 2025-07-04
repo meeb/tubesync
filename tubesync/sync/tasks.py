@@ -42,21 +42,8 @@ atomic = db.transaction.atomic
 db_vendor = db.connection.vendor
 register_huey_signals()
 
-
-def set_verbose_name(task_wrapper, /, *args, vn_args=(), vn_fmt=None, **kwargs):
-    assert vn_fmt is not None, 'vn_fmt is required'
-    if vn_fmt is None:
-        return False
-    result = task_wrapper.schedule(*args, **kwargs)
-    try:
-        task_history = TaskHistory.objects.get(task_id=str(result.id))
-    except TaskHistory.DoesNotExist:
-        pass
-    else:
-        task_history.verbose_name = str(vn_fmt).format(*vn_args)
-        task_history.save()
-        return True
-    return False
+# TODO: tcely: remove this
+set_verbose_name = TaskHistory.schedule
 
 
 def get_hash(task_name, pk):
@@ -633,7 +620,7 @@ def index_source(source_id):
     # Let the checking task run
     indexing_lock.clear()
     # Trigger any signals that we skipped with batched updates
-    set_verbose_name(
+    TaskHistory.schedule(
         save_all_media_for_source,
         str(source.pk),
         delay=60,
