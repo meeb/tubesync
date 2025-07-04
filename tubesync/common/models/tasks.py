@@ -11,6 +11,9 @@ def set_verbose_name(task_wrapper, /, *args, vn_args=(), vn_fmt=None, **kwargs):
     assert vn_fmt is not None, 'vn_fmt is required'
     if vn_fmt is None:
         return False
+    # support using the delay setting from the decorator
+    if not ('delay' in kwargs or 'eta' in kwargs):
+        kwargs['delay'] = task_wrapper.settings.get('delay') or int()
     result = task_wrapper.schedule(*args, **kwargs)
     try:
         task_history = TaskHistory.objects.get(task_id=str(result.id))
