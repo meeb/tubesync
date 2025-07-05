@@ -1115,7 +1115,7 @@ from background_task.exceptions import InvalidTaskError # noqa: E402
 from background_task.models import Task, CompletedTask # noqa: E402
 
 
-@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
+@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=False)
 def wait_for_database_queue():
     from common.huey import h_q_tuple
     queue_name = Val(TaskQueue.DB)
@@ -1144,11 +1144,6 @@ def index_source_task(source_id):
     else:
         if retval is not True:
             return retval
-        wait_for_database_queue(
-            priority=29, # the checking task uses 30
-            queue=Val(TaskQueue.FS),
-            verbose_name=_('Delaying checking all media for database tasks'),
-        )
         wait_for_database_queue(
             priority=19, # the indexing task uses 20
             queue=Val(TaskQueue.NET),
