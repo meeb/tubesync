@@ -1,6 +1,0 @@
-#!/command/with-contenv bash
-
-exec nice -n "${TUBESYNC_NICE:-1}" s6-setuidgid app \
-    /usr/bin/python3 /app/manage.py process_tasks \
-    --queue filesystem --duration 43200 \
-    --sleep "20.${RANDOM}"
