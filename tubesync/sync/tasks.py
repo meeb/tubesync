@@ -233,7 +233,7 @@ def upcoming_media():
         published__isnull=False,
         published__gte=(
             # previous hour
-            timezone.now() - timezone.timedelta(hours=1, minutes=1),
+            timezone.now() - timezone.timedelta(hours=1, minutes=1)
         ),
     )
     for media in qs_gen(qs):
