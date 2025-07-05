@@ -166,8 +166,8 @@ def get_media_metadata_task(media_id):
 def get_media_thumbnail_task(media_id):
     return get_first_task('sync.tasks.download_media_thumbnail', media_id)
 
-def get_media_premiere_task(media_id):
-    return get_first_task('sync.tasks.wait_for_media_premiere', media_id)
+def get_source_check_task(source_id):
+    return get_first_task('sync.tasks.save_all_media_for_source', source_id)
 
 def get_source_index_task(source_id):
     return get_first_task('sync.tasks.index_source_task', source_id)
@@ -231,28 +231,32 @@ def save_model(instance):
     queue=Val(TaskQueue.DB),
 )
 def upcoming_media():
-    now = timezone.now()
-    next_hour = now + timezone.timedelta(hours=1, minutes=3)
-    previous_hour = now - timezone.timedelta(hours=1, minutes=1)
     qs = Media.objects.filter(
         manual_skip=True,
-        metadata__isnull=False,
         published__isnull=False,
-        published__gte=previous_hour,
+        published__gte=(
+            # previous hour
+            timezone.now() - timezone.timedelta(hours=1, minutes=1),
+        ),
     )
     for media in qs_gen(qs):
+        media_id = str(media.pk)
         valid, hours = media.wait_for_premiere()
         if valid:
             save_model(media)
-        vn_fmt = _('Waiting for the premiere of "{}" at: {}')
-        wait_for_media_premiere(
-            str(media.pk),
-            run_at=next_hour,
-            verbose_name=vn_fmt.format(
+        task = get_first_task('sync.tasks.wait_for_media_premiere', media_id)
+        if not task:
+            # create a task to update
+            when = media.published + timezone.timedelta(minutes=1)
+            vn_fmt = _('Waiting for the premiere of "{}" at: {}')
+            vn = vn_fmt.format(
                 media.key,
                 media.published.isoformat(' ', 'seconds'),
-            ),
-        )
+            )
+            wait_for_media_premiere(media_id, run_at=when, verbose_name=vn)
+            task = get_first_task('sync.tasks.wait_for_media_premiere', media_id)
+        if hours:
+            update_task_status(task, f'available in {hours} hours')
         log.debug(f'upcoming_media: wait_for_premiere: {media.key}: {valid=} {hours=}')
 
 
@@ -1113,6 +1117,17 @@ from background_task.exceptions import InvalidTaskError # noqa: E402
 from background_task.models import Task, CompletedTask # noqa: E402
 
 
+@background(schedule=dict(priority=0, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
+def wait_for_media_premiere(media_id):
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist as e:
+        raise InvalidTaskError(_('no such media')) from e
+    else:
+        t = media.wait_for_premiere()
+        if t[0]:
+            save_model(media)
+
 @background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=False)
 def wait_for_database_queue():
     from common.huey import h_q_tuple
@@ -1173,23 +1188,6 @@ def download_media(media_id, override=False):
         return res.get(blocking=True)
     except CancelExecution as e:
         raise InvalidTaskError(str(e)) from e
-
-
-@background(schedule=dict(priority=0, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def wait_for_media_premiere(media_id):
-    try:
-        media = Media.objects.get(pk=media_id)
-    except Media.DoesNotExist as e:
-        raise InvalidTaskError(_('no such media')) from e
-    else:
-        valid, hours = media.wait_for_premiere()
-        if not valid:
-            return
-        
-        if hours:
-            task = get_media_premiere_task(media_id)
-            update_task_status(task, f'available in {hours} hours')
-        save_model(media)
 
 
 @background(schedule=dict(priority=1, run_at=90), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
