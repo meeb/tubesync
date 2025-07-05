@@ -152,15 +152,16 @@ def source_pre_delete(sender, instance, **kwargs):
     if sqs.count():
         media_source = sqs[0]
         # Schedule deletion of media
-        delete_task_by_source('sync.tasks.delete_all_media_for_source', media_source.pk)
-        verbose_name = _('Deleting all media for source "{}"')
         on_commit(partial(
+            TaskHistory.schedule,
             delete_all_media_for_source,
             str(media_source.pk),
             str(media_source.name),
             str(media_source.directory_path),
-            priority=1,
-            verbose_name=verbose_name.format(media_source.name),
+            vn_fmt = _('Deleting all media for source "{}"'),
+            vn_args=(
+                media_source.name,
+            ),
         ))
 
 
