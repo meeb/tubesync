@@ -166,9 +166,6 @@ def get_media_metadata_task(media_id):
 def get_media_thumbnail_task(media_id):
     return get_first_task('sync.tasks.download_media_thumbnail', media_id)
 
-def get_source_check_task(source_id):
-    return get_first_task('sync.tasks.save_all_media_for_source', source_id)
-
 def get_source_index_task(source_id):
     return get_first_task('sync.tasks.index_source_task', source_id)
 
