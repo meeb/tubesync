@@ -25,6 +25,7 @@ from django.utils.translation import gettext_lazy as _
 from django_huey import lock_task as huey_lock_task, task as huey_task # noqa
 from django_huey import db_periodic_task, db_task, signal as huey_signal
 from huey import crontab as huey_crontab, signals as huey_signals
+from huey.exceptions import TaskLockedException
 from common.huey import CancelExecution, dynamic_retry, register_huey_signals
 from common.logger import log
 from common.models import TaskHistory
@@ -486,6 +487,11 @@ def index_source(source_id):
         f'source:{source.uuid}',
         queue=Val(TaskQueue.FS),
     )
+    try:
+        indexing_lock.__enter__()
+    except TaskLockedException:
+        # already locked
+        pass
     # update the target schedule column
     source.task_run_at_dt
     # Reset any errors
