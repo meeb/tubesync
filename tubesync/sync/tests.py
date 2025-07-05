@@ -212,7 +212,7 @@ class FrontEndTestCase(TestCase):
                                      args=(source_uuid,))[0]
         self.assertEqual(task.queue, Val(TaskQueue.NET))
         # Run the check_source_directory_exists task
-        check_source_directory_exists.now(source_uuid)
+        check_source_directory_exists.call_local(source_uuid)
         # Check the source is now on the source overview page
         response = c.get('/sources')
         self.assertEqual(response.status_code, 200)
@@ -560,6 +560,9 @@ class FilepathTestCase(TestCase):
         self.source.media_format = 'test-{yyyy_mm_dd}'
         self.assertEqual(self.source.get_example_media_format(),
                          'test-' + timezone.now().strftime('%Y-%m-%d'))
+        self.source.media_format = 'test-{yyyy_0mm_dd}'
+        self.assertEqual(self.source.get_example_media_format(),
+                         'test-' + timezone.now().strftime('%Y-0%m-%d'))
         self.source.media_format = 'test-{yyyy}'
         self.assertEqual(self.source.get_example_media_format(),
                          'test-' + timezone.now().strftime('%Y'))
@@ -1833,7 +1836,7 @@ class TasksTestCase(TestCase):
         self.assertEqual(src1.media_source.all().count(), 3)
         self.assertEqual(src2.media_source.all().count(), 3)
 
-        cleanup_old_media()
+        cleanup_old_media.call_local(durable=False)
 
         self.assertEqual(src1.media_source.all().count(), 3)
         self.assertEqual(src2.media_source.all().count(), 3)

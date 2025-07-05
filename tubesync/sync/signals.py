@@ -6,18 +6,23 @@ from django.db import IntegrityError
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
 from django.db.transaction import atomic, on_commit
 from django.dispatch import receiver
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from background_task.signals import task_failed
+from background_task.signals import (
+    task_created, task_started, task_successful, task_rescheduled, task_failed,
+)
 from background_task.models import Task
 from common.logger import log
+from common.models import TaskHistory
 from common.utils import glob_quote, mkdir_p
 from .models import Source, Media, Metadata
-from .tasks import (delete_task_by_source, delete_task_by_media, index_source_task,
-                    download_media_thumbnail, download_media_metadata,
-                    map_task_to_instance, check_source_directory_exists,
-                    download_media, download_source_images,
-                    delete_all_media_for_source, save_all_media_for_source,
-                    rename_media, get_media_metadata_task, get_media_download_task)
+from .tasks import (
+    map_task_to_instance, rename_media, save_all_media_for_source,
+    delete_task_by_source, delete_task_by_media, delete_all_media_for_source,
+    check_source_directory_exists, download_source_images, index_source_task,
+    download_media, download_media_metadata, download_media_thumbnail,
+    get_media_download_task, get_media_metadata_task, get_media_thumbnail_task,
+)
 from .utils import delete_file
 from .filtering import filter_media
 from .choices import Val, YouTube_SourceType
@@ -34,7 +39,7 @@ def source_pre_save(sender, instance, **kwargs):
         return
 
     args = ( str(instance.pk), )
-    check_source_directory_exists.now(*args)
+    check_source_directory_exists.call_local(*args)
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
     new_dirpath = instance.directory_path.resolve(strict=False)
     if existing_dirpath != new_dirpath:
@@ -95,7 +100,7 @@ def source_pre_save(sender, instance, **kwargs):
         verbose_name = _('Index media from source "{}"')
         index_source_task(
             str(instance.pk),
-            repeat=instance.index_schedule,
+            repeat=0,
             schedule=instance.task_run_at_dt,
             verbose_name=verbose_name.format(instance.name),
         )
@@ -105,23 +110,16 @@ def source_pre_save(sender, instance, **kwargs):
 def source_post_save(sender, instance, created, **kwargs):
     # Check directory exists and create an indexing task for newly created sources
     if created:
-        verbose_name = _('Check download directory exists for source "{}"')
-        check_source_directory_exists(
-            str(instance.pk),
-            verbose_name=verbose_name.format(instance.name),
-        )
+        check_source_directory_exists(str(instance.pk))
         if instance.source_type != Val(YouTube_SourceType.PLAYLIST) and instance.copy_channel_images:
-            download_source_images(
-                str(instance.pk),
-                verbose_name=verbose_name.format(instance.name),
-            )
+            download_source_images(str(instance.pk))
         if instance.index_schedule > 0:
             delete_task_by_source('sync.tasks.index_source_task', instance.pk)
             log.info(f'Scheduling first media indexing for source: {instance.name}')
             verbose_name = _('Index media from source "{}"')
             index_source_task(
                 str(instance.pk),
-                repeat=instance.index_schedule,
+                repeat=0,
                 schedule=600,
                 verbose_name=verbose_name.format(instance.name),
             )
@@ -142,7 +140,6 @@ def source_pre_delete(sender, instance, **kwargs):
     instance.deactivate()
     log.info(f'Deleting tasks for source: {instance.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
-    delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
 
@@ -169,15 +166,108 @@ def source_post_delete(sender, instance, **kwargs):
     source = instance
     log.info(f'Deleting tasks for removed source: {source.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
-    delete_task_by_source('sync.tasks.check_source_directory_exists', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
     delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
 
 
-@receiver(task_failed, sender=Task)
+@receiver(task_created, dispatch_uid='sync.signals.task_task_created')
+@atomic(durable=False)
+def task_task_created(sender, task=None, **kwargs):
+    if task is None:
+        return
+    task_obj = task
+    th, created = TaskHistory.objects.get_or_create(
+        task_id=str(task_obj.pk),
+        name=task_obj.task_name,
+        queue=task_obj.queue,
+    )
+    th.scheduled_at = task_obj.run_at
+    th.priority = (100 - task_obj.priority)
+    th.repeat = task_obj.repeat
+    th.repeat_until = task_obj.repeat_until
+    th.task_params = list(task_obj.params())
+    th.verbose_name = task_obj.verbose_name
+    th.save()
+    if created:
+        log.debug(f'Created a new task history record: {th.pk}: {th.verbose_name}')
+
+
+@receiver(task_started, dispatch_uid='sync.signals.task_task_started')
+@atomic(durable=False)
+def task_task_started(sender, **kwargs):
+    locked_tasks = Task.objects.locked(timezone.now())
+    for task_obj in locked_tasks:
+        th, created = TaskHistory.objects.get_or_create(
+            task_id=str(task_obj.pk),
+            name=task_obj.task_name,
+            queue=task_obj.queue,
+        )
+        th.attempts += 1
+        th.end_at = task_obj.locked_at
+        th.priority = (100 - task_obj.priority)
+        th.repeat = task_obj.repeat
+        th.repeat_until = task_obj.repeat_until
+        th.start_at = task_obj.locked_at
+        th.task_params = list(task_obj.params())
+        th.verbose_name = task_obj.verbose_name
+        th.save()
+        if created:
+            log.debug(f'Started a new task history record: {th.pk}: {th.verbose_name}')
+
+
+@receiver(task_rescheduled, dispatch_uid='sync.signals.task_task_rescheduled')
+@atomic(durable=False)
+def task_task_rescheduled(sender, task=None, **kwargs):
+    if task is None:
+        return
+    now_dt = timezone.now()
+    task_obj = task
+    th, created = TaskHistory.objects.get_or_create(
+        task_id=str(task_obj.pk),
+        name=task_obj.task_name,
+        queue=task_obj.queue,
+    )
+    th.elapsed += (
+        now_dt - task_obj.locked_at
+    ).total_seconds()
+    th.end_at = now_dt
+    th.scheduled_at = task_obj.run_at
+    th.start_at = task_obj.locked_at
+    th.save()
+    if created:
+        log.debug(f'Rescheduled a new task history record: {th.pk}: {th.verbose_name}')
+
+def merge_completed_task_into_history(task_id, task_obj):
+    th, created = TaskHistory.objects.get_or_create(
+        task_id=str(task_id),
+        name=task_obj.task_name,
+        queue=task_obj.queue,
+    )
+    th.elapsed += (
+        (task_obj.failed_at or task_obj.run_at) - task_obj.locked_at
+    ).total_seconds()
+    th.end_at = task_obj.run_at
+    th.failed_at = task_obj.failed_at
+    th.last_error = task_obj.last_error
+    th.repeat = task_obj.repeat
+    th.repeat_until = task_obj.repeat_until
+    th.start_at = task_obj.locked_at
+    th.verbose_name = task_obj.verbose_name
+    th.save()
+
+
+@receiver(task_successful, dispatch_uid='sync.signals.task_task_successful')
+@atomic(durable=False)
+def task_task_successful(sender, task_id, completed_task, **kwargs):
+    merge_completed_task_into_history(task_id, completed_task)
+
+
+@receiver(task_failed, dispatch_uid='sync.signals.task_task_failed')
+@atomic(durable=False)
 def task_task_failed(sender, task_id, completed_task, **kwargs):
+    merge_completed_task_into_history(task_id, completed_task)
     # Triggered after a task fails by reaching its max retry attempts
-    obj, url = map_task_to_instance(completed_task)
+    obj, url = map_task_to_instance(completed_task, using_history=False)
     if isinstance(obj, Source):
         log.error(f'Permanent failure for source: {obj} task: {completed_task}')
         obj.has_failed = True
@@ -200,6 +290,7 @@ def media_post_save(sender, instance, created, **kwargs):
     # Reset the skip flag if the download cap has changed if the media has not
     # already been downloaded
     downloaded = instance.downloaded
+    existing_media_thumbnail_task = get_media_thumbnail_task(str(instance.pk))
     existing_media_metadata_task = get_media_metadata_task(str(instance.pk))
     existing_media_download_task = get_media_download_task(str(instance.pk))
     if not downloaded:
@@ -230,35 +321,31 @@ def media_post_save(sender, instance, created, **kwargs):
             settings.RENAME_ALL_SOURCES
         )
         if create_rename_task:
-            verbose_name = _('Renaming media for: {}: "{}"')
-            rename_media(
-                str(media.pk),
-                verbose_name=verbose_name.format(media.key, media.name),
-            )
+            rename_media(str(media.pk))
 
     # If the media is missing metadata schedule it to be downloaded
     if not (media.skip or media.has_metadata or existing_media_metadata_task):
-        log.info(f'Scheduling task to download metadata for: {instance.url}')
+        log.info(f'Scheduling task to download metadata for: {media.url}')
         verbose_name = _('Downloading metadata for: {}: "{}"')
         download_media_metadata(
-            str(instance.pk),
+            str(media.pk),
             verbose_name=verbose_name.format(media.key, media.name),
         )
     # If the media is missing a thumbnail schedule it to be downloaded (unless we are skipping this media)
-    if not instance.thumb_file_exists:
-        instance.thumb = None
-    if not instance.thumb and not instance.skip:
-        thumbnail_url = instance.thumbnail
+    if not media.thumb_file_exists:
+        media.thumb = None
+    if not (media.skip or media.thumb or existing_media_thumbnail_task):
+        thumbnail_url = media.thumbnail
         if thumbnail_url:
             log.info(
                 'Scheduling task to download thumbnail'
-                f' for: {instance.name} from: {thumbnail_url}'
+                f' for: {media.name} from: {thumbnail_url}'
             )
             verbose_name = _('Downloading thumbnail for "{}"')
             download_media_thumbnail(
-                str(instance.pk),
+                str(media.pk),
                 thumbnail_url,
-                verbose_name=verbose_name.format(instance.name),
+                verbose_name=verbose_name.format(media.name),
             )
     media_file_exists = False
     try:
@@ -294,7 +381,6 @@ def media_pre_delete(sender, instance, **kwargs):
     log.info(f'Deleting tasks for media: {instance.name}')
     delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
     delete_task_by_media('sync.tasks.download_media_metadata', (str(instance.pk),))
-    delete_task_by_media('sync.tasks.rename_media', (str(instance.pk),))
     delete_task_by_media('sync.tasks.wait_for_media_premiere', (str(instance.pk),))
     thumbnail_url = instance.thumbnail
     if thumbnail_url:

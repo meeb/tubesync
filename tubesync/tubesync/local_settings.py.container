@@ -1,3 +1,4 @@
+import logging
 import sys
 from pathlib import Path
 from urllib.parse import urljoin
@@ -32,13 +33,15 @@ if database_connection_env:
 
 
 if database_dict:
-    print(f'Using database connection: {database_dict["DRIVER"]}://'
-          f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
-          f'{database_dict["PORT"]}/{database_dict["NAME"]}',
-        file=sys.stdout, flush=True)
     DATABASES = {
         'default': database_dict,
     }
+    DATABASES['default']['_msgs'] = database_dict.get('_msgs', list())
+    DATABASES['default']['_msgs'].append((
+        f'Using database connection: {database_dict["DRIVER"]}://'
+        f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
+        f'{database_dict["PORT"]}/{database_dict["NAME"]}',
+    ))
     DATABASE_CONNECTION_STR = (f'{database_dict["DRIVER"]} at "{database_dict["HOST"]}:'
                                f'{database_dict["PORT"]}" database '
                                f'"{database_dict["NAME"]}"')
@@ -48,8 +51,12 @@ else:
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': CONFIG_BASE_DIR / 'db.sqlite3',
             "OPTIONS": {
+                "timeout": 10,
                 "transaction_mode": "IMMEDIATE",
+                # PRAGMA journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
                 "init_command": """
+                    PRAGMA journal_mode = TRUNCATE;
+                    PRAGMA journal_size_limit = 67108864;
                     PRAGMA legacy_alter_table = OFF;
                     PRAGMA auto_vacuum = INCREMENTAL;
                     PRAGMA incremental_vacuum(100);
@@ -69,6 +76,10 @@ else:
 DEFAULT_THREADS = 1
 BACKGROUND_TASK_ASYNC_THREADS = getenv('TUBESYNC_WORKERS', DEFAULT_THREADS, integer=True)
 if BACKGROUND_TASK_ASYNC_THREADS > 1:
+    DATABASES['default']['_msgs'] = database_dict.get('_msgs', list())
+    DATABASES['default']['_msgs'].append((logging.WARNING,
+        'Using more than 1 worker is generally a bad idea.',
+    ))
     BACKGROUND_TASK_RUN_ASYNC = True
 
 

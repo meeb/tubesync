@@ -21,7 +21,7 @@ existing database data with:
 # Stop services
 $ docker exec -t tubesync \
     bash -c 'for svc in \
-    /run/service/{gunicorn,tubesync*-worker} ; \
+    /run/service/{gunicorn,huey-*,tubesync*-worker} ; \
 do \
     /command/s6-svc -wd -D "${svc}" ; \
 done'
@@ -52,7 +52,7 @@ After you have changed your database backend over, then use:
 # Stop services
 $ docker exec -t tubesync \
     bash -c 'for svc in \
-    /run/service/{gunicorn,tubesync*-worker} ; \
+    /run/service/{gunicorn,huey-*,tubesync*-worker} ; \
 do \
     /command/s6-svc -wd -D "${svc}" ; \
 done'
@@ -67,7 +67,7 @@ Or, if you only have the copy in `/tmp/`, then you would use:
 # Stop services
 $ docker exec -t tubesync \
     bash -c 'for svc in \
-    /run/service/{gunicorn,tubesync*-worker} ; \
+    /run/service/{gunicorn,huey-*,tubesync*-worker} ; \
 do \
     /command/s6-svc -wd -D "${svc}" ; \
 done'
@@ -80,11 +80,11 @@ $ xzcat /tmp/tubesync-database-backup.jsonl.xz | \
 
 As detailed in the Django documentation:
 
-https://docs.djangoproject.com/en/5.1/ref/django-admin/#dumpdata
+* https://docs.djangoproject.com/en/5.2/ref/django-admin/#dumpdata
 
 and:
 
-https://docs.djangoproject.com/en/5.1/ref/django-admin/#loaddata
+* https://docs.djangoproject.com/en/5.2/ref/django-admin/#loaddata
 
 Further instructions are beyond the scope of TubeSync documenation and you should refer
 to Django documentation for more details.

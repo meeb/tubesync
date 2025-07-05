@@ -255,6 +255,7 @@ docker logs -t tubesync > TubeSync.logs.txt 2>&1
 Once you're happy using TubeSync there are some advanced usage guides for more complex
 and less common features:
 
+ * [Using Plex](https://github.com/meeb/tubesync/blob/main/docs/plex-notes.md)
  * [Import existing media into TubeSync](https://github.com/meeb/tubesync/blob/main/docs/import-existing-media.md)
  * [Sync or create missing metadata files](https://github.com/meeb/tubesync/blob/main/docs/create-missing-metadata.md)
  * [Reset tasks from the command line](https://github.com/meeb/tubesync/blob/main/docs/reset-tasks.md)
@@ -284,11 +285,6 @@ downloading any media. Check your tasks for the status of your TubeSync install.
 **Be nice.** It's entirely possible that your IP address could get throttled and/or banned, by the
 source, if you try to crawl extremely large amounts quickly. **Try to be polite
 with the smallest amount of indexing and concurrent downloads possible for your needs.**
-
-Only, if you absolutely must, should you increase [`TUBESYNC_WORKERS`](#advanced-configuration) above its default value.
-The maximum the software accepts is `8` threads per queue worker process.
-By default, up to `3` tasks will be executing concurrently.
-The maximum is `24` concurrent tasks.
 
 # FAQ
 
@@ -400,7 +396,6 @@ useful if you are manually installing TubeSync in some other environment. These 
 | TUBESYNC_DIRECTORY_PREFIX    | Enable `video` and `audio` directory prefixes in `/downloads` | True                                                                          |
 | TUBESYNC_SHRINK_NEW          | Filter unneeded information from newly retrieved metadata     | True                                                                          |
 | TUBESYNC_SHRINK_OLD          | Filter unneeded information from metadata loaded from the database | True                                                                     |
-| TUBESYNC_WORKERS             | Number of background threads per (task runner) process. Default is 1. Max allowed is 8. | 2                                                  |
 | GUNICORN_WORKERS             | Number of `gunicorn` (web request) workers to spawn           | 3                                                                             |
 | LISTEN_HOST                  | IP address for `gunicorn` to listen on                        | 127.0.0.1                                                                     |
 | LISTEN_PORT                  | Port number for `gunicorn` to listen on                       | 8080                                                                          |

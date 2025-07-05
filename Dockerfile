@@ -540,7 +540,9 @@ HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck
 ENV PYTHONPATH="/app" \
     PYTHONPYCACHEPREFIX="/config/cache/pycache" \
     S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0" \
-    XDG_CACHE_HOME="/config/cache"
+    XDG_CACHE_HOME="/config/cache" \
+    XDG_CONFIG_HOME="/config/tubesync" \
+    XDG_STATE_HOME="/config/state"
 EXPOSE 4848
 
 # Volumes

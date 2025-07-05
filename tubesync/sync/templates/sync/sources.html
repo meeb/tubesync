@@ -31,7 +31,8 @@
           {% if source.has_failed %}
           <span class="error-text"><i class="fas fa-exclamation-triangle"></i> <strong>Source has permanent failures</strong></span>
           {% else %}
-          <strong>{{ source.media_count }}</strong> media items, <strong>{{ source.downloaded_count }}</strong> downloaded{% if source.delete_old_media and source.days_to_keep > 0 %}, keeping {{ source.days_to_keep }} days of media{% endif %}
+          <strong>{{ source.media_count }}</strong> media items, <strong>{{ source.downloaded_count }}</strong> downloaded{% if source.delete_old_media and source.days_to_keep > 0 %}, keeping {{ source.days_to_keep }} days of media{% endif %}<br>
+          Next update target: <strong>{% if source.target_schedule %}{{ source.target_schedule|date:'l, h:00 A' }}{% else %}Not set{% endif %}</strong>
           {% endif %}
         </a>
         <a href="{% url 'sync:source-sync-now' pk=source.pk %}" class="btn">Sync Now</a>
