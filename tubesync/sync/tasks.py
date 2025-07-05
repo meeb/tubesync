@@ -65,7 +65,6 @@ def map_task_to_instance(task, using_history=True):
         'sync.tasks.save_all_media_for_source': Source,
         'sync.tasks.rename_all_media_for_source': Source,
         'sync.tasks.wait_for_media_premiere': Media,
-        'sync.tasks.delete_all_media_for_source': Source,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
@@ -200,13 +199,11 @@ def cleanup_completed_tasks():
 
 @atomic(durable=False)
 def migrate_queues():
-    tqs = Task.objects.all()
-    remaining_queues = list((
-        Val(TaskQueue.FS),
-        Val(TaskQueue.NET),
-    ))
-    qs = tqs.exclude(queue__in=remaining_queues)
-    return qs.update(queue=Val(TaskQueue.NET))
+    return Task.objects.exclude(
+        queue=Val(TaskQueue.NET)
+    ).update(
+        queue=Val(TaskQueue.NET)
+    )
 
 
 def save_model(instance):
@@ -1227,4 +1224,5 @@ def download_media(media_id, override=False):
         return res.get(blocking=True)
     except CancelExecution as e:
         raise InvalidTaskError(str(e)) from e
+
 
