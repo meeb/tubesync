@@ -1044,6 +1044,7 @@ def rename_all_media_for_source(source_id):
 
 
 @dynamic_retry(db_task, delay=600, priority=70, retries=15, queue=Val(TaskQueue.FS))
+@huey_lock_task('sync.tasks.save_all_media_for_source', queue=Val(TaskQueue.FS))
 def save_all_media_for_source(source_id):
     '''
         Iterates all media items linked to a source and saves them to
@@ -1103,10 +1104,7 @@ def save_all_media_for_source(source_id):
         for media in qs_gen(save_qs)
         if str(media.pk) not in saved_later
     }
-
-    # wait for tasks to complete
-    res = save_media.map(saved_now)
-    res.get(blocking=True)
+    save_media.map(saved_now)
 
 
 # Old tasks system
