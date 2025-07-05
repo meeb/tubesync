@@ -15,7 +15,7 @@ def set_verbose_name(cls, task_wrapper, /, *args, vn_args=(), vn_fmt=None, **kwa
     # support using the delay setting from the decorator
     if not ('delay' in kwargs or 'eta' in kwargs):
         kwargs['delay'] = task_wrapper.settings.get('delay') or int()
-    result = task_wrapper.schedule(*args, **kwargs)
+    result = task_wrapper.schedule(args=args, **kwargs)
     try:
         task_history = cls.objects.get(task_id=str(result.id))
     except cls.DoesNotExist:
