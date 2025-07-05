@@ -1124,13 +1124,12 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
     ).filter(
         source=source or source_id,
     )
+    delete_media.map({
+        str(media.pk)
+        for media in qs_gen(mqs)
+    })
     with atomic(durable=True):
-        for media in qs_gen(mqs):
-            delete_media(str(media.pk))
-            media.skip = True
-            media.manual_skip = True
-            media.save()
-    with atomic(durable=True):
+        mqs.update(manual_skip=True, skip=True)
         log.info(f'Deleting media for source: {source_name}')
         mqs.delete()
     # Remove the directory, if the user requested that
