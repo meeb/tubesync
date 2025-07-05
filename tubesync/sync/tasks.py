@@ -72,20 +72,16 @@ def map_task_to_instance(task, using_history=True):
         Media: 'sync:media-item',
     }
     # Unpack
-    task_args = None
-    if using_history:
-        task_func = task.name
-        task_args = task.task_params
-    else:
-        task_func, task_args_str = task.task_name, task.task_params
+    task_func = task.name if using_history else task.task_name
     model = TASK_MAP.get(task_func, None)
     if not model:
         return None, None
     url = MODEL_URL_MAP.get(model, None)
     if not url:
         return None, None
+    task_args = task.task_params if using_history else None
     try:
-        task_args = task_args or json.loads(task_args_str)
+        task_args = task_args or json.loads(task.task_params)
     except (TypeError, ValueError, AttributeError):
         return None, None
     if len(task_args) != 2:
