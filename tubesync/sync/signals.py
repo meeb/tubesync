@@ -17,11 +17,12 @@ from common.models import TaskHistory
 from common.utils import glob_quote, mkdir_p
 from .models import Source, Media, Metadata
 from .tasks import (
-    map_task_to_instance, rename_media, save_all_media_for_source,
-    delete_task_by_source, delete_task_by_media, delete_all_media_for_source,
+    delete_task_by_media, delete_task_by_source,
+    get_media_download_task, get_media_metadata_task, get_media_thumbnail_task,
+    map_task_to_instance,
+    delete_all_media_for_source, rename_media, save_all_media_for_source,
     check_source_directory_exists, download_source_images, index_source_task,
     download_media, download_media_metadata, download_media_thumbnail,
-    get_media_download_task, get_media_metadata_task, get_media_thumbnail_task,
 )
 from .utils import delete_file
 from .filtering import filter_media
@@ -124,10 +125,14 @@ def source_post_save(sender, instance, created, **kwargs):
                 verbose_name=verbose_name.format(instance.name),
             )
 
-    verbose_name = _('Checking all media for source "{}"')
-    save_all_media_for_source(
-        str(instance.pk),
-        verbose_name=verbose_name.format(instance.name),
+    source = instance
+    TaskHistory.schedule(
+        save_all_media_for_source,
+        str(source.pk),
+        vn_fmt = _('Checking all media for "{}"'),
+        vn_args=(
+            source.name,
+        ),
     )
 
 
@@ -141,7 +146,6 @@ def source_pre_delete(sender, instance, **kwargs):
     log.info(f'Deleting tasks for source: {instance.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
-    delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
 
     # Fetch the media source
     sqs = Source.objects.filter(filter_text=str(source.pk))
@@ -167,7 +171,6 @@ def source_post_delete(sender, instance, **kwargs):
     log.info(f'Deleting tasks for removed source: {source.name}')
     delete_task_by_source('sync.tasks.index_source_task', instance.pk)
     delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
-    delete_task_by_source('sync.tasks.save_all_media_for_source', instance.pk)
 
 
 @receiver(task_created, dispatch_uid='sync.signals.task_task_created')

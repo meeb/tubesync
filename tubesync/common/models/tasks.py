@@ -6,6 +6,27 @@ from django.utils import timezone
 from ..json import JSONEncoder
 # from common.json import JSONEncoder
 
+# cls = TaskHistory
+# TaskHistory is defined below this function in this file
+def set_verbose_name(cls, task_wrapper, /, *args, vn_args=(), vn_fmt=None, **kwargs):
+    assert vn_fmt is not None, 'vn_fmt is required'
+    if vn_fmt is None:
+        return False
+    # support using the delay setting from the decorator
+    if not ('delay' in kwargs or 'eta' in kwargs):
+        kwargs['delay'] = task_wrapper.settings.get('delay') or int()
+    result = task_wrapper.schedule(args=args, **kwargs)
+    try:
+        task_history = cls.objects.get(task_id=str(result.id))
+    except cls.DoesNotExist:
+        pass
+    else:
+        task_history.verbose_name = str(vn_fmt).format(*vn_args)
+        task_history.save()
+        return True
+    return False
+
+
 class TaskHistoryQuerySet(models.QuerySet):
 
     def failed(self, within=None):
@@ -72,6 +93,10 @@ class TaskHistory(models.Model):
     repeat_until = models.DateTimeField(null=True, blank=True)
 
     objects = TaskHistoryQuerySet.as_manager()
+
+    @classmethod
+    def schedule(cls, task_wrapper, /, *args, vn_args=(), vn_fmt=None, **kwargs):
+        return set_verbose_name(cls, task_wrapper, *args, vn_fmt=vn_fmt, vn_args=vn_args, **kwargs)
 
     def save(self, *args, **kwargs):
         self.queue = self.queue or None
