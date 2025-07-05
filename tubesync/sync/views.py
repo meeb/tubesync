@@ -867,9 +867,12 @@ class TasksView(ListView):
         data = super().get_context_data(*args, **kwargs)
         now_dt = timezone.now()
         scheduled_qs = get_waiting_tasks()
-        running_qs = scheduled_qs.filter(
-            start_at__isnull=False,
-            end_at__lte=F('start_at'),
+        # Huey removes running tasks,
+        # so the waiting tasks will not include them.
+        running_qs = TaskHistory.objects.filter(
+            start_at=F('end_at'),
+            scheduled_at__lte=F('end_at'),
+            end_at__gte=now_dt-timezone.timedelta(hours=12),
         )
         errors_qs = scheduled_qs.filter(
             attempts__gt=0
