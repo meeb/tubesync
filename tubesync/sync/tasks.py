@@ -66,7 +66,6 @@ def map_task_to_instance(task, using_history=True):
         'sync.tasks.save_all_media_for_source': Source,
         'sync.tasks.rename_all_media_for_source': Source,
         'sync.tasks.wait_for_media_premiere': Media,
-        'sync.tasks.delete_all_media_for_source': Source,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
@@ -201,13 +200,11 @@ def cleanup_completed_tasks():
 
 @atomic(durable=False)
 def migrate_queues():
-    tqs = Task.objects.all()
-    remaining_queues = list((
-        Val(TaskQueue.FS),
-        Val(TaskQueue.NET),
-    ))
-    qs = tqs.exclude(queue__in=remaining_queues)
-    return qs.update(queue=Val(TaskQueue.NET))
+    return Task.objects.exclude(
+        queue=Val(TaskQueue.NET)
+    ).update(
+        queue=Val(TaskQueue.NET)
+    )
 
 
 def save_model(instance):
@@ -1104,6 +1101,47 @@ def save_all_media_for_source(source_id):
     save_media.map(saved_now)
 
 
+@dynamic_retry(db_task, delay=90, priority=99, queue=Val(TaskQueue.FS))
+def delete_all_media_for_source(source_id, source_name, source_directory):
+    source = None
+    assert source_id
+    assert source_name
+    assert source_directory
+    try:
+        source = Source.objects.get(pk=source_id)
+    except Source.DoesNotExist:
+        # Task triggered but the source no longer exists, do nothing
+        log.warning(f'Task delete_all_media_for_source(pk={source_id}) called but no '
+                  f'source exists with ID: {source_id}')
+        #raise CancelExecution(_('no such source'), retry=False) from e
+        pass # this task can run after a source was deleted
+    mqs = Media.objects.all().defer(
+        'metadata',
+    ).filter(
+        source=source or source_id,
+    )
+    delete_media.map({
+        str(media.pk)
+        for media in qs_gen(mqs)
+    })
+    with atomic(durable=True):
+        mqs.update(manual_skip=True, skip=True)
+        log.info(f'Deleting media for source: {source_name}')
+        mqs.delete()
+    # Remove the directory, if the user requested that
+    directory_path = Path(source_directory)
+    remove = (
+        (source and source.delete_removed_media) or
+        (directory_path / '.to_be_removed').is_file()
+    )
+    if source:
+        with atomic(durable=True):
+            source.delete()
+    if remove:
+        log.info(f'Deleting directory for: {source_name}: {directory_path}')
+        rmtree(directory_path, True)
+
+
 # Old tasks system
 from background_task import background # noqa: E402
 from background_task.exceptions import InvalidTaskError # noqa: E402
@@ -1182,49 +1220,4 @@ def download_media(media_id, override=False):
     except CancelExecution as e:
         raise InvalidTaskError(str(e)) from e
 
-
-@background(schedule=dict(priority=1, run_at=90), queue=Val(TaskQueue.FS), remove_existing_tasks=False)
-def delete_all_media_for_source(source_id, source_name, source_directory):
-    source = None
-    assert source_id
-    assert source_name
-    assert source_directory
-    try:
-        source = Source.objects.get(pk=source_id)
-    except Source.DoesNotExist:
-        # Task triggered but the source no longer exists, do nothing
-        log.warn(f'Task delete_all_media_for_source(pk={source_id}) called but no '
-                  f'source exists with ID: {source_id}')
-        #raise InvalidTaskError(_('no such source')) from e
-        pass # this task can run after a source was deleted
-    mqs = Media.objects.all().defer(
-        'metadata',
-    ).filter(
-        source=source or source_id,
-    )
-    deleted_now = set()
-    with atomic(durable=True):
-        for media in qs_gen(mqs):
-            log.info(f'Deleting media for source: {source_name} item: {media.name}')
-            with atomic():
-                #media.downloaded = False
-                media.skip = True
-                media.manual_skip = True
-                media.save()
-                deleted_now.add(str(media.pk))
-                #media.delete()
-    res = delete_media.map(deleted_now)
-    res.get(blocking=True)
-    # Remove the directory, if the user requested that
-    directory_path = Path(source_directory)
-    remove = (
-        (source and source.delete_removed_media) or
-        (directory_path / '.to_be_removed').is_file()
-    )
-    if source:
-        with atomic(durable=True):
-            source.delete()
-    if remove:
-        log.info(f'Deleting directory for: {source_name}: {directory_path}')
-        rmtree(directory_path, True)
 
