@@ -9,7 +9,7 @@ from huey.api import TaskLock
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
 
 
-def _set_locked(self, value=True):
+def _set_acquired(self, value=True):
     if value is not True:
         self.clear()
     try:
@@ -18,10 +18,10 @@ def _set_locked(self, value=True):
         return False
     else:
         return True
-#TaskLock._set_locked = _set_locked
-TaskLock.locked = property(
+#TaskLock._set_acquired = _set_acquired
+TaskLock.acquired = property(
     TaskLock.is_locked,
-    _set_locked,
+    _set_acquired,
     TaskLock.clear,
 )
 
