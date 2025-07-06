@@ -617,18 +617,8 @@ def index_source(source_id):
     videos = video = None
     db_batch_data.clear()
     db_batch_media.clear()
-    # Let the checking task run
+    # Let the checking task created by saving `last_crawl` run
     indexing_lock.clear()
-    # Trigger any signals that we skipped with batched updates
-    TaskHistory.schedule(
-        save_all_media_for_source,
-        str(source.pk),
-        delay=60,
-        vn_fmt = _('Checking all media for "{}"'),
-        vn_args=(
-            source.name,
-        ),
-    )
     return True
 
 
