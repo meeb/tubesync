@@ -502,7 +502,7 @@ def index_source(source_id):
     if not videos:
         source.has_failed = True
         save_model(source)
-        indexing_lock.clear()
+        indexing_lock.acquired = False
         raise NoMediaException(f'Source "{source}" (ID: {source_id}) returned no '
                                f'media to index, is the source key valid? Check the '
                                f'source configuration is correct and that the source '
@@ -1130,8 +1130,8 @@ def save_all_media_for_source(source_id):
         f'source:{source.uuid}',
         queue=Val(TaskQueue.FS),
     )
-    if indexing_lock.is_locked():
-        raise CancelExecution(_('Indexing not completed'))
+    if indexing_lock.acquired:
+        raise CancelExecution(_('source indexing in progress'))
 
     refresh_qs = Media.objects.all().only(
         'pk',
