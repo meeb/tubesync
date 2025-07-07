@@ -282,6 +282,25 @@ RUN set -eu ; \
 FROM scratch AS s6-overlay
 COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 
+FROM tubesync-base AS tubesync-prepare-app
+
+COPY tubesync /app
+
+RUN --mount=type=bind,source=fontawesome-free,target=/fontawesome-free \
+  set -x && \
+  # turn any symbolic links into files
+  ( \
+    cd /app && \
+      find . -type l -print0 | \
+      tar --null -ch --files-from=- | \
+      tar --unlink-first -xvp ; \
+  ) && \
+  rm -v /app/tubesync/local_settings.py.example && \
+  mv -v /app/tubesync/local_settings.py.container /app/tubesync/local_settings.py
+
+FROM scratch AS tubesync-app
+COPY --from=tubesync-prepare-app /app /app
+
 FROM tubesync-base AS tubesync-uv
 COPY --from=uv-binaries /uv /uvx /usr/local/bin/
 
@@ -503,8 +522,7 @@ COPY patches/yt_dlp/ \
     /usr/local/lib/python3/dist-packages/yt_dlp/
 
 # Copy app
-COPY tubesync /app
-COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
+COPY --from=tubesync-app /app /app
 
 # Build app
 RUN set -x && \
