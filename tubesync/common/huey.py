@@ -11,7 +11,7 @@ from .timestamp import datetime_to_timestamp, timestamp_to_datetime
 
 def _set_acquired(self, value=True):
     if value is not True:
-        self.clear()
+        return self.clear()
     try:
         self.__enter__()
     except Exception:
