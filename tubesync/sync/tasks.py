@@ -432,6 +432,10 @@ def migrate_to_metadata(media_id):
                   f'media exists with ID: {media_id}')
         raise CancelExecution(_('no such media'), retry=False) from e
 
+    migrating_lock = huey_lock_task(
+        f'index_media:{media.uuid}',
+        queue=Val(TaskQueue.FS),
+    )
     try:
         data = Metadata.objects.get(
             media__isnull=True,
@@ -439,6 +443,7 @@ def migrate_to_metadata(media_id):
             key=media.key,
         )
     except Metadata.DoesNotExist as e:
+        migrating_lock.acquired = False
         raise CancelExecution(_('no indexed data to migrate to metadata'), retry=False) from e
 
     with huey_lock_task(
@@ -461,6 +466,7 @@ def migrate_to_metadata(media_id):
                 if existing_value and ('epoch' == key or value == existing_value):
                     continue
                 media.save_to_metadata(field, value)
+    migrating_lock.acquired = False
 
 
 @db_task(delay=30, priority=80, queue=Val(TaskQueue.LIMIT))
@@ -484,11 +490,9 @@ def index_source(source_id):
         f'source:{source.uuid}',
         queue=Val(TaskQueue.FS),
     )
-    try:
-        indexing_lock.__enter__()
-    except TaskLockedException:
-        # already locked
-        pass
+    # be sure that this is locked
+    if not indexing_lock.acquired:
+        indexing_lock.acquired = True
     # update the target schedule column
     source.task_run_at_dt
     # Reset any errors
@@ -575,6 +579,12 @@ def index_source(source_id):
         data.retrieved = source.last_crawl
         data.value = { k: v for k,v in video.items() if v is not None }
         db_batch_data.append(data)
+        migrating_lock = huey_lock_task(
+            f'index_media:{media.uuid}',
+            queue=Val(TaskQueue.FS),
+        )
+        if not migrating_lock.acquired:
+            migrating_lock.acquired = True
         migrate_to_metadata(str(media.pk))
         if not new_media:
             # update the existing media
@@ -615,7 +625,7 @@ def index_source(source_id):
     db_batch_data.clear()
     db_batch_media.clear()
     # Let the checking task created by saving `last_crawl` run
-    indexing_lock.clear()
+    indexing_lock.acquired = False
     return True
 
 
@@ -698,8 +708,18 @@ def delete_media(media_id):
     except Media.DoesNotExist as e:
         raise CancelExecution(_('no such media'), retry=False) from e
     else:
-        media.delete()
-        return True
+        migrating_lock = huey_lock_task(
+            f'index_media:{media.uuid}',
+            queue=Val(TaskQueue.FS),
+        )
+        if migrating_lock.acquired:
+            raise CancelExecution(_('media indexing in progress'), retry=True)
+        with huey_lock_task(
+            f'media:{media.uuid}',
+            queue=Val(TaskQueue.DB),
+        ):
+            media.delete()
+            return True
     return False
 
 
@@ -711,6 +731,12 @@ def rename_media(media_id):
     except Media.DoesNotExist as e:
         raise CancelExecution(_('no such media'), retry=False) from e
     else:
+        migrating_lock = huey_lock_task(
+            f'index_media:{media.uuid}',
+            queue=Val(TaskQueue.FS),
+        )
+        if migrating_lock.acquired:
+            raise CancelExecution(_('media indexing in progress'), retry=True)
         with huey_lock_task(
             f'media:{media.uuid}',
             queue=Val(TaskQueue.DB),
@@ -726,16 +752,22 @@ def save_media(media_id):
     except Media.DoesNotExist as e:
         raise CancelExecution(_('no such media'), retry=False) from e
     else:
+        migrating_lock = huey_lock_task(
+            f'index_media:{media.uuid}',
+            queue=Val(TaskQueue.FS),
+        )
+        if migrating_lock.acquired:
+            raise CancelExecution(_('media indexing in progress'), retry=True)
         with huey_lock_task(
             f'media:{media.uuid}',
             queue=Val(TaskQueue.DB),
         ):
-            media.save()
+            save_model(media)
         return True
     return False
 
 
-@db_task(delay=60, priority=60, queue=Val(TaskQueue.LIMIT))
+@db_task(delay=60, priority=60, retries=3, retry_delay=600, queue=Val(TaskQueue.LIMIT))
 def download_metadata(media_id):
     '''
         Downloads the metadata for a media item.
@@ -756,6 +788,15 @@ def download_metadata(media_id):
         queue_name=Val(TaskQueue.LIMIT),
         task_name='sync.tasks.download_media_metadata',
     )
+    metadata_lock = huey_lock_task(
+        f'index_media:{media.uuid}',
+        queue=Val(TaskQueue.FS),
+    )
+    keep_metadata_lock = False
+    try:
+        metadata_lock.__enter__()
+    except TaskLockedException as e:
+        raise CancelExecution(_('media indexing in progress'), retry=True) from e
     try:
         metadata = media.index_metadata()
     except YouTubeError as e:
@@ -791,6 +832,10 @@ def download_metadata(media_id):
             raise
         log.debug(str(e))
         return False
+    else:
+        keep_metadata_lock = True
+    finally:
+        metadata_lock.acquired = keep_metadata_lock
     response = metadata
     if getattr(settings, 'SHRINK_NEW_MEDIA_METADATA', False):
         response = filter_response(metadata, True)
@@ -822,10 +867,16 @@ def download_metadata(media_id):
         media.duration = media.metadata_duration
 
     # Don't filter media here, the post_save signal will handle that
-    save_model(media)
-    log.info(f'Saved {len(media.metadata_dumps())} bytes of metadata for: '
+    try:
+        media.save()
+    except Exception:
+        raise
+    else:
+        log.info(f'Saved {len(media.metadata_dumps())} bytes of metadata for: '
              f'{source} / {media}: {media_id}')
-    return True
+        return True
+    finally:
+        metadata_lock.acquired = False
 
 
 @dynamic_retry(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.NET))
@@ -854,7 +905,8 @@ def download_media_image(media_id, url):
                 raise
             raise NoThumbnailException(re.response.reason) from re
     except NoThumbnailException as e:
-        raise CancelExecution(str(e.__cause__), retry=False) from e
+        log.exception(str(e.__cause__))
+        return False
     if (i.width > width) and (i.height > height):
         log.info(f'Resizing {i.width}x{i.height} thumbnail to '
                  f'{width}x{height}: {url}')
@@ -892,8 +944,8 @@ def on_complete_download_media_image(signal_name, task_obj, exception_obj=None, 
     if 'download_media_image' != task_obj.name:
         return
     result = huey.result(preserve=True, id=task_obj.id)
-    # clear True from the results storage
-    if result is True:
+    # clear False/True from the results storage
+    if result is False or result is True:
         huey.result(preserve=False, id=task_obj.id)
 
 @db_task(delay=60, priority=70, queue=Val(TaskQueue.LIMIT))
@@ -917,39 +969,44 @@ def download_media_file(media_id, override=False):
         queue_name=Val(TaskQueue.LIMIT),
         task_name='sync.tasks.download_media',
     )
-    filepath = media.filepath
-    container = format_str = None
-    log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
-    try:
-        format_str, container = media.download_media()
-    except NoFormatException as e:
-        # Try refreshing formats
-        if media.has_metadata:
-            log.debug(f'Scheduling a task to refresh metadata for: {media.key}: "{media.name}"')
-            refresh_formats(str(media.pk))
-        log.exception(str(e))
-        raise
-    else:
-        if not os.path.exists(filepath):
+    with huey_lock_task(
+        f'media:{media.uuid}',
+        queue=Val(TaskQueue.DB),
+    ):
+        filepath = media.filepath
+        container = format_str = None
+        log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
+        try:
+            format_str, container = media.download_media()
+        except NoFormatException:
             # Try refreshing formats
             if media.has_metadata:
                 log.debug(f'Scheduling a task to refresh metadata for: {media.key}: "{media.name}"')
                 refresh_formats(str(media.pk))
-            # Expected file doesn't exist on disk
-            err = (f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
-                   f'expected outfile does not exist: {filepath}')
-            log.error(err)
-            # Raising an error here triggers the task to be re-attempted (or fail)
-            raise DownloadFailedException(err)
+            raise
+        else:
+            if not os.path.exists(filepath):
+                # Try refreshing formats
+                if media.has_metadata:
+                    log.debug(f'Scheduling a task to refresh metadata for: {media.key}: "{media.name}"')
+                    refresh_formats(str(media.pk))
+                # Expected file doesn't exist on disk
+                err = (
+                    f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
+                    f'expected outfile does not exist: {filepath}'
+                )
+                log.error(err)
+                # Raising an error here triggers the task to be re-attempted (or fail)
+                raise DownloadFailedException(err)
 
-        # Media has been downloaded successfully
-        media.download_finished(format_str, container, filepath)
-        save_model(media)
-        media.copy_thumbnail()
-        media.write_nfo_file()
-        # Schedule a task to update media servers
-        schedule_media_servers_update()
-        return True
+            # Media has been downloaded successfully
+            media.download_finished(format_str, container, filepath)
+            media.save()
+            media.copy_thumbnail()
+            media.write_nfo_file()
+            # Schedule a task to update media servers
+            schedule_media_servers_update()
+            return True
 
 
 @db_task(delay=30, expires=210, priority=100, queue=Val(TaskQueue.NET))
@@ -999,8 +1056,9 @@ def refresh_formats(media_id):
             exc.reason = msg
             exc.save = save
             raise exc
+        # the metadata has already been saved, trigger the post_save signal
         log.info(f'Saving refreshed formats for "{media.key}": {msg}')
-        save_model(media)
+        media.save()
 
 
 @db_task(delay=300, priority=80, retries=5, retry_delay=600, queue=Val(TaskQueue.FS))
@@ -1029,12 +1087,25 @@ def rename_all_media_for_source(source_id):
         downloaded=True,
     )
     for media in qs_gen(mqs):
-        with huey_lock_task(
+        migrating_lock = huey_lock_task(
+            f'index_media:{media.uuid}',
+            queue=Val(TaskQueue.FS),
+        )
+        if migrating_lock.acquired:
+            # good luck to you in the queue!
+            rename_media(str(media.pk))
+        media_lock = huey_lock_task(
             f'media:{media.uuid}',
             queue=Val(TaskQueue.DB),
-        ):
+        )
+        try:
+            media_lock.__enter__()
+        except TaskLockedException:
+            rename_media(str(media.pk))
+        else:
             with atomic(durable=False):
                 media.rename_files()
+            media_lock.clear()
 
 
 @dynamic_retry(db_task, delay=600, priority=70, retries=15, queue=Val(TaskQueue.FS))
