@@ -961,7 +961,7 @@ class TasksView(ListView):
             mapped = add_to_task(task)
             if 'error' == mapped:
                 data['errors'].append(task)
-            elif mapped:
+            elif mapped or settings.DEBUG:
                 data['scheduled'].append(task)
 
         sort_keys = (
