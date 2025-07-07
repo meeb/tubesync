@@ -873,7 +873,7 @@ def download_metadata(media_id):
         raise
     else:
         log.info(f'Saved {len(media.metadata_dumps())} bytes of metadata for: '
-             f'{source} / {media}: {media_id}')
+                 f'{source} / {media}: {media_id}')
         return True
     finally:
         metadata_lock.acquired = False
