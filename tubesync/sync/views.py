@@ -859,7 +859,8 @@ class TasksView(ListView):
             params_prefix=f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
         return qs.order_by(
-            'priority',
+            '-priority',
+            'scheduled_at',
             'end_at',
         )
 
