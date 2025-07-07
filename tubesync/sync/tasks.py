@@ -1094,18 +1094,15 @@ def rename_all_media_for_source(source_id):
         if migrating_lock.acquired:
             # good luck to you in the queue!
             rename_media(str(media.pk))
-        media_lock = huey_lock_task(
-            f'media:{media.uuid}',
-            queue=Val(TaskQueue.DB),
-        )
         try:
-            media_lock.__enter__()
+            with huey_lock_task(
+                f'media:{media.uuid}',
+                queue=Val(TaskQueue.DB),
+            ):
+                with atomic(durable=False):
+                    media.rename_files()
         except TaskLockedException:
             rename_media(str(media.pk))
-        else:
-            with atomic(durable=False):
-                media.rename_files()
-            media_lock.clear()
 
 
 @dynamic_retry(db_task, delay=600, priority=70, retries=15, queue=Val(TaskQueue.FS))
