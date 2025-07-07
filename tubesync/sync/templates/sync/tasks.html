@@ -83,6 +83,9 @@
           <a href="{%if task.instance.pk %}{% url task.url pk=task.instance.pk %}{% else %}#{{ task.task_id }}{% endif %}">
             <i class="fas fa-hourglass-start"></i> <strong>{{ task }}</strong><br>
             {% if task.instance.is_active and 'once' not in task.verbose_name %}Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>{% endif %}
+            <span class="fa-flip-horizontal" style="display: inline-block;">
+              <i class="fas fa-chart-bar fa-rotate-270"></i>
+            </span> Priority:&nbsp;{{ task.priority }}&nbsp;Queue:&nbsp;{{ task.queue }}<br>
             <i class="far fa-clock"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong>
           {% if '-' not in task.task_id %}
           </a>
