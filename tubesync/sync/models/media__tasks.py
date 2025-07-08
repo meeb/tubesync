@@ -124,6 +124,21 @@ def download_finished(self, format_str, container, downloaded_filepath=None):
             self.downloaded_format = Val(SourceResolution.AUDIO)
 
 
+def failed_format(self, format_str, /, *, cause=None, exc=None):
+    if not self.has_metadata:
+        return
+    t = format_str.partition('+')
+    data = self.loaded_metadata
+    field = self.get_metadata_field('formats')
+    formats = data.get(field, list())
+    new_formats = [
+        f
+        for f in formats
+        if f.get('format_id') not in (t[0],)
+    ]
+    self.save_to_metadata(field, new_formats)
+
+
 def refresh_formats(self):
     if not self.has_metadata:
         return (None, False, 'missing metadata') # save, retry, msg
