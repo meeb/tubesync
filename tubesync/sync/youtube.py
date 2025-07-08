@@ -6,6 +6,7 @@
 
 import os
 
+from common.errors import FormatUnavailableError
 from common.logger import log
 from common.utils import mkdir_p
 from copy import deepcopy
@@ -431,5 +432,7 @@ def download_media(
         try:
             return y.download([url])
         except yt_dlp.utils.DownloadError as e:
+            if ': Requested format is not available.' in str(e):
+                raise FormatUnavailableError(url, exc=e.__cause__, format=opts.get('format')) from e
             raise YouTubeError(f'Failed to download for "{url}": {e}') from e
     return False
