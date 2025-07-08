@@ -29,9 +29,11 @@ from huey.exceptions import TaskLockedException
 from common.huey import CancelExecution, dynamic_retry, register_huey_signals
 from common.logger import log
 from common.models import TaskHistory
-from common.errors import ( BgTaskWorkerError, DownloadFailedException,
-                            NoFormatException, NoMediaException,
-                            NoThumbnailException, )
+from common.errors import (
+    BgTaskWorkerError, HueyConsumerError,
+    DownloadFailedException, FormatUnavailableError,
+    NoFormatException, NoMediaException, NoThumbnailException,
+)
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, seconds_to_timestr, )
 from .choices import Val, IndexSchedule, TaskQueue
@@ -978,6 +980,9 @@ def download_media_file(media_id, override=False):
         log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
         try:
             format_str, container = media.download_media()
+        except FormatUnavailableError as e:
+            media.failed_format(e.format, cause=e.exc, exc=e)
+            raise CancelExecution(_('format did not work'), retry=True) from e.__cause__
         except NoFormatException:
             # Try refreshing formats
             if media.has_metadata:
@@ -1236,7 +1241,7 @@ def wait_for_database_queue():
     total_count = 1
     while 0 < total_count:
         if consumer_down_path.exists() and consumer_down_path.is_file():
-            raise BgTaskWorkerError(_('queue consumer stopped'))
+            raise HueyConsumerError(_('queue consumer stopped'))
         time.sleep(5)
         status_dict = h_q_tuple(queue_name)[2]
         total_count = status_dict.get('pending', (0,))[0]
