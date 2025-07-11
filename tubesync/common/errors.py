@@ -47,3 +47,16 @@ class DatabaseConnectionError(Exception):
 class BgTaskWorkerError(Exception):
     # Raised when the worker process is not in a normal working state.
     pass
+
+
+class HueyConsumerError(Exception):
+    # Raised when the consumer process is not in a normal working state.
+    pass
+
+
+class FormatUnavailableError(Exception):
+    def __init__(self, *args, exc=None, format=None, **kwargs):
+        self.exc = exc
+        self.format = format
+        super().__init__(*args, **kwargs)
+
