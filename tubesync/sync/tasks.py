@@ -991,6 +991,8 @@ def download_media_file(media_id, override=False):
                     refresh_formats,
                     str(media.pk),
                     remove_duplicates=True,
+                    vn_fmt = _('Refreshing formats for "{}"'),
+                    vn_args=(media.key,),
                 )
             raise
         else:
@@ -1002,6 +1004,8 @@ def download_media_file(media_id, override=False):
                         refresh_formats,
                         str(media.pk),
                         remove_duplicates=True,
+                        vn_fmt = _('Refreshing formats for "{}"'),
+                        vn_args=(media.key,),
                     )
                 # Expected file doesn't exist on disk
                 err = (
@@ -1165,17 +1169,17 @@ def save_all_media_for_source(source_id):
     ).filter(
         source=source,
     )
-    saved_later = {
-        str(media.pk)
-        for media in qs_gen(refresh_qs)
-        if media.has_metadata
-    }
-    for media_id in saved_later:
-        TaskHistory.schedule(
-            refresh_formats,
-            media_id,
-            remove_duplicates=True,
-        )
+    saved_later = set()
+    for media in qs_gen(refresh_qs):
+        if media.has_metadata:
+            saved_later.add(str(media.pk))
+            TaskHistory.schedule(
+                refresh_formats,
+                str(media.pk),
+                remove_duplicates=True,
+                vn_fmt = _('Refreshing formats for "{}"'),
+                vn_args=(media.key,),
+            )
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
