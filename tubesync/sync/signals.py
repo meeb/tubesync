@@ -129,6 +129,7 @@ def source_post_save(sender, instance, created, **kwargs):
     TaskHistory.schedule(
         save_all_media_for_source,
         str(source.pk),
+        remove_duplicates=True,
         vn_fmt = _('Checking all media for "{}"'),
         vn_args=(
             source.name,
