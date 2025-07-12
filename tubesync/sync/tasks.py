@@ -987,14 +987,22 @@ def download_media_file(media_id, override=False):
             # Try refreshing formats
             if media.has_metadata:
                 log.debug(f'Scheduling a task to refresh metadata for: {media.key}: "{media.name}"')
-                refresh_formats(str(media.pk))
+                TaskHistory.schedule(
+                    refresh_formats,
+                    str(media.pk),
+                    remove_duplicates=True,
+                )
             raise
         else:
             if not os.path.exists(filepath):
                 # Try refreshing formats
                 if media.has_metadata:
                     log.debug(f'Scheduling a task to refresh metadata for: {media.key}: "{media.name}"')
-                    refresh_formats(str(media.pk))
+                    TaskHistory.schedule(
+                        refresh_formats,
+                        str(media.pk),
+                        remove_duplicates=True,
+                    )
                 # Expected file doesn't exist on disk
                 err = (
                     f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
@@ -1181,7 +1189,12 @@ def save_all_media_for_source(source_id):
         for media in qs_gen(refresh_qs)
         if media.has_metadata
     }
-    refresh_formats.map(saved_later)
+    for media_id in saved_later:
+        TaskHistory.schedule(
+            refresh_formats,
+            media_id,
+            remove_duplicates=True,
+        )
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated
