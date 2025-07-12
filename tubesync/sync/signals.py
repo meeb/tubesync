@@ -22,7 +22,7 @@ from .tasks import (
     map_task_to_instance,
     delete_all_media_for_source, rename_media, save_all_media_for_source,
     check_source_directory_exists, download_source_images, index_source_task,
-    download_media, download_media_metadata, download_media_thumbnail,
+    download_media_file, download_media_metadata, download_media_thumbnail,
 )
 from .utils import delete_file
 from .filtering import filter_media
@@ -368,10 +368,12 @@ def media_post_save(sender, instance, created, **kwargs):
         downloaded = False
     if (instance.source.download_media and instance.can_download) and not (
         instance.skip or downloaded or existing_media_download_task):
-        verbose_name = _('Downloading media for "{}"')
-        download_media(
-            str(instance.pk),
-            verbose_name=verbose_name.format(instance.name),
+        TaskHistory.schedule(
+            download_media_file,
+            str(media.pk),
+            remove_duplicates=True,
+            vn_fmt = _('Downloading media for "{}"'),
+            vn_args=(media.name,),
         )
     # Save the instance if any changes were required
     if skip_changed or can_download_changed:
