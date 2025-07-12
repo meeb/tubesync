@@ -30,11 +30,12 @@ from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMedia
                     SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
                     ConfirmDeleteMediaServerForm, SourceForm)
 from .utils import delete_file, validate_url
-from .tasks import (map_task_to_instance, get_error_message,
-                    get_source_completed_tasks, get_media_download_task,
-                    delete_task_by_media, index_source_task,
-                    download_media_thumbnail,
-                    check_source_directory_exists, migrate_queues)
+from .tasks import (
+    map_task_to_instance, get_error_message, migrate_queues,
+    get_running_tasks, get_media_download_task, get_source_completed_tasks,
+    delete_task_by_media, index_source_task, download_media_thumbnail,
+    check_source_directory_exists,
+)
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
                         youtube_help, youtube_validation_urls)
@@ -870,11 +871,7 @@ class TasksView(ListView):
         scheduled_qs = get_waiting_tasks()
         # Huey removes running tasks,
         # so the waiting tasks will not include them.
-        running_qs = TaskHistory.objects.filter(
-            start_at=F('end_at'),
-            scheduled_at__lte=F('end_at'),
-            end_at__gte=now_dt-timezone.timedelta(hours=12),
-        )
+        running_qs = get_running_tasks(now_dt)
         errors_qs = scheduled_qs.filter(
             attempts__gt=0
         ).exclude(last_error__exact='')
