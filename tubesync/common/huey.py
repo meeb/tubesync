@@ -318,15 +318,26 @@ def register_huey_signals():
         # clean up old history and results from storage
         q = get_queue(qn)
         now_time = utils.time_clock()
+        now_dt = datetime.datetime.now(datetime.timezone.utc)
         for key in q.all_results().keys():
             if not key.startswith(storage_key_prefix):
                 continue
             history = q.get(peek=True, key=key)
             if not isinstance(history, dict):
                 continue
-            age = datetime.timedelta(
-                seconds=(now_time - history.get(signals.SIGNAL_EXECUTING, now_time)),
-            )
+            if 'created' not in history:
+                # Set an incorrect created time to ensure eventual removal.
+                history['created'] = now_dt
+                q.put(key=key, data=history)
+                # Attempt to calculate an accurate age.
+                # This doesn't work all the time,
+                # so the created datetime is the fail-safe case.
+                seconds = now_time - history.get(signals.SIGNAL_EXECUTING, now_time)
+                age = datetime.timedelta(
+                    seconds=(seconds if seconds > 0 else 0),
+                )
+            else:
+                age = now_dt - history['created']
             if age > datetime.timedelta(days=7):
                 result_key = key[len(storage_key_prefix) :]
                 q.get(peek=False, key=result_key)
