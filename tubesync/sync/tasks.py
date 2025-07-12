@@ -1074,25 +1074,6 @@ def refresh_formats(media_id):
         media.save()
 
 
-@huey_signal(huey_signals.SIGNAL_EXECUTING, queue=Val(TaskQueue.LIMIT))
-def on_executing_refresh_formats(signal_name, task_obj, exception_obj=None, /, *, huey=None):
-    assert huey_signals.SIGNAL_EXECUTING == signal_name
-    assert huey is not None
-    if 'refresh_formats' != task_obj.name:
-        return
-    waiting = [
-        t
-        for t in huey.pending() + huey.scheduled()
-        if task_obj.id != t.id and
-        task_obj.name == t.name and
-        task_obj.data == t.data and
-        task_obj.priority >= t.priority and
-        task_obj.retries <= t.retries
-    ]
-    for t in waiting:
-        huey.revoke_by_id(t.id, revoke_once=True)
-
-
 @db_task(delay=300, priority=80, retries=5, retry_delay=600, queue=Val(TaskQueue.FS))
 @atomic(durable=True)
 def rename_all_media_for_source(source_id):
