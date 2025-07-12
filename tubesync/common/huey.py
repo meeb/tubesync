@@ -219,7 +219,7 @@ def on_executing_remove_duplicates(signal_name, task_obj, exception_obj=None, /,
     assert hasattr(huey, 'pending') and callable(huey.pending)
     assert hasattr(huey, 'revoke_by_id') and callable(huey.revoke_by_id)
     assert hasattr(huey, 'scheduled') and callable(huey.scheduled)
-    assert huey_signals.SIGNAL_EXECUTING == signal_name
+    assert signals.SIGNAL_EXECUTING == signal_name
 
     from common.models import TaskHistory
     try:
