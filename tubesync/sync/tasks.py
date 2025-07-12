@@ -1075,11 +1075,11 @@ def on_executing_refresh_formats(signal_name, task_obj, exception_obj=None, /, *
     waiting = [
         t
         for t in huey.pending() + huey.scheduled()
-        if t.id != task_obj.id and
-        t.name == 'refresh_formats' and
-        t.data == task_obj.data and
-        t.priority <= task_obj.priority and
-        t.retries >= task_obj.retries
+        if task_obj.id != t.id and
+        task_obj.name == t.name and
+        task_obj.data == t.data and
+        task_obj.priority >= t.priority and
+        task_obj.retries <= t.retries
     ]
     for t in waiting:
         huey.revoke_by_id(t.id, revoke_once=True)
