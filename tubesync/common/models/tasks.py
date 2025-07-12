@@ -8,7 +8,7 @@ from ..json import JSONEncoder
 
 # cls = TaskHistory
 # TaskHistory is defined below this function in this file
-def set_verbose_name(cls, task_wrapper, /, *args, vn_args=(), vn_fmt=None, **kwargs):
+def th_schedule(cls, task_wrapper, /, *args, remove_duplicates=False, vn_args=(), vn_fmt=None, **kwargs):
     assert vn_fmt is not None, 'vn_fmt is required'
     if vn_fmt is None:
         return False
@@ -21,6 +21,7 @@ def set_verbose_name(cls, task_wrapper, /, *args, vn_args=(), vn_fmt=None, **kwa
     except cls.DoesNotExist:
         pass
     else:
+        task_history.remove_duplicates = remove_duplicates
         task_history.verbose_name = str(vn_fmt).format(*vn_args)
         task_history.save()
         return True
@@ -92,11 +93,13 @@ class TaskHistory(models.Model):
     repeat = models.BigIntegerField(default=int)
     repeat_until = models.DateTimeField(null=True, blank=True)
 
+    remove_duplicates = models.BooleanField(default=bool)
+
     objects = TaskHistoryQuerySet.as_manager()
 
     @classmethod
     def schedule(cls, task_wrapper, /, *args, vn_args=(), vn_fmt=None, **kwargs):
-        return set_verbose_name(cls, task_wrapper, *args, vn_fmt=vn_fmt, vn_args=vn_args, **kwargs)
+        return th_schedule(cls, task_wrapper, *args, vn_fmt=vn_fmt, vn_args=vn_args, **kwargs)
 
     def save(self, *args, **kwargs):
         self.queue = self.queue or None
