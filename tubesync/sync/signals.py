@@ -22,7 +22,7 @@ from .tasks import (
     map_task_to_instance,
     delete_all_media_for_source, rename_media, save_all_media_for_source,
     check_source_directory_exists, download_source_images, index_source_task,
-    download_media, download_media_metadata, download_media_thumbnail,
+    download_media, download_media_metadata, download_media_image,
 )
 from .utils import delete_file
 from .filtering import filter_media
@@ -345,11 +345,12 @@ def media_post_save(sender, instance, created, **kwargs):
                 'Scheduling task to download thumbnail'
                 f' for: {media.name} from: {thumbnail_url}'
             )
-            verbose_name = _('Downloading thumbnail for "{}"')
-            download_media_thumbnail(
+            TaskHistory.schedule(
+                download_media_image,
                 str(media.pk),
                 thumbnail_url,
-                verbose_name=verbose_name.format(media.name),
+                vn_fmt=_('Downloading thumbnail for "{}"'),
+                vn_args=(media.name,),
             )
     media_file_exists = False
     try:
