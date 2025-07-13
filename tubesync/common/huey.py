@@ -29,14 +29,20 @@ TaskLock.acquired = property(
 class SqliteHuey(huey_SqliteHuey):
     begin_sql = 'BEGIN IMMEDIATE'
     auto_vacuum = 'INCREMENTAL'
+    journal_size_limit = 1024 * 1024 * 64
+    wal_autocheckpoint = 100
     vacuum_pages = 10
 
     def _create_connection(self):
         conn = super()._create_connection()
-        conn.execute(f'PRAGMA incremental_vacuum({self.vacuum_pages})')
+        conn.execute(f'PRAGMA auto_vacuum = {self.auto_vacuum}')
+        conn.execute(f'PRAGMA journal_size_limit = {self.journal_size_limit}')
+        conn.execute(f'PRAGMA wal_autocheckpoint={self.wal_autocheckpoint}')
         # copied from huey_SqliteHuey to use EXTRA or NORMAL
         # instead of FULL or OFF
         conn.execute('pragma synchronous=%s' % (3 if self._fsync else 1))
+        # take at most vacuum_pages off the free list
+        conn.execute(f'PRAGMA incremental_vacuum({self.vacuum_pages})')
         return conn
 
     def _emit(self, signal, task, *args, **kwargs):
@@ -44,9 +50,25 @@ class SqliteHuey(huey_SqliteHuey):
         super()._emit(signal, task, *args, **kwargs)
 
     def initialize_schema(self):
-        self.ddl.insert(0, f'PRAGMA auto_vacuum = {self.auto_vacuum}')
-        self.ddl.append('VACUUM')
         super().initialize_schema()
+        auto_vacuum_dict = {'NONE': 0, 'FULL': 1, 'INCREMENTAL': 2}
+        valid = set(auto_vacuum_dict.values()) + set(auto_vacuum_dict.keys())
+        assert self.auto_vacuum in valid, 'auto_vacuum was invalid'
+        current = self.sql('PRAGMA auto_vacuum', results=True)
+        expected = auto_vacuum_dict.get(self.auto_vacuum) or self.auto_vacuum
+        vacuum_db = True
+        try:
+            current = int(current[0][0])
+            expected = int(expected)
+        except (TypeError, ValueError,):
+            pass
+        else:
+            vacuum_db = (current != expected)
+        with self.db(close=True) as curs:
+            curs.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+            if vacuum_db:
+                curs.execute(f'PRAGMA auto_vacuum = {self.auto_vacuum}')
+                curs.execute('VACUUM')
 
 
 def CancelExecution_init(self, *args, retry=None, **kwargs):
