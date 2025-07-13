@@ -19,7 +19,7 @@ from .choices import Val, FileExtension
 from .hooks import postprocessor_hook, progress_hook
 import yt_dlp
 import yt_dlp.patch.check_thumbnails
-import yt_dlp.patch.fatal_http_errors
+#import yt_dlp.patch.fatal_http_errors
 from yt_dlp.utils import remove_end, shell_quote, OUTTMPL_TYPES
 
 
