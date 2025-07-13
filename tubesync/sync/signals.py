@@ -373,7 +373,7 @@ def media_post_save(sender, instance, created, **kwargs):
             download_media_file,
             str(media.pk),
             remove_duplicates=True,
-            vn_fmt = _('Downloading media for "{}"'),
+            vn_fmt=_('Downloading media for "{}"'),
             vn_args=(media.name,),
         )
     # Save the instance if any changes were required
