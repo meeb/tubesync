@@ -987,14 +987,26 @@ def download_media_file(media_id, override=False):
             # Try refreshing formats
             if media.has_metadata:
                 log.debug(f'Scheduling a task to refresh metadata for: {media.key}: "{media.name}"')
-                refresh_formats(str(media.pk))
+                TaskHistory.schedule(
+                    refresh_formats,
+                    str(media.pk),
+                    remove_duplicates=True,
+                    vn_fmt = _('Refreshing formats for "{}"'),
+                    vn_args=(media.key,),
+                )
             raise
         else:
             if not os.path.exists(filepath):
                 # Try refreshing formats
                 if media.has_metadata:
                     log.debug(f'Scheduling a task to refresh metadata for: {media.key}: "{media.name}"')
-                    refresh_formats(str(media.pk))
+                    TaskHistory.schedule(
+                        refresh_formats,
+                        str(media.pk),
+                        remove_duplicates=True,
+                        vn_fmt = _('Refreshing formats for "{}"'),
+                        vn_args=(media.key,),
+                    )
                 # Expected file doesn't exist on disk
                 err = (
                     f'Failed to download media: {media} (UUID: {media.pk}) to disk, '
@@ -1064,25 +1076,6 @@ def refresh_formats(media_id):
         # the metadata has already been saved, trigger the post_save signal
         log.info(f'Saving refreshed formats for "{media.key}": {msg}')
         media.save()
-
-
-@huey_signal(huey_signals.SIGNAL_EXECUTING, queue=Val(TaskQueue.LIMIT))
-def on_executing_refresh_formats(signal_name, task_obj, exception_obj=None, /, *, huey=None):
-    assert huey_signals.SIGNAL_EXECUTING == signal_name
-    assert huey is not None
-    if 'refresh_formats' != task_obj.name:
-        return
-    waiting = [
-        t
-        for t in huey.pending() + huey.scheduled()
-        if task_obj.id != t.id and
-        task_obj.name == t.name and
-        task_obj.data == t.data and
-        task_obj.priority >= t.priority and
-        task_obj.retries <= t.retries
-    ]
-    for t in waiting:
-        huey.revoke_by_id(t.id, revoke_once=True)
 
 
 @db_task(delay=300, priority=80, retries=5, retry_delay=600, queue=Val(TaskQueue.FS))
@@ -1176,12 +1169,17 @@ def save_all_media_for_source(source_id):
     ).filter(
         source=source,
     )
-    saved_later = {
-        str(media.pk)
-        for media in qs_gen(refresh_qs)
-        if media.has_metadata
-    }
-    refresh_formats.map(saved_later)
+    saved_later = set()
+    for media in qs_gen(refresh_qs):
+        if media.has_metadata:
+            saved_later.add(str(media.pk))
+            TaskHistory.schedule(
+                refresh_formats,
+                str(media.pk),
+                remove_duplicates=True,
+                vn_fmt = _('Refreshing formats for "{}"'),
+                vn_args=(media.key,),
+            )
 
     # Trigger the post_save signal for each media item linked to this source as various
     # flags may need to be recalculated

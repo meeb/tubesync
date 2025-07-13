@@ -211,10 +211,42 @@ def dynamic_retry(task_func=None, /, *args, **kwargs):
 
 # Signal handlers shared between queues
 
+def on_executing_remove_duplicates(signal_name, task_obj, exception_obj=None, /, *, huey=None):
+    if signals.SIGNAL_EXECUTING != signal_name:
+        return
+    assert exception_obj is None
+    assert huey is not None
+    assert hasattr(huey, 'pending') and callable(huey.pending)
+    assert hasattr(huey, 'revoke_by_id') and callable(huey.revoke_by_id)
+    assert hasattr(huey, 'scheduled') and callable(huey.scheduled)
+    assert signals.SIGNAL_EXECUTING == signal_name
+
+    from common.models import TaskHistory
+    try:
+        th = TaskHistory.objects.get(task_id=str(task_obj.id))
+    except TaskHistory.DoesNotExist:
+        return
+    else:
+        if not th.remove_duplicates:
+            return
+
+    waiting = [
+        t
+        for t in huey.pending() + huey.scheduled()
+        if task_obj.id != t.id and
+        task_obj.name == t.name and
+        task_obj.data == t.data and
+        task_obj.priority >= t.priority and
+        task_obj.retries <= t.retries
+    ]
+    for t in waiting:
+        huey.revoke_by_id(t.id, revoke_once=True)
+
 def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     if signals.SIGNAL_INTERRUPTED != signal_name:
         return
     assert exception_obj is None
+    assert huey is not None
     assert hasattr(huey, 'enqueue') and callable(huey.enqueue)
     huey.enqueue(task_obj)
 
@@ -223,6 +255,9 @@ storage_key_prefix = 'task_history:'
 def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     signal_time = utils.time_clock()
     signal_dt = datetime.datetime.now(datetime.timezone.utc)
+    assert huey is not None
+    assert hasattr(huey, 'get') and callable(huey.get)
+    assert hasattr(huey, 'put') and callable(huey.put)
 
     from common.models import TaskHistory
     add_to_elapsed_signals = frozenset((
@@ -314,6 +349,7 @@ def register_huey_signals():
     for qn in DJANGO_HUEY.get('queues', dict()):
         signal(signals.SIGNAL_INTERRUPTED, queue=qn)(on_interrupted)
         signal(queue=qn)(historical_task)
+        signal(signals.SIGNAL_EXECUTING, queue=qn)(on_executing_remove_duplicates)
 
         # clean up old history and results from storage
         q = get_queue(qn)
