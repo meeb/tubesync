@@ -466,10 +466,15 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 404)
         response = c.get(f'/media/{test_media3_pk}')
         self.assertEqual(response.status_code, 404)
+        # simulate the tasks consumer signals having already run
+        TaskHistory.objects.all().update(end_at=timezone.now())
         # Confirm any tasks have been deleted
-        q = {'task_name': 'sync.tasks.download_media_thumbnail'}
-        download_media_thumbnail_tasks = Task.objects.filter(**q)
-        self.assertFalse(download_media_thumbnail_tasks)
+        found_thumbnail_task1 = get_media_thumbnail_task(test_media1_pk)
+        found_thumbnail_task2 = get_media_thumbnail_task(test_media2_pk)
+        found_thumbnail_task3 = get_media_thumbnail_task(test_media3_pk)
+        self.assertFalse(found_thumbnail_task1)
+        self.assertFalse(found_thumbnail_task2)
+        self.assertFalse(found_thumbnail_task3)
         q = {'task_name': 'sync.tasks.download_media'}
         download_media_tasks = Task.objects.filter(**q)
         self.assertFalse(download_media_tasks)
