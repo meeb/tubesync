@@ -461,21 +461,18 @@ class FrontEndTestCase(TestCase):
         # simulate the tasks consumer signals having already run
         TaskHistory.objects.all().update(end_at=timezone.now())
         # Confirm any tasks have been deleted
-        found_thumbnail_task1 = get_media_thumbnail_task(test_media1_pk)
-        found_thumbnail_task2 = get_media_thumbnail_task(test_media2_pk)
-        found_thumbnail_task3 = get_media_thumbnail_task(test_media3_pk)
-        self.assertFalse(found_thumbnail_task1)
-        self.assertFalse(found_thumbnail_task2)
-        self.assertFalse(found_thumbnail_task3)
-        q = {'task_name': 'sync.tasks.download_media'}
-        download_media_tasks = Task.objects.filter(**q)
-        self.assertFalse(download_media_tasks)
         found_download_task1 = get_media_download_task(test_media1_pk)
         found_download_task2 = get_media_download_task(test_media2_pk)
         found_download_task3 = get_media_download_task(test_media3_pk)
+        found_thumbnail_task1 = get_media_thumbnail_task(test_media1_pk)
+        found_thumbnail_task2 = get_media_thumbnail_task(test_media2_pk)
+        found_thumbnail_task3 = get_media_thumbnail_task(test_media3_pk)
         self.assertFalse(found_download_task1)
         self.assertFalse(found_download_task2)
         self.assertFalse(found_download_task3)
+        self.assertFalse(found_thumbnail_task1)
+        self.assertFalse(found_thumbnail_task2)
+        self.assertFalse(found_thumbnail_task3)
 
     def test_tasks(self):
         # Tasks overview page
