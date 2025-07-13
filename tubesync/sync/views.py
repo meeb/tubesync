@@ -33,8 +33,7 @@ from .utils import delete_file, validate_url
 from .tasks import (
     map_task_to_instance, get_error_message, migrate_queues, delete_task_by_media,
     get_running_tasks, get_media_download_task, get_source_completed_tasks,
-    index_source_task, download_media_image, download_media_thumbnail,
-    check_source_directory_exists,
+    check_source_directory_exists, index_source_task, download_media_image,
 )
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
