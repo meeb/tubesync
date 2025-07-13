@@ -40,3 +40,6 @@ class PatchedYoutubeIE(YoutubeIE):
 
 YoutubeIE.__unpatched___download_player_responses = YoutubeIE._download_player_responses
 YoutubeIE._download_player_responses = PatchedYoutubeIE._download_player_responses
+
+YoutubeIE.__unpatched___download_initial_webpage = YoutubeIE._download_initial_webpage
+YoutubeIE._download_initial_webpage = PatchedYoutubeIE._download_initial_webpage
