@@ -386,12 +386,6 @@ def media_pre_delete(sender, instance, **kwargs):
     log.info(f'Deleting tasks for media: {instance.name}')
     delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
     delete_task_by_media('sync.tasks.download_media_metadata', (str(instance.pk),))
-    thumbnail_url = instance.thumbnail
-    if thumbnail_url:
-        delete_task_by_media(
-            'sync.tasks.download_media_thumbnail',
-            (str(instance.pk), thumbnail_url,),
-        )
     # Remove thumbnail file for deleted media
     if instance.thumb:
         instance.thumb.delete(save=False)
