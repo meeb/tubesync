@@ -62,7 +62,7 @@ def map_task_to_instance(task, using_history=True):
     '''
     TASK_MAP = {
         'sync.tasks.index_source_task': Source,
-        'sync.tasks.download_media_thumbnail': Media,
+        'sync.tasks.download_media_image': Media,
         'sync.tasks.download_media': Media,
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
@@ -150,6 +150,24 @@ def get_source_completed_tasks(source_id, only_errors=False):
     return CompletedTask.objects.filter(**q).order_by('-failed_at')
 
 
+def get_running_tasks(arg_dt=None, /):
+    if arg_dt is None:
+        arg_dt = timezone.now()
+    running_qs = TaskHistory.objects.filter(
+            start_at=db.models.F('end_at'),
+            scheduled_at__lte=db.models.F('end_at'),
+            end_at__gte=arg_dt-timezone.timedelta(hours=12),
+    ).order_by('end_at')
+    return running_qs
+
+def get_media_thumbnail_task(media_id):
+    tqs = get_running_tasks().filter(
+        name='sync.tasks.download_media_image',
+        task_params__0__0=media_id,
+    )
+    return tqs[0] if tqs.count() else False
+
+
 def get_tasks(task_name, id=None, /, instance=None):
     assert not (id is None and instance is None)
     arg = str(id or instance.pk)
@@ -164,9 +182,6 @@ def get_media_download_task(media_id):
 
 def get_media_metadata_task(media_id):
     return get_first_task('sync.tasks.download_media_metadata', media_id)
-
-def get_media_thumbnail_task(media_id):
-    return get_first_task('sync.tasks.download_media_thumbnail', media_id)
 
 def get_source_index_task(source_id):
     return get_first_task('sync.tasks.index_source_task', source_id)
