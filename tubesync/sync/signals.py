@@ -386,7 +386,6 @@ def media_post_save(sender, instance, created, **kwargs):
 def media_pre_delete(sender, instance, **kwargs):
     # Triggered before media is deleted, delete any unlocked scheduled tasks
     log.info(f'Deleting tasks for media: {instance.name}')
-    delete_task_by_media('sync.tasks.download_media', (str(instance.pk),))
     delete_task_by_media('sync.tasks.download_media_metadata', (str(instance.pk),))
     thumbnail_url = instance.thumbnail
     if thumbnail_url:
