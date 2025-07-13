@@ -401,7 +401,7 @@ def media_pre_delete(sender, instance, **kwargs):
             'Youtube',
             arg_dict=existing_metadata,
         ),
-        thumbnail_field: thumbnail_url,
+        thumbnail_field: instance.thumbnail,
     })
     instance.metadata = instance.metadata_dumps(arg_dict=arg_dict)
     # Do not create more tasks before deleting
