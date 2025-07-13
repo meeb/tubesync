@@ -1297,13 +1297,6 @@ def download_media_metadata(media_id):
         raise InvalidTaskError(str(e)) from e
 
 
-@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def download_media_thumbnail(media_id, url):
-    try:
-        return download_media_image.call_local(media_id, url)
-    except CancelExecution as e:
-        raise InvalidTaskError(str(e)) from e
-
 @background(schedule=dict(priority=30, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def download_media(media_id, override=False):
     try:
