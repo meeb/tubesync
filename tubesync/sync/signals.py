@@ -22,7 +22,7 @@ from .tasks import (
     map_task_to_instance,
     delete_all_media_for_source, rename_media, save_all_media_for_source,
     check_source_directory_exists, download_source_images, index_source_task,
-    download_media_file, download_media_metadata, download_media_thumbnail,
+    download_media_file, download_media_metadata, download_media_image,
 )
 from .utils import delete_file
 from .filtering import filter_media
@@ -346,11 +346,12 @@ def media_post_save(sender, instance, created, **kwargs):
                 'Scheduling task to download thumbnail'
                 f' for: {media.name} from: {thumbnail_url}'
             )
-            verbose_name = _('Downloading thumbnail for "{}"')
-            download_media_thumbnail(
+            TaskHistory.schedule(
+                download_media_image,
                 str(media.pk),
                 thumbnail_url,
-                verbose_name=verbose_name.format(media.name),
+                vn_fmt=_('Downloading thumbnail for "{}"'),
+                vn_args=(media.name,),
             )
     media_file_exists = False
     try:
@@ -387,12 +388,6 @@ def media_pre_delete(sender, instance, **kwargs):
     # Triggered before media is deleted, delete any unlocked scheduled tasks
     log.info(f'Deleting tasks for media: {instance.name}')
     delete_task_by_media('sync.tasks.download_media_metadata', (str(instance.pk),))
-    thumbnail_url = instance.thumbnail
-    if thumbnail_url:
-        delete_task_by_media(
-            'sync.tasks.download_media_thumbnail',
-            (str(instance.pk), thumbnail_url,),
-        )
     # Remove thumbnail file for deleted media
     if instance.thumb:
         instance.thumb.delete(save=False)
@@ -408,7 +403,7 @@ def media_pre_delete(sender, instance, **kwargs):
             'Youtube',
             arg_dict=existing_metadata,
         ),
-        thumbnail_field: thumbnail_url,
+        thumbnail_field: instance.thumbnail,
     })
     instance.metadata = instance.metadata_dumps(arg_dict=arg_dict)
     # Do not create more tasks before deleting

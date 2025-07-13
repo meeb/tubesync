@@ -62,7 +62,7 @@ def map_task_to_instance(task, using_history=True):
     '''
     TASK_MAP = {
         'sync.tasks.index_source_task': Source,
-        'sync.tasks.download_media_thumbnail': Media,
+        'sync.tasks.download_media_image': Media,
         'sync.tasks.download_media_file': Media,
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
@@ -160,12 +160,18 @@ def get_running_tasks(arg_dt=None, /):
     ).order_by('end_at')
     return running_qs
 
-def get_media_download_task(media_id):
-    tqs = get_running_tasks().filter(
-        name='sync.tasks.download_media_file',
-        task_params__0__0=media_id,
-    )
+def get_running_task_by_name(arg_str, media_id, /):
+    name = arg_str
+    if '.' not in name:
+        name = f'sync.tasks.{name}'
+    tqs = get_running_tasks().filter(name=name, task_params__0__0=media_id)
     return tqs[0] if tqs.count() else False
+
+def get_media_download_task(media_id):
+    return get_running_task_by_name('download_media_file', media_id)
+    
+def get_media_thumbnail_task(media_id):
+    return get_running_task_by_name('download_media_image', media_id)
 
 
 def get_tasks(task_name, id=None, /, instance=None):
@@ -179,9 +185,6 @@ def get_first_task(task_name, id=None, /, *, instance=None):
 
 def get_media_metadata_task(media_id):
     return get_first_task('sync.tasks.download_media_metadata', media_id)
-
-def get_media_thumbnail_task(media_id):
-    return get_first_task('sync.tasks.download_media_thumbnail', media_id)
 
 def get_source_index_task(source_id):
     return get_first_task('sync.tasks.index_source_task', source_id)
@@ -1307,11 +1310,4 @@ def download_media_metadata(media_id):
     except CancelExecution as e:
         raise InvalidTaskError(str(e)) from e
 
-
-@background(schedule=dict(priority=10, run_at=10), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def download_media_thumbnail(media_id, url):
-    try:
-        return download_media_image.call_local(media_id, url)
-    except CancelExecution as e:
-        raise InvalidTaskError(str(e)) from e
 

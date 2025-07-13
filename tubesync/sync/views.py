@@ -31,9 +31,9 @@ from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMedia
                     ConfirmDeleteMediaServerForm, SourceForm)
 from .utils import delete_file, validate_url
 from .tasks import (
-    map_task_to_instance, get_error_message, migrate_queues,
+    map_task_to_instance, get_error_message, migrate_queues, delete_task_by_media,
     get_running_tasks, get_media_download_task, get_source_completed_tasks,
-    delete_task_by_media, index_source_task, download_media_thumbnail,
+    index_source_task, download_media_image, download_media_thumbnail,
     check_source_directory_exists,
 )
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
@@ -629,11 +629,16 @@ class MediaItemView(DetailView):
             if media is None:
                 return HttpResponseNotFound()
 
-            verbose_name = _('Redownload thumbnail for "{}": {}')
-            download_media_thumbnail(
+            TaskHistory.schedule(
+                download_media_image,
                 str(media.pk),
                 media.thumbnail,
-                verbose_name=verbose_name.format(media.key, media.name),
+                priority=1+download_media_image.settings.get('default_priority', 0),
+                vn_fmt=_('Redownload thumbnail for "{}": {}'),
+                vn_args=(
+                    media.key,
+                    media.name,
+                ),
             )
             url = reverse_lazy('sync:media-item', kwargs={'pk': media.pk})
             url = append_uri_params(url, {'message': 'thumbnail'})
