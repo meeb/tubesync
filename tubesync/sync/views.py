@@ -33,7 +33,7 @@ from .utils import delete_file, validate_url
 from .tasks import (map_task_to_instance, get_error_message,
                     get_source_completed_tasks, get_media_download_task,
                     delete_task_by_media, index_source_task,
-                    download_media_thumbnail,
+                    download_media_image,
                     check_source_directory_exists, migrate_queues)
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
@@ -628,11 +628,16 @@ class MediaItemView(DetailView):
             if media is None:
                 return HttpResponseNotFound()
 
-            verbose_name = _('Redownload thumbnail for "{}": {}')
-            download_media_thumbnail(
+            TaskHistory.schedule(
+                download_media_image,
                 str(media.pk),
                 media.thumbnail,
-                verbose_name=verbose_name.format(media.key, media.name),
+                priority=1+download_media_image.settings.get('default_priority', 0),
+                vn_fmt=_('Redownload thumbnail for "{}": {}'),
+                vn_args=(
+                    media.key,
+                    media.name,
+                ),
             )
             url = reverse_lazy('sync:media-item', kwargs={'pk': media.pk})
             url = append_uri_params(url, {'message': 'thumbnail'})
