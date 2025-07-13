@@ -31,7 +31,7 @@ class PatchedYoutubeIE(YoutubeIE):
             if pp:
                 query['pp'] = pp
             webpage = self._download_webpage_with_retries(
-                webpage_url, video_id, query=query,
+                webpage_url, video_id, retry_fatal=True, query=query,
                 headers=traverse_obj(self._get_default_ytcfg(webpage_client), {
                     'User-Agent': ('INNERTUBE_CONTEXT', 'client', 'userAgent', {str}),
                 }))
