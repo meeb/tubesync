@@ -30,6 +30,20 @@ def th_schedule(cls, task_wrapper, /, *args, remove_duplicates=False, vn_args=()
 
 class TaskHistoryQuerySet(models.QuerySet):
 
+    def running(self, now=None, within=None):
+        if now is None:
+            now = timezone.now()
+        qs = self.filter(
+            start_at=models.F('end_at'),
+            scheduled_at__lte=models.F('end_at'),
+        ).order_by('end_at')
+        if within:
+            if not isinstance(within, timedelta):
+                within = timedelta(seconds=within)
+            time_limit = now - within
+            qs = qs.filter(end_at__gt=time_limit)
+        return qs
+
     def failed(self, within=None):
         """
         :param within: A timedelta object
