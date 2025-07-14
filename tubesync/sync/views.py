@@ -1135,6 +1135,11 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         self.object.attempts = max_attempts // 2
         self.object.run_at = max(self.now, when)
         self.object.save()
+        TaskHistory.objects.filter(
+            task_id=str(self.object.pk),
+        ).update(
+            scheduled_at=self.object.run_at,
+        )
 
         return super().form_valid(form)
 
