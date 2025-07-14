@@ -118,7 +118,7 @@ def parse_database_connection_string(database_connection_string):
         'mysql': 'django.db.backends.mysql',
     }
     backend_options = {
-        'postgresql': {},
+        'postgresql': {'pool': True,},
         'mysql': {
             'charset': 'utf8mb4',
         }
@@ -181,7 +181,7 @@ def parse_database_connection_string(database_connection_string):
         'PASSWORD': password,
         'HOST': hostname,
         'PORT': port,
-        'CONN_MAX_AGE': 300,
+        'CONN_MAX_AGE': 300 if 'mysql' == driver else 0,
         'OPTIONS': backend_options.get(driver),
     }
 

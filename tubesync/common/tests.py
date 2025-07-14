@@ -79,8 +79,8 @@ class UtilsTestCase(TestCase):
                 'HOST': 'localhost',
                 'PORT': 5432,
                 'NAME': 'tubesync',
-                'CONN_MAX_AGE': 300,
-                'OPTIONS': {},
+                'CONN_MAX_AGE': 0,
+                'OPTIONS': dict(pool=True),
             }
         )
         database_dict = parse_database_connection_string(
