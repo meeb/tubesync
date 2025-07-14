@@ -49,7 +49,7 @@ class SqliteStorage(huey_SqliteStorage):
     def initialize_schema(self):
         super().initialize_schema()
         auto_vacuum_dict = {'NONE': 0, 'FULL': 1, 'INCREMENTAL': 2}
-        valid = set(auto_vacuum_dict.values()) + set(auto_vacuum_dict.keys())
+        valid = set(auto_vacuum_dict.values()) | set(auto_vacuum_dict.keys())
         assert self.auto_vacuum in valid, 'auto_vacuum was invalid'
         current = self.sql('PRAGMA auto_vacuum', results=True)
         expected = auto_vacuum_dict.get(self.auto_vacuum) or self.auto_vacuum
