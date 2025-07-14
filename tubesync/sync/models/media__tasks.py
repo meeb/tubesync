@@ -209,7 +209,7 @@ def refresh_formats(self):
         fmt_dict['a'] = 'availability'
         fmt_dict['j'] = ', and ' if 'thumbnails' == fmt_dict['t'] else ', '
         fmt_dict['s'] = '; '
-    return (True, False, 'updated formats{s}{a}{j}{t}'.format(**fmt_dict))
+    return (True, False, 'updated formats{s}{a}{j}{t}'.format(**{k:fmt_dict[k] for k in 'sajt'}))
 
 
 def wait_for_premiere(self):
