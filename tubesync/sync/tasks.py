@@ -151,14 +151,10 @@ def get_source_completed_tasks(source_id, only_errors=False):
 
 
 def get_running_tasks(arg_dt=None, /):
-    if arg_dt is None:
-        arg_dt = timezone.now()
-    running_qs = TaskHistory.objects.filter(
-            start_at=db.models.F('end_at'),
-            scheduled_at__lte=db.models.F('end_at'),
-            end_at__gte=arg_dt-timezone.timedelta(hours=12),
-    ).order_by('end_at')
-    return running_qs
+    return TaskHistory.objects.running(
+        now=arg_dt,
+        within=timezone.timedelta(hours=12),
+    )
 
 def get_running_task_by_name(arg_str, media_id, /):
     name = arg_str
