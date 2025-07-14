@@ -118,10 +118,21 @@ def parse_database_connection_string(database_connection_string):
         'mysql': 'django.db.backends.mysql',
     }
     backend_options = {
-        'postgresql': {'pool': True,},
+        'postgresql': dict(pool={
+            'max_size': 80, # default: None (static min_size pool)
+            'min_size': 8, # default: 4
+            'num_workers': 6, # default: 3
+            'timeout': 180, # default: 30
+        }),
         'mysql': {
             'charset': 'utf8mb4',
         }
+    }
+    db_overrides = {
+        'mysql': {
+            'CONN_MAX_AGE': 300,
+        },
+        'postgresql': dict(),
     }
     try:
         parts = urlparse(str(database_connection_string))
@@ -173,7 +184,7 @@ def parse_database_connection_string(database_connection_string):
     if '/' in database:
         raise DatabaseConnectionError(f'Database connection string path can only '
                                       f'contain a single string name, got: {database}')
-    return {
+    db_dict = {
         'DRIVER': driver,
         'ENGINE': django_driver,
         'NAME': database,
@@ -181,9 +192,13 @@ def parse_database_connection_string(database_connection_string):
         'PASSWORD': password,
         'HOST': hostname,
         'PORT': port,
-        'CONN_MAX_AGE': 300 if 'mysql' == driver else 0,
+        'CONN_HEALTH_CHECKS': True,
+        'CONN_MAX_AGE': 0,
         'OPTIONS': backend_options.get(driver),
     }
+    db_dict.update(db_overrides.get(driver))
+    
+    return db_dict
 
 
 def get_client_ip(request):
