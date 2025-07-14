@@ -77,6 +77,37 @@ class SqliteHuey(huey_SqliteHuey):
         kwargs['huey'] = self
         super()._emit(signal, task, *args, **kwargs)
 
+    def reschedule(self, task_id, eta):
+        pc = self.pending_count()
+        found = [
+            t
+            for t in self.pending(100)
+            if t.id == task_id
+        ]
+        if not found and pc > 100:
+            found = [
+                t
+                for t in self.pending()
+                if t.id == task_id
+            ]
+        if not found:
+            found = [
+                t
+                for t in self.scheduled()
+                if t.id == task_id
+            ]
+        if not found:
+            return False
+        for t in found:
+            self.revoke(t, revoke_once=True)
+        task_eta = utils.normalize_time(eta=eta, utc=self.utc)
+        for t in found:
+            t.eta = task_eta
+            t.id = t.create_id()
+            t.revoke_id = f'r:{t.id}'
+            self.enqueue(t)
+        return True
+
 
 def CancelExecution_init(self, *args, retry=None, **kwargs):
     self.retry = retry
