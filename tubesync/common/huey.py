@@ -4,10 +4,10 @@ from functools import wraps
 from huey import (
     CancelExecution,
     SqliteHuey as huey_SqliteHuey,
-    SqliteStorage as huey_SqliteStorage,
     signals, utils,
 )
 from huey.api import TaskLock
+from huey.storage import SqliteStorage as huey_SqliteStorage
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
 
 
