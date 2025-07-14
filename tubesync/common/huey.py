@@ -2,7 +2,9 @@ import datetime
 import os
 from functools import wraps
 from huey import (
-    CancelExecution, SqliteHuey as huey_SqliteHuey,
+    CancelExecution,
+    SqliteHuey as huey_SqliteHuey,
+    SqliteStorage as huey_SqliteStorage,
     signals, utils,
 )
 from huey.api import TaskLock
@@ -26,7 +28,7 @@ TaskLock.acquired = property(
 )
 
 
-class SqliteHuey(huey_SqliteHuey):
+class SqliteStorage(huey_SqliteStorage):
     begin_sql = 'BEGIN IMMEDIATE'
     auto_vacuum = 'INCREMENTAL'
     journal_size_limit = 1024 * 1024 * 64
@@ -44,10 +46,6 @@ class SqliteHuey(huey_SqliteHuey):
         # take at most vacuum_pages off the free list
         conn.execute(f'PRAGMA incremental_vacuum({self.vacuum_pages})')
         return conn
-
-    def _emit(self, signal, task, *args, **kwargs):
-        kwargs['huey'] = self
-        super()._emit(signal, task, *args, **kwargs)
 
     def initialize_schema(self):
         super().initialize_schema()
@@ -69,6 +67,14 @@ class SqliteHuey(huey_SqliteHuey):
             if vacuum_db:
                 curs.execute(f'PRAGMA auto_vacuum = {self.auto_vacuum}')
                 curs.execute('VACUUM')
+
+
+class SqliteHuey(huey_SqliteHuey):
+    storage_class = SqliteStorage
+
+    def _emit(self, signal, task, *args, **kwargs):
+        kwargs['huey'] = self
+        super()._emit(signal, task, *args, **kwargs)
 
 
 def CancelExecution_init(self, *args, retry=None, **kwargs):
