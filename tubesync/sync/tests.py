@@ -18,7 +18,7 @@ from common.models import TaskHistory
 from .models import Source, Media
 from .tasks import (
     cleanup_old_media, check_source_directory_exists,
-    get_media_thumbnail_task,
+    get_media_download_task, get_media_thumbnail_task,
 )
 from .filtering import filter_media
 from .utils import filter_response
@@ -421,26 +421,18 @@ class FrontEndTestCase(TestCase):
         now_dt = timezone.now()
         TaskHistory.objects.all().update(start_at=now_dt, end_at=now_dt)
         # Check the tasks to fetch the media thumbnails have been scheduled
+        found_download_task1 = get_media_download_task(test_media1_pk)
+        found_download_task2 = get_media_download_task(test_media2_pk)
+        found_download_task3 = get_media_download_task(test_media3_pk)
         found_thumbnail_task1 = get_media_thumbnail_task(test_media1_pk)
         found_thumbnail_task2 = get_media_thumbnail_task(test_media2_pk)
         found_thumbnail_task3 = get_media_thumbnail_task(test_media3_pk)
-        found_download_task1 = False
-        found_download_task2 = False
-        found_download_task3 = False
-        q = {'task_name': 'sync.tasks.download_media'}
-        for task in Task.objects.filter(**q):
-            if test_media1_pk in task.task_params:
-                found_download_task1 = True
-            if test_media2_pk in task.task_params:
-                found_download_task2 = True
-            if test_media3_pk in task.task_params:
-                found_download_task3 = True
-        self.assertTrue(found_thumbnail_task1)
-        self.assertTrue(found_thumbnail_task2)
-        self.assertTrue(found_thumbnail_task3)
         self.assertTrue(found_download_task1)
         self.assertTrue(found_download_task2)
         self.assertTrue(found_download_task3)
+        self.assertTrue(found_thumbnail_task1)
+        self.assertTrue(found_thumbnail_task2)
+        self.assertTrue(found_thumbnail_task3)
         # Check the media is listed on the media overview page
         response = c.get('/media')
         self.assertEqual(response.status_code, 200)
@@ -469,15 +461,18 @@ class FrontEndTestCase(TestCase):
         # simulate the tasks consumer signals having already run
         TaskHistory.objects.all().update(end_at=timezone.now())
         # Confirm any tasks have been deleted
+        found_download_task1 = get_media_download_task(test_media1_pk)
+        found_download_task2 = get_media_download_task(test_media2_pk)
+        found_download_task3 = get_media_download_task(test_media3_pk)
         found_thumbnail_task1 = get_media_thumbnail_task(test_media1_pk)
         found_thumbnail_task2 = get_media_thumbnail_task(test_media2_pk)
         found_thumbnail_task3 = get_media_thumbnail_task(test_media3_pk)
+        self.assertFalse(found_download_task1)
+        self.assertFalse(found_download_task2)
+        self.assertFalse(found_download_task3)
         self.assertFalse(found_thumbnail_task1)
         self.assertFalse(found_thumbnail_task2)
         self.assertFalse(found_thumbnail_task3)
-        q = {'task_name': 'sync.tasks.download_media'}
-        download_media_tasks = Task.objects.filter(**q)
-        self.assertFalse(download_media_tasks)
 
     def test_tasks(self):
         # Tasks overview page

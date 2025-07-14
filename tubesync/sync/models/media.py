@@ -996,7 +996,12 @@ class Media(models.Model):
         if self.downloaded:
             return Val(MediaState.DOWNLOADED)
         if task:
-            if task.locked_by_pid_running():
+            def running(arg_task, /):
+                if hasattr(arg_task, 'locked_by_pid_running'):
+                    return arg_task.locked_by_pid_running()
+                from ..tasks import get_media_download_task
+                return get_media_download_task(str(self.pk))
+            if running(task):
                 return Val(MediaState.DOWNLOADING)
             elif task.has_error():
                 return Val(MediaState.ERROR)

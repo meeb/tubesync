@@ -63,7 +63,7 @@ def map_task_to_instance(task, using_history=True):
     TASK_MAP = {
         'sync.tasks.index_source_task': Source,
         'sync.tasks.download_media_image': Media,
-        'sync.tasks.download_media': Media,
+        'sync.tasks.download_media_file': Media,
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
         'sync.tasks.rename_all_media_for_source': Source,
@@ -160,12 +160,18 @@ def get_running_tasks(arg_dt=None, /):
     ).order_by('end_at')
     return running_qs
 
-def get_media_thumbnail_task(media_id):
-    tqs = get_running_tasks().filter(
-        name='sync.tasks.download_media_image',
-        task_params__0__0=media_id,
-    )
+def get_running_task_by_name(arg_str, media_id, /):
+    name = arg_str
+    if '.' not in name:
+        name = f'sync.tasks.{name}'
+    tqs = get_running_tasks().filter(name=name, task_params__0__0=media_id)
     return tqs[0] if tqs.count() else False
+
+def get_media_download_task(media_id):
+    return get_running_task_by_name('download_media_file', media_id)
+    
+def get_media_thumbnail_task(media_id):
+    return get_running_task_by_name('download_media_image', media_id)
 
 
 def get_tasks(task_name, id=None, /, instance=None):
@@ -176,9 +182,6 @@ def get_tasks(task_name, id=None, /, instance=None):
 def get_first_task(task_name, id=None, /, *, instance=None):
     tqs = get_tasks(task_name, id, instance).order_by('run_at')
     return tqs[0] if tqs.count() else False
-
-def get_media_download_task(media_id):
-    return get_first_task('sync.tasks.download_media', media_id)
 
 def get_media_metadata_task(media_id):
     return get_first_task('sync.tasks.download_media_metadata', media_id)
@@ -979,12 +982,11 @@ def download_media_file(media_id, override=False):
         if not media.download_checklist(override):
             # any condition that needs to reschedule the task
             # should raise an exception to avoid this
-            return False
+            return
 
     wait_for_errors(
         media,
         queue_name=Val(TaskQueue.LIMIT),
-        task_name='sync.tasks.download_media',
     )
     with huey_lock_task(
         f'media:{media.uuid}',
@@ -1038,7 +1040,6 @@ def download_media_file(media_id, override=False):
             media.write_nfo_file()
             # Schedule a task to update media servers
             schedule_media_servers_update()
-            return True
 
 
 @db_task(delay=30, expires=210, priority=100, queue=Val(TaskQueue.NET))
@@ -1113,7 +1114,7 @@ def rename_all_media_for_source(source_id):
         getattr(settings, 'RENAME_ALL_SOURCES', False)
     )
     if not create_rename_tasks:
-        return None
+        return
     mqs = Media.objects.filter(
         source=source,
         downloaded=True,
@@ -1305,15 +1306,6 @@ def index_source_task(source_id):
 def download_media_metadata(media_id):
     try:
         res = download_metadata(media_id)
-        return res.get(blocking=True)
-    except CancelExecution as e:
-        raise InvalidTaskError(str(e)) from e
-
-
-@background(schedule=dict(priority=30, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def download_media(media_id, override=False):
-    try:
-        res = download_media_file(media_id, override)
         return res.get(blocking=True)
     except CancelExecution as e:
         raise InvalidTaskError(str(e)) from e
