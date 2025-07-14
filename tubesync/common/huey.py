@@ -2,8 +2,7 @@ import datetime
 import os
 from functools import wraps
 from huey import (
-    CancelExecution,
-    SqliteHuey as huey_SqliteHuey,
+    CancelExecution, SqliteHuey as huey_SqliteHuey,
     signals, utils,
 )
 from huey.api import TaskLock
