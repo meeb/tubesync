@@ -37,7 +37,9 @@ class SqliteStorage(huey_SqliteStorage):
     def _create_connection(self):
         conn = super()._create_connection()
         conn.execute(f'PRAGMA auto_vacuum = {self.auto_vacuum}')
+        conn.execute('PRAGMA foreign_keys = ON')
         conn.execute(f'PRAGMA journal_size_limit = {self.journal_size_limit}')
+        conn.execute('PRAGMA user_version = 1')
         conn.execute(f'PRAGMA wal_autocheckpoint={self.wal_autocheckpoint}')
         # copied from huey_SqliteHuey to use EXTRA or NORMAL
         # instead of FULL or OFF
