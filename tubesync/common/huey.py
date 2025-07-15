@@ -192,7 +192,8 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
         workers = 2
     finally:
         if 0 >= workers:
-            workers = os.cpu_count()
+            useful_cpus = os.sched_getaffinity(0)
+            workers = max(2, len(useful_cpus) // 2)
         elif 1 == workers:
             thread = False
     return dict(
