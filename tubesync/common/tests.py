@@ -79,8 +79,14 @@ class UtilsTestCase(TestCase):
                 'HOST': 'localhost',
                 'PORT': 5432,
                 'NAME': 'tubesync',
+                'CONN_HEALTH_CHECKS': True,
                 'CONN_MAX_AGE': 0,
-                'OPTIONS': dict(pool=True),
+                'OPTIONS': dict(pool={
+                    'max_size': 80,
+                    'min_size': 8,
+                    'num_workers': 6,
+                    'timeout': 180,
+                }),
             }
         )
         database_dict = parse_database_connection_string(
@@ -94,6 +100,7 @@ class UtilsTestCase(TestCase):
                 'HOST': 'localhost',
                 'PORT': 3306,
                 'NAME': 'tubesync',
+                'CONN_HEALTH_CHECKS': True,
                 'CONN_MAX_AGE': 300,
                 'OPTIONS': {'charset': 'utf8mb4'}
             }
