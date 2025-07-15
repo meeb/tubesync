@@ -30,7 +30,7 @@ from common.huey import CancelExecution, dynamic_retry, register_huey_signals
 from common.logger import log
 from common.models import TaskHistory
 from common.errors import (
-    BgTaskWorkerError, HueyConsumerError,
+    HueyConsumerError,
     DownloadFailedException, FormatUnavailableError,
     NoFormatException, NoMediaException, NoThumbnailException,
 )
@@ -361,9 +361,9 @@ def wait_for_errors(model, /, *, queue_name=None, task_name=None):
         total_count += sum([ 1 if contains_http429(q, k) else 0 for k in q.all_results() ])
     delay = 10 * total_count
     time_str = seconds_to_timestr(delay)
+    db_down_path = Path('/run/service/huey-database/down')
+    fs_down_path = Path('/run/service/huey-filesystem/down')
     log.info(f'waiting for errors: 429 ({time_str}): {model}')
-    db_down_path = Path('/run/service/tubesync-db-worker/down')
-    fs_down_path = Path('/run/service/tubesync-fs-worker/down')
     while delay > 0:
         # this happenes when the container is shutting down
         # do not prevent that while we are delaying a task
@@ -374,7 +374,7 @@ def wait_for_errors(model, /, *, queue_name=None, task_name=None):
     for task in tasks:
         update_task_status(task, None)
     if delay > 0:
-        raise BgTaskWorkerError(_('queue worker stopped'))
+        raise HueyConsumerError(_('queue consumer stopped'))
 
 
 @db_task(priority=90, queue=Val(TaskQueue.FS))
