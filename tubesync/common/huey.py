@@ -110,12 +110,14 @@ class SqliteHuey(huey_SqliteHuey):
 
     def scheduled_at_from_task(self, task_obj, /):
         scheduled_at = None
+        if not (hasattr(task_obj, 'eta') and task_obj.eta):
+            return None
         if self.utc:
-            scheduled_at = task_obj.eta.replace(tzinfo=datetime.UTC)
+            scheduled_at = task_obj.eta.replace(tzinfo=datetime.timezone.utc)
         else: # this path is unlikely
             scheduled_at = timestamp_to_datetime(
                 datetime_to_timestamp(task_obj.eta, integer=False),
-            ).astimezone(tz=datetime.UTC)
+            ).astimezone(tz=datetime.timezone.utc)
         return scheduled_at
 
 
@@ -388,7 +390,9 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         th.failed_at = signal_dt
         th.last_error = str(exception_obj)
     elif signal_name == signals.SIGNAL_ENQUEUED:
-        th.scheduled_at = huey.scheduled_at_from_task(task_obj)
+        scheduled_at = huey.scheduled_at_from_task(task_obj)
+        if scheduled_at:
+            th.scheduled_at = scheduled_at
         from sync.models import Media, Source
         if not th.verbose_name and task_obj.args:
             key = task_obj.args[0]
@@ -403,7 +407,9 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
                         if hasattr(model_instance, 'name'):
                             th.verbose_name += f' / {model_instance.name}'
     elif signal_name == signals.SIGNAL_SCHEDULED:
-        th.scheduled_at = huey.scheduled_at_from_task(task_obj)
+        scheduled_at = huey.scheduled_at_from_task(task_obj)
+        if scheduled_at:
+            th.scheduled_at = scheduled_at
     th.end_at = signal_dt
     th.elapsed = history['elapsed']
     th.save()
