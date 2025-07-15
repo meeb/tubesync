@@ -79,7 +79,7 @@ class TaskHistoryQuerySet(models.QuerySet):
 class TaskHistory(models.Model):
     # the "name" of the task/function to be run
     name = models.CharField(max_length=190, db_index=True)
-    task_id = models.CharField(max_length=40, db_index=True)
+    task_id = models.CharField(max_length=40, unique=True)
     # the json encoded parameters to pass to the task
     task_params = models.JSONField(default=dict, encoder=JSONEncoder)
 
