@@ -303,12 +303,14 @@ def schedule_indexing():
             ).clear()
         # schedule a new indexing task
         log.info(f'Scheduling an indexing task for source "{source.name}": {source.pk}')
-        vn_fmt = _('Index media from source "{}"')
-        index_source_task(
+        TaskHistory.schedule(
+            index_source,
             str(source.pk),
-            repeat=0,
-            schedule=600,
-            verbose_name=vn_fmt.format(source.name),
+            delay=300,
+            expires=40*60,
+            remove_duplicates=True,
+            vn_fmt=_('Index media from source "{}"'),
+            vn_args=(source.name,),
         )
 
 
@@ -735,8 +737,6 @@ def delete_media(media_id):
             queue=Val(TaskQueue.DB),
         ):
             media.delete()
-            return True
-    return False
 
 
 @db_task(delay=60, priority=70, retries=5, retry_delay=60, queue=Val(TaskQueue.FS))
@@ -779,8 +779,6 @@ def save_media(media_id):
             queue=Val(TaskQueue.DB),
         ):
             save_model(media)
-        return True
-    return False
 
 
 @db_task(delay=60, priority=60, retries=3, retry_delay=600, queue=Val(TaskQueue.LIMIT))
@@ -1260,43 +1258,6 @@ def wait_for_media_premiere(media_id):
         t = media.wait_for_premiere()
         if t[0]:
             save_model(media)
-
-@background(schedule=dict(priority=0, run_at=0), queue=Val(TaskQueue.NET), remove_existing_tasks=False)
-def wait_for_database_queue():
-    from common.huey import h_q_tuple
-    queue_name = Val(TaskQueue.DB)
-    consumer_down_path = Path(f'/run/service/huey-{queue_name}/down')
-    included_names = frozenset(('migrate_to_metadata',))
-    total_count = 1
-    while 0 < total_count:
-        if consumer_down_path.exists() and consumer_down_path.is_file():
-            raise HueyConsumerError(_('queue consumer stopped'))
-        time.sleep(5)
-        status_dict = h_q_tuple(queue_name)[2]
-        total_count = status_dict.get('pending', (0,))[0]
-        scheduled_tasks = status_dict.get('scheduled', (0,[]))[1] 
-        total_count += sum(
-            [ 1 for t in scheduled_tasks if t.name.rsplit('.', 1)[-1] in included_names ],
-        )
-
-
-@background(schedule=dict(priority=20, run_at=30), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def index_source_task(source_id):
-    try:
-        res = index_source(source_id)
-        retval = res.get(blocking=True)
-    except CancelExecution as e:
-        raise InvalidTaskError(str(e)) from e
-    else:
-        if retval is not True:
-            return retval
-        wait_for_database_queue(
-            priority=19, # the indexing task uses 20
-            queue=Val(TaskQueue.NET),
-            verbose_name=_('Waiting for database tasks to complete'),
-        )
-        return True
-
 
 @background(schedule=dict(priority=40, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
 def download_media_metadata(media_id):
