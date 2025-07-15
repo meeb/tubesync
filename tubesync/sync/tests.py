@@ -395,6 +395,7 @@ class FrontEndTestCase(TestCase):
                 }]
             } 
         '''
+        before_dt = timezone.now()
         past_date = timezone.make_aware(datetime(year=2000, month=1, day=1))
         test_media1 = Media.objects.create(
             key='mediakey1',
@@ -419,7 +420,11 @@ class FrontEndTestCase(TestCase):
         test_media3_pk = str(test_media3.pk)
         # simulate the tasks consumer signals having already run
         now_dt = timezone.now()
-        TaskHistory.objects.all().update(start_at=now_dt, end_at=now_dt)
+        TaskHistory.objects.all().update(
+            scheduled_at=before_dt,
+            start_at=now_dt,
+            end_at=now_dt,
+        )
         # Check the tasks to fetch the media thumbnails have been scheduled
         found_download_task1 = get_media_download_task(test_media1_pk)
         found_download_task2 = get_media_download_task(test_media2_pk)
