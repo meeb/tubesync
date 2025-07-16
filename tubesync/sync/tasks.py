@@ -150,10 +150,19 @@ def get_source_completed_tasks(source_id, only_errors=False):
     return CompletedTask.objects.filter(**q).order_by('-failed_at')
 
 
+def get_model_task(model_pk, /, name=None, qs=None):
+    if qs is None:
+        qs = TaskHistory.objects.all()
+    if name is not None:
+        qs = qs.filter(name__endswith=name)
+    params_prefix = f'[["{model_pk}"'
+    qs = qs.filter(task_params__istartswith=params_prefix)
+    return qs[0] if qs.count() else False
+
 def get_running_tasks(arg_dt=None, /):
     return TaskHistory.objects.running(
         now=arg_dt,
-        within=timezone.timedelta(hours=12),
+        within=timezone.timedelta(seconds=settings.MAX_RUN_TIME),
     )
 
 def get_running_task_by_name(arg_str, media_id, /):
@@ -164,10 +173,20 @@ def get_running_task_by_name(arg_str, media_id, /):
     return tqs[0] if tqs.count() else False
 
 def get_media_download_task(media_id):
-    return get_running_task_by_name('download_media_file', media_id)
+    #return get_running_task_by_name('download_media_file', media_id)
+    return get_model_task(
+        media_id,
+        name='download_media_file',
+        qs=get_running_tasks(),
+    )
     
 def get_media_thumbnail_task(media_id):
-    return get_running_task_by_name('download_media_image', media_id)
+    #return get_running_task_by_name('download_media_image', media_id)
+    return get_model_task(
+        media_id,
+        name='download_media_image',
+        qs=get_running_tasks(),
+    )
 
 
 def get_tasks(task_name, id=None, /, instance=None):
