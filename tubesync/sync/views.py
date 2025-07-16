@@ -33,7 +33,7 @@ from .utils import delete_file, validate_url
 from .tasks import (
     map_task_to_instance, get_error_message, migrate_queues, delete_task_by_media,
     get_running_tasks, get_media_download_task, get_source_completed_tasks,
-    check_source_directory_exists, index_source_task, download_media_image,
+    check_source_directory_exists, index_source, download_media_image,
 )
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
@@ -142,18 +142,16 @@ class SourcesView(ListView):
 
     def get(self, *args, **kwargs):
         if args[0].path.startswith("/source-sync-now/"):
-            sobj = Source.objects.get(pk=kwargs["pk"])
-            if sobj is None:
+            source = Source.objects.get(pk=kwargs["pk"])
+            if source is None:
                 return HttpResponseNotFound()
 
-            source = sobj
-            verbose_name = _('Index media from source "{}" once')
-            index_source_task(
+            TaskHistory.schedule(
+                index_source,
                 str(source.pk),
-                remove_existing_tasks=False,
-                repeat=0,
-                schedule=30,
-                verbose_name=verbose_name.format(source.name),
+                delay=30,
+                vn_fmt=_('Index media from source "{}" once'),
+                vn_args=(source.name,),
             )
             url = reverse_lazy('sync:sources')
             url = append_uri_params(url, {'message': 'source-refreshed'})
