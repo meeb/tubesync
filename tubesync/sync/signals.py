@@ -6,7 +6,6 @@ from django.db import IntegrityError
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
 from django.db.transaction import atomic, on_commit
 from django.dispatch import receiver
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.logger import log
 from common.models import TaskHistory
@@ -14,7 +13,6 @@ from common.utils import glob_quote, mkdir_p
 from .models import Source, Media, Metadata
 from .tasks import (
     get_media_download_task, get_media_metadata_task, get_media_thumbnail_task,
-    map_task_to_instance,
     delete_all_media_for_source, rename_media, save_all_media_for_source,
     check_source_directory_exists, download_source_images, index_source,
     download_media_file, download_media_metadata, download_media_image,
