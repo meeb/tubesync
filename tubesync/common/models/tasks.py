@@ -12,20 +12,36 @@ def th_schedule(cls, task_wrapper, /, *args, remove_duplicates=False, vn_args=()
     assert vn_fmt is not None, 'vn_fmt is required'
     if vn_fmt is None:
         return False
+    defaults = dict(
+        queue=task_wrapper.huey.name,
+        remove_duplicates=remove_duplicates,
+        verbose_name=str(vn_fmt).format(*vn_args),
+    )
     # support using the delay setting from the decorator
     if not ('delay' in kwargs or 'eta' in kwargs):
         kwargs['delay'] = task_wrapper.settings.get('delay') or int()
-    result = task_wrapper.schedule(args=args, **kwargs)
-    try:
-        task_history = cls.objects.get(task_id=str(result.id))
-    except cls.DoesNotExist:
-        pass
-    else:
-        task_history.remove_duplicates = remove_duplicates
-        task_history.verbose_name = str(vn_fmt).format(*vn_args)
-        task_history.save()
-        return True
-    return False
+    task_obj = task_wrapper.s(*args, **kwargs)
+    task_id = str(task_obj.id)
+    scheduled_at = task_wrapper.huey.scheduled_at_from_task(task_obj)
+    if scheduled_at:
+        defaults['scheduled_at'] = scheduled_at
+    defaults['end_at'] = timezone.datetime.now(timezone.timezone.utc)
+    defaults['name'] = f'{task_obj.__module__}.{task_obj.name}'
+    defaults['priority'] = task_obj.priority
+    defaults['task_params'] = list((
+        list(task_obj.args),
+        repr(task_obj.kwargs),
+    ))
+    cls.objects.update_or_create(
+        task_id=task_id,
+        defaults=defaults,
+        create_defaults={
+            'task_id': task_id,
+            **defaults,
+        },
+    )
+    task_wrapper.huey.enqueue(task_obj)
+    return True
 
 
 class TaskHistoryQuerySet(models.QuerySet):
