@@ -17,7 +17,6 @@ from common.models import TaskHistory
 from common.utils import glob_quote, mkdir_p
 from .models import Source, Media, Metadata
 from .tasks import (
-    delete_task_by_media,
     get_media_download_task, get_media_metadata_task, get_media_thumbnail_task,
     map_task_to_instance,
     delete_all_media_for_source, rename_media, save_all_media_for_source,
@@ -317,10 +316,12 @@ def media_post_save(sender, instance, created, **kwargs):
     # If the media is missing metadata schedule it to be downloaded
     if not (media.skip or media.has_metadata or existing_media_metadata_task):
         log.info(f'Scheduling task to download metadata for: {media.url}')
-        verbose_name = _('Downloading metadata for: {}: "{}"')
-        download_media_metadata(
+        TaskHistory.schedule(
+            download_media_metadata,
             str(media.pk),
-            verbose_name=verbose_name.format(media.key, media.name),
+            remove_duplicates=True,
+            vn_fmt=_('Downloading metadata for: {}: "{}"'),
+            vn_args=(media.key, media.name,),
         )
     # If the media is missing a thumbnail schedule it to be downloaded (unless we are skipping this media)
     if not media.thumb_file_exists:
@@ -371,9 +372,6 @@ def media_post_save(sender, instance, created, **kwargs):
 
 @receiver(pre_delete, sender=Media)
 def media_pre_delete(sender, instance, **kwargs):
-    # Triggered before media is deleted, delete any unlocked scheduled tasks
-    log.info(f'Deleting tasks for media: {instance.name}')
-    delete_task_by_media('sync.tasks.download_media_metadata', (str(instance.pk),))
     # Remove thumbnail file for deleted media
     if instance.thumb:
         instance.thumb.delete(save=False)
