@@ -23,6 +23,7 @@ from .filtering import filter_media
 
 @receiver(pre_save, sender=Source)
 def source_pre_save(sender, instance, **kwargs):
+    source = instance # noqa: F841
     # Triggered before a source is saved, if the schedule has been updated recreate
     # its indexing task
     try:
@@ -33,6 +34,10 @@ def source_pre_save(sender, instance, **kwargs):
 
     args = ( str(instance.pk), )
     check_source_directory_exists.call_local(*args)
+    existing_copy_channel_images = existing_source.copy_channel_images
+    new_copy_channel_images = instance.copy_channel_images
+    if new_copy_channel_images and not (existing_copy_channel_images or instance.is_playlist):
+        download_source_images(str(instance.pk))
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
     new_dirpath = instance.directory_path.resolve(strict=False)
     if existing_dirpath != new_dirpath:
