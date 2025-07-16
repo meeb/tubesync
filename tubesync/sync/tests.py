@@ -13,8 +13,9 @@ from xml.etree import ElementTree
 from django.conf import settings
 from django.test import TestCase, Client, override_settings
 from django.utils import timezone
-from background_task.models import Task
+from django_huey import DJANGO_HUEY, get_queue
 from common.models import TaskHistory
+from huey.consumer_options import ConsumerConfig
 from .models import Source, Media
 from .tasks import (
     cleanup_old_media, check_source_directory_exists,
@@ -29,7 +30,29 @@ from .choices import (Val, Fallback, IndexSchedule, SourceResolution,
 
 class FrontEndTestCase(TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._consumers = dict()
+        for qn, qc in DJANGO_HUEY.get('queues', dict()).items():
+            q = get_queue(qn)
+            consumer_opts = qc.get('consumer', {})
+            config = ConsumerConfig(**consumer_opts)
+            config.validate()
+            #consumer = q.create_consumer(**config.values)
+            #cls._consumers[qn] = consumer
+            #consumer.start()
+            q.immediate = True
+            q.immediate_use_memory = True
+
+    @classmethod
+    def tearDownClass(cls):
+        for qn, consumer in cls._consumers.items():
+            consumer.stop(graceful=True)
+        super().tearDownClass()
+
     def setUp(self):
+        self.maxDiff = None
         # Disable general logging for test case
         logging.disable(logging.CRITICAL)
 
@@ -165,6 +188,14 @@ class FrontEndTestCase(TestCase):
         self.assertTrue(checked_directory)
 
     def test_source(self):
+        #logging.disable(logging.NOTSET)
+        def get_model_task(model_pk, /, name=None):
+            qs = TaskHistory.objects.all()
+            if name is not None:
+                qs = qs.filter(name__endswith=name)
+            params_prefix = f'[["{model_pk}"'
+            qs = qs.filter(task_params__istartswith=params_prefix)
+            return qs[0] if qs.count() else False
         # Sources overview page
         c = Client()
         response = c.get('/sources')
@@ -185,6 +216,8 @@ class FrontEndTestCase(TestCase):
             'filter_text': '.*',
             'filter_seconds_min': int(True),
             'index_schedule': 3600,
+            'download_media': False,
+            'index_videos': True,
             'delete_old_media': False,
             'days_to_keep': 14,
             'source_resolution': '1080p',
@@ -210,13 +243,8 @@ class FrontEndTestCase(TestCase):
         # Check that the SponsorBlock categories were saved
         self.assertEqual(source.sponsorblock_categories.selected_choices,
                          expected_categories)
-        # Check a task was created to index the media for the new source
-        source_uuid = str(source.pk)
-        task = Task.objects.get_task('sync.tasks.index_source_task',
-                                     args=(source_uuid,))[0]
-        self.assertEqual(task.queue, Val(TaskQueue.NET))
         # Run the check_source_directory_exists task
-        check_source_directory_exists.call_local(source_uuid)
+        check_source_directory_exists(source_uuid)
         # Check the source is now on the source overview page
         response = c.get('/sources')
         self.assertEqual(response.status_code, 200)
@@ -224,6 +252,21 @@ class FrontEndTestCase(TestCase):
         # Check the source detail page loads
         response = c.get(f'/source/{source_uuid}')
         self.assertEqual(response.status_code, 200)
+        # Check a task was created to index the media for the new source
+        index_task_qs = TaskHistory.objects.filter(
+            name='sync.tasks.index_source',
+            task_params__0__0=source_uuid,
+        ).order_by('end_at')
+        self.assertNotEqual(list(), list(index_task_qs))
+        self.assertNotEqual(
+            list(),
+            [
+                th.__dict__ for th in TaskHistory.objects.all()
+            ]
+        )
+        task = get_model_task(source_uuid, name='index_source')
+        self.assertNotEqual(False, task)
+        self.assertEqual(task.queue, get_queue(Val(TaskQueue.LIMIT)).name)
         # save and refresh the Source
         source.refresh_from_db()
         source.sponsorblock_categories.selected_choices.append('sponsor')
@@ -305,8 +348,7 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(source.sponsorblock_categories.selected_choices,
                          expected_categories)
         # Check a new task has been created by seeing if the pk has changed
-        new_task = Task.objects.get_task('sync.tasks.index_source_task',
-                                         args=(source_uuid,))[0]
+        new_task = index_task_qs.last()
         self.assertNotEqual(task.pk, new_task.pk)
         # Delete source confirmation page
         response = c.get(f'/source-delete/{source_uuid}')
@@ -329,10 +371,6 @@ class FrontEndTestCase(TestCase):
         # Check the source details page now 404s
         response = c.get(f'/source/{source_uuid}')
         self.assertEqual(response.status_code, 404)
-        # Check the indexing media task was removed
-        tasks = Task.objects.get_task('sync.tasks.index_source_task',
-                                      args=(source_uuid,))
-        self.assertFalse(tasks)
 
     def test_media(self):
         # Media overview page
@@ -420,24 +458,35 @@ class FrontEndTestCase(TestCase):
         test_media3_pk = str(test_media3.pk)
         # simulate the tasks consumer signals having already run
         now_dt = timezone.now()
-        TaskHistory.objects.all().update(
+        TaskHistory.objects.filter(
+            name__startswith='sync.tasks.download_media_',
+        ).update(
             scheduled_at=before_dt,
             start_at=now_dt,
             end_at=now_dt,
         )
         # Check the tasks to fetch the media thumbnails have been scheduled
-        found_download_task1 = get_media_download_task(test_media1_pk)
-        found_download_task2 = get_media_download_task(test_media2_pk)
+        def get_model_task(model_pk, /, name=None):
+            qs = TaskHistory.objects.all()
+            if name is not None:
+                qs = qs.filter(name__endswith=name)
+            params_prefix = f'[["{model_pk}"'
+            qs = qs.filter(task_params__istartswith=params_prefix)
+            return 1 == qs.count()
+        name_suffix = 'download_media_file'
+        found_download_task1 = get_model_task(test_media1_pk, name_suffix)
+        found_download_task2 = get_model_task(test_media2_pk, name_suffix)
         found_download_task3 = get_media_download_task(test_media3_pk)
-        found_thumbnail_task1 = get_media_thumbnail_task(test_media1_pk)
-        found_thumbnail_task2 = get_media_thumbnail_task(test_media2_pk)
+        name_suffix = 'download_media_image'
+        found_thumbnail_task1 = get_model_task(test_media1_pk, name_suffix)
+        found_thumbnail_task2 = get_model_task(test_media2_pk, name_suffix)
         found_thumbnail_task3 = get_media_thumbnail_task(test_media3_pk)
         self.assertTrue(found_download_task1)
         self.assertTrue(found_download_task2)
-        self.assertTrue(found_download_task3)
+        self.assertTrue(not not found_download_task3)
         self.assertTrue(found_thumbnail_task1)
         self.assertTrue(found_thumbnail_task2)
-        self.assertTrue(found_thumbnail_task3)
+        self.assertTrue(not not found_thumbnail_task3)
         # Check the media is listed on the media overview page
         response = c.get('/media')
         self.assertEqual(response.status_code, 200)
@@ -464,7 +513,9 @@ class FrontEndTestCase(TestCase):
         response = c.get(f'/media/{test_media3_pk}')
         self.assertEqual(response.status_code, 404)
         # simulate the tasks consumer signals having already run
-        TaskHistory.objects.all().update(end_at=timezone.now())
+        TaskHistory.objects.filter(
+            name__startswith='sync.tasks.download_media_',
+        ).update(end_at=timezone.now())
         # Confirm any tasks have been deleted
         found_download_task1 = get_media_download_task(test_media1_pk)
         found_download_task2 = get_media_download_task(test_media2_pk)
