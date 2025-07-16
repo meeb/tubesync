@@ -31,7 +31,7 @@ from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMedia
                     ConfirmDeleteMediaServerForm, SourceForm)
 from .utils import delete_file, validate_url
 from .tasks import (
-    map_task_to_instance, get_error_message, migrate_queues, delete_task_by_media,
+    map_task_to_instance, get_error_message,
     get_running_tasks, get_media_download_task, get_source_completed_tasks,
     check_source_directory_exists, index_source, download_media_image,
 )
@@ -662,8 +662,6 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        # Delete any active download tasks for the media
-        delete_task_by_media('sync.tasks.download_media', (str(self.object.pk),))
         # If the thumbnail file exists on disk, delete it
         if self.object.thumb_file_exists:
             delete_file(self.object.thumb.path)
@@ -714,8 +712,6 @@ class MediaSkipView(FormView, SingleObjectMixin):
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        # Delete any active download tasks for the media
-        delete_task_by_media('sync.tasks.download_media', (str(self.object.pk),))
         # If the media file exists on disk, delete it
         if self.object.media_file_exists:
             # Delete all files which contains filename
@@ -886,7 +882,6 @@ class TasksView(ListView):
         data['total_errors'] = errors_qs.count()
         data['scheduled'] = list()
         data['total_scheduled'] = scheduled_qs.count()
-        data['migrated'] = migrate_queues()
         data['wait_for_database_queue'] = False
 
         def add_to_task(task):
