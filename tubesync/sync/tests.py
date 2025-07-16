@@ -244,7 +244,7 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(source.sponsorblock_categories.selected_choices,
                          expected_categories)
         # Run the check_source_directory_exists task
-        check_source_directory_exists(source_uuid)
+        check_source_directory_exists.call_local(source_uuid)
         # Check the source is now on the source overview page
         response = c.get('/sources')
         self.assertEqual(response.status_code, 200)
