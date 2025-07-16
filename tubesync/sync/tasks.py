@@ -5,14 +5,12 @@
 
 
 import os
-import json
 import random
 import requests
 import time
 import uuid
 from collections import deque as queue
 from io import BytesIO
-from hashlib import sha1
 from pathlib import Path
 from datetime import timedelta
 from shutil import copyfile, rmtree
@@ -219,7 +217,6 @@ def upcoming_media():
         ),
     )
     for media in qs_gen(qs):
-        media_id = str(media.pk)
         valid, hours = media.wait_for_premiere()
         if valid:
             save_model(media)
