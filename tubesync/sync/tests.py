@@ -496,15 +496,20 @@ class FrontEndTestCase(TestCase):
 
 
 metadata_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata.json'
-metadata = open(metadata_filepath, 'rt').read()
+with open(metadata_filepath, 'rt') as file:
+    metadata = file.read()
 metadata_hdr_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_hdr.json'
-metadata_hdr = open(metadata_hdr_filepath, 'rt').read()
+with open(metadata_hdr_filepath, 'rt') as file:
+    metadata_hdr = file.read()
 metadata_60fps_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_60fps.json'
-metadata_60fps = open(metadata_60fps_filepath, 'rt').read()
+with open(metadata_60fps_filepath, 'rt') as file:
+    metadata_60fps = file.read()
 metadata_60fps_hdr_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_60fps_hdr.json'
-metadata_60fps_hdr = open(metadata_60fps_hdr_filepath, 'rt').read()
+with open(metadata_60fps_hdr_filepath, 'rt') as file:
+    metadata_60fps_hdr = file.read()
 metadata_20230629_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_2023-06-29.json'
-metadata_20230629 = open(metadata_20230629_filepath, 'rt').read()
+with open(metadata_20230629_filepath, 'rt') as file:
+    metadata_20230629 = file.read()
 all_test_metadata = {
     'boring': metadata,
     'hdr': metadata_hdr,
