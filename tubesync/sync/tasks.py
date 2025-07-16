@@ -150,25 +150,26 @@ def get_running_tasks(arg_dt=None, /):
         within=timezone.timedelta(seconds=max_run_time),
     )
 
-def get_running_task_by_name(arg_str, instance_id, /):
+def get_running_tasks_by_name(arg_str, instance_id, /):
     name = arg_str
     if '.' not in name:
         name = f'sync.tasks.{name}'
     tqs = get_model_tasks(instance_id, qs=get_running_tasks())
-    tqs = tqs.filter(name=name)
-    return tqs[0] if tqs.count() else False
+    return tqs.filter(name=name)
 
 def get_media_download_task(media_id):
-    return get_running_task_by_name('download_media_file', media_id)
+    tqs = get_running_tasks_by_name('download_media_file', media_id)
+    return tqs[0] if tqs.count() else False
     
 def get_media_thumbnail_task(media_id):
-    return get_running_task_by_name('download_media_image', media_id)
+    tqs = get_running_tasks_by_name('download_media_image', media_id)
+    return tqs[0] if tqs.count() else False
 
 
 def get_tasks(task_name, id=None, /, instance=None):
     assert not (id is None and instance is None)
     arg = str(id or instance.pk)
-    return get_running_task_by_name(str(task_name), arg)
+    return get_running_tasks_by_name(str(task_name), arg)
 
 def get_first_task(task_name, id=None, /, *, instance=None):
     tqs = get_tasks(task_name, id, instance).order_by('scheduled_at')
