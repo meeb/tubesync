@@ -25,7 +25,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize',
     'sass_processor',
-    'background_task',
     'django_huey',
     'common',
     'sync',
