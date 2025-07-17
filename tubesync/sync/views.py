@@ -662,6 +662,20 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
+        # Try to download manually, when can_download was true
+        media = self.object
+        if media.can_download:
+            TaskHistory.schedule(
+                download_media_file,
+                str(media.pk),
+                override=True,
+                priority=90,
+                remove_duplicates=True,
+                retries=3,
+                retry_dalay=600,
+                vn_fmt=_('Downloading media (manually) for "{}"'),
+                vn_args=(media.name,),
+            )
         # Delete any active download tasks for the media
         delete_task_by_media('sync.tasks.download_media', (str(self.object.pk),))
         # If the thumbnail file exists on disk, delete it
@@ -687,19 +701,6 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
         # Mark it as not skipped
         self.object.skip = False
         self.object.manual_skip = False
-        # Try to download manually
-        media = self.object
-        TaskHistory.schedule(
-            download_media_file,
-            str(media.pk),
-            override=True,
-            priority=90,
-            remove_duplicates=True,
-            retries=3,
-            retry_dalay=600,
-            vn_fmt=_('Downloading media (manually) for "{}"'),
-            vn_args=(media.name,),
-        )
         # Saving here will trigger the post_create signals to schedule new tasks
         self.object.save()
         return super().form_valid(form)
