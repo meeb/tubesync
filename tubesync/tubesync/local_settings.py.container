@@ -21,8 +21,6 @@ SECRET_KEY = getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret')
 
 ALLOWED_HOSTS_STR = getenv('TUBESYNC_HOSTS', '*')
 ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
-DEBUG_STR = getenv('TUBESYNC_DEBUG', False)
-DEBUG = True if 'true' == DEBUG_STR.strip().lower() else False
 FORCE_SCRIPT_NAME = getenv('DJANGO_FORCE_SCRIPT_NAME', DJANGO_URL_PREFIX)
 
 

@@ -115,7 +115,9 @@ jobs:
       - name: Set up Django environment
         run: |
           mkdir -v -p ~/.config/TubeSync/config
+          mkdir -v -p ~/.config/TubeSync/downloads
           sudo ln -v -s -f -T ~/.config/TubeSync/config /config
+          sudo ln -v -s -f -T ~/.config/TubeSync/downloads /downloads
           cp -v -p tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/background_task/ patches/background_task/*
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/yt_dlp/ patches/yt_dlp/*
@@ -162,7 +164,7 @@ jobs:
               --output-format github \
               --ignore "${ignore_csv_list}"
       - name: Run Django tests
-        run: cd tubesync && python3 -B -W default manage.py test --verbosity=2
+        run: cd tubesync && TUBESYNC_DEBUG=True python3 -B -W default manage.py test --no-input --buffer --verbosity=2
 
   containerise:
     if: ${{ !cancelled() && 'success' == needs.info.result }}

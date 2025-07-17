@@ -17,16 +17,15 @@ from common.models import TaskHistory
 from common.utils import glob_quote, mkdir_p
 from .models import Source, Media, Metadata
 from .tasks import (
-    delete_task_by_media, delete_task_by_source,
+    delete_task_by_media,
     get_media_download_task, get_media_metadata_task, get_media_thumbnail_task,
     map_task_to_instance,
     delete_all_media_for_source, rename_media, save_all_media_for_source,
-    check_source_directory_exists, download_source_images, index_source_task,
+    check_source_directory_exists, download_source_images, index_source,
     download_media_file, download_media_metadata, download_media_image,
 )
 from .utils import delete_file
 from .filtering import filter_media
-from .choices import Val, YouTube_SourceType
 
 
 @receiver(pre_save, sender=Source)
@@ -102,35 +101,34 @@ def source_pre_save(sender, instance, **kwargs):
     )
     if recreate_index_source_task:
         # Indexing schedule has changed, recreate the indexing task
-        delete_task_by_source('sync.tasks.index_source_task', instance.pk)
-        verbose_name = _('Index media from source "{}"')
-        index_source_task(
+        TaskHistory.schedule(
+            index_source,
             str(instance.pk),
-            repeat=0,
-            schedule=instance.task_run_at_dt,
-            verbose_name=verbose_name.format(instance.name),
+            eta=instance.task_run_at_dt,
+            remove_duplicates=True,
+            vn_fmt=_('Index media from source "{}"'),
+            vn_args=(instance.name,),
         )
 
 
 @receiver(post_save, sender=Source)
 def source_post_save(sender, instance, created, **kwargs):
+    source = instance
     # Check directory exists and create an indexing task for newly created sources
     if created:
-        check_source_directory_exists(str(instance.pk))
-        if instance.source_type != Val(YouTube_SourceType.PLAYLIST) and instance.copy_channel_images:
-            download_source_images(str(instance.pk))
-        if instance.index_schedule > 0:
-            delete_task_by_source('sync.tasks.index_source_task', instance.pk)
-            log.info(f'Scheduling first media indexing for source: {instance.name}')
-            verbose_name = _('Index media from source "{}"')
-            index_source_task(
-                str(instance.pk),
-                repeat=0,
-                schedule=600,
-                verbose_name=verbose_name.format(instance.name),
+        check_source_directory_exists(str(source.pk))
+        if source.copy_channel_images and not source.is_playlist:
+            download_source_images(str(source.pk))
+        if source.is_active:
+            log.info(f'Scheduling first media indexing for source: {source.name}')
+            TaskHistory.schedule(
+                index_source,
+                str(source.pk),
+                delay=600,
+                vn_fmt=_('Index media from source "{}"'),
+                vn_args=(source.name,),
             )
 
-    source = instance
     TaskHistory.schedule(
         save_all_media_for_source,
         str(source.pk),
@@ -149,9 +147,6 @@ def source_pre_delete(sender, instance, **kwargs):
     source = instance
     log.info(f'Deactivating source: {instance.name}')
     instance.deactivate()
-    log.info(f'Deleting tasks for source: {instance.name}')
-    delete_task_by_source('sync.tasks.index_source_task', instance.pk)
-    delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
 
     # Fetch the media source
     sqs = Source.objects.filter(filter_text=str(source.pk))
@@ -169,15 +164,6 @@ def source_pre_delete(sender, instance, **kwargs):
                 media_source.name,
             ),
         ))
-
-
-@receiver(post_delete, sender=Source)
-def source_post_delete(sender, instance, **kwargs):
-    # Triggered after a source is deleted
-    source = instance
-    log.info(f'Deleting tasks for removed source: {source.name}')
-    delete_task_by_source('sync.tasks.index_source_task', instance.pk)
-    delete_task_by_source('sync.tasks.rename_all_media_for_source', instance.pk)
 
 
 @receiver(task_created, dispatch_uid='sync.signals.task_task_created')

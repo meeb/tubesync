@@ -12,7 +12,7 @@ DOWNLOADS_BASE_DIR = BASE_DIR
 
 VERSION = '0.15.7'
 SECRET_KEY = ''
-DEBUG = False
+DEBUG = 'true' == getenv('TUBESYNC_DEBUG').strip().lower()
 ALLOWED_HOSTS = []
 
 
@@ -53,7 +53,7 @@ FORCE_SCRIPT_NAME = None
 DJANGO_HUEY = {
     'default': TaskQueue.LIMIT.value,
     'queues': dict(),
-    'verbose': None if 'true' == getenv('TUBESYNC_DEBUG', False).strip().lower() else False,
+    'verbose': None if DEBUG else False,
 }
 for queue_name in TaskQueue.values:
     queues = DJANGO_HUEY['queues']
