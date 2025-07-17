@@ -672,7 +672,7 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
                 priority=90,
                 remove_duplicates=True,
                 retries=3,
-                retry_dalay=600,
+                retry_delay=600,
                 vn_fmt=_('Downloading media (manually) for "{}"'),
                 vn_args=(media.name,),
             )
