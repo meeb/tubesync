@@ -256,9 +256,12 @@ def media_post_save(sender, instance, created, **kwargs):
         )
     # Save the instance if any changes were required
     if skip_changed or can_download_changed:
-        post_save.disconnect(media_post_save, sender=Media)
-        instance.save()
-        post_save.connect(media_post_save, sender=Media)
+        Media.objects.filter(
+            pk=instance.pk,
+        ).update(
+            can_download=instance.can_download,
+            skip=instance.skip,
+        )
 
 
 @receiver(pre_delete, sender=Media)
