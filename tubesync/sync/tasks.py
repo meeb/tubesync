@@ -254,6 +254,13 @@ def save_model(instance):
     time.sleep(random.expovariate(arg))
 
 
+def update_model(instance, **kwargs):
+    qs = instance.__class__.objects.all()
+    return qs.filter(
+        pk=instance.pk,
+    ).update(**kwargs)
+
+
 @db_periodic_task(
     huey_crontab(minute=40, strict=True,),
     priority=100,
@@ -532,13 +539,14 @@ def index_source(source_id):
         indexing_lock.acquired = True
     # update the target schedule column
     source.task_run_at_dt
+    update_model(source, target_schedule=source.target_schedule)
     # Reset any errors
     source.has_failed = False
     # Index the source
     videos = source.index_media()
     if not videos:
         source.has_failed = True
-        save_model(source)
+        update_model(source, has_failed=source.has_failed)
         indexing_lock.acquired = False
         raise NoMediaException(f'Source "{source}" (ID: {source_id}) returned no '
                                f'media to index, is the source key valid? Check the '
@@ -546,7 +554,11 @@ def index_source(source_id):
                                f'is reachable')
     # Got some media, update the last crawl timestamp
     source.last_crawl = timezone.now()
-    save_model(source)
+    update_model(
+        source,
+        has_failed=source.has_failed,
+        last_crawl=source.last_crawl,
+    )
     num_videos = len(videos)
     log.info(f'Found {num_videos} media items for source: {source}')
     tvn_format = '{:,}' + f'/{num_videos:,}'
@@ -661,8 +673,18 @@ def index_source(source_id):
     videos = video = None
     db_batch_data.clear()
     db_batch_media.clear()
-    # Let the checking task created by saving `last_crawl` run
+    # Let the checking task run
     indexing_lock.acquired = False
+    # Create the checking task
+    TaskHistory.schedule(
+        save_all_media_for_source,
+        str(source.pk),
+        remove_duplicates=True,
+        vn_fmt = _('Checking all media for "{}"'),
+        vn_args=(
+            source.name,
+        ),
+    )
     return True
 
 
