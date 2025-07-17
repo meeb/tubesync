@@ -61,7 +61,7 @@ def map_task_to_instance(task, using_history=True):
         because UUID's are incompatible with background_task's "creator" feature.
     '''
     TASK_MAP = {
-        'sync.tasks.index_source_task': Source,
+        'sync.tasks.index_source': Source,
         'sync.tasks.download_media_image': Media,
         'sync.tasks.download_media_file': Media,
         'sync.tasks.download_media_metadata': Media,
@@ -188,6 +188,14 @@ def get_media_thumbnail_task(media_id):
         qs=get_running_tasks(),
     )
 
+def get_source_index_task(source_id):
+    #return get_running_task_by_name('index_source', source_id)
+    return get_model_task(
+        source_id,
+        name='index_source',
+        qs=get_running_tasks(),
+    )
+
 
 def get_tasks(task_name, id=None, /, instance=None):
     assert not (id is None and instance is None)
@@ -200,9 +208,6 @@ def get_first_task(task_name, id=None, /, *, instance=None):
 
 def get_media_metadata_task(media_id):
     return get_first_task('sync.tasks.download_media_metadata', media_id)
-
-def get_source_index_task(source_id):
-    return get_first_task('sync.tasks.index_source_task', source_id)
 
 
 def delete_task_by_source(task_name, source_id):
