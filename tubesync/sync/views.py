@@ -33,7 +33,7 @@ from .utils import delete_file, validate_url
 from .tasks import (
     map_task_to_instance, get_error_message, migrate_queues, delete_task_by_media,
     get_running_tasks, get_media_download_task, get_source_completed_tasks,
-    check_source_directory_exists, index_source, download_media_image,
+    check_source_directory_exists, index_source, download_media_image, download_media_file,
 )
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
@@ -687,6 +687,19 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
         # Mark it as not skipped
         self.object.skip = False
         self.object.manual_skip = False
+        # Try to download manually
+        media = self.object
+        TaskHistory.schedule(
+            download_media_file,
+            str(media.pk),
+            override=True,
+            priority=90,
+            remove_duplicates=True,
+            retries=3,
+            retry_dalay=600,
+            vn_fmt=_('Downloading media (manually) for "{}"'),
+            vn_args=(media.name,),
+        )
         # Saving here will trigger the post_create signals to schedule new tasks
         self.object.save()
         return super().form_valid(form)
