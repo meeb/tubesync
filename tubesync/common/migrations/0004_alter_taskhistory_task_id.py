@@ -33,7 +33,7 @@ def remove_duplicated_rows(apps, schema_editor):
         ).exclude(
             id=keeping,
         ).delete()
-    log.info(f'TaskHistory rows: finished removing duplicates.')
+    log.info('TaskHistory rows: finished removing duplicates.')
 
 
 class Migration(migrations.Migration):
