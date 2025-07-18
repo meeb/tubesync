@@ -22,6 +22,17 @@
     {% endif %}
   </div>
 </div>
+<div class="row">
+  <form method="post" class="col s12 simpleform">
+    {% csrf_token %}
+    <div class="col s12 m8">
+      Search: <input name="query" type="text" />
+    </div>
+    <div class="col s12 m4">
+      <input type="submit" />
+    </div>
+  </form>
+</div>
 {% include 'infobox.html' with message=message %}
 <div class="row no-margin-bottom">
   {% for m in media %}
