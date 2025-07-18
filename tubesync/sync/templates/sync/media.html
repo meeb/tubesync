@@ -25,14 +25,14 @@
 <div class="row s12" style="height: 100px; border-top: 2px dashed slategray; border-bottom: 2px dashed slategray;">
   <form method="get" class="simpleform">
     <!-- {% csrf_token %} -->
-     <div class="col m10 left" style="height: 80%;">
+     <div class="col m11 left">
       <label for="query">
         <span class="no-text-transform">Search for:</span>
       </label>
       <input name="query" type="text" size=30 placeholder="A key or title containing this text"{% if query %} value="{{ query }}"{% endif %} />
     </div>
-    <div class="col m2" style="height: 100%; margin-top: 4%;">
-      <input value="Go" type="submit" />
+    <div class="col m1" style="height: 75px; display: flex; align-items: flex-end;">
+      <input value="Go" style="height: 50px;"type="submit" />
     </div>
   </form>
 </div>
