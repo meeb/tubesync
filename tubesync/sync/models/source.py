@@ -5,7 +5,6 @@ from collections import deque as queue
 from pathlib import Path
 from django import db
 from django.conf import settings
-from django.core.exceptions import SuspiciousOperation
 from django.core.validators import RegexValidator
 from django.utils import timezone
 from django.utils.text import slugify
@@ -20,7 +19,7 @@ from ..choices import (Val,
 from ..fields import CommaSepChoiceField
 from ..youtube import (
     get_media_info as get_youtube_media_info,
-    get_channel_image_info as get_youtube_channel_image_info,
+    get_image_info as get_youtube_image_info,
 )
 from ._migrations import media_file_storage
 from ._private import _srctype_dict
@@ -484,10 +483,7 @@ class Source(db.models.Model):
 
     @property
     def get_image_url(self):
-        if self.is_playlist:
-            raise SuspiciousOperation('This source is a playlist so it doesn\'t have thumbnail.')
-
-        return get_youtube_channel_image_info(self.url)
+        return get_youtube_image_info(self.url)
 
 
     def directory_exists(self):
