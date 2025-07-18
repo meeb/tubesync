@@ -1132,18 +1132,22 @@ class TaskScheduleView(FormView, SingleObjectMixin):
 
         huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
         huey_queues = list(map(get_queue, huey_queue_names))
-        matching = { q for q in huey_queues if q.name == self.object.queue }
+        pk = self.object.pk
+        queue = self.object.queue
+        task_id = self.object.task_id
+        matching = { q for q in huey_queues if q.name == queue }
         try:
             q = matching.pop()
         except KeyError as e:
-            pk = self.object.pk
-            queue = self.object.queue
             msg = f'TaskScheduleView: queue not found: {pk=} {queue=}'
             log.exception(msg, exc_info=e)
         else:
             self.object.scheduled_at = max(self.now, when)
-            if q and q.reschedule(self.object.task_id, self.object.scheduled_at):
+            if q and q.reschedule(task_id, self.object.scheduled_at):
                 self.object.save()
+            else:
+                msg = f'TaskScheduleView: task not found: {pk=} {task_id=}'
+                log.warning(msg)
 
         return super().form_valid(form)
 
