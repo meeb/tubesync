@@ -43,7 +43,7 @@ def source_pre_save(sender, instance, **kwargs):
     check_source_directory_exists.call_local(*args)
     existing_copy_channel_images = existing_source.copy_channel_images
     new_copy_channel_images = instance.copy_channel_images
-    if new_copy_channel_images and not (existing_copy_channel_images or instance.is_playlist):
+    if new_copy_channel_images and existing_copy_channel_images:
         download_source_images(str(instance.pk))
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
     new_dirpath = instance.directory_path.resolve(strict=False)
@@ -117,7 +117,7 @@ def source_post_save(sender, instance, created, **kwargs):
     # Check directory exists and create an indexing task for newly created sources
     if created:
         check_source_directory_exists(str(source.pk))
-        if source.copy_channel_images and not source.is_playlist:
+        if source.copy_channel_images:
             download_source_images(str(source.pk))
         if source.is_active:
             log.info(f'Scheduling first media indexing for source: {source.name}')
