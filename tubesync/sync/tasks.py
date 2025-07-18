@@ -720,10 +720,11 @@ def download_source_images(source_id):
         log.error(f'Task download_source_images(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         raise CancelExecution(_('no such source'), retry=False) from e
-    avatar, banner = source.get_image_url
+    avatar, banner, thumbnail = source.get_image_url
     log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
-        f'Banner: {banner}')
+        f'Banner: {banner} '
+        f'Thumbnail: {thumbnail}')
     if banner is not None:
         url = banner
         i = get_remote_image(url)
