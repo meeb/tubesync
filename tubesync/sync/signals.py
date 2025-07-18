@@ -43,7 +43,7 @@ def source_pre_save(sender, instance, **kwargs):
     check_source_directory_exists.call_local(*args)
     existing_copy_channel_images = existing_source.copy_channel_images
     new_copy_channel_images = instance.copy_channel_images
-    if new_copy_channel_images and existing_copy_channel_images:
+    if new_copy_channel_images and not existing_copy_channel_images:
         download_source_images(str(instance.pk))
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
     new_dirpath = instance.directory_path.resolve(strict=False)
