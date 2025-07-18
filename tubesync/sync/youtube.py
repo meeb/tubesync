@@ -100,13 +100,19 @@ def get_image_info(url):
         except yt_dlp.utils.DownloadError as e:
             raise YouTubeError(f'Failed to extract info for "{url}": {e}') from e
         else:
-            height = 0
+            max_height = 0
             for thumbnail in response['thumbnails']:
+                thumbnail_height = thumbnail.get('height')
+                try:
+                    thumbnail_height = int(thumbnail_height)
+                except (TypeError, ValueError,):
+                    thumbnail_height = int()
                 if thumbnail['id'] == 'avatar_uncropped':
                     avatar_url = thumbnail['url']
                 elif thumbnail['id'] == 'banner_uncropped':
                     banner_url = thumbnail['url']
-                elif (thumbnail.get('height') or 0) > height:
+                elif thumbnail_height > max_height:
+                    max_height = thumbnail_height
                     thumbnail_url = thumbnail['url']
             try:
                 entry_type = response['entries'][0].get('_type')
