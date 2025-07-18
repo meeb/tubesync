@@ -29,7 +29,7 @@
       <label for="query">
         <span class="no-text-transform">Search for:</span>
       </label>
-      <input name="query" type="text" placeholder="A key or title containing this text" value="{{ query }}" />
+      <input name="query" type="text" placeholder="A key or title containing this text"{% if query %} value="{{ query }}"{% endif %} />
     </div>
     <div class="col m2" style="height: 100%; margin-top: 4%;">
       <input value="Go" type="submit" />
