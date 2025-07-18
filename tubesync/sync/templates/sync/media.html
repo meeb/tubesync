@@ -22,18 +22,16 @@
     {% endif %}
   </div>
 </div>
-<div class="row">
-  <form method="get" class="col s12 simpleform">
+<div class="row s12" style="height: 100px; border-top: 2px dashed slategray; border-bottom: 2px dashed slategray;">
+  <form method="get" class="simpleform">
     <!-- {% csrf_token %} -->
-     <div class="col s12 m2">
+     <div class="col m10 left" style="height: 80%;">
       <label for="query">
         <span class="no-text-transform">Search for:</span>
       </label>
-    </div>
-    <div class="col s12 m8">
       <input name="query" type="text" />
     </div>
-    <div class="col s12 m2">
+    <div class="col m2" style="height: 100%; margin-top: 4%;">
       <input value="Go" type="submit" />
     </div>
   </form>
