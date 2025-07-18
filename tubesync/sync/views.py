@@ -503,6 +503,7 @@ class MediaView(ListView):
         self.filter_source = None
         self.show_skipped = False
         self.only_skipped = False
+        self.query = None
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
@@ -519,6 +520,7 @@ class MediaView(ListView):
             only_skipped = request.GET.get('only_skipped', '').strip()
             if only_skipped == 'yes':
                 self.only_skipped = True
+        self.query = request.GET.get('query') or request.POST.get('query') or None
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -526,6 +528,9 @@ class MediaView(ListView):
 
         if self.filter_source:
             q = q.filter(source=self.filter_source)
+        if self.query:
+            needle = self.query
+            q = q.filter(Q(title__icontains=needle) | Q(key__contains=needle))
         if self.only_skipped:
             q = q.filter(Q(can_download=False) | Q(skip=True) | Q(manual_skip=True))
         elif not self.show_skipped:
@@ -543,6 +548,7 @@ class MediaView(ListView):
             data['source'] = self.filter_source
         data['show_skipped'] = self.show_skipped
         data['only_skipped'] = self.only_skipped
+        data['query'] = self.query or str()
         return data
 
 
