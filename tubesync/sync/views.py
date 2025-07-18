@@ -25,6 +25,7 @@ from common.utils import append_uri_params, mkdir_p, multi_key_sort
 from background_task.models import Task
 from django_huey import DJANGO_HUEY, get_queue
 from common.huey import h_q_reset_tasks
+from common.logger import log
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
