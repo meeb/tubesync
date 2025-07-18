@@ -23,13 +23,18 @@
   </div>
 </div>
 <div class="row">
-  <form method="post" class="col s12 simpleform">
-    {% csrf_token %}
-    <div class="col s12 m8">
-      Search: <input name="query" type="text" />
+  <form method="get" class="col s12 simpleform">
+    <!-- {% csrf_token %} -->
+     <div class="col s12 m2">
+      <label for="query">
+        <span class="no-text-transform">Search for:</span>
+      </label>
     </div>
-    <div class="col s12 m4">
-      <input type="submit" />
+    <div class="col s12 m8">
+      <input name="query" type="text" />
+    </div>
+    <div class="col s12 m2">
+      <input name="Go" type="submit" />
     </div>
   </form>
 </div>
