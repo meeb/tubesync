@@ -1059,7 +1059,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
 
     template_name = 'sync/task-schedule.html'
     form_class = ScheduleTaskForm
-    model = Task
+    model = TaskHistory
     errors = dict(
         invalid_when=_('The type ({}) was incorrect.'),
         when_before_now=_('The date and time must be in the future.'),
@@ -1109,7 +1109,6 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         )
 
     def form_valid(self, form):
-        max_attempts = getattr(settings, 'MAX_ATTEMPTS', 15)
         when = form.cleaned_data.get('when')
   
         if not isinstance(when, self.now.__class__):
@@ -1130,14 +1129,20 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         if form.errors:
             return super().form_invalid(form)
 
-        self.object.attempts = max_attempts // 2
-        self.object.run_at = max(self.now, when)
-        self.object.save()
-        TaskHistory.objects.filter(
-            task_id=str(self.object.pk),
-        ).update(
-            scheduled_at=self.object.run_at,
-        )
+        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+        huey_queues = list(map(get_queue, huey_queue_names))
+        matching = { q for q in huey_queues if q.name == self.object.queue }
+        try:
+            q = matching.pop()
+        except KeyError as e:
+            pk = self.object.pk
+            queue = self.object.queue
+            msg = f'TaskScheduleView: queue not found: {pk=} {queue=}'
+            log.exception(msg, exc_info=e)
+        else:
+            self.object.scheduled_at = max(self.now, when)
+            if q and q.reschedule(self.object.task_id, self.object.scheduled_at):
+                self.object.save()
 
         return super().form_valid(form)
 
