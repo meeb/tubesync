@@ -648,10 +648,27 @@ def download_source_images(source_id):
         log.error(f'Task download_source_images(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         raise CancelExecution(_('no such source'), retry=False) from e
-    avatar, banner = source.get_image_url
+    avatar, banner, thumbnail = source.get_image_url
     log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
-        f'Banner: {banner}')
+        f'Banner: {banner} '
+        f'Thumbnail: {thumbnail}')
+    if thumbnail is not None:
+        url = thumbnail
+        i = get_remote_image(url)
+        image_file = BytesIO()
+        i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
+
+        for file_name in ["thumbnail.jpg",]:
+            # Reset file pointer to the beginning for the next save
+            image_file.seek(0)
+            # Create a Django ContentFile from BytesIO stream
+            django_file = ContentFile(image_file.read())
+            file_path = source.directory_path / file_name
+            with open(file_path, 'wb') as f:
+                f.write(django_file.read())
+        i = image_file = None
+
     if banner is not None:
         url = banner
         i = get_remote_image(url)
