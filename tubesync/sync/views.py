@@ -24,6 +24,7 @@ from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params, mkdir_p, multi_key_sort
 from django_huey import DJANGO_HUEY, get_queue
 from common.huey import h_q_reset_tasks
+from common.logger import log
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
@@ -1068,7 +1069,6 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         )
 
     def form_valid(self, form):
-        max_attempts = getattr(settings, 'MAX_ATTEMPTS', 15)
         when = form.cleaned_data.get('when')
   
         if not isinstance(when, self.now.__class__):
@@ -1089,14 +1089,24 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         if form.errors:
             return super().form_invalid(form)
 
-        self.object.attempts = max_attempts // 2
-        self.object.run_at = max(self.now, when)
-        self.object.save()
-        TaskHistory.objects.filter(
-            task_id=str(self.object.pk),
-        ).update(
-            scheduled_at=self.object.run_at,
-        )
+        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+        huey_queues = list(map(get_queue, huey_queue_names))
+        pk = self.object.pk
+        queue = self.object.queue
+        task_id = self.object.task_id
+        matching = { q for q in huey_queues if q.name == queue }
+        try:
+            q = matching.pop()
+        except KeyError as e:
+            msg = f'TaskScheduleView: queue not found: {pk=} {queue=}'
+            log.exception(msg, exc_info=e)
+        else:
+            self.object.scheduled_at = max(self.now, when)
+            if q and q.reschedule(task_id, self.object.scheduled_at):
+                self.object.save()
+            else:
+                msg = f'TaskScheduleView: task not found: {pk=} {task_id=}'
+                log.warning(msg)
 
         return super().form_valid(form)
 
