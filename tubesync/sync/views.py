@@ -508,6 +508,10 @@ class MediaView(ListView):
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
+        def is_active(arg, /):
+            return str(arg).strip().lower() in (
+                'enable', 'enabled', 'on', 'true', 'yes', '1',
+            )
         def post_or_get(request, /, key, default=None):
             return request.POST.get(key) or request.GET.get(key) or default
 
@@ -517,16 +521,14 @@ class MediaView(ListView):
                 self.filter_source = Source.objects.get(pk=filter_by)
             except Source.DoesNotExist:
                 self.filter_source = None
-        show_skipped = post_or_get(request, 'show_skipped', '').strip()
-        if show_skipped == 'yes':
+        show_skipped = post_or_get(request, 'show_skipped', '')
+        if is_active(show_skipped):
             self.show_skipped = True
-        only_skipped = post_or_get(request, 'only_skipped', '').strip()
-        if only_skipped == 'yes':
+        only_skipped = post_or_get(request, 'only_skipped', '')
+        if is_active(only_skipped):
             self.only_skipped = True
         self.query = post_or_get(request, 'query')
-        self.search_description = str(post_or_get(request, 'search_description')).strip().lower() in (
-            'enable', 'on', 'true', 'yes', '1',
-        )
+        self.search_description = is_active(post_or_get(request, 'search_description'))
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
