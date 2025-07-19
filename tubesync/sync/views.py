@@ -500,22 +500,32 @@ class MediaView(ListView):
         self.filter_source = None
         self.show_skipped = False
         self.only_skipped = False
+        self.query = None
+        self.search_description = False
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
-        filter_by = request.GET.get('filter', '')
+        def is_active(arg, /):
+            return str(arg).strip().lower() in (
+                'enable', 'enabled', 'on', 'true', 'yes', '1',
+            )
+        def post_or_get(request, /, key, default=None):
+            return request.POST.get(key) or request.GET.get(key) or default
+
+        filter_by = post_or_get(request, 'filter', '')
         if filter_by:
             try:
                 self.filter_source = Source.objects.get(pk=filter_by)
             except Source.DoesNotExist:
                 self.filter_source = None
-        show_skipped = request.GET.get('show_skipped', '').strip()
-        if show_skipped == 'yes':
+        show_skipped = post_or_get(request, 'show_skipped', '')
+        if is_active(show_skipped):
             self.show_skipped = True
-        if not self.show_skipped:
-            only_skipped = request.GET.get('only_skipped', '').strip()
-            if only_skipped == 'yes':
-                self.only_skipped = True
+        only_skipped = post_or_get(request, 'only_skipped', '')
+        if is_active(only_skipped):
+            self.only_skipped = True
+        self.query = post_or_get(request, 'query')
+        self.search_description = is_active(post_or_get(request, 'search_description'))
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -523,6 +533,21 @@ class MediaView(ListView):
 
         if self.filter_source:
             q = q.filter(source=self.filter_source)
+        if self.query:
+            needle = self.query
+            if self.search_description:
+                q = q.filter(
+                    Q(new_metadata__value__fulltitle__icontains=needle) |
+                    Q(new_metadata__value__description__icontains=needle) |
+                    Q(title__icontains=needle) |
+                    Q(key__contains=needle)
+                )
+            else:
+                q = q.filter(
+                    Q(new_metadata__value__fulltitle__icontains=needle) |
+                    Q(title__icontains=needle) |
+                    Q(key__contains=needle)
+                )
         if self.only_skipped:
             q = q.filter(Q(can_download=False) | Q(skip=True) | Q(manual_skip=True))
         elif not self.show_skipped:
@@ -540,6 +565,8 @@ class MediaView(ListView):
             data['source'] = self.filter_source
         data['show_skipped'] = self.show_skipped
         data['only_skipped'] = self.only_skipped
+        data['query'] = self.query or str()
+        data['search_description'] = self.search_description
         return data
 
 

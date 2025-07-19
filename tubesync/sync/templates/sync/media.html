@@ -9,18 +9,36 @@
   </div>
   <div class="col s12 m3">
     {% if show_skipped %}
-    <a href="{% url 'sync:media' %}{% if source %}?filter={{ source.pk }}{% endif %}" class="btn"><i class="far fa-eye-slash"></i> Hide skipped media</a>
+    <a href="{% url 'sync:media' %}{% querystring show_skipped=None %}" class="btn"><i class="far fa-eye-slash"></i> Hide skipped media</a>
     {% else %}
-    <a href="{% url 'sync:media' %}?show_skipped=yes{% if source %}&filter={{ source.pk }}{% endif %}" class="btn"><i class="far fa-eye"></i> Show skipped media</a>
+    <a href="{% url 'sync:media' %}{% querystring show_skipped='yes' %}" class="btn"><i class="far fa-eye"></i> Show skipped media</a>
     {% endif %}
   </div>
   <div class="col s12 m3">
     {% if only_skipped %}
-    <a href="{% url 'sync:media' %}{% if source %}?filter={{ source.pk }}{% endif %}" class="btn"><i class="far fa-eye-slash"></i> Only skipped media</a>
+    <a href="{% url 'sync:media' %}{% querystring only_skipped=None %}" class="btn"><i class="far fa-eye-slash"></i> Only skipped media</a>
     {% else %}
-    <a href="{% url 'sync:media' %}?only_skipped=yes{% if source %}&filter={{ source.pk }}{% endif %}" class="btn"><i class="far fa-eye"></i> Only skipped media</a>
+    <a href="{% url 'sync:media' %}{% querystring only_skipped='yes' %}" class="btn"><i class="far fa-eye"></i> Only skipped media</a>
     {% endif %}
   </div>
+</div>
+<div class="row input-field s12" style="padding-top: 20px; padding-bottom: 10px; border-top: 2px dashed slategray; border-bottom: 2px dashed slategray;">
+  <form method="get" class="simpleform">
+    <!-- {% csrf_token %} -->
+    <div class="col m9">
+      <label>
+        <span class="no-text-transform" style="font-size: 1.25rem !important;">Search for:</span>
+        <input name="query" type="text" size=30 placeholder="A key or title containing this text"{% if query %} value="{{ query }}"{% endif %} />
+      </label>
+    </div>
+    <div class="col m3" style="height: 75px; display: flex; flex-direction: column; align-items: flex-end;">
+      <label>
+        <input name="search_description" type="checkbox" value="yes" {% if search_description %}checked {% endif %}/>
+        <span class="no-text-transform" style="height: 25px; font-size: 1.25rem !important;">In description?</span>
+      </label>
+      <input value="Go" class="btn" style="height: 50px;" type="submit" />
+    </div>
+  </form>
 </div>
 {% include 'infobox.html' with message=message %}
 <div class="row no-margin-bottom">
@@ -64,5 +82,5 @@
   </div>
   {% endfor %}
 </div>
-{% include 'pagination.html' with pagination=sources.paginator filter=source.pk show_skipped=show_skipped only_skipped=only_skipped%}
+{% include 'pagination.html' %}
 {% endblock %}
