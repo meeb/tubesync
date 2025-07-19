@@ -520,10 +520,9 @@ class MediaView(ListView):
         show_skipped = post_or_get(request, 'show_skipped', '').strip()
         if show_skipped == 'yes':
             self.show_skipped = True
-        if not self.show_skipped:
-            only_skipped = post_or_get(request, 'only_skipped', '').strip()
-            if only_skipped == 'yes':
-                self.only_skipped = True
+        only_skipped = post_or_get(request, 'only_skipped', '').strip()
+        if only_skipped == 'yes':
+            self.only_skipped = True
         self.query = post_or_get(request, 'query')
         self.search_description = str(post_or_get(request, 'search_description')).strip().lower() in (
             'enable', 'on', 'true', 'yes', '1',
