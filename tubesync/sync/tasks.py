@@ -165,6 +165,10 @@ def get_media_thumbnail_task(media_id):
     tqs = get_running_tasks_by_name('download_media_image', media_id)
     return tqs[0] if tqs.count() else False
 
+def get_source_index_task(source_id):
+    tqs = get_running_tasks_by_name('index_source', source_id)
+    return tqs[0] if tqs.count() else False
+
 
 def get_tasks(task_name, id=None, /, instance=None):
     assert not (id is None and instance is None)
@@ -177,9 +181,6 @@ def get_first_task(task_name, id=None, /, *, instance=None):
 
 def get_media_metadata_task(media_id):
     return get_first_task('sync.tasks.download_media_metadata', media_id)
-
-def get_source_index_task(source_id):
-    return get_first_task('sync.tasks.index_source', source_id)
 
 
 def cleanup_completed_tasks():
