@@ -33,7 +33,7 @@
     </div>
     <div class="col m3" style="height: 75px; display: flex; flex-direction: column; align-items: flex-end;">
       <label>
-        <input name="search_description" type="checkbox" value="yes" />
+        <input name="search_description" type="checkbox" value="yes" {% if search_description %}checked {% endif %}/>
         <span class="no-text-transform" style="height: 25px; font-size: 1.25rem !important;">In description?</span>
       </label>
       <input value="Go" class="btn" style="height: 50px;" type="submit" />
