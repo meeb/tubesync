@@ -93,6 +93,8 @@ def download_finished(self, format_str, container, downloaded_filepath=None):
     media.download_date = timezone.now()
     media.downloaded_filesize = os.path.getsize(filepath)
     media.downloaded_container = container
+    media.manual_skip = False
+    media.skip = False
     if '+' in format_str:
         # Seperate audio and video streams
         vformat_code, aformat_code = format_str.split('+')

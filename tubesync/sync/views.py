@@ -33,7 +33,7 @@ from .utils import delete_file, validate_url
 from .tasks import (
     map_task_to_instance, get_error_message,
     get_running_tasks, get_media_download_task, get_source_completed_tasks,
-    check_source_directory_exists, index_source, download_media_image,
+    check_source_directory_exists, index_source, download_media_image, download_media_file,
 )
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
@@ -686,6 +686,20 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
+        # Try to download manually, when can_download was true
+        media = self.object
+        if media.can_download:
+            TaskHistory.schedule(
+                download_media_file,
+                str(media.pk),
+                override=True,
+                priority=90,
+                remove_duplicates=True,
+                retries=3,
+                retry_delay=600,
+                vn_fmt=_('Downloading media (manually) for "{}"'),
+                vn_args=(media.name,),
+            )
         # If the thumbnail file exists on disk, delete it
         if self.object.thumb_file_exists:
             delete_file(self.object.thumb.path)
