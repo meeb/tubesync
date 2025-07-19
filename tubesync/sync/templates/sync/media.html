@@ -22,16 +22,20 @@
     {% endif %}
   </div>
 </div>
-<div class="row s12" style="height: 100px; border-top: 2px dashed slategray; border-bottom: 2px dashed slategray;">
+<div class="row input-field s12" style="padding-top: 20px; padding-bottom: 10px; border-top: 2px dashed slategray; border-bottom: 2px dashed slategray;">
   <form method="get" class="simpleform">
     <!-- {% csrf_token %} -->
-     <div class="col m10 left">
-      <label for="query">
-        <span class="no-text-transform">Search for:</span>
+    <div class="col m9">
+      <label>
+        <span class="no-text-transform" style="font-size: 1.25rem !important;">Search for:</span>
+        <input name="query" type="text" size=30 placeholder="A key or title containing this text"{% if query %} value="{{ query }}"{% endif %} />
       </label>
-      <input name="query" type="text" size=30 placeholder="A key or title containing this text"{% if query %} value="{{ query }}"{% endif %} />
     </div>
-    <div class="col m2" style="height: 75px; display: flex; align-items: flex-end;">
+    <div class="col m3" style="height: 75px; display: flex; flex-direction: column; align-items: flex-end;">
+      <label>
+        <input name="search_description" type="checkbox" value="yes" />
+        <span class="no-text-transform" style="height: 25px; font-size: 1.25rem !important;">In description?</span>
+      </label>
       <input value="Go" class="btn" style="height: 50px;" type="submit" />
     </div>
   </form>
