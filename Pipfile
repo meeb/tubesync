@@ -14,7 +14,6 @@ pillow = "*"
 whitenoise = "*"
 gunicorn = "*"
 httptools = "*"
-django-background-tasks = ">=1.2.8"
 django-basicauth = "*"
 psycopg = {extras = ["binary", "pool"], version = "*"}
 mysqlclient = "*"
