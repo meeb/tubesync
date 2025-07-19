@@ -6,20 +6,13 @@ from django.db import IntegrityError
 from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
 from django.db.transaction import atomic, on_commit
 from django.dispatch import receiver
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from background_task.signals import (
-    task_created, task_started, task_successful, task_rescheduled, task_failed,
-)
-from background_task.models import Task
 from common.logger import log
 from common.models import TaskHistory
 from common.utils import glob_quote, mkdir_p
 from .models import Source, Media, Metadata
 from .tasks import (
-    delete_task_by_media,
     get_media_download_task, get_media_metadata_task, get_media_thumbnail_task,
-    map_task_to_instance,
     delete_all_media_for_source, rename_media, save_all_media_for_source,
     check_source_directory_exists, download_source_images, index_source,
     download_media_file, download_media_metadata, download_media_image,
@@ -43,7 +36,7 @@ def source_pre_save(sender, instance, **kwargs):
     check_source_directory_exists.call_local(*args)
     existing_copy_channel_images = existing_source.copy_channel_images
     new_copy_channel_images = instance.copy_channel_images
-    if new_copy_channel_images and not (existing_copy_channel_images or instance.is_playlist):
+    if new_copy_channel_images and not existing_copy_channel_images:
         download_source_images(str(instance.pk))
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
     new_dirpath = instance.directory_path.resolve(strict=False)
@@ -117,7 +110,7 @@ def source_post_save(sender, instance, created, **kwargs):
     # Check directory exists and create an indexing task for newly created sources
     if created:
         check_source_directory_exists(str(source.pk))
-        if source.copy_channel_images and not source.is_playlist:
+        if source.copy_channel_images:
             download_source_images(str(source.pk))
         if source.is_active:
             log.info(f'Scheduling first media indexing for source: {source.name}')
@@ -165,114 +158,6 @@ def source_pre_delete(sender, instance, **kwargs):
             ),
         ))
 
-
-@receiver(task_created, dispatch_uid='sync.signals.task_task_created')
-@atomic(durable=False)
-def task_task_created(sender, task=None, **kwargs):
-    if task is None:
-        return
-    task_obj = task
-    th, created = TaskHistory.objects.get_or_create(
-        task_id=str(task_obj.pk),
-        name=task_obj.task_name,
-        queue=task_obj.queue,
-    )
-    th.scheduled_at = task_obj.run_at
-    th.priority = (100 - task_obj.priority)
-    th.repeat = task_obj.repeat
-    th.repeat_until = task_obj.repeat_until
-    th.task_params = list(task_obj.params())
-    th.verbose_name = task_obj.verbose_name
-    th.save()
-    if created:
-        log.debug(f'Created a new task history record: {th.pk}: {th.verbose_name}')
-
-
-@receiver(task_started, dispatch_uid='sync.signals.task_task_started')
-@atomic(durable=False)
-def task_task_started(sender, **kwargs):
-    locked_tasks = Task.objects.locked(timezone.now())
-    for task_obj in locked_tasks:
-        th, created = TaskHistory.objects.get_or_create(
-            task_id=str(task_obj.pk),
-            name=task_obj.task_name,
-            queue=task_obj.queue,
-        )
-        th.attempts += 1
-        th.end_at = task_obj.locked_at
-        th.priority = (100 - task_obj.priority)
-        th.repeat = task_obj.repeat
-        th.repeat_until = task_obj.repeat_until
-        th.start_at = task_obj.locked_at
-        th.task_params = list(task_obj.params())
-        th.verbose_name = task_obj.verbose_name
-        th.save()
-        if created:
-            log.debug(f'Started a new task history record: {th.pk}: {th.verbose_name}')
-
-
-@receiver(task_rescheduled, dispatch_uid='sync.signals.task_task_rescheduled')
-@atomic(durable=False)
-def task_task_rescheduled(sender, task=None, **kwargs):
-    if task is None:
-        return
-    now_dt = timezone.now()
-    task_obj = task
-    th, created = TaskHistory.objects.get_or_create(
-        task_id=str(task_obj.pk),
-        name=task_obj.task_name,
-        queue=task_obj.queue,
-    )
-    th.elapsed += (
-        now_dt - task_obj.locked_at
-    ).total_seconds()
-    th.end_at = now_dt
-    th.scheduled_at = task_obj.run_at
-    th.start_at = task_obj.locked_at
-    th.save()
-    if created:
-        log.debug(f'Rescheduled a new task history record: {th.pk}: {th.verbose_name}')
-
-def merge_completed_task_into_history(task_id, task_obj):
-    th, created = TaskHistory.objects.get_or_create(
-        task_id=str(task_id),
-        name=task_obj.task_name,
-        queue=task_obj.queue,
-    )
-    th.elapsed += (
-        (task_obj.failed_at or task_obj.run_at) - task_obj.locked_at
-    ).total_seconds()
-    th.end_at = task_obj.run_at
-    th.failed_at = task_obj.failed_at
-    th.last_error = task_obj.last_error
-    th.repeat = task_obj.repeat
-    th.repeat_until = task_obj.repeat_until
-    th.start_at = task_obj.locked_at
-    th.verbose_name = task_obj.verbose_name
-    th.save()
-
-
-@receiver(task_successful, dispatch_uid='sync.signals.task_task_successful')
-@atomic(durable=False)
-def task_task_successful(sender, task_id, completed_task, **kwargs):
-    merge_completed_task_into_history(task_id, completed_task)
-
-
-@receiver(task_failed, dispatch_uid='sync.signals.task_task_failed')
-@atomic(durable=False)
-def task_task_failed(sender, task_id, completed_task, **kwargs):
-    merge_completed_task_into_history(task_id, completed_task)
-    # Triggered after a task fails by reaching its max retry attempts
-    obj, url = map_task_to_instance(completed_task, using_history=False)
-    if isinstance(obj, Source):
-        log.error(f'Permanent failure for source: {obj} task: {completed_task}')
-        obj.has_failed = True
-        obj.save()
-
-    if isinstance(obj, Media) and completed_task.task_name == "sync.tasks.download_media_metadata":
-        log.error(f'Permanent failure for media: {obj} task: {completed_task}')
-        obj.skip = True
-        obj.save()
 
 @receiver(post_save, sender=Media)
 def media_post_save(sender, instance, created, **kwargs):
@@ -322,10 +207,12 @@ def media_post_save(sender, instance, created, **kwargs):
     # If the media is missing metadata schedule it to be downloaded
     if not (media.skip or media.has_metadata or existing_media_metadata_task):
         log.info(f'Scheduling task to download metadata for: {media.url}')
-        verbose_name = _('Downloading metadata for: {}: "{}"')
-        download_media_metadata(
+        TaskHistory.schedule(
+            download_media_metadata,
             str(media.pk),
-            verbose_name=verbose_name.format(media.key, media.name),
+            remove_duplicates=True,
+            vn_fmt=_('Downloading metadata for: {}: "{}"'),
+            vn_args=(media.key, media.name,),
         )
     # If the media is missing a thumbnail schedule it to be downloaded (unless we are skipping this media)
     if not media.thumb_file_exists:
@@ -379,9 +266,6 @@ def media_post_save(sender, instance, created, **kwargs):
 
 @receiver(pre_delete, sender=Media)
 def media_pre_delete(sender, instance, **kwargs):
-    # Triggered before media is deleted, delete any unlocked scheduled tasks
-    log.info(f'Deleting tasks for media: {instance.name}')
-    delete_task_by_media('sync.tasks.download_media_metadata', (str(instance.pk),))
     # Remove thumbnail file for deleted media
     if instance.thumb:
         instance.thumb.delete(save=False)

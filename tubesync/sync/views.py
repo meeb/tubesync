@@ -22,16 +22,16 @@ from django.utils.translation import gettext_lazy as _
 from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params, mkdir_p, multi_key_sort
-from background_task.models import Task
 from django_huey import DJANGO_HUEY, get_queue
 from common.huey import h_q_reset_tasks
+from common.logger import log
 from .models import Source, Media, MediaServer
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
                     ConfirmDeleteMediaServerForm, SourceForm)
 from .utils import delete_file, validate_url
 from .tasks import (
-    map_task_to_instance, get_error_message, migrate_queues, delete_task_by_media,
+    map_task_to_instance, get_error_message,
     get_running_tasks, get_media_download_task, get_source_completed_tasks,
     check_source_directory_exists, index_source, download_media_image,
 )
@@ -43,9 +43,6 @@ from . import youtube
 
 
 def get_waiting_tasks():
-    background_task_ids = {
-        str(t.pk) for t in Task.objects.all()
-    }
     huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
     huey_queues = list(map(get_queue, huey_queue_names))
     huey_task_ids = {
@@ -56,7 +53,7 @@ def get_waiting_tasks():
         )
     }
     return TaskHistory.objects.filter(
-        task_id__in=huey_task_ids.union(background_task_ids),
+        task_id__in=huey_task_ids,
     )
 
 
@@ -503,22 +500,32 @@ class MediaView(ListView):
         self.filter_source = None
         self.show_skipped = False
         self.only_skipped = False
+        self.query = None
+        self.search_description = False
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
-        filter_by = request.GET.get('filter', '')
+        def is_active(arg, /):
+            return str(arg).strip().lower() in (
+                'enable', 'enabled', 'on', 'true', 'yes', '1',
+            )
+        def post_or_get(request, /, key, default=None):
+            return request.POST.get(key) or request.GET.get(key) or default
+
+        filter_by = post_or_get(request, 'filter', '')
         if filter_by:
             try:
                 self.filter_source = Source.objects.get(pk=filter_by)
             except Source.DoesNotExist:
                 self.filter_source = None
-        show_skipped = request.GET.get('show_skipped', '').strip()
-        if show_skipped == 'yes':
+        show_skipped = post_or_get(request, 'show_skipped', '')
+        if is_active(show_skipped):
             self.show_skipped = True
-        if not self.show_skipped:
-            only_skipped = request.GET.get('only_skipped', '').strip()
-            if only_skipped == 'yes':
-                self.only_skipped = True
+        only_skipped = post_or_get(request, 'only_skipped', '')
+        if is_active(only_skipped):
+            self.only_skipped = True
+        self.query = post_or_get(request, 'query')
+        self.search_description = is_active(post_or_get(request, 'search_description'))
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -526,6 +533,21 @@ class MediaView(ListView):
 
         if self.filter_source:
             q = q.filter(source=self.filter_source)
+        if self.query:
+            needle = self.query
+            if self.search_description:
+                q = q.filter(
+                    Q(new_metadata__value__fulltitle__icontains=needle) |
+                    Q(new_metadata__value__description__icontains=needle) |
+                    Q(title__icontains=needle) |
+                    Q(key__contains=needle)
+                )
+            else:
+                q = q.filter(
+                    Q(new_metadata__value__fulltitle__icontains=needle) |
+                    Q(title__icontains=needle) |
+                    Q(key__contains=needle)
+                )
         if self.only_skipped:
             q = q.filter(Q(can_download=False) | Q(skip=True) | Q(manual_skip=True))
         elif not self.show_skipped:
@@ -543,6 +565,8 @@ class MediaView(ListView):
             data['source'] = self.filter_source
         data['show_skipped'] = self.show_skipped
         data['only_skipped'] = self.only_skipped
+        data['query'] = self.query or str()
+        data['search_description'] = self.search_description
         return data
 
 
@@ -662,8 +686,6 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        # Delete any active download tasks for the media
-        delete_task_by_media('sync.tasks.download_media', (str(self.object.pk),))
         # If the thumbnail file exists on disk, delete it
         if self.object.thumb_file_exists:
             delete_file(self.object.thumb.path)
@@ -714,8 +736,6 @@ class MediaSkipView(FormView, SingleObjectMixin):
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        # Delete any active download tasks for the media
-        delete_task_by_media('sync.tasks.download_media', (str(self.object.pk),))
         # If the media file exists on disk, delete it
         if self.object.media_file_exists:
             # Delete all files which contains filename
@@ -886,7 +906,6 @@ class TasksView(ListView):
         data['total_errors'] = errors_qs.count()
         data['scheduled'] = list()
         data['total_scheduled'] = scheduled_qs.count()
-        data['migrated'] = migrate_queues()
         data['wait_for_database_queue'] = False
 
         def add_to_task(task):
@@ -900,37 +919,6 @@ class TasksView(ListView):
                 setattr(task, 'error_message', error_message)
                 return 'error'
             return True and obj
-
-        verbose_names = dict()
-        for task in Task.objects.filter(locked_by__isnull=False):
-            # There was broken logic in `Task.objects.locked()`, work around it.
-            # With that broken logic, the tasks never resume properly.
-            # This check unlocks the tasks without a running process.
-            # `task.locked_by_pid_running()` returns:
-            # - `True`: locked and PID exists
-            # - `False`: locked and PID does not exist
-            # - `None`: not `locked_by`, so there was no PID to check
-            locked_by_pid_running = task.locked_by_pid_running()
-            if locked_by_pid_running is False:
-                task.locked_by = None
-                # do not wait for the task to expire
-                task.locked_at = None
-                task.save()
-            task_id = str(task.pk)
-            verbose_names[task_id] = task.verbose_name
-            try:
-                task = TaskHistory.objects.get(task_id=task_id)
-            except TaskHistory.DoesNotExist:
-                # possibly create a new instance?
-                pass
-            else:
-                if locked_by_pid_running and add_to_task(task):
-                    # Use the status if it is available
-                    task.verbose_name = verbose_names.get(task_id) or task.verbose_name
-                    data['running'].append(task)
-                elif locked_by_pid_running and 'wait_for_database_queue' in task.name:
-                    data['wait_for_database_queue'] = True
-        verbose_names = None
 
         for task in running_qs:
             if task in data['running']:
@@ -1036,7 +1024,6 @@ class ResetTasks(FormView):
 
     def form_valid(self, form):
         # Delete all tasks
-        Task.objects.all().delete()
         huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
         for queue_name in huey_queue_names:
             h_q_reset_tasks(queue_name)
@@ -1059,7 +1046,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
 
     template_name = 'sync/task-schedule.html'
     form_class = ScheduleTaskForm
-    model = Task
+    model = TaskHistory
     errors = dict(
         invalid_when=_('The type ({}) was incorrect.'),
         when_before_now=_('The date and time must be in the future.'),
@@ -1109,7 +1096,6 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         )
 
     def form_valid(self, form):
-        max_attempts = getattr(settings, 'MAX_ATTEMPTS', 15)
         when = form.cleaned_data.get('when')
   
         if not isinstance(when, self.now.__class__):
@@ -1130,14 +1116,24 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         if form.errors:
             return super().form_invalid(form)
 
-        self.object.attempts = max_attempts // 2
-        self.object.run_at = max(self.now, when)
-        self.object.save()
-        TaskHistory.objects.filter(
-            task_id=str(self.object.pk),
-        ).update(
-            scheduled_at=self.object.run_at,
-        )
+        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+        huey_queues = list(map(get_queue, huey_queue_names))
+        pk = self.object.pk
+        queue = self.object.queue
+        task_id = self.object.task_id
+        matching = { q for q in huey_queues if q.name == queue }
+        try:
+            q = matching.pop()
+        except KeyError as e:
+            msg = f'TaskScheduleView: queue not found: {pk=} {queue=}'
+            log.exception(msg, exc_info=e)
+        else:
+            self.object.scheduled_at = max(self.now, when)
+            if q and q.reschedule(task_id, self.object.scheduled_at):
+                self.object.save()
+            else:
+                msg = f'TaskScheduleView: task not found: {pk=} {task_id=}'
+                log.warning(msg)
 
         return super().form_valid(form)
 

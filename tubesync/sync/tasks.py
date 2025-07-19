@@ -5,14 +5,12 @@
 
 
 import os
-import json
 import random
 import requests
 import time
 import uuid
 from collections import deque as queue
 from io import BytesIO
-from hashlib import sha1
 from pathlib import Path
 from datetime import timedelta
 from shutil import copyfile, rmtree
@@ -46,15 +44,7 @@ db_vendor = db.connection.vendor
 register_huey_signals()
 
 
-def get_hash(task_name, pk):
-    '''
-        Create a background_task compatible hash for a Task or CompletedTask.
-    '''
-    task_params = json.dumps(((str(pk),), {}), sort_keys=True)
-    return sha1(f'{task_name}{task_params}'.encode('utf-8')).hexdigest()
-
-
-def map_task_to_instance(task, using_history=True):
+def map_task_to_instance(task):
     '''
         Reverse-maps a scheduled backgrond task to an instance. Requires the task name
         to be a known task function and the first argument to be a UUID. This is used
@@ -67,25 +57,20 @@ def map_task_to_instance(task, using_history=True):
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
         'sync.tasks.rename_all_media_for_source': Source,
-        'sync.tasks.wait_for_media_premiere': Media,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
         Media: 'sync:media-item',
     }
     # Unpack
-    task_func = task.name if using_history else task.task_name
+    task_func = task.name
     model = TASK_MAP.get(task_func, None)
     if not model:
         return None, None
     url = MODEL_URL_MAP.get(model, None)
     if not url:
         return None, None
-    task_args = task.task_params if using_history else None
-    try:
-        task_args = task_args or json.loads(task.task_params)
-    except (TypeError, ValueError, AttributeError):
-        return None, None
+    task_args = task.task_params
     if len(task_args) != 2:
         return None, None
     args, kwargs = task_args
@@ -142,51 +127,43 @@ def update_task_status(task, status):
 
 def get_source_completed_tasks(source_id, only_errors=False):
     '''
-        Returns a queryset of CompletedTask objects for a source by source ID.
+        Returns a queryset of TaskHistory objects for a source by source ID.
     '''
-    q = {'task_params__istartswith': f'[["{source_id}"'}
+    qs = get_model_tasks(source_id)
     if only_errors:
-        q['failed_at__isnull'] = False
-    return CompletedTask.objects.filter(**q).order_by('-failed_at')
+        qs = qs.filter(failed_at__isnull=False)
+    return qs.order_by('-failed_at')
 
 
-def get_model_task(model_pk, /, name=None, qs=None):
+def get_model_tasks(model_pk, /, name=None, qs=None):
     if qs is None:
         qs = TaskHistory.objects.all()
     if name is not None:
         qs = qs.filter(name__endswith=name)
-    params_prefix = f'[["{model_pk}"'
-    qs = qs.filter(task_params__istartswith=params_prefix)
-    return qs[0] if qs.count() else False
+    #return qs.filter(task_params__0__0=model_pk)
+    return qs.filter(task_params__istartswith=f'[["{model_pk}"')
 
 def get_running_tasks(arg_dt=None, /):
+    max_run_time = getattr(settings, 'MAX_RUN_TIME', 3600)
     return TaskHistory.objects.running(
         now=arg_dt,
-        within=timezone.timedelta(seconds=settings.MAX_RUN_TIME),
+        within=timezone.timedelta(seconds=max_run_time),
     )
 
-def get_running_task_by_name(arg_str, media_id, /):
+def get_running_tasks_by_name(arg_str, instance_id, /):
     name = arg_str
     if '.' not in name:
         name = f'sync.tasks.{name}'
-    tqs = get_running_tasks().filter(name=name, task_params__0__0=media_id)
-    return tqs[0] if tqs.count() else False
+    tqs = get_model_tasks(instance_id, qs=get_running_tasks())
+    return tqs.filter(name=name)
 
 def get_media_download_task(media_id):
-    #return get_running_task_by_name('download_media_file', media_id)
-    return get_model_task(
-        media_id,
-        name='download_media_file',
-        qs=get_running_tasks(),
-    )
+    tqs = get_running_tasks_by_name('download_media_file', media_id)
+    return tqs[0] if tqs.count() else False
     
 def get_media_thumbnail_task(media_id):
-    #return get_running_task_by_name('download_media_image', media_id)
-    return get_model_task(
-        media_id,
-        name='download_media_image',
-        qs=get_running_tasks(),
-    )
+    tqs = get_running_tasks_by_name('download_media_image', media_id)
+    return tqs[0] if tqs.count() else False
 
 def get_source_index_task(source_id):
     #return get_running_task_by_name('index_source', source_id)
@@ -200,33 +177,17 @@ def get_source_index_task(source_id):
 def get_tasks(task_name, id=None, /, instance=None):
     assert not (id is None and instance is None)
     arg = str(id or instance.pk)
-    return Task.objects.get_task(str(task_name), args=(arg,),)
+    return get_running_tasks_by_name(str(task_name), arg)
 
 def get_first_task(task_name, id=None, /, *, instance=None):
-    tqs = get_tasks(task_name, id, instance).order_by('run_at')
+    tqs = get_tasks(task_name, id, instance).order_by('scheduled_at')
     return tqs[0] if tqs.count() else False
 
 def get_media_metadata_task(media_id):
     return get_first_task('sync.tasks.download_media_metadata', media_id)
 
-
-def delete_task_by_source(task_name, source_id):
-    now = timezone.now()
-    unlocked = Task.objects.unlocked(now)
-    qs = unlocked.filter(
-        task_name=task_name,
-        task_params__istartswith=f'[["{source_id}"',
-    )
-    return qs.delete()
-
-
-def delete_task_by_media(task_name, args):
-    max_run_time = getattr(settings, 'MAX_RUN_TIME', 3600)
-    now = timezone.now()
-    expires_at = now - timedelta(seconds=max_run_time)
-    task_qs = Task.objects.get_task(task_name, args=args)
-    unlocked = task_qs.filter(locked_by=None) | task_qs.filter(locked_at__lt=expires_at)
-    return unlocked.delete()
+def get_source_index_task(source_id):
+    return get_first_task('sync.tasks.index_source', source_id)
 
 
 def cleanup_completed_tasks():
@@ -234,17 +195,7 @@ def cleanup_completed_tasks():
     delta = timezone.now() - timedelta(days=days_to_keep)
     log.info(f'Deleting completed tasks older than {days_to_keep} days '
              f'(run_at before {delta})')
-    CompletedTask.objects.filter(run_at__lt=delta).delete()
     TaskHistory.objects.filter(end_at__lt=delta).delete()
-
-
-@atomic(durable=False)
-def migrate_queues():
-    return Task.objects.exclude(
-        queue=Val(TaskQueue.NET)
-    ).update(
-        queue=Val(TaskQueue.NET)
-    )
 
 
 def save_model(instance):
@@ -282,23 +233,9 @@ def upcoming_media():
         ),
     )
     for media in qs_gen(qs):
-        media_id = str(media.pk)
         valid, hours = media.wait_for_premiere()
         if valid:
             save_model(media)
-        task = get_first_task('sync.tasks.wait_for_media_premiere', media_id)
-        if not task:
-            # create a task to update
-            when = media.published + timezone.timedelta(minutes=1)
-            vn_fmt = _('Waiting for the premiere of "{}" at: {}')
-            vn = vn_fmt.format(
-                media.key,
-                media.published.isoformat(' ', 'seconds'),
-            )
-            wait_for_media_premiere(media_id, run_at=when, verbose_name=vn)
-            task = get_first_task('sync.tasks.wait_for_media_premiere', media_id)
-        if hours:
-            update_task_status(task, f'available in {hours} hours')
         log.debug(f'upcoming_media: wait_for_premiere: {media.key}: {valid=} {hours=}')
 
 
@@ -364,7 +301,7 @@ def contains_http429(q, task_id, /):
 def wait_for_errors(model, /, *, queue_name=None, task_name=None):
     if task_name is None:
         task_name=tuple((
-            'sync.tasks.download_media',
+            'sync.tasks.download_media_file',
             'sync.tasks.download_media_metadata',
         ))
     elif isinstance(task_name, str):
@@ -374,18 +311,10 @@ def wait_for_errors(model, /, *, queue_name=None, task_name=None):
         ft = get_first_task(tn, instance=model)
         if ft:
             tasks.append(ft)
-    window = timezone.timedelta(hours=3) + timezone.now()
-    tqs = Task.objects.filter(
-        task_name__in=task_name,
-        attempts__gt=0,
-        locked_at__isnull=True,
-        run_at__lte=window,
-        last_error__contains='HTTPError 429: Too Many Requests',
-    )
     for task in tasks:
         update_task_status(task, 'paused (429)')
 
-    total_count = tqs.count()
+    total_count = int()
     if queue_name:
         from django_huey import get_queue
         q = get_queue(queue_name)
@@ -661,11 +590,13 @@ def index_source(source_id):
                     delay=65-(30*num),
                 )
             log.info(f'Scheduling task to download metadata for: {media.url}')
-            verbose_name = _('Downloading metadata for: "{}": {}')
-            download_media_metadata(
+            TaskHistory.schedule(
+                download_media_metadata,
                 str(media.pk),
-                schedule=dict(priority=35),
-                verbose_name=verbose_name.format(media.key, media.name),
+                priority=65,
+                remove_duplicates=True,
+                vn_fmt=_('Downloading metadata for: "{}": {}'),
+                vn_args=(media.key, media.name,),
             )
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
@@ -725,10 +656,27 @@ def download_source_images(source_id):
         log.error(f'Task download_source_images(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         raise CancelExecution(_('no such source'), retry=False) from e
-    avatar, banner = source.get_image_url
+    avatar, banner, thumbnail = source.get_image_url
     log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
-        f'Banner: {banner}')
+        f'Banner: {banner} '
+        f'Thumbnail: {thumbnail}')
+    if thumbnail is not None:
+        url = thumbnail
+        i = get_remote_image(url)
+        image_file = BytesIO()
+        i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
+
+        for file_name in ["thumbnail.jpg",]:
+            # Reset file pointer to the beginning for the next save
+            image_file.seek(0)
+            # Create a Django ContentFile from BytesIO stream
+            django_file = ContentFile(image_file.read())
+            file_path = source.directory_path / file_name
+            with open(file_path, 'wb') as f:
+                f.write(django_file.read())
+        i = image_file = None
+
     if banner is not None:
         url = banner
         i = get_remote_image(url)
@@ -828,7 +776,7 @@ def save_media(media_id):
 
 
 @db_task(delay=60, priority=60, retries=3, retry_delay=600, queue=Val(TaskQueue.LIMIT))
-def download_metadata(media_id):
+def download_media_metadata(media_id):
     '''
         Downloads the metadata for a media item.
     '''
@@ -841,7 +789,7 @@ def download_metadata(media_id):
         raise CancelExecution(_('no such media'), retry=False) from e
     if media.manual_skip:
         log.info(f'Task for ID: {media_id} / {media} skipped, due to task being manually skipped.')
-        return False
+        return
     source = media.source
     wait_for_errors(
         media,
@@ -891,7 +839,6 @@ def download_metadata(media_id):
         if raise_exception:
             raise
         log.debug(str(e))
-        return False
     else:
         keep_metadata_lock = True
     finally:
@@ -934,7 +881,6 @@ def download_metadata(media_id):
     else:
         log.info(f'Saved {len(media.metadata_dumps())} bytes of metadata for: '
                  f'{source} / {media}: {media_id}')
-        return True
     finally:
         metadata_lock.acquired = False
 
@@ -1286,31 +1232,5 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
     if remove:
         log.info(f'Deleting directory for: {source_name}: {directory_path}')
         rmtree(directory_path, True)
-
-
-# Old tasks system
-from background_task import background # noqa: E402
-from background_task.exceptions import InvalidTaskError # noqa: E402
-from background_task.models import Task, CompletedTask # noqa: E402
-
-
-@background(schedule=dict(priority=0, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def wait_for_media_premiere(media_id):
-    try:
-        media = Media.objects.get(pk=media_id)
-    except Media.DoesNotExist as e:
-        raise InvalidTaskError(_('no such media')) from e
-    else:
-        t = media.wait_for_premiere()
-        if t[0]:
-            save_model(media)
-
-@background(schedule=dict(priority=40, run_at=60), queue=Val(TaskQueue.NET), remove_existing_tasks=True)
-def download_media_metadata(media_id):
-    try:
-        res = download_metadata(media_id)
-        return res.get(blocking=True)
-    except CancelExecution as e:
-        raise InvalidTaskError(str(e)) from e
 
 
