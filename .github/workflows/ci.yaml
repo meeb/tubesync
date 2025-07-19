@@ -119,7 +119,6 @@ jobs:
           sudo ln -v -s -f -T ~/.config/TubeSync/config /config
           sudo ln -v -s -f -T ~/.config/TubeSync/downloads /downloads
           cp -v -p tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
-          cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/background_task/ patches/background_task/*
           cp -v -a -t "${Python3_ROOT_DIR}"/lib/python3.*/site-packages/yt_dlp/ patches/yt_dlp/*
           cd tubesync && python3 -B manage.py collectstatic --no-input --link
       - name: Check with ruff

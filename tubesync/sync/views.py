@@ -22,7 +22,6 @@ from django.utils.translation import gettext_lazy as _
 from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params, mkdir_p, multi_key_sort
-from background_task.models import Task
 from django_huey import DJANGO_HUEY, get_queue
 from common.huey import h_q_reset_tasks
 from .models import Source, Media, MediaServer
@@ -31,7 +30,7 @@ from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMedia
                     ConfirmDeleteMediaServerForm, SourceForm)
 from .utils import delete_file, validate_url
 from .tasks import (
-    map_task_to_instance, get_error_message, migrate_queues, delete_task_by_media,
+    map_task_to_instance, get_error_message,
     get_running_tasks, get_media_download_task, get_source_completed_tasks,
     check_source_directory_exists, index_source, download_media_image,
 )
@@ -43,9 +42,6 @@ from . import youtube
 
 
 def get_waiting_tasks():
-    background_task_ids = {
-        str(t.pk) for t in Task.objects.all()
-    }
     huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
     huey_queues = list(map(get_queue, huey_queue_names))
     huey_task_ids = {
@@ -56,7 +52,7 @@ def get_waiting_tasks():
         )
     }
     return TaskHistory.objects.filter(
-        task_id__in=huey_task_ids.union(background_task_ids),
+        task_id__in=huey_task_ids,
     )
 
 
@@ -662,8 +658,6 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        # Delete any active download tasks for the media
-        delete_task_by_media('sync.tasks.download_media', (str(self.object.pk),))
         # If the thumbnail file exists on disk, delete it
         if self.object.thumb_file_exists:
             delete_file(self.object.thumb.path)
@@ -714,8 +708,6 @@ class MediaSkipView(FormView, SingleObjectMixin):
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        # Delete any active download tasks for the media
-        delete_task_by_media('sync.tasks.download_media', (str(self.object.pk),))
         # If the media file exists on disk, delete it
         if self.object.media_file_exists:
             # Delete all files which contains filename
@@ -886,7 +878,6 @@ class TasksView(ListView):
         data['total_errors'] = errors_qs.count()
         data['scheduled'] = list()
         data['total_scheduled'] = scheduled_qs.count()
-        data['migrated'] = migrate_queues()
         data['wait_for_database_queue'] = False
 
         def add_to_task(task):
@@ -900,37 +891,6 @@ class TasksView(ListView):
                 setattr(task, 'error_message', error_message)
                 return 'error'
             return True and obj
-
-        verbose_names = dict()
-        for task in Task.objects.filter(locked_by__isnull=False):
-            # There was broken logic in `Task.objects.locked()`, work around it.
-            # With that broken logic, the tasks never resume properly.
-            # This check unlocks the tasks without a running process.
-            # `task.locked_by_pid_running()` returns:
-            # - `True`: locked and PID exists
-            # - `False`: locked and PID does not exist
-            # - `None`: not `locked_by`, so there was no PID to check
-            locked_by_pid_running = task.locked_by_pid_running()
-            if locked_by_pid_running is False:
-                task.locked_by = None
-                # do not wait for the task to expire
-                task.locked_at = None
-                task.save()
-            task_id = str(task.pk)
-            verbose_names[task_id] = task.verbose_name
-            try:
-                task = TaskHistory.objects.get(task_id=task_id)
-            except TaskHistory.DoesNotExist:
-                # possibly create a new instance?
-                pass
-            else:
-                if locked_by_pid_running and add_to_task(task):
-                    # Use the status if it is available
-                    task.verbose_name = verbose_names.get(task_id) or task.verbose_name
-                    data['running'].append(task)
-                elif locked_by_pid_running and 'wait_for_database_queue' in task.name:
-                    data['wait_for_database_queue'] = True
-        verbose_names = None
 
         for task in running_qs:
             if task in data['running']:
@@ -1036,7 +996,6 @@ class ResetTasks(FormView):
 
     def form_valid(self, form):
         # Delete all tasks
-        Task.objects.all().delete()
         huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
         for queue_name in huey_queue_names:
             h_q_reset_tasks(queue_name)
@@ -1059,7 +1018,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
 
     template_name = 'sync/task-schedule.html'
     form_class = ScheduleTaskForm
-    model = Task
+    model = TaskHistory
     errors = dict(
         invalid_when=_('The type ({}) was incorrect.'),
         when_before_now=_('The date and time must be in the future.'),
