@@ -73,6 +73,12 @@ class SqliteStorage(huey_SqliteStorage):
 class SqliteHuey(huey_SqliteHuey):
     storage_class = SqliteStorage
 
+    # do not use __len__ (pending_count) for bool
+    def __bool__(self):
+        if not (self._registry._registry or self._registry._periodic_tasks):
+            return False
+        return True
+
     def _emit(self, signal, task, *args, **kwargs):
         kwargs['huey'] = self
         super()._emit(signal, task, *args, **kwargs)
