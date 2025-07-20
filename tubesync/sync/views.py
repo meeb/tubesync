@@ -1061,6 +1061,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
     template_name = 'sync/task-schedule.html'
     form_class = ScheduleTaskForm
     model = TaskHistory
+    context_object_name = 'task'
     errors = dict(
         invalid_when=_('The type ({}) was incorrect.'),
         when_before_now=_('The date and time must be in the future.'),
