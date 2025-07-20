@@ -25,7 +25,7 @@ def remove_duplicated_rows(apps, schema_editor):
     )
 
     log.info(f'TaskHistory rows: {len(duplicates)=}')
-    for task_id, n in enumerate(duplicates, start=1):
+    for n, task_id in enumerate(duplicates, start=1):
         keeping = None
         try:
             keeping = keep_which(task_id, th_qs)
