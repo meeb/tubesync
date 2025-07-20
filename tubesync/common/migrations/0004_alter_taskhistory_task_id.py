@@ -5,14 +5,14 @@ from common.logger import log
 
 
 def remove_duplicated_rows(apps, schema_editor):
-    def keep_which(task_id):
-        th_qs = TaskHistory.objects.all().order_by('-id')
-        tqs = th_qs.filter(task_id=task_id)
+    def keep_which(task_id, th_qs):
+        tqs = th_qs.order_by('-id').filter(task_id=task_id)
         return tqs[0].id
 
     TaskHistory = apps.get_model("common", 'TaskHistory')
+    th_qs = TaskHistory.objects.all()
     duplicates = set(
-        TaskHistory.objects.values(
+        th_qs.values(
             'task_id',
         ).alias(
             count=models.Count('id'),
@@ -26,7 +26,13 @@ def remove_duplicated_rows(apps, schema_editor):
 
     log.info(f'TaskHistory rows: {len(duplicates)=}')
     for task_id, n in enumerate(duplicates, start=1):
-        keeping = keep_which(task_id)
+        keeping = None
+        try:
+            keeping = keep_which(task_id, th_qs)
+        except IndexError as e:
+            msg = f'TaskHistory: {n=}: {task_id=}: failed to find the row to keep'
+            log.exception(msg, exc_info=e)
+            continue
         log.debug(f'{n=}: {task_id=}: {keeping=}')
         TaskHistory.objects.filter(
             task_id=task_id,
