@@ -58,7 +58,7 @@ class Command(BaseCommand):
                 item.downloaded_filesize = Path(filepath).stat().st_size
                 # import .info.json file
                 info_json = Path(filepath).with_suffix('.info.json')
-                if info_json.is_file():
+                if not item.has_metadata and info_json.is_file():
                     try:
                         item.ingest_metadata(json.loads(info_json.read_text()))
                     except:
