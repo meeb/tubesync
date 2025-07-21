@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError # noqa
@@ -55,6 +56,15 @@ class Command(BaseCommand):
                 item.media_file.name = str(Path(filepath).relative_to(item.media_file.storage.location))
                 item.downloaded = True
                 item.downloaded_filesize = Path(filepath).stat().st_size
+                # import .info.json file
+                info_json = Path(filepath).with_suffix('.info.json')
+                if info_json.is_file():
+                    try:
+                        with open(info_json, 'rt') as file:
+                            item.ingest_metadata(json.loads(file.read()))
+                    except:
+                        log.exception(f'could not import: {info_json}')
+                        pass
                 # set a reasonable download date
                 date = timestamp_to_datetime(Path(filepath).stat().st_mtime)
                 if item.published and item.published > date:
