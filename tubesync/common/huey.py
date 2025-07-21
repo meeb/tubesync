@@ -2,7 +2,7 @@ import datetime
 import os
 from functools import wraps
 from huey import (
-    CancelExecution, SqliteHuey as huey_SqliteHuey,
+    CancelExecution, Huey as huey_Huey,
     signals, utils,
 )
 from huey.api import TaskLock
@@ -70,8 +70,7 @@ class SqliteStorage(huey_SqliteStorage):
                 curs.execute('VACUUM')
 
 
-class SqliteHuey(huey_SqliteHuey):
-    storage_class = SqliteStorage
+class Huey(huey_Huey):
 
     # do not use __len__ (pending_count) for bool
     def __bool__(self):
@@ -125,6 +124,10 @@ class SqliteHuey(huey_SqliteHuey):
                 datetime_to_timestamp(task_obj.eta, integer=False),
             ).astimezone(tz=datetime.timezone.utc)
         return scheduled_at
+
+
+class SqliteHuey(Huey):
+    storage_class = SqliteStorage
 
 
 def CancelExecution_init(self, *args, retry=None, **kwargs):
