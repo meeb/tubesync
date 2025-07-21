@@ -60,8 +60,7 @@ class Command(BaseCommand):
                 info_json = Path(filepath).with_suffix('.info.json')
                 if info_json.is_file():
                     try:
-                        with open(info_json, 'rt') as file:
-                            item.ingest_metadata(json.loads(file.read()))
+                        item.ingest_metadata(json.loads(info_json.read_text()))
                     except:
                         log.exception(f'could not import: {info_json}')
                         pass
