@@ -25,7 +25,7 @@ from common.utils import append_uri_params, mkdir_p, multi_key_sort
 from django_huey import DJANGO_HUEY, get_queue
 from common.huey import h_q_reset_tasks
 from common.logger import log
-from .models import Source, Media, MediaServer
+from .models import Source, Media, MediaServer, Metadata
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
                     ConfirmDeleteMediaServerForm, SourceForm)
@@ -530,24 +530,24 @@ class MediaView(ListView):
 
     def get_queryset(self):
         q = Media.objects.all()
+        md_qs = Metadata.objects.all()
 
         if self.filter_source:
             q = q.filter(source=self.filter_source)
         if self.query:
+            m_q = q
             needle = self.query
+            md_q = md_qs.filter(
+                Q(media__in=m_q) &
+                (
+                    Q(key__contains=needle) |
+                    Q(media__title__icontains=needle) |
+                    Q(value__fulltitle__icontains=needle)
+                )
+            ).only('pk')
+            q = q.filter(new_metadata__in=md_q)
             if self.search_description:
-                q = q.filter(
-                    Q(new_metadata__value__fulltitle__icontains=needle) |
-                    Q(new_metadata__value__description__icontains=needle) |
-                    Q(title__icontains=needle) |
-                    Q(key__contains=needle)
-                )
-            else:
-                q = q.filter(
-                    Q(new_metadata__value__fulltitle__icontains=needle) |
-                    Q(title__icontains=needle) |
-                    Q(key__contains=needle)
-                )
+                q = q.union(m_q.filter(new_metadata__value__description__icontains=needle))
         if self.only_skipped:
             q = q.filter(Q(can_download=False) | Q(skip=True) | Q(manual_skip=True))
         elif not self.show_skipped:
