@@ -190,19 +190,6 @@ def media_post_save(sender, instance, created, **kwargs):
                         can_download_changed = True
             # Recalculate the "skip_changed" flag
             skip_changed = filter_media(instance)
-    else:
-        # Downloaded media might need to be renamed
-        # Check settings before any rename tasks are scheduled
-        rename_sources_setting = getattr(settings, 'RENAME_SOURCES') or list()
-        create_rename_task = (
-            (
-                media.source.directory and
-                media.source.directory in rename_sources_setting
-            ) or
-            settings.RENAME_ALL_SOURCES
-        )
-        if False and create_rename_task:
-            rename_media(str(media.pk))
 
     # If the media is missing metadata schedule it to be downloaded
     if not (media.skip or media.has_metadata or existing_media_metadata_task):
