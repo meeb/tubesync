@@ -1184,6 +1184,14 @@ def save_all_media_for_source(source_id):
         if str(media.pk) not in saved_later
     }
     save_media.map(saved_now)
+    # rename_all_media_for_source
+    TaskHistory.schedule(
+        rename_all_media_for_source,
+        str(source.pk),
+        remove_duplicates=True,
+        vn_fmt = _('Renaming downloaded media from source "{}"'),
+        vn_args=(source.name,),
+    )
 
 
 @dynamic_retry(db_task, delay=90, priority=99, queue=Val(TaskQueue.FS))
