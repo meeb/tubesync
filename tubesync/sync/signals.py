@@ -201,7 +201,7 @@ def media_post_save(sender, instance, created, **kwargs):
             ) or
             settings.RENAME_ALL_SOURCES
         )
-        if create_rename_task:
+        if False and create_rename_task:
             rename_media(str(media.pk))
 
     # If the media is missing metadata schedule it to be downloaded
