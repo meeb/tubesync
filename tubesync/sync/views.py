@@ -528,8 +528,8 @@ class MediaView(ListView):
         self.query = post_or_get(request, 'query')
         self.search_description = is_active(post_or_get(request, 'search_description'))
         self.sp = post_or_get(request, 'sp')
-        if self.sp not in ('base', 'union', 'or',):
-            self.sp = 'base'
+        if self.sp not in ('combined', 'union', 'or',):
+            self.sp = 'or'
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -540,7 +540,7 @@ class MediaView(ListView):
         if self.filter_source:
             q = q.filter(source=self.filter_source)
         m_q = q
-        if needle and 'base' == self.sp:
+        if needle and 'combined' == self.sp:
             if self.search_description:
                 q = q.filter(
                     Q(new_metadata__value__description__icontains=needle) |
@@ -563,11 +563,11 @@ class MediaView(ListView):
                     Q(value__fulltitle__icontains=needle)
                 )
             ).only('pk')
-            q = q.filter(new_metadata__in=md_q).only('pk')
+            q = m_q.filter(new_metadata__in=md_q)
             if self.search_description:
                 q = q.union(m_q.filter(new_metadata__value__description__icontains=needle).only('pk'))
-            # We need to be able to filter again, even after using union
-            q = m_q.filter(pk__in=q)
+                # We need to be able to filter again, even after using union
+                q = m_q.filter(pk__in=q.only('pk'))
         elif needle and 'or' == self.sp:
             md_q = md_qs.filter(
                 Q(media__in=m_q) &
