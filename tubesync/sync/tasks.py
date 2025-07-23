@@ -1185,7 +1185,7 @@ def save_all_media_for_source(source_id):
         if str(media.pk) not in saved_later
     }
     save_media.map(saved_now)
-    # rename_all_media_for_source
+
     TaskHistory.schedule(
         rename_all_media_for_source,
         str(source.pk),
