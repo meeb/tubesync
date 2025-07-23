@@ -13,7 +13,7 @@ from common.utils import glob_quote, mkdir_p
 from .models import Source, Media, Metadata
 from .tasks import (
     get_media_download_task, get_media_metadata_task, get_media_thumbnail_task,
-    delete_all_media_for_source, rename_media, save_all_media_for_source,
+    delete_all_media_for_source, save_all_media_for_source,
     check_source_directory_exists, download_source_images, index_source,
     download_media_file, download_media_metadata, download_media_image,
 )
