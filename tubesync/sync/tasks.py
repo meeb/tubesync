@@ -1015,6 +1015,7 @@ def download_media_file(media_id, override=False):
             # Media has been downloaded successfully
             media.download_finished(format_str, container, filepath)
             media.save()
+            media.rename_files()
             media.copy_thumbnail()
             media.write_nfo_file()
             # Schedule a task to update media servers
