@@ -52,12 +52,12 @@
   <div class="col s12">
     <div class="collection">
       <span class="collection-item">
-        {% if task.locked_by_pid_running %}
+        {% if task.start_at == task.end_at %}
         <i class="fas fa-running"></i> <strong>{{ task }}</strong><br>
-        <i class="far fa-clock"></i> Task started at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+        <i class="far fa-clock"></i> Task started at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong>
         {% else %}
         <i class="fas fa-stopwatch"></i> <strong>{{ task }}</strong><br>
-        <i class="fas fa-redo"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>{% endif %}
+        <i class="fas fa-redo"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong>{% endif %}
         {% endif %}
       </span>
     </div>
