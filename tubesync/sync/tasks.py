@@ -1015,6 +1015,7 @@ def download_media_file(media_id, override=False):
             # Media has been downloaded successfully
             media.download_finished(format_str, container, filepath)
             media.save()
+            media.rename_files()
             media.copy_thumbnail()
             media.write_nfo_file()
             # Schedule a task to update media servers
@@ -1184,6 +1185,14 @@ def save_all_media_for_source(source_id):
         if str(media.pk) not in saved_later
     }
     save_media.map(saved_now)
+
+    TaskHistory.schedule(
+        rename_all_media_for_source,
+        str(source.pk),
+        remove_duplicates=True,
+        vn_fmt = _('Renaming downloaded media from source "{}"'),
+        vn_args=(source.name,),
+    )
 
 
 @dynamic_retry(db_task, delay=90, priority=99, queue=Val(TaskQueue.FS))
