@@ -768,6 +768,31 @@ def save_media(media_id):
             save_model(media)
 
 
+@db_task(delay=60, priority=50, retries=6, retry_delay=3600, queue=Val(TaskQueue.LIMIT))
+def upgrade_media(media_id):
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist as e:
+        # Task triggered but the media no longer exists, do nothing
+        raise CancelExecution(_('no such media'), retry=False) from e
+    else:
+        if not media.downloaded:
+            raise CancelExecution(_('media not downloaded'))
+        format_str = media.get_format_str()
+        downloaded_dict = media.get_display_format(format_str)
+        downloaded_height = downloaded_dict.get('height')
+        if not downloaded_height:
+            if media.source.is_audio:
+                raise CancelExecution(_('upgrading audio is unsupported'), retry=False)
+            raise CancelExecution(_('media height not available'))
+        media.downloaded = False
+        new_dict = media.get_display_format(format_str)
+        media.downloaded = True
+        format_height = new_dict.get('height')
+        if not format_height or format_height <= downloaded_height:
+            raise CancelExecution(_('downloaded media is better'))
+        download_media_file.call_local(str(media.pk), override=True)
+
 @db_task(delay=60, priority=60, retries=3, retry_delay=600, queue=Val(TaskQueue.LIMIT))
 def download_media_metadata(media_id):
     '''
@@ -1018,6 +1043,7 @@ def download_media_file(media_id, override=False):
             media.rename_files()
             media.copy_thumbnail()
             media.write_nfo_file()
+            upgrade_media(str(media.pk))
             # Schedule a task to update media servers
             schedule_media_servers_update()
 
