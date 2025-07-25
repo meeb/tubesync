@@ -582,11 +582,16 @@ def index_source(source_id):
                     priority=10+(5*num),
                     delay=65-(30*num),
                 )
+            priority = download_media_metadata.settings.get('default_priority', 50)
+            if source.download_media:
+                priority += 5
+            else:
+                priority -= 5
             log.info(f'Scheduling task to download metadata for: {media.url}')
             TaskHistory.schedule(
                 download_media_metadata,
                 str(media.pk),
-                priority=65,
+                priority=priority,
                 remove_duplicates=True,
                 vn_fmt=_('Downloading metadata for: "{}": {}'),
                 vn_args=(media.key, media.name,),
