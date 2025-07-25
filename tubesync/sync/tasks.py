@@ -1043,7 +1043,9 @@ def download_media_file(media_id, override=False):
             media.rename_files()
             media.copy_thumbnail()
             media.write_nfo_file()
-            upgrade_media(str(media.pk))
+            # Try to download a better format later, if the settings allow this
+            if getattr(settings, 'VIDEO_HEIGHT_UPGRADE', False):
+                upgrade_media(str(media.pk))
             # Schedule a task to update media servers
             schedule_media_servers_update()
 
