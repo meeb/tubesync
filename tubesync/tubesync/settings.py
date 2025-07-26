@@ -180,6 +180,7 @@ MEDIA_THUMBNAIL_HEIGHT = 240                # Height in pixels to resize thumbna
 
 VIDEO_HEIGHT_CUTOFF = 240                   # Smallest resolution in pixels permitted to download
 VIDEO_HEIGHT_IS_HD = 500                    # Height in pixels to count as 'HD'
+VIDEO_HEIGHT_UPGRADE = True                 # Download again when a format with more pixels is available
 
 
 

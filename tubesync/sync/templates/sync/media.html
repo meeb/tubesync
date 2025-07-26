@@ -25,6 +25,12 @@
 <div class="row input-field s12" style="padding-top: 20px; padding-bottom: 10px; border-top: 2px dashed slategray; border-bottom: 2px dashed slategray;">
   <form method="get" class="simpleform">
     <!-- {% csrf_token %} -->
+    {% if only_skipped %}
+    <input type="hidden" name="only_skipped" value="yes" />
+    {% endif %}
+    {% if show_skipped %}
+    <input type="hidden" name="show_skipped" value="yes" />
+    {% endif %}
     <div class="col m9">
       <label>
         <span class="no-text-transform" style="font-size: 1.25rem !important;">Search for:</span>

@@ -582,11 +582,16 @@ def index_source(source_id):
                     priority=10+(5*num),
                     delay=65-(30*num),
                 )
+            priority = download_media_metadata.settings.get('default_priority', 50)
+            if source.download_media:
+                priority += 5
+            else:
+                priority -= 5
             log.info(f'Scheduling task to download metadata for: {media.url}')
             TaskHistory.schedule(
                 download_media_metadata,
                 str(media.pk),
-                priority=65,
+                priority=priority,
                 remove_duplicates=True,
                 vn_fmt=_('Downloading metadata for: "{}": {}'),
                 vn_args=(media.key, media.name,),
@@ -767,6 +772,31 @@ def save_media(media_id):
         ):
             save_model(media)
 
+
+@db_task(delay=60, priority=50, retries=6, retry_delay=3600, queue=Val(TaskQueue.LIMIT))
+def upgrade_media(media_id):
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist as e:
+        # Task triggered but the media no longer exists, do nothing
+        raise CancelExecution(_('no such media'), retry=False) from e
+    else:
+        if not media.downloaded:
+            raise CancelExecution(_('media not downloaded'))
+        format_str = media.get_format_str()
+        downloaded_dict = media.get_display_format(format_str)
+        downloaded_height = downloaded_dict.get('height')
+        if not downloaded_height:
+            if media.source.is_audio:
+                raise CancelExecution(_('upgrading audio is unsupported'), retry=False)
+            raise CancelExecution(_('media height not available'))
+        media.downloaded = False
+        new_dict = media.get_display_format(format_str)
+        media.downloaded = True
+        format_height = new_dict.get('height')
+        if not format_height or format_height <= downloaded_height:
+            raise CancelExecution(_('downloaded media is better'))
+        download_media_file.call_local(str(media.pk), override=True)
 
 @db_task(delay=60, priority=60, retries=3, retry_delay=600, queue=Val(TaskQueue.LIMIT))
 def download_media_metadata(media_id):
@@ -1015,8 +1045,12 @@ def download_media_file(media_id, override=False):
             # Media has been downloaded successfully
             media.download_finished(format_str, container, filepath)
             media.save()
+            media.rename_files()
             media.copy_thumbnail()
             media.write_nfo_file()
+            # Try to download a better format later, if the settings allow this
+            if getattr(settings, 'VIDEO_HEIGHT_UPGRADE', False):
+                upgrade_media(str(media.pk))
             # Schedule a task to update media servers
             schedule_media_servers_update()
 
@@ -1184,6 +1218,14 @@ def save_all_media_for_source(source_id):
         if str(media.pk) not in saved_later
     }
     save_media.map(saved_now)
+
+    TaskHistory.schedule(
+        rename_all_media_for_source,
+        str(source.pk),
+        remove_duplicates=True,
+        vn_fmt = _('Renaming downloaded media from source "{}"'),
+        vn_args=(source.name,),
+    )
 
 
 @dynamic_retry(db_task, delay=90, priority=99, queue=Val(TaskQueue.FS))
