@@ -25,7 +25,7 @@ from common.utils import append_uri_params, mkdir_p, multi_key_sort
 from django_huey import DJANGO_HUEY, get_queue
 from common.huey import h_q_reset_tasks
 from common.logger import log
-from .models import Source, Media, MediaServer
+from .models import Source, Media, MediaServer, Metadata
 from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
                     SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
                     ConfirmDeleteMediaServerForm, SourceForm)
@@ -502,6 +502,7 @@ class MediaView(ListView):
         self.only_skipped = False
         self.query = None
         self.search_description = False
+        self.sp = None
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
@@ -526,28 +527,54 @@ class MediaView(ListView):
             self.only_skipped = True
         self.query = post_or_get(request, 'query')
         self.search_description = is_active(post_or_get(request, 'search_description'))
+        self.sp = post_or_get(request, 'sp')
+        if self.sp not in ('combined', 'union', 'or',):
+            self.sp = 'or'
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         q = Media.objects.all()
+        md_qs = Metadata.objects.all()
+        needle = self.query
 
         if self.filter_source:
             q = q.filter(source=self.filter_source)
-        if self.query:
-            needle = self.query
+        m_q = q
+        if needle and 'combined' == self.sp:
             if self.search_description:
                 q = q.filter(
-                    Q(new_metadata__value__fulltitle__icontains=needle) |
                     Q(new_metadata__value__description__icontains=needle) |
+                    Q(key__contains=needle) |
                     Q(title__icontains=needle) |
-                    Q(key__contains=needle)
+                    Q(new_metadata__value__fulltitle__icontains=needle)
                 )
             else:
                 q = q.filter(
-                    Q(new_metadata__value__fulltitle__icontains=needle) |
+                    Q(key__contains=needle) |
                     Q(title__icontains=needle) |
-                    Q(key__contains=needle)
+                    Q(new_metadata__value__fulltitle__icontains=needle)
                 )
+        elif needle:
+            md_q = md_qs.filter(
+                Q(media__in=m_q) &
+                (
+                    Q(key__contains=needle) |
+                    Q(media__title__icontains=needle) |
+                    Q(value__fulltitle__icontains=needle)
+                )
+            ).only('pk')
+            if 'union' == self.sp:
+                if self.search_description:
+                    q = q.union(m_q.filter(new_metadata__value__description__icontains=needle).only('pk'))
+                    # We need to be able to filter again, even after using union
+                    q = m_q.filter(pk__in=q.only('pk'))
+                else:
+                    q = m_q.filter(new_metadata__in=md_q)
+            else:
+                if self.search_description:
+                    q = m_q.filter(Q(new_metadata__value__description__icontains=needle) | Q(new_metadata__in=md_q))
+                else:
+                    q = m_q.filter(new_metadata__in=md_q)
         if self.only_skipped:
             q = q.filter(Q(can_download=False) | Q(skip=True) | Q(manual_skip=True))
         elif not self.show_skipped:
