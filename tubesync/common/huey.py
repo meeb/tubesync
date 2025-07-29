@@ -409,7 +409,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
             for model in (Media, Source,):
                 try:
                     model_instance = model.objects.get(pk=key)
-                except model.DoesNotExist:
+                except (model.DoesNotExist, ValueError,):
                     pass
                 else:
                     if hasattr(model_instance, 'key'):
