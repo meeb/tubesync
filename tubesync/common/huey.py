@@ -424,7 +424,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
                 else:
                     for model in (Source, Media,):
                         try:
-                            model_instance = model.objects.get(pk=instance_uuid_str)
+                            model_instance = model.objects.get(pk=instance_uuid)
                         except (model.DoesNotExist, ValidationError,):
                             pass
                         else:
