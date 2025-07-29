@@ -404,13 +404,13 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         scheduled_at = huey.scheduled_at_from_task(task_obj)
         if scheduled_at:
             th.scheduled_at = scheduled_at
-        try:
-            from django.core.exceptions import ValidationError
-            from sync.models import Media, Source
-        except:
-            pass
-        else:
-            if not th.verbose_name:
+        if not th.verbose_name:
+            try:
+                from django.core.exceptions import ValidationError
+                from sync.models import Media, Source
+            except:
+                pass
+            else:
                 try:
                     key = task_obj.args[0]
                     instance_uuid_str = str(key)
