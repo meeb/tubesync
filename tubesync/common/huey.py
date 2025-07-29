@@ -1,5 +1,6 @@
 import datetime
 import os
+import uuid
 from functools import wraps
 from huey import (
     CancelExecution, Huey as huey_Huey,
@@ -403,19 +404,35 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         scheduled_at = huey.scheduled_at_from_task(task_obj)
         if scheduled_at:
             th.scheduled_at = scheduled_at
-        from sync.models import Media, Source
-        if not th.verbose_name and task_obj.args:
-            key = task_obj.args[0]
-            for model in (Media, Source,):
+        if not th.verbose_name:
+            try:
+                from django.core.exceptions import ValidationError
+                from sync.models import Media, Source
+            except:
+                pass
+            else:
                 try:
-                    model_instance = model.objects.get(pk=key)
-                except (model.DoesNotExist, ValueError,):
-                    pass
+                    key = task_obj.args[0]
+                    instance_uuid_str = str(key)
+                    instance_uuid = uuid.UUID(instance_uuid_str)
+                except IndexError:
+                    key = None
+                except RuntimeError:
+                    instance_uuid_str = None
+                except ValueError:
+                    instance_uuid = None
                 else:
-                    if hasattr(model_instance, 'key'):
-                        th.verbose_name = f'{th.name} with: {model_instance.key}'
-                        if hasattr(model_instance, 'name'):
-                            th.verbose_name += f' / {model_instance.name}'
+                    for model in (Source, Media,):
+                        try:
+                            model_instance = model.objects.get(pk=instance_uuid)
+                        except (model.DoesNotExist, ValidationError,):
+                            pass
+                        else:
+                            if hasattr(model_instance, 'key'):
+                                th.verbose_name = f'{th.name} with: {model_instance.key}'
+                                if hasattr(model_instance, 'name'):
+                                    th.verbose_name += f' / {model_instance.name}'
+                            break
     elif signal_name == signals.SIGNAL_SCHEDULED:
         scheduled_at = huey.scheduled_at_from_task(task_obj)
         if scheduled_at:
