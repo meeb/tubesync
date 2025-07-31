@@ -200,6 +200,7 @@ YOUTUBE_DEFAULTS = {
     'ignoreerrors': False,  # When true, yt-dlp does not raise descriptive exceptions
     'cachedir': False,      # Disable on-disk caching
     'addmetadata': True,    # Embed metadata during postprocessing where available
+    'updatetime': True,     # Set mtime in recent versions
     'geo_verification_proxy': getenv('geo_verification_proxy').strip() or None,
     'max_sleep_interval': (60)*5,
     'sleep_interval': 0.25,
