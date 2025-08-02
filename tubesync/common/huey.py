@@ -367,7 +367,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
             peek=True,
         ) or dict(
             created=signal_dt,
-            data=task_obj.data,
+            data=(task_obj.args, repr(task_obj.kwargs),),
             elapsed=0,
             module=task_obj.__module__,
             name=task_obj.name,
