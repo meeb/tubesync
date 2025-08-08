@@ -1151,6 +1151,8 @@ class Media(models.Model):
                             other_path.replace(new_file_path)
 
                     for fuzzy_path in fuzzy_paths:
+                        if not fuzzy_path.exists():
+                            continue
                         (fuzzy_prefix_path, fuzzy_stem) = directory_and_stem(fuzzy_path, True)
                         old_file_str = fuzzy_path.name
                         new_file_str = new_stem + old_file_str[len(fuzzy_stem):]
@@ -1159,7 +1161,7 @@ class Media(models.Model):
                             continue
                         log.debug(f'Considering rename for: {self!s}\n\t{fuzzy_path!s}\n\t{new_file_path!s}')
                         # it quite possibly was renamed already
-                        if fuzzy_path.exists() and not new_file_path.exists():
+                        if not (new_video_path.samefile(fuzzy_path) or new_file_path.exists()):
                             log.debug(f'{self!s}: {fuzzy_path!s} => {new_file_path!s}')
                             fuzzy_path.rename(new_file_path)
 
