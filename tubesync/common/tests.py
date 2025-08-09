@@ -82,9 +82,9 @@ class UtilsTestCase(TestCase):
                 'CONN_HEALTH_CHECKS': True,
                 'CONN_MAX_AGE': 0,
                 'OPTIONS': dict(pool={
-                    'max_size': 80,
-                    'min_size': 8,
-                    'num_workers': 6,
+                    'max_size': 10,
+                    'min_size': 3,
+                    'num_workers': 2,
                     'timeout': 180,
                 }),
             }
