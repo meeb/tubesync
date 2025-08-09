@@ -178,7 +178,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
             return
         if 'exception' == status and exception is not None:
             # log, but do not raise an exception
-            from huey import logger
+            from huey.api import logger
             logger.error(
                 f'{queue.name}: maintenance function exception: {exception}'
             )
