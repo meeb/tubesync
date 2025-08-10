@@ -201,6 +201,7 @@ YOUTUBE_DEFAULTS = {
     'cachedir': False,      # Disable on-disk caching
     'addmetadata': True,    # Embed metadata during postprocessing where available
     'updatetime': True,     # Set mtime in recent versions
+    'update_self': False,   # Updates are handled by pip
     'geo_verification_proxy': getenv('geo_verification_proxy').strip() or None,
     'max_sleep_interval': (60)*5,
     'sleep_interval': 0.25,
