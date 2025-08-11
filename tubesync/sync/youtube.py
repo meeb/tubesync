@@ -205,6 +205,17 @@ def get_media_info(url, /, *, days=None, info_json=None):
         paths.update({
             'infojson': user_set('infojson', paths, str(info_json_path))
         })
+    default_ea = user_set('extractor_args', default_opts.__dict__, dict())
+    extractor_args = user_set('extractor_args', opts, default_ea)
+    ea_yt_dict = extractor_args.get('youtube', dict())
+    ea_yt_formats_list = ea_yt_dict.get('formats', list())
+    if 'missing_pot' not in ea_yt_formats_list:
+        ea_yt_formats_list.append('missing_pot')
+        ea_yt_dict['formats'] = ea_yt_formats_list
+        extractor_args['youtube'] = ea_yt_dict
+    ea_ytt_dict = extractor_args.get('youtubetab', dict())
+    ea_ytt_dict['approximate_date'] = ['true']
+    extractor_args['youtubetab'] = ea_ytt_dict
     default_postprocessors = user_set('postprocessors', default_opts.__dict__, list())
     postprocessors = user_set('postprocessors', opts, default_postprocessors)
     postprocessors.append(dict(
@@ -233,10 +244,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'check_thumbnails': False,
         'clean_infojson': False,
         'daterange': yt_dlp.utils.DateRange(start=start),
-        'extractor_args': {
-            'youtube': {'formats': ['missing_pot']},
-            'youtubetab': {'approximate_date': ['true']},
-        },
+        'extractor_args': extractor_args,
         'outtmpl': outtmpl,
         'overwrites': True,
         'paths': paths,
@@ -413,16 +421,13 @@ def download_media(
     })
 
     # Allow download of formats that tested good with 'missing_pot'
-    youtube_ea_dict = ytopts['extractor_args'].get('youtube', dict())
-    formats_list = youtube_ea_dict.get('formats', list())
-    if 'missing_pot' not in formats_list:
-        formats_list.append('missing_pot')
-        youtube_ea_dict.update({
-            'formats': formats_list,
-        })
-    ytopts['extractor_args'].update({
-        'youtube': youtube_ea_dict,
-    })
+    extractor_args = ytopts['extractor_args']
+    ea_yt_dict = extractor_args.get('youtube', dict())
+    ea_yt_formats_list = ea_yt_dict.get('formats', list())
+    if 'missing_pot' not in ea_yt_formats_list:
+        ea_yt_formats_list.append('missing_pot')
+        ea_yt_dict['formats'] = ea_yt_formats_list
+        extractor_args['youtube'] = ea_yt_dict
 
     postprocessor_hook_func = postprocessor_hook.get('function', None)
     if postprocessor_hook_func:
