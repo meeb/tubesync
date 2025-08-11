@@ -1140,6 +1140,7 @@ def rename_all_media_for_source(source_id):
         if migrating_lock.acquired:
             # good luck to you in the queue!
             rename_media(str(media.pk))
+            continue
         try:
             with huey_lock_task(
                 f'media:{media.uuid}',
