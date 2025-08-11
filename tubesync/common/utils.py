@@ -11,7 +11,7 @@ from functools import partial
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from urllib.parse import urlunsplit, urlencode, urlparse
-from .errors import DatabaseConnectionError
+from .errors import DatabaseConnectionError, QuerySetEmptyError
 
 def directory_and_stem(arg_path, /, all_suffixes=False):
     filepath = Path(arg_path)
@@ -307,14 +307,22 @@ def django_queryset_generator(query_set, /, *,
     gc.disable()
     if use_chunked_fetch:
         for key in qs._iterator(use_chunked_fetch, chunk_size):
-            yield query_set.filter(pk=key)[0]
+            try:
+                yield query_set.filter(pk=key)[0]
+            except IndexError as exc:
+                msg = f'missing primary key: {key}'
+                raise QuerySetEmptyError(msg, exc=exc, key=key) from exc
             key = None
             gc.collect(generation=1)
         key = None
     else:
         for page in iter(Paginator(qs, page_size)):
             for key in page.object_list:
-                yield query_set.filter(pk=key)[0]
+                try:
+                    yield query_set.filter(pk=key)[0]
+                except IndexError as exc:
+                    msg = f'missing primary key: {key}'
+                    raise QuerySetEmptyError(msg, exc=exc, key=key) from exc
                 key = None
                 gc.collect(generation=1)
             key = None

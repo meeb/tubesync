@@ -31,6 +31,7 @@ from common.errors import (
     HueyConsumerError,
     DownloadFailedException, FormatUnavailableError,
     NoFormatException, NoMediaException, NoThumbnailException,
+    QuerySetEmptyError,
 )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, seconds_to_timestr, )
@@ -255,13 +256,18 @@ def schedule_indexing():
         )
         if skip_source:
             continue
-        # clear all existing media locks
-        media_qs = Media.objects.filter(source=source).only('uuid')
-        for media in qs_gen(media_qs):
-            huey_lock_task(
-                f'media:{media.uuid}',
-                queue=Val(TaskQueue.DB),
-            ).clear()
+        try:
+            # clear all existing media locks
+            media_qs = Media.objects.filter(source=source).only('uuid')
+            for media in qs_gen(media_qs):
+                huey_lock_task(
+                    f'media:{media.uuid}',
+                    queue=Val(TaskQueue.DB),
+                ).clear()
+        except QuerySetEmptyError as e:
+            msg = f'missing media from "{source.name}": {source.pk}: {e.key}'
+            log.exception(msg, exc_info=e)
+            pass
         # schedule a new indexing task
         log.info(f'Scheduling an indexing task for source "{source.name}": {source.pk}')
         TaskHistory.schedule(
