@@ -60,3 +60,11 @@ class FormatUnavailableError(Exception):
         self.format = format
         super().__init__(*args, **kwargs)
 
+
+class QuerySetEmptyError(Exception):
+    # Raised when a primary key was missing when iterating a query set.
+    def __init__(self, *args, exc=None, key=None, **kwargs):
+        self.exc = exc
+        self.key = key
+        super().__init__(*args, **kwargs)
+
