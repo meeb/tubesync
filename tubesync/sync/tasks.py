@@ -31,6 +31,7 @@ from common.errors import (
     HueyConsumerError,
     DownloadFailedException, FormatUnavailableError,
     NoFormatException, NoMediaException, NoThumbnailException,
+    QuerySetEmptyError,
 )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, seconds_to_timestr, )
