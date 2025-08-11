@@ -72,9 +72,12 @@ def glob_quote(filestr, /):
 
 def list_of_dictionaries(arg_list, /, arg_function=lambda x: x):
     assert callable(arg_function)
-    if isinstance(arg_list, list):
+    _map_list = arg_list
+    if hasattr(arg_list, 'exhaust') and callable(arg_list.exhaust):
+        _map_list = arg_list.exhaust()
+    if isinstance(_map_list, list):
         _map_func = partial(lambda f, d: f(d) if isinstance(d, dict) else d, arg_function)
-        return (True, list(map(_map_func, arg_list)),)
+        return (True, list(map(_map_func, _map_list)),)
     return (False, arg_list,)
 
 
