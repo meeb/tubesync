@@ -304,15 +304,19 @@ def django_queryset_generator(query_set, /, *,
     gc.disable()
     if use_chunked_fetch:
         for key in qs._iterator(use_chunked_fetch, chunk_size):
-            yield query_set.filter(pk=key)[0]
-            key = None
+            found = query_set.filter(pk=key)
+            if found:
+                yield found[0]
+            found = key = None
             gc.collect(generation=1)
         key = None
     else:
         for page in iter(Paginator(qs, page_size)):
             for key in page.object_list:
-                yield query_set.filter(pk=key)[0]
-                key = None
+                found = query_set.filter(pk=key)
+                if found:
+                    yield found[0]
+                found = key = None
                 gc.collect(generation=1)
             key = None
             page = None
