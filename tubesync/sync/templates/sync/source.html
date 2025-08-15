@@ -231,7 +231,7 @@
         <span class="collection-item error-text">
           <i class="fas fa-exclamation-triangle"></i> <strong>{{ task.verbose_name }}</strong><br>
           Error: &quot;{{ task.error_message }}&quot;<br>
-          <i class="far fa-clock"></i> Occured at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+          <i class="far fa-clock"></i> Occured at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong>
         </span>
       {% endfor %}
     </div>
