@@ -188,7 +188,7 @@ def cleanup_completed_tasks():
     days_to_keep = getattr(settings, 'COMPLETED_TASKS_DAYS_TO_KEEP', 30)
     delta = timezone.now() - timedelta(days=days_to_keep)
     log.info(f'Deleting completed tasks older than {days_to_keep} days '
-             f'(run_at before {delta})')
+             f'(end_at before {delta})')
     TaskHistory.objects.filter(end_at__lt=delta).delete()
 
 
