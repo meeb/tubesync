@@ -258,11 +258,11 @@ youtube_help = {
     'examples': dict(zip(
         YouTube_SourceType.values,
         (
-            ('https://www.youtube.com/google'),
+            ('https://www.youtube.com/@rossmanngroup'),
             ('https://www.youtube.com/channel/'
-             'UCK8sQmJBp8GCxrOtXWBpyEA'),
+             'UCl2mFZoRqjw_ELax4Yisf6w'),
             ('https://www.youtube.com/playlist?list='
-             'PL590L5WQmH8dpP0RyH5pCfIaDEdt9nk7r'),
+             'PLkVbIsAWN2lsmovRO20_gtfUfgWi-XnnT'),
         ),
     )),
     'texts': dict(zip(
