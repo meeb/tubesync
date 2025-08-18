@@ -210,7 +210,7 @@ YOUTUBE_DEFAULTS = {
             'player_client': ['default', 'mweb', 'tv_simply', 'web_embedded'],
         },
         'youtubepot-bgutilhttp': {
-            'baseurl': ['http://127.0.0.1:4416'],
+            'base_url': ['http://127.0.0.1:4416'],
         },
     },
 }
