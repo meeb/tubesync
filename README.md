@@ -333,7 +333,8 @@ Notable libraries and software used:
  * [Django](https://www.djangoproject.com/)
  * [yt-dlp](https://github.com/yt-dlp/yt-dlp)
  * [ffmpeg](https://ffmpeg.org/)
- * [Django Background Tasks](https://github.com/arteria/django-background-tasks/)
+ * [Django Huey](https://github.com/gaiacoop/django-huey)
+ * [Huey](https://github.com/coleifer/huey)
  * [django-sass](https://github.com/coderedcorp/django-sass/)
  * The container bundles with `s6-init` and `nginx`
 
