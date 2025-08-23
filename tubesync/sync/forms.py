@@ -22,6 +22,11 @@ SourceForm = forms.modelform_factory(
         'copy_thumbnails', 'write_nfo', 'write_json', 'embed_metadata', 'embed_thumbnail',
         'enable_sponsorblock', 'sponsorblock_categories', 'write_subtitles', 'auto_subtitles', 'sub_langs',
     ),
+    field_classes = {
+        'filter_seconds_min': forms.TypedChoiceField(
+            coerce=int,
+        ),
+    },
     widgets = {
         'target_schedule': forms.DateTimeInput(
             attrs={'type': 'datetime-local'},
