@@ -47,8 +47,12 @@ class FileExtension(models.TextChoices):
 
 
 class FilterSeconds(models.IntegerChoices):
-    MIN = 1, _('Minimum Length')
-    MAX = 0, _('Maximum Length')
+    MIN = True, _('Minimum Length')
+    MAX = False, _('Maximum Length')
+
+    @classmethod
+    def choices_bool(cls):
+        return [ (bool(k), v,) for k, v in cls.choices ]
 
 
 class IndexSchedule(models.IntegerChoices):
