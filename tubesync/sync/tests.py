@@ -22,9 +22,11 @@ from .tasks import (
 )
 from .filtering import filter_media
 from .utils import filter_response
-from .choices import (Val, Fallback, IndexSchedule, SourceResolution,
-                        TaskQueue, YouTube_AudioCodec, YouTube_VideoCodec,
-                        YouTube_SourceType, youtube_long_source_types)
+from .choices import (
+    Val, Fallback, FilterSeconds, IndexSchedule, SourceResolution,
+    TaskQueue, YouTube_AudioCodec, YouTube_VideoCodec,
+    YouTube_SourceType, youtube_long_source_types,
+)
 
 
 class FrontEndTestCase(TestCase):
@@ -195,7 +197,7 @@ class FrontEndTestCase(TestCase):
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
             'filter_text': '.*',
-            'filter_seconds_min': int(True),
+            'filter_seconds_min': Val(FilterSeconds.MIN),
             'index_schedule': 3600,
             'download_media': False,
             'index_videos': True,
@@ -258,7 +260,7 @@ class FrontEndTestCase(TestCase):
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
             'filter_text': '.*',
-            'filter_seconds_min': int(True),
+            'filter_seconds_min': Val(FilterSeconds.MIN),
             'index_schedule': Val(IndexSchedule.EVERY_HOUR),
             'delete_old_media': False,
             'days_to_keep': 14,
@@ -295,7 +297,7 @@ class FrontEndTestCase(TestCase):
             'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
             'download_cap': 0,
             'filter_text': '.*',
-            'filter_seconds_min': int(True),
+            'filter_seconds_min': Val(FilterSeconds.MIN),
             'index_schedule': Val(IndexSchedule.EVERY_2_HOURS),  # changed
             'delete_old_media': False,
             'days_to_keep': 14,
