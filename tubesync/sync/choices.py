@@ -46,9 +46,9 @@ class FileExtension(models.TextChoices):
     MKV = 'mkv', _('Matroska Multimedia Container')
 
 
-class FilterSeconds(models.TextChoices):
-    MIN = "True", _('Minimum Length')
-    MAX = "False", _('Maximum Length')
+class FilterSeconds(models.IntegerChoices):
+    MIN = 1, _('Minimum Length')
+    MAX = 0, _('Maximum Length')
 
 
 class IndexSchedule(models.IntegerChoices):
