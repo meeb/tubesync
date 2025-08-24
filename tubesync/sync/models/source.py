@@ -195,7 +195,7 @@ class Source(db.models.Model):
     filter_seconds_min = db.models.BooleanField(
         _('filter seconds min/max'),
         choices=FilterSeconds.choices_bool(),
-        default=Val(FilterSeconds.MIN),
+        default=bool(FilterSeconds.MIN),
         help_text=_(
             'When Filter Seconds is > 0, do we skip on minimum (video shorter than limit) or maximum (video '
             'greater than maximum) video duration'
