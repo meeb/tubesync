@@ -50,6 +50,10 @@ class FilterSeconds(models.IntegerChoices):
     MIN = True, _('Minimum Length')
     MAX = False, _('Maximum Length')
 
+    @classmethod
+    def choices_bool(cls):
+        return [ (bool(k), v,) for k, v in cls.choices ]
+
 
 class IndexSchedule(models.IntegerChoices):
     EVERY_HOUR = 3600, _('Every hour')
