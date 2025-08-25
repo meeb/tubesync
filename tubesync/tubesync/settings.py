@@ -207,7 +207,7 @@ YOUTUBE_DEFAULTS = {
     'sleep_interval': 0.25,
     'extractor_args': {
         'youtube': {
-            'player_client': ['default', 'mweb', 'tv_simply', 'web_embedded'],
+            'player_client': ['default', 'ios', 'web_embedded'],
         },
         'youtubepot-bgutilhttp': {
             'base_url': ['http://127.0.0.1:4416'],
