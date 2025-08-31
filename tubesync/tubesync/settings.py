@@ -206,6 +206,7 @@ YOUTUBE_DEFAULTS = {
     'max_sleep_interval': (60)*5,
     'sleep_interval': 0.25,
     'extractor_args': {
+        'formats': ['missing_pot'],
         'youtube': {
             'player_client': ['default', 'ios'],
         },
