@@ -106,7 +106,7 @@ def download_finished(self, format_str, container, downloaded_filepath=None):
         media.downloaded_audio_codec = aformat['acodec']
         media.downloaded_video_codec = vformat['vcodec']
         media.downloaded_container = container
-        media.downloaded_fps = vformat['fps']
+        media.downloaded_fps = round(vformat['fps'])
         media.downloaded_hdr = vformat['is_hdr']
     else:
         # Combined stream or audio-only stream
@@ -119,7 +119,7 @@ def download_finished(self, format_str, container, downloaded_filepath=None):
             media.downloaded_height = cformat['height']
             media.downloaded_width = cformat['width']
             media.downloaded_video_codec = cformat['vcodec']
-            media.downloaded_fps = cformat['fps']
+            media.downloaded_fps = round(cformat['fps'])
             media.downloaded_hdr = cformat['is_hdr']
         else:
             self.downloaded_format = Val(SourceResolution.AUDIO)
