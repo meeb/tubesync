@@ -207,12 +207,6 @@ def get_media_info(url, /, *, days=None, info_json=None):
         })
     default_ea = user_set('extractor_args', default_opts.__dict__, dict())
     extractor_args = user_set('extractor_args', opts, default_ea)
-    ea_yt_dict = extractor_args.get('youtube', dict())
-    ea_yt_formats_list = ea_yt_dict.get('formats', list())
-    if 'missing_pot' not in ea_yt_formats_list:
-        ea_yt_formats_list.append('missing_pot')
-        ea_yt_dict['formats'] = ea_yt_formats_list
-        extractor_args['youtube'] = ea_yt_dict
     ea_ytt_dict = extractor_args.get('youtubetab', dict())
     ea_ytt_dict['approximate_date'] = ['true']
     extractor_args['youtubetab'] = ea_ytt_dict
@@ -396,7 +390,6 @@ def download_media(
         'sleep_interval': 10,
         'max_sleep_interval': min(15*60, max(60, settings.DOWNLOAD_MEDIA_DELAY)),
         'sleep_interval_requests': 3,
-        'extractor_args': opts.get('extractor_args', dict()),
         'paths': opts.get('paths', dict()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),
         'postprocessor_hooks': opts.get('postprocessor_hooks', list()),
@@ -419,15 +412,6 @@ def download_media(
         'home': str(output_dir),
         'temp': str(temp_dir_path),
     })
-
-    # Allow download of formats that tested good with 'missing_pot'
-    extractor_args = ytopts['extractor_args']
-    ea_yt_dict = extractor_args.get('youtube', dict())
-    ea_yt_formats_list = ea_yt_dict.get('formats', list())
-    if 'missing_pot' not in ea_yt_formats_list:
-        ea_yt_formats_list.append('missing_pot')
-        ea_yt_dict['formats'] = ea_yt_formats_list
-        extractor_args['youtube'] = ea_yt_dict
 
     postprocessor_hook_func = postprocessor_hook.get('function', None)
     if postprocessor_hook_func:
