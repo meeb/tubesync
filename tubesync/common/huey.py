@@ -108,9 +108,21 @@ class Huey(huey_Huey):
             self.revoke(t, revoke_once=True)
         task_eta = utils.normalize_time(eta=eta, utc=self.utc)
         for t in found:
+            previous_id = t.id
             t.eta = task_eta
             t.id = t.create_id()
             t.revoke_id = f'r:{t.id}'
+            try:
+                from common.models import TaskHistory
+                th = TaskHistory.objects.get(task_id=previous_id)
+            except:
+                pass
+            else:
+                # clone the old task history
+                th.pk = None
+                th._state.adding = True
+                th.task_id = t.id
+                th.save()
             self.enqueue(t)
         return True
 
