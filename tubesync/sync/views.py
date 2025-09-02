@@ -1189,8 +1189,10 @@ class TaskScheduleView(FormView, SingleObjectMixin):
             msg = f'TaskScheduleView: queue not found: {pk=} {queue=}'
             log.exception(msg, exc_info=e)
         else:
-            self.object.scheduled_at = max(self.now, when)
-            if q.reschedule(task_id, self.object.scheduled_at):
+            eta = max(self.now, when)
+            if q.reschedule(task_id, eta):
+                vn = self.object.verbose_name or task_id or pk
+                self.object.verbose_name = f'[revoked] {vn}'
                 self.object.save()
             else:
                 msg = f'TaskScheduleView: task not found: {pk=} {task_id=}'
