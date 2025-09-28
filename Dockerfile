@@ -359,7 +359,8 @@ ARG TARGETARCH
 
 ENV S6_VERSION="${S6_VERSION}" \
     FFMPEG_DATE="${FFMPEG_DATE}" \
-    FFMPEG_VERSION="${FFMPEG_VERSION}"
+    FFMPEG_VERSION="${FFMPEG_VERSION}" \
+    DENO_NO_UPDATE_CHECK=1
 
 # Reminder: the SHELL handles all variables
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
