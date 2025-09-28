@@ -360,6 +360,7 @@ ARG TARGETARCH
 ENV S6_VERSION="${S6_VERSION}" \
     FFMPEG_DATE="${FFMPEG_DATE}" \
     FFMPEG_VERSION="${FFMPEG_VERSION}" \
+    DENO_NO_PROMPT=1 \
     DENO_NO_UPDATE_CHECK=1
 
 # Reminder: the SHELL handles all variables
@@ -552,7 +553,8 @@ RUN set -x && \
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
 
 # ENVS and ports
-ENV PYTHONPATH="/app" \
+ENV DENO_DIR="/config/cache/deno" \
+    PYTHONPATH="/app" \
     PYTHONPYCACHEPREFIX="/config/cache/pycache" \
     S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0" \
     XDG_CACHE_HOME="/config/cache" \
