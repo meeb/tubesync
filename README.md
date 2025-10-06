@@ -109,6 +109,7 @@ $ docker run \
   -v /some/directory/tubesync-config:/config \
   -v /some/directory/tubesync-downloads:/downloads \
   -p 4848:4848 \
+  --stop-timeout 1800 \
   ghcr.io/meeb/tubesync:latest
 ```
 
@@ -125,6 +126,7 @@ services:
     image: ghcr.io/meeb/tubesync:latest
     container_name: tubesync
     restart: unless-stopped
+    stop_grace_period: 30m
     ports:
       - 4848:4848
     volumes:
