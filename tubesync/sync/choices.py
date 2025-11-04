@@ -163,6 +163,7 @@ class SponsorBlock_Category(models.TextChoices):
     FILLER = 'filler', _( 'Filler Tangent' )
     INTERACTION = 'interaction', _( 'Interaction Reminder' )
     MUSIC_OFFTOPIC = 'music_offtopic', _( 'Non-Music Section' )
+    HOOK = 'hook', _('Hook/Greetings')
 
 
 class TaskQueue(models.TextChoices):
