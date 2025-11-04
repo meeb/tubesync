@@ -430,8 +430,7 @@ def download_media(
     if '-opus' in ofn:
         codec_options.extend(['-c:a', 'libopus'])
     set_ffmpeg_codec = not (
-        ytopts['postprocessor_args'] and
-        ytopts['postprocessor_args']['modifychapters+ffmpeg']
+        'modifychapters+ffmpeg' in ytopts['postprocessor_args']
     )
     if set_ffmpeg_codec and codec_options:
         ytopts['postprocessor_args'].update({
