@@ -210,6 +210,9 @@ YOUTUBE_DEFAULTS = {
             'base_url': ['http://127.0.0.1:4416'],
         },
     },
+    'postprocessor_args': {
+        'VideoRemuxer+ffmpeg': ['-bsf', 'setts=ts=TS-STARTPTS'],
+    },
 }
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 
