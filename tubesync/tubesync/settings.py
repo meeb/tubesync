@@ -211,7 +211,7 @@ YOUTUBE_DEFAULTS = {
         },
     },
     'postprocessor_args': {
-        'videoremuxer+ffmpeg': ['-bsf', 'setts=ts=TS-STARTPTS'],
+        'videoremuxer+ffmpeg': ['-bsf:v', 'setts=pts=DTS'],
     },
 }
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
