@@ -189,9 +189,7 @@ class ValidateSourceView(FormView):
     template_name = 'sync/source-validate.html'
     form_class = ValidateSourceForm
     errors = {
-        'invalid_source': _('Invalid type for the source.'),
-        'invalid_url': _('Invalid URL, the URL must for a "{item}" must be in '
-                         'the format of "{example}". The error was: {error}.'),
+        'unsupported_format': _('URL does not match any supported format.'),
     }
     source_types = youtube_long_source_types
     help_item = dict(YouTube_SourceType.choices)
@@ -213,14 +211,7 @@ class ValidateSourceView(FormView):
     def dispatch(self, request, *args, **kwargs):
         self.source_type_str = kwargs.get('source_type', '').strip().lower()
         self.source_type = self.source_types.get(self.source_type_str, None)
-        if not self.source_type:
-            raise Http404
         return super().dispatch(request, *args, **kwargs)
-
-    def get_initial(self):
-        initial = super().get_initial()
-        initial['source_type'] = self.source_type
-        return initial
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
@@ -233,30 +224,22 @@ class ValidateSourceView(FormView):
     def form_valid(self, form):
         # Perform extra validation on the URL, we need to extract the channel name or
         # playlist ID and check they are valid
-        source_type = form.cleaned_data['source_type']
-        if source_type not in YouTube_SourceType.values:
-            form.add_error(
-                'source_type',
-                ValidationError(self.errors['invalid_source'])
-            )
         source_url = form.cleaned_data['source_url']
-        validation_url = self.validation_urls.get(source_type)
-        try:
-            self.key = validate_url(source_url, validation_url)
-        except ValidationError as e:
-            error = self.errors.get('invalid_url')
-            item = self.help_item.get(self.source_type)
-            form.add_error(
-                'source_url',
-                ValidationError(error.format(
-                    item=item,
-                    example=validation_url['example'],
-                    error=e.message)
-                )
-            )
-        if form.errors:
-            return super().form_invalid(form)
-        return super().form_valid(form)
+        for source_type in YouTube_SourceType.values:
+            validation_url = self.validation_urls.get(source_type)
+            try:
+                self.key = validate_url(source_url, validation_url)
+                self.source_type = source_type
+                for long_type_str, st_val in youtube_long_source_types.items():
+                    if st_val == source_type:
+                        self.source_type_str = long_type_str
+                        break
+                return super().form_valid(form)
+            except ValidationError:
+                continue
+        # Source type wasn't detected - presumably it's not a valid URL
+        form.add_error('source_url', ValidationError(self.errors['unsupported_format']))
+        return super().form_invalid(form)
 
     def get_success_url(self):
         url = reverse_lazy('sync:add-source')

@@ -212,7 +212,7 @@ class YouTube_SourceType(models.TextChoices):
             (
                 update_and_return(deepcopy(defaults), {
                     'path_regex': r'^\/(c\/)?([^\/]+)(\/videos)?$',
-                    'path_must_not_match': ('/playlist', '/c/playlist'),
+                    'path_must_not_match': ('/playlist', '/c/playlist', '/watch', '/shorts', '/live', '/feed', '/trending'),
                     'extract_key': ('path_regex', 1),
                     'example': 'https://www.youtube.com/SOMECHANNEL',
                 }),

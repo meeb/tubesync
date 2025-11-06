@@ -10,14 +10,8 @@
 </div>
 {% include 'infobox.html' with message=message %}
 <div class="row">
-  <div class="col m12 xl4 margin-bottom">
-    <a href="{% url 'sync:validate-source' source_type='youtube-channel' %}" class="btn">Add a YouTube channel <i class="fab fa-youtube"></i></a>
-  </div>
-  <div class="col m12 xl4 margin-bottom">
-    <a href="{% url 'sync:validate-source' source_type='youtube-channel-id' %}" class="btn">Add a YouTube channel by ID <i class="fab fa-youtube"></i></a>
-  </div>
-  <div class="col m12 xl4 margin-bottom">
-    <a href="{% url 'sync:validate-source' source_type='youtube-playlist' %}" class="btn">Add a YouTube playlist <i class="fab fa-youtube"></i></a>
+  <div class="col m12 margin-bottom">
+    <a href="{% url 'sync:validate-source' %}" class="btn">Add Source <i class="fab fa-youtube"></i></a>
   </div>
 </div>
 <div class="row no-margin-bottom">

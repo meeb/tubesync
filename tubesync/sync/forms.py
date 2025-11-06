@@ -31,14 +31,10 @@ SourceForm = forms.modelform_factory(
 
 class ValidateSourceForm(forms.Form):
 
-    source_type = forms.CharField(
-        max_length=1,
-        required=True,
-        widget=forms.HiddenInput()
-    )
     source_url = forms.URLField(
         label=_('Source URL'),
         required=True,
+        widget=forms.URLInput(attrs={'placeholder': 'https://www.youtube.com/@channelname'}),
         **_assume_scheme,
     )
 
