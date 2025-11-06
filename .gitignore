@@ -140,3 +140,11 @@ Pipfile.lock
 
 # Ignore Jetbrains IDE files
 .idea/
+
+# Task queue DBs
+/tubesync/tasks/*.db
+/tubesync/tasks/*.db-shm
+/tubesync/tasks/*.db-wal
+
+# Compiled CSS
+tubesync/common/static/styles/*.css
