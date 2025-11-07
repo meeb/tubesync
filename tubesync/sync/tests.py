@@ -25,7 +25,7 @@ from .utils import filter_response
 from .choices import (
     Val, Fallback, FilterSeconds, IndexSchedule, SourceResolution,
     TaskQueue, YouTube_AudioCodec, YouTube_VideoCodec,
-    YouTube_SourceType, youtube_long_source_types,
+    YouTube_SourceType,
 )
 
 

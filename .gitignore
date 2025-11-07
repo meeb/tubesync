@@ -147,4 +147,4 @@ Pipfile.lock
 /tubesync/tasks/*.db-wal
 
 # Compiled CSS
-tubesync/common/static/styles/*.css
+/tubesync/common/static/styles/*.css
