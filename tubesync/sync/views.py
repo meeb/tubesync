@@ -154,7 +154,7 @@ class SourcesView(ListView):
             url = append_uri_params(url, {'message': 'source-refreshed'})
             return HttpResponseRedirect(url)
         else:
-            return super().get(self, *args, **kwargs)    
+            return super().get(self, *args, **kwargs)
 
     def __init__(self, *args, **kwargs):
         self.message = None
@@ -597,7 +597,7 @@ class MediaThumbView(DetailView):
         if media.thumb_file_exists:
             thumb_path = pathlib.Path(media.thumb.path)
             thumb = thumb_path.read_bytes()
-            content_type = 'image/jpeg' 
+            content_type = 'image/jpeg'
         else:
             # No thumbnail on disk, return a blank 1x1 gif
             thumb = b64decode('R0lGODlhAQABAIABAP///wAAACH5BAEKAAEALAA'
@@ -605,7 +605,7 @@ class MediaThumbView(DetailView):
             content_type = 'image/gif'
             max_age = 600
         response = HttpResponse(thumb, content_type=content_type)
-        
+
         response['Cache-Control'] = f'public, max-age={max_age}'
         return response
 
@@ -949,7 +949,7 @@ class TasksView(ListView):
                     continue
             add_to_task(task)
             data['running'].append(task)
-            
+
         # show all the errors when they fit on one page
         if (data['total_errors'] + len(data['running'])) < self.paginate_by:
             for task in errors_qs:
@@ -1141,7 +1141,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
 
     def form_valid(self, form):
         when = form.cleaned_data.get('when')
-  
+
         if not isinstance(when, self.now.__class__):
             form.add_error(
                 'when',

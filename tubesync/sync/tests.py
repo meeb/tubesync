@@ -395,7 +395,7 @@ class FrontEndTestCase(TestCase):
                     "format":"248 - 1920x1080 (1080p)",
                     "protocol":"https"
                 }]
-            } 
+            }
         '''
         before_dt = timezone.now()
         past_date = timezone.make_aware(datetime(year=2000, month=1, day=1))
