@@ -189,7 +189,7 @@ class ValidateSourceView(FormView):
     template_name = 'sync/source-validate.html'
     form_class = ValidateSourceForm
     errors = {
-        'unsupported_format': _('URL does not match any supported format.'),
+        'invalid_url': _('That URL does not match any supported formats.'),
     }
     source_types = youtube_long_source_types
     validation_urls = youtube_validation_urls
@@ -222,7 +222,7 @@ class ValidateSourceView(FormView):
             except ValidationError:
                 continue
         # Source type wasn't detected - presumably it's not a valid URL
-        form.add_error('source_url', ValidationError(self.errors['unsupported_format']))
+        form.add_error('source_url', ValidationError(self.errors['invalid_url']))
         return super().form_invalid(form)
 
     def get_success_url(self):
