@@ -25,7 +25,7 @@ from .utils import filter_response
 from .choices import (
     Val, Fallback, FilterSeconds, IndexSchedule, SourceResolution,
     TaskQueue, YouTube_AudioCodec, YouTube_VideoCodec,
-    YouTube_SourceType, youtube_long_source_types,
+    YouTube_SourceType,
 )
 
 
@@ -75,12 +75,13 @@ class FrontEndTestCase(TestCase):
                     'https://www.youtube.com/test/invalid',
                     'https://www.youtube.com/c/test/invalid',
                 ),
-                'invalid_is_playlist': (
-                    'https://www.youtube.com/c/playlist',
-                ),
-                'invalid_channel_with_id': (
-                    'https://www.youtube.com/channel/channelid',
-                    'https://www.youtube.com/channel/channelid/videos',
+                'invalid_reserved_paths': (
+                    'https://www.youtube.com/watch?v=OkMadb8cpIw',
+                    'https://www.youtube.com/watch',
+                    'https://www.youtube.com/shorts',
+                    'https://www.youtube.com/live',
+                    'https://www.youtube.com/feed',
+                    'https://www.youtube.com/trending',
                 ),
             },
             'youtube-channel-id': {
@@ -103,9 +104,6 @@ class FrontEndTestCase(TestCase):
                     'https://www.youtube.com/test/invalid',
                     'https://www.youtube.com/channel/test/invalid',
                 ),
-                'invalid_is_named_channel': (
-                    'https://www.youtube.com/c/testname',
-                ),
             },
             'youtube-playlist': {
                 'valid': (
@@ -124,28 +122,18 @@ class FrontEndTestCase(TestCase):
                     'https://n.youtube.com/playlist?list=testplaylist',
                 ),
                 'invalid_path': (
-                    'https://www.youtube.com/notplaylist?list=testplaylist',
-                    'https://www.youtube.com/c/notplaylist?list=testplaylist',
-                ),
-                'invalid_is_channel': (
-                    'https://www.youtube.com/testchannel',
-                    'https://www.youtube.com/c/testchannel',
-                    'https://www.youtube.com/channel/testchannel',
+                    'https://www.youtube.com/test/invalid',
                 ),
             }
         }
         c = Client()
-        for source_type in youtube_long_source_types.keys():
-            response = c.get(f'/source-validate/{source_type}')
-            self.assertEqual(response.status_code, 200)
-        response = c.get('/source-validate/invalid')
-        self.assertEqual(response.status_code, 404)
+        response = c.get('/source-validate')
+        self.assertEqual(response.status_code, 200)
         for (source_type, tests) in test_sources.items():
             for test, urls in tests.items():
                 for url in urls:
-                    source_type_char = youtube_long_source_types.get(source_type)
-                    data = {'source_url': url, 'source_type': source_type_char}
-                    response = c.post(f'/source-validate/{source_type}', data)
+                    data = {'source_url': url}
+                    response = c.post('/source-validate', data)
                     if test == 'valid':
                         # Valid source tests should bounce to /source-add
                         self.assertEqual(response.status_code, 302)
@@ -407,7 +395,7 @@ class FrontEndTestCase(TestCase):
                     "format":"248 - 1920x1080 (1080p)",
                     "protocol":"https"
                 }]
-            } 
+            }
         '''
         before_dt = timezone.now()
         past_date = timezone.make_aware(datetime(year=2000, month=1, day=1))

@@ -212,7 +212,7 @@ class YouTube_SourceType(models.TextChoices):
             (
                 update_and_return(deepcopy(defaults), {
                     'path_regex': r'^\/(c\/)?([^\/]+)(\/videos)?$',
-                    'path_must_not_match': ('/playlist', '/c/playlist'),
+                    'path_must_not_match': ('/playlist', '/c/playlist', '/watch', '/shorts', '/live', '/feed', '/trending'),
                     'extract_key': ('path_regex', 1),
                     'example': 'https://www.youtube.com/SOMECHANNEL',
                 }),
@@ -258,40 +258,4 @@ class YouTube_VideoCodec(models.TextChoices):
 SourceResolutionInteger = SourceResolution._integer_mapping()
 youtube_long_source_types = YouTube_SourceType._long_type_mapping()
 youtube_validation_urls = YouTube_SourceType._validation_urls()
-youtube_help = {
-    'examples': dict(zip(
-        YouTube_SourceType.values,
-        (
-            ('https://www.youtube.com/@rossmanngroup'),
-            ('https://www.youtube.com/channel/'
-             'UCl2mFZoRqjw_ELax4Yisf6w'),
-            ('https://www.youtube.com/playlist?list='
-             'PLkVbIsAWN2lsmovRO20_gtfUfgWi-XnnT'),
-        ),
-    )),
-    'texts': dict(zip(
-        YouTube_SourceType.values,
-        (
-            _(
-                'Enter a YouTube channel URL into the box below. A channel URL will be in '
-                'the format of <strong>https://www.youtube.com/CHANNELNAME</strong> '
-                'where <strong>CHANNELNAME</strong> is the name of the channel you want '
-                'to add.'
-            ),
-            _(
-                'Enter a YouTube channel URL by channel ID into the box below. A channel '
-                'URL by channel ID will be in the format of <strong>'
-                'https://www.youtube.com/channel/BiGLoNgUnIqUeId</strong> '
-                'where <strong>BiGLoNgUnIqUeId</strong> is the ID of the channel you want '
-                'to add.'
-            ),
-            _(
-                'Enter a YouTube playlist URL into the box below. A playlist URL will be '
-                'in the format of <strong>https://www.youtube.com/playlist?list='
-                'BiGLoNgUnIqUeId</strong> where <strong>BiGLoNgUnIqUeId</strong> is the '
-                'unique ID of the playlist you want to add.'
-            ),
-        ),
-    )),
-}
 

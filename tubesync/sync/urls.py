@@ -29,7 +29,7 @@ urlpatterns = [
     ),
 
     path(
-        'source-validate/<slug:source_type>',
+        'source-validate',
         ValidateSourceView.as_view(),
         name='validate-source',
     ),

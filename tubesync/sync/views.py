@@ -37,7 +37,7 @@ from .tasks import (
 )
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
-                        youtube_help, youtube_validation_urls)
+                        youtube_validation_urls)
 from . import signals # noqa
 from . import youtube
 
@@ -154,7 +154,7 @@ class SourcesView(ListView):
             url = append_uri_params(url, {'message': 'source-refreshed'})
             return HttpResponseRedirect(url)
         else:
-            return super().get(self, *args, **kwargs)    
+            return super().get(self, *args, **kwargs)
 
     def __init__(self, *args, **kwargs):
         self.message = None
@@ -189,14 +189,9 @@ class ValidateSourceView(FormView):
     template_name = 'sync/source-validate.html'
     form_class = ValidateSourceForm
     errors = {
-        'invalid_source': _('Invalid type for the source.'),
-        'invalid_url': _('Invalid URL, the URL must for a "{item}" must be in '
-                         'the format of "{example}". The error was: {error}.'),
+        'invalid_url': _('That URL does not match any supported formats.'),
     }
     source_types = youtube_long_source_types
-    help_item = dict(YouTube_SourceType.choices)
-    help_texts = youtube_help.get('texts')
-    help_examples = youtube_help.get('examples')
     validation_urls = youtube_validation_urls
     prepopulate_fields = {
         Val(YouTube_SourceType.CHANNEL): ('source_type', 'key', 'name', 'directory'),
@@ -210,53 +205,25 @@ class ValidateSourceView(FormView):
         self.key = ''
         super().__init__(*args, **kwargs)
 
-    def dispatch(self, request, *args, **kwargs):
-        self.source_type_str = kwargs.get('source_type', '').strip().lower()
-        self.source_type = self.source_types.get(self.source_type_str, None)
-        if not self.source_type:
-            raise Http404
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_initial(self):
-        initial = super().get_initial()
-        initial['source_type'] = self.source_type
-        return initial
-
-    def get_context_data(self, *args, **kwargs):
-        data = super().get_context_data(*args, **kwargs)
-        data['source_type'] = self.source_type_str
-        data['help_item'] = self.help_item.get(self.source_type)
-        data['help_text'] = self.help_texts.get(self.source_type)
-        data['help_example'] = self.help_examples.get(self.source_type)
-        return data
-
     def form_valid(self, form):
         # Perform extra validation on the URL, we need to extract the channel name or
         # playlist ID and check they are valid
-        source_type = form.cleaned_data['source_type']
-        if source_type not in YouTube_SourceType.values:
-            form.add_error(
-                'source_type',
-                ValidationError(self.errors['invalid_source'])
-            )
         source_url = form.cleaned_data['source_url']
-        validation_url = self.validation_urls.get(source_type)
-        try:
-            self.key = validate_url(source_url, validation_url)
-        except ValidationError as e:
-            error = self.errors.get('invalid_url')
-            item = self.help_item.get(self.source_type)
-            form.add_error(
-                'source_url',
-                ValidationError(error.format(
-                    item=item,
-                    example=validation_url['example'],
-                    error=e.message)
-                )
-            )
-        if form.errors:
-            return super().form_invalid(form)
-        return super().form_valid(form)
+        for source_type in YouTube_SourceType.values:
+            validation_url = self.validation_urls.get(source_type)
+            try:
+                self.key = validate_url(source_url, validation_url)
+                self.source_type = source_type
+                for long_type_str, st_val in youtube_long_source_types.items():
+                    if st_val == source_type:
+                        self.source_type_str = long_type_str
+                        break
+                return super().form_valid(form)
+            except ValidationError:
+                continue
+        # Source type wasn't detected - presumably it's not a valid URL
+        form.add_error('source_url', ValidationError(self.errors['invalid_url']))
+        return super().form_invalid(form)
 
     def get_success_url(self):
         url = reverse_lazy('sync:add-source')
@@ -614,7 +581,7 @@ class MediaThumbView(DetailView):
         if media.thumb_file_exists:
             thumb_path = pathlib.Path(media.thumb.path)
             thumb = thumb_path.read_bytes()
-            content_type = 'image/jpeg' 
+            content_type = 'image/jpeg'
         else:
             # No thumbnail on disk, return a blank 1x1 gif
             thumb = b64decode('R0lGODlhAQABAIABAP///wAAACH5BAEKAAEALAA'
@@ -622,7 +589,7 @@ class MediaThumbView(DetailView):
             content_type = 'image/gif'
             max_age = 600
         response = HttpResponse(thumb, content_type=content_type)
-        
+
         response['Cache-Control'] = f'public, max-age={max_age}'
         return response
 
@@ -966,7 +933,7 @@ class TasksView(ListView):
                     continue
             add_to_task(task)
             data['running'].append(task)
-            
+
         # show all the errors when they fit on one page
         if (data['total_errors'] + len(data['running'])) < self.paginate_by:
             for task in errors_qs:
@@ -1158,7 +1125,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
 
     def form_valid(self, form):
         when = form.cleaned_data.get('when')
-  
+
         if not isinstance(when, self.now.__class__):
             form.add_error(
                 'when',
