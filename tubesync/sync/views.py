@@ -37,7 +37,7 @@ from .tasks import (
 )
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
-                        youtube_help, youtube_validation_urls)
+                        youtube_validation_urls)
 from . import signals # noqa
 from . import youtube
 
@@ -192,9 +192,6 @@ class ValidateSourceView(FormView):
         'unsupported_format': _('URL does not match any supported format.'),
     }
     source_types = youtube_long_source_types
-    help_item = dict(YouTube_SourceType.choices)
-    help_texts = youtube_help.get('texts')
-    help_examples = youtube_help.get('examples')
     validation_urls = youtube_validation_urls
     prepopulate_fields = {
         Val(YouTube_SourceType.CHANNEL): ('source_type', 'key', 'name', 'directory'),
@@ -207,19 +204,6 @@ class ValidateSourceView(FormView):
         self.source_type = None
         self.key = ''
         super().__init__(*args, **kwargs)
-
-    def dispatch(self, request, *args, **kwargs):
-        self.source_type_str = kwargs.get('source_type', '').strip().lower()
-        self.source_type = self.source_types.get(self.source_type_str, None)
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_context_data(self, *args, **kwargs):
-        data = super().get_context_data(*args, **kwargs)
-        data['source_type'] = self.source_type_str
-        data['help_item'] = self.help_item.get(self.source_type)
-        data['help_text'] = self.help_texts.get(self.source_type)
-        data['help_example'] = self.help_examples.get(self.source_type)
-        return data
 
     def form_valid(self, form):
         # Perform extra validation on the URL, we need to extract the channel name or
