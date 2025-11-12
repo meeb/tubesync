@@ -420,6 +420,9 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     # Installed ffmpeg (using COPY earlier)
     /usr/local/bin/ffmpeg -version && \
     file /usr/local/bin/ff* && \
+    # Installed deno (using COPY earlier)
+    /usr/local/bin/deno --version && \
+    file /usr/local/bin/deno && \
     # Clean up file
     apt-get -y autoremove --purge file && \
     # Clean up
