@@ -420,6 +420,9 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     # Installed ffmpeg (using COPY earlier)
     /usr/local/bin/ffmpeg -version && \
     file /usr/local/bin/ff* && \
+    # Installed deno (using COPY earlier)
+    /usr/local/bin/deno --version && \
+    file /usr/local/bin/deno && \
     # Clean up file
     apt-get -y autoremove --purge file && \
     # Clean up
@@ -548,6 +551,9 @@ RUN set -x && \
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
   printf -- "ffmpeg_version = '%s'\n" "${ffmpeg_version}" >> /app/common/third_party_versions.py
+  deno_version=$(/usr/local/bin/deno -V | awk -v 'ev=31' '1 == NR && "deno" == $1 { print $2; ev=0; } END { exit ev; }') && \
+  test -n "${deno_version}" && \
+  printf -- "deno_version = '%s'\n" "${deno_version}" >> /app/common/third_party_versions.py
 
 # Create a healthcheck
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
