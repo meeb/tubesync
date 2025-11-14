@@ -21,6 +21,9 @@ def get_best_combined_format(media):
         and video formats if possible. Combined formats are the easiest to check
         for as they must exactly match the source profile be be valid.
     '''
+    matches = set()
+    by_fmt_id = dict()
+    by_language = dict()
     for fmt in media.iter_formats():
         # Check height matches
         if media.source.source_resolution_height != fmt['height']:
@@ -40,8 +43,28 @@ def get_best_combined_format(media):
             if not fmt['is_hdr']:
                 continue
         # If we reach here, we have a combined match!
-        return True, fmt['id']
-    return False, False
+        matches.add(fmt['id'])
+        by_fmt_id[fmt['id']] = fmt
+        by_language[fmt['language_code']] = fmt
+        if 'format_note' in fmt and '(default)' in fmt['format_note']:
+            by_fmt_id['default'] = fmt
+
+    # nothing matched, return early
+    if not matches:
+        return False, False
+
+    # prefer default
+    if 'default' in by_fmt_id:
+        return True, by_fmt_id['default']['id']
+
+    # try for English
+    for lc in ('en-US', 'en',):
+        if lc in by_language:
+            return True, by_language[lc]['id']
+
+    # use any available matching format
+    return True, matches.pop()
+    
 
 
 def get_best_audio_format(media):
