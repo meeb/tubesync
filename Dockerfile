@@ -606,7 +606,10 @@ RUN set -x && \
   printf -- "ffmpeg_version = '%s'\n" "${ffmpeg_version}" >> /app/common/third_party_versions.py && \
   deno_version=$(/usr/local/bin/deno -V | awk -v 'ev=31' '1 == NR && "deno" == $1 { print $2; ev=0; } END { exit ev; }') && \
   test -n "${deno_version}" && \
-  printf -- "deno_version = '%s'\n" "${deno_version}" >> /app/common/third_party_versions.py
+  printf -- "deno_version = '%s'\n" "${deno_version}" >> /app/common/third_party_versions.py && \
+  qjs_version=$(/usr/local/sbin/qjs --help | awk -v 'ev=31' '1 == NR && "version" == $2 { print $3; ev=0; } END { exit ev; }') && \
+  test -n "${qjs_version}" && \
+  printf -- "qjs_version = '%s'\n" "${qjs_version}" >> /app/common/third_party_versions.py
 
 # Create a healthcheck
 HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
