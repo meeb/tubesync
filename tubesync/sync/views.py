@@ -626,9 +626,11 @@ class MediaItemView(DetailView):
         data['combined_format_dict'] = {'id': str(combined_format)}
         data['audio_format_dict'] = {'id': str(audio_format)}
         data['video_format_dict'] = {'id': str(video_format)}
+        context_keys = { k for k in data.keys() if k.endswith('_format_dict') }
         for fmt in self.object.iter_formats():
-            for k, v in data.items():
-                if k.endswith('_format_dict') and v.get('id') == fmt.get('id'):
+            for k in context_keys:
+                v = data[k]
+                if v.get('id') == fmt.get('id'):
                     data[k] = fmt
         task = get_media_download_task(self.object.pk)
         data['task'] = task
