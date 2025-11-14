@@ -171,8 +171,8 @@
       <tr title="Best available format for source requirements">
         <td class="hide-on-small-only">Matched formats</td>
         <td><span class="hide-on-med-and-up">Matched formats<br></span>
-          Combined: <strong>{% if combined_format %}{{ combined_format }} {% if combined_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}</strong><br>
-          Audio: <strong>{% if audio_format %}{{ audio_format }} {% if audio_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}</strong><br>
+          Combined: <strong>{% if combined_format %}{{ combined_format }}{% if combined_format_dict.language_code %} [{{ combined_format_dict.language_code }}]{% endif %} {% if combined_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}</strong><br>
+          Audio: <strong>{% if audio_format %}{{ audio_format }}{% if audio_format_dict.language_code %} [{{ audio_format_dict.language_code }}]{% endif %} {% if audio_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}</strong><br>
           Video: <strong>{% if video_format %}{{ video_format }} {% if video_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}
         </strong></td>
       </tr>
