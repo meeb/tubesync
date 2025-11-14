@@ -623,25 +623,23 @@ class MediaItemView(DetailView):
         combined_exact, combined_format = self.object.get_best_combined_format()
         audio_exact, audio_format = self.object.get_best_audio_format()
         video_exact, video_format = self.object.get_best_video_format()
+        data['combined_format_dict'] = {'id': str(combined_format)}
+        data['audio_format_dict'] = {'id': str(audio_format)}
+        data['video_format_dict'] = {'id': str(video_format)}
+        for fmt in self.object.iter_formats():
+            for k, v in data.items():
+                if k.endswith('_format_dict') and v.get('id') == fmt.get('id'):
+                    data[k] = fmt
         task = get_media_download_task(self.object.pk)
         data['task'] = task
         data['download_state'] = self.object.get_download_state(task)
         data['download_state_icon'] = self.object.get_download_state_icon(task)
         data['combined_exact'] = combined_exact
         data['combined_format'] = combined_format
-        data['combined_format_dict'] = self.object.new_metadata.format.get(
-            value__format_id=str(combined_format)
-        ).value
         data['audio_exact'] = audio_exact
         data['audio_format'] = audio_format
-        data['audio_format_dict'] = self.object.new_metadata.format.get(
-            value__format_id=str(audio_format)
-        ).value
         data['video_exact'] = video_exact
         data['video_format'] = video_format
-        data['video_format_dict'] = self.object.new_metadata.format.get(
-            value__format_id=str(video_format)
-        ).value
         data['youtube_dl_format'] = self.object.get_format_str()
         data['filename_path'] = pathlib.Path(self.object.filename)
         data['media_file_path'] = pathlib.Path(self.object.media_file.path) if self.object.media_file else None
