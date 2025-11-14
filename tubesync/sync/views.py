@@ -34,6 +34,7 @@ from .tasks import (
     map_task_to_instance, get_error_message,
     get_running_tasks, get_media_download_task, get_source_completed_tasks,
     check_source_directory_exists, index_source, download_media_image, download_media_file,
+    refresh_formats,
 )
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
@@ -683,12 +684,27 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
         # Try to download manually, when can_download was true
         media = self.object
         if media.can_download:
+            attempted_key = '_refresh_formats_attempted'
+            media.save_to_metadata(attempted_key, 1)
+            refreshed_key = 'formats_epoch'
+            media.save_to_metadata(refreshed_key, 1)
+            TaskHistory.schedule(
+                refresh_formats,
+                str(media.pk),
+                priority=90,
+                remove_duplicates=False,
+                retries=1,
+                retry_delay=300,
+                vn_fmt=_('Refreshing formats (manually) for "{}"'),
+                vn_args=(media.key,),
+            )
             TaskHistory.schedule(
                 download_media_file,
                 str(media.pk),
                 override=True,
                 priority=90,
                 remove_duplicates=True,
+                delay=10,
                 retries=3,
                 retry_delay=600,
                 vn_fmt=_('Downloading media (manually) for "{}"'),
