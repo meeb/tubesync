@@ -474,7 +474,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     file /usr/local/bin/deno && \
     # Installed quickjs (using COPY earlier)
     /usr/local/sbin/qjs --assimilate && \
-    /usr/local/sbin/qjs --help && \
+    /usr/local/sbin/qjs --help | grep -Fe 'QuickJS version' && \
     file /usr/local/sbin/qjs && \
     # Clean up file
     apt-get -y autoremove --purge file && \
