@@ -629,10 +629,19 @@ class MediaItemView(DetailView):
         data['download_state_icon'] = self.object.get_download_state_icon(task)
         data['combined_exact'] = combined_exact
         data['combined_format'] = combined_format
+        data['combined_format_dict'] = self.object.new_metadata.format.get(
+            value__format_id=str(combined_format)
+        ).value
         data['audio_exact'] = audio_exact
         data['audio_format'] = audio_format
+        data['audio_format_dict'] = self.object.new_metadata.format.get(
+            value__format_id=str(audio_format)
+        ).value
         data['video_exact'] = video_exact
         data['video_format'] = video_format
+        data['video_format_dict'] = self.object.new_metadata.format.get(
+            value__format_id=str(video_format)
+        ).value
         data['youtube_dl_format'] = self.object.get_format_str()
         data['filename_path'] = pathlib.Path(self.object.filename)
         data['media_file_path'] = pathlib.Path(self.object.media_file.path) if self.object.media_file else None
