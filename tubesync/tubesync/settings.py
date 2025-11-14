@@ -213,6 +213,10 @@ YOUTUBE_DEFAULTS = {
     'postprocessor_args': {
         'videoremuxer+ffmpeg': ['-bsf:v', 'setts=pts=DTS'],
     },
+    'js_runtimes': {
+        'deno': {'path': None,},
+        'quickjs': {'path': None,},
+    },
 }
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 
