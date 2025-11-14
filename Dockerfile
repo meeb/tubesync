@@ -9,6 +9,10 @@ ARG SHA256_S6_AMD64="01eb9a6dce10b5428655974f1903f48e7ba7074506dfb262e85ffab64a5
 ARG SHA256_S6_ARM64="3a078ef3720a6f16cc93fbd748bdf1b17c9e9ff4ead67947e9565d93379d4168"
 ARG SHA256_S6_NOARCH="ca79e39c9fea1ccfb6857a0eb13df7e7e12bc1b09454c4158b4075ade5a870ee"
 
+ARG QJS_VERSION="2025-09-13"
+
+ARG SHA256_QJS="fed9715220d616d1a178e1c2e6bd62e8e850626b4fe337cf417940fd32b35802"
+
 ARG ALPINE_VERSION="latest"
 ARG DEBIAN_VERSION="bookworm-slim"
 
@@ -17,6 +21,7 @@ ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
+ARG QJS_CHECKSUM_ALGORITHM="sha256"
 
 
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
@@ -287,6 +292,49 @@ RUN set -eu ; \
 ## COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 FROM ghcr.io/meeb/s6-overlay:v${S6_VERSION} AS s6-overlay
 
+FROM alpine:${ALPINE_VERSION} AS quickjs-download
+ARG QJS_VERSION
+ARG SHA256_QJS
+
+ARG DESTDIR="/downloaded"
+ARG QJS_CHECKSUM_ALGORITHM
+ARG CHECKSUM_ALGORITHM="${QJS_CHECKSUM_ALGORITHM}"
+
+ARG QJS_CHECKSUM="${CHECKSUM_ALGORITHM}:${SHA256_QJS}"
+
+ARG QJS_URL="https://bellard.org/quickjs/binary_releases/"
+ARG QJS_PREFIX_FILE="quickjs-cosmo-"
+ARG QJS_SUFFIX_FILE=".zip"
+
+ARG QJS_FILE="${QJS_PREFIX_FILE}${QJS_VERSION}${QJS_SUFFIX_FILE}"
+
+##ADD --checksum="${QJS_CHECKSUM}" "${QJS_URL}/${QJS_FILE}" "${DESTDIR}/"
+
+# --checksum wasn't recognized, so use busybox to check the sums instead
+ADD "${QJS_URL}/${QJS_FILE}" "${DESTDIR}/"
+RUN set -eu ; checksum="${QJS_CHECKSUM}" ; file="${QJS_FILE}" ; cd "${DESTDIR}/" && \
+    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
+
+FROM alpine:${ALPINE_VERSION} AS quickjs-extracted
+COPY --from=quickjs-download /downloaded /downloaded
+
+ARG QJS_CHECKSUM_ALGORITHM
+ARG CHECKSUM_ALGORITHM="${QJS_CHECKSUM_ALGORITHM}"
+
+RUN set -eu ; \
+\
+    apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" cmd:unzip ; \
+    mkdir -v /extracted ; \
+    cd /extracted ; \
+    for f in /downloaded/*.zip ; \
+    do \
+      unzip "${f}" || exit ; \
+    done ; \
+    unset -v f ;
+
+FROM scratch AS quickjs
+COPY --from=quickjs-extracted /extracted/qjs /usr/local/sbin/
+
 FROM tubesync-base AS tubesync-prepare-app
 
 COPY tubesync /app
@@ -408,6 +456,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 COPY --from=s6-overlay / /
 COPY --from=deno /usr/local/bin/ /usr/local/bin/
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
+COPY --from=quickjs /usr/local/sbin/ /usr/local/sbin/
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
@@ -423,6 +472,9 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     # Installed deno (using COPY earlier)
     /usr/local/bin/deno --version && \
     file /usr/local/bin/deno && \
+    # Installed quickjs (using COPY earlier)
+    /usr/local/sbin/qjs --assimilate && \
+    file /usr/local/sbin/qjs && \
     # Clean up file
     apt-get -y autoremove --purge file && \
     # Clean up
