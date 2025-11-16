@@ -6,16 +6,23 @@
 # - unzip
 
 download_deno() {
+    local fn
+    fn="deno-${uname_m}-unknown-linux-gnu.zip"
+
     local url
     url='https://github.com/denoland/deno/releases/latest/download'
-    curl -sSLRJO "${url}/deno-$(uname -m)-unknown-linux-gnu.zip"{,.sha256sum} | sha256sum -wc
+
+    curl -sSLRJO "${url}/${fn}"{,.sha256sum} | sha256sum -wc
 }
 
 extract_deno() {
+    local fn
+    fn="deno-${uname_m}-unknown-linux-gnu.zip"
+
     command -v unzip > /dev/null || {
         apt-get update && apt-get install -y unzip ;
     }
-    unzip -u -o -d /usr/local/bin "deno-$(uname -m)-unknown-linux-gnu.zip"
+    unzip -u -o -d /usr/local/bin "${fn}"
     chmod -c a+rx /usr/local/bin/deno
 }
 
@@ -25,6 +32,7 @@ record_deno_version() {
 }
 
 set -eu
+uname_m="$(uname -m)"
 work_dir="$(mktemp -d)"
 trap "rm -rf -- '${work_dir}'" EXIT
 cd "${work_dir}"
