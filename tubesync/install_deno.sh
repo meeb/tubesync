@@ -16,14 +16,19 @@ download_deno() {
 }
 
 extract_deno() {
+    local dest_dir
+    dest_dir="${1:-.}"
+
     local fn
     fn="deno-${uname_m}-unknown-linux-gnu.zip"
 
-    command -v unzip > /dev/null || {
-        apt-get update && apt-get install -y unzip ;
-    }
-    unzip -u -o -d /usr/local/bin "${fn}"
-    chmod -c a+rx /usr/local/bin/deno
+    command -v unzip > /dev/null || install_unzip
+    unzip -u -o -d "${dest_dir}" "${fn}"
+    chmod -c a+rx "${dest_dir}"/deno
+}
+
+install_unzip() {
+    apt-get update && apt-get install -y unzip
 }
 
 record_deno_version() {
@@ -38,5 +43,5 @@ trap "rm -rf -- '${work_dir}'" EXIT
 cd "${work_dir}"
 
 download_deno
-extract_deno
+extract_deno /usr/local/bin
 record_deno_version
