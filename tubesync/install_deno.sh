@@ -13,8 +13,9 @@ download_deno() {
     url='https://github.com/denoland/deno/releases/latest/download'
 
     test -n "${fn}"
-    rm -v -f "./${fn}"* # should never do anything
-    curl -sSLRo "${fn}" "${url}/${fn}"{,.sha256sum} | sha256sum -wc
+    rm -v -f "./${fn}"* # this should never do anything
+    curl -sSJLR --remote-name-all "${url}/${fn}{,.sha256sum}"
+    sha256sum -wc "./${fn}.sha256sum"
 }
 
 extract_deno() {
