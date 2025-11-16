@@ -7,24 +7,25 @@
 
 download_deno() {
     local fn
-    fn="deno-${uname_m}-unknown-linux-gnu.zip"
+    fn="${1}"
 
     local url
     url='https://github.com/denoland/deno/releases/latest/download'
 
-    curl -sSLRJO "${url}/${fn}"{,.sha256sum} | sha256sum -wc
+    test -n "${fn}"
+    rm -v -f "./${fn}"* # should never do anything
+    curl -sSLRo "${fn}" "${url}/${fn}"{,.sha256sum} | sha256sum -wc
 }
 
 extract_deno() {
     local dest_dir
-    dest_dir="${1:-.}"
+    dest_dir="${2:-.}"
 
     local fn
-    fn="deno-${uname_m}-unknown-linux-gnu.zip"
+    fn="${1}"
 
     command -v unzip > /dev/null || install_unzip
-    unzip -u -o -d "${dest_dir}" "${fn}"
-    chmod -c a+rx "${dest_dir}"/deno
+    unzip -u -o -d "${dest_dir}" "${fn}" && chmod -c a+rx "${dest_dir}"/deno
 }
 
 install_unzip() {
@@ -32,16 +33,20 @@ install_unzip() {
 }
 
 record_deno_version() {
-    deno_version="$(/usr/local/bin/deno -V | awk -v 'ev=31' '1 == NR && "deno" == $1 { print $2; ev=0; } END { exit ev; }')"
+    local deno_bin
+    deno_bin="${1:-./deno}"
+
+    deno_version="$("${deno_bin}" -V | awk -v 'ev=31' '1 == NR && "deno" == $1 { print $2; ev=0; } END { exit ev; }')"
+    test -n "${deno_version}"
     printf -- "deno_version = '%s'\n" "${deno_version}" >> /app/common/third_party_versions.py
 }
 
 set -eu
-uname_m="$(uname -m)"
+deno_archive="deno-$(uname -m)-unknown-linux-gnu.zip"
 work_dir="$(mktemp -d)"
 trap "rm -rf -- '${work_dir}'" EXIT
 cd "${work_dir}"
 
-download_deno
-extract_deno /usr/local/bin
-record_deno_version
+download_deno "${deno_archive}"
+extract_deno "${deno_archive}" '/usr/local/bin'
+record_deno_version '/usr/local/bin/deno'
