@@ -1,27 +1,44 @@
 {% if form %}
   {% if form.errors %}
-  <ul class="errors">
-    {% for _, error in form.errors.items %}
-    <li>{{ error }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% for field in form %}
-  {% if field.field.widget.input_type == 'hidden' %}{{ field }}{% else %}
-  <div class="row">
-    <div class="input-field col s12">
-      {% if field.field.widget.input_type == 'checkbox' %}
-      <label>
-        {{ field }}
-        <span>{{ field.label }}</span>
-      </label>
-      {% else %}
-      {{ field.label_tag }}
-      {{ field }}
-      {% endif %}
-      {% if field.help_text %}<span class="help-text"><i class="fas fa-info-circle"></i> {{ field.help_text }}</span>{% endif %}
-    </div>
+  <div class="notification is-danger">
+    <ul class="errors py-3">
+      {% for _, error in form.errors.items %}
+      <li class="px-3 pb-2">{{ error }}</li>
+      {% endfor %}
+    </ul>
   </div>
   {% endif %}
-  {% endfor %}
+  <div class="columns is-multiline">
+    {% for field in form %}
+      {% if field.field.widget.input_type == 'hidden' %}
+        {{ field }}
+      {% else %}
+        <div class="column is-half-tablet is-one-third-desktop{% if field.field.widget.input_type == 'checkbox' %} is-flex is-align-items-center{% endif %}">
+          <div class="field">
+            {% if field.field.widget.input_type == 'checkbox' %}
+            <div class="control">
+              <label class="checkbox">
+                {{ field }}
+                {{ field.label }}
+              </label>
+            </div>
+            {% else %}
+            <label class="label">{{ field.label }}</label>
+            <div class="control{% if field.field.widget.input_type == 'select' %} select is-medium is-fullwidth{% endif %}">
+              {{ field }}
+            </div>
+            {% endif %}
+            {% if field.name == 'media_format' %}
+            <p class="help help-text">
+              <i class="fas fa-info-circle pr-2"></i> File format to use for saving files
+              <a id="show-media-vars" style="cursor: pointer; text-decoration: underline;"><i class="fas fa-list"></i> show available variables</a>
+            </p>
+            {% elif field.help_text %}
+            <p class="help help-text"><i class="fas fa-info-circle pr-2"></i> {{ field.help_text }}</p>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
 {% endif %}

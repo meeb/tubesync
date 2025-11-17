@@ -3,29 +3,76 @@
 {% block headtitle %}Add a new source{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Add a source</h1>
-    <p>
-      You can use this form to add a new source. A source is what's polled on regular
-      basis to find new media to download, such as a channel or playlist.
-    </p>
-  </div>
+<h1 class="title mb-4">Add a source</h1>
+<div class="content mb-4">
+  <p>
+    You can use this form to add a new source. A source is what's polled on regular
+    basis to find new media to download, such as a channel or playlist.
+  </p>
 </div>
-<div class="row">
-  <form method="post" action="{% url 'sync:add-source' %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Add source <i class="fas fa-fw fa-plus"></i></button>
+<form method="post" action="{% url 'sync:add-source' %}" class="simpleform">
+      {% csrf_token %}
+      {% include 'simpleform.html' with form=form %}
+      <div class="field pt-4 has-text-centered">
+        <div class="control">
+          <button class="button is-primary" type="submit" name="action">
+            <span class="icon"><i class="fas fa-plus"></i></span>
+            <span>Add source</span>
+          </button>
+        </div>
       </div>
-    </div>
-  </form>
-</div>
-<div class="row">
-  <div class="col s12">
-{% include 'sync/_mediaformatvars.html' %}
+    </form>
+
+<div id="media-vars-modal" class="modal">
+  <div class="modal-background" id="close-modal-bg"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Available Media Name Variables</p>
+      <button class="delete" aria-label="close" id="close-modal"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="content">
+        <table class="table is-striped is-fullwidth">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Description</th>
+              <th>Output example</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% include 'sync/_mediaformatvars.html' %}
+          </tbody>
+        </table>
+      </div>
+    </section>
   </div>
 </div>
+
+<script>
+(function() {
+  const modal = document.getElementById('media-vars-modal');
+  const showBtn = document.getElementById('show-media-vars');
+  const closeBtn = document.getElementById('close-modal');
+  const closeBg = document.getElementById('close-modal-bg');
+
+  if (showBtn) {
+    showBtn.addEventListener('click', function() {
+      modal.classList.add('is-active');
+    });
+  }
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function() {
+      modal.classList.remove('is-active');
+    });
+  }
+
+  if (closeBg) {
+    closeBg.addEventListener('click', function() {
+      modal.classList.remove('is-active');
+    });
+  }
+})();
+</script>
 {% endblock %}

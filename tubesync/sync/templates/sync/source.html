@@ -3,239 +3,244 @@
 {% block headtitle %}Source - {{ source.name }}{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1 class="truncate">Source <strong>{{ source.name }}</strong></h1>
-    <p class="truncate"><strong><a href="{{ source.url }}" target="_blank"><i class="fas fa-link"></i> {{ source.url }}</a></strong></p>
-    <p class="truncate">Saving to: <strong>{{ source.directory_path }}</strong></p>
-  </div>
+<h1 class="title mb-4">{{ source.name }}</h1>
+  <p class="subtitle mb-2">
+    <a href="{{ source.url }}" target="_blank" class="icon-text">
+      <span class="icon"><i class="fas fa-link"></i></span>
+      <span>{{ source.url }}</span>
+    </a>
+  </p>
+  <p class="has-text-grey mb-4">Saving to: <strong>{{ source.directory_path }}</strong></p>
+
+<div class="buttons mb-5">
+  <a href="{% url 'sync:media' %}?filter={{ source.pk }}" class="button is-primary">
+    <span>View media<span class="is-hidden-mobile"> linked to this source</span></span>
+    <span class="icon"><i class="fas fa-film"></i></span>
+  </a>
+  <a href="{% url 'sync:tasks-completed' %}?filter={{ source.pk }}" class="button is-primary">
+    <span>View tasks<span class="is-hidden-mobile"> linked to this source</span></span>
+    <span class="icon"><i class="far fa-clock"></i></span>
+  </a>
 </div>
-<div class="row">
-  <div class="col s12 l6 margin-bottom">
-    <a href="{% url 'sync:media' %}?filter={{ source.pk }}" class="btn">View media<span class="hide-on-small-only"> linked to this source</span> <i class="fas fa-fw fa-film"></i></a>
-  </div>
-  <div class="col s12 l6 margin-bottom">
-    <a href="{% url 'sync:tasks-completed' %}?filter={{ source.pk }}" class="btn">View tasks<span class="hide-on-small-only"> linked to this source</span> <i class="far fa-fw fa-clock"></i></a>
-  </div>
-</div>
+
 {% include 'infobox.html' with message=message %}
 {% if source.has_failed %}{% include 'errorbox.html' with message='This source has encountered permanent failures listed at the bottom of this page, check its settings' %}{% endif %}
-<div class="row">
-  <div class="col s12">
-    <table class="striped">
-      <tr title="The source type">
-        <td class="hide-on-small-only">Type</td>
-        <td><span class="hide-on-med-and-up">Type<br></span><strong>{{ source.get_source_type_display }}</strong></td>
+
+<div class="box">
+  <h2 class="title is-5 mb-4">Source Details</h2>
+
+  <table class="table is-fullwidth is-striped">
+    <tbody>
+      <tr>
+        <td><strong>Type</strong></td>
+        <td>{{ source.get_source_type_display }}</td>
       </tr>
-      <tr title="Name of the souce in TubeSync for your reference">
-        <td class="hide-on-small-only">Name</td>
-        <td><span class="hide-on-med-and-up">Name<br></span><strong>{{ source.name }}</strong></td>
+      <tr>
+        <td><strong>Name</strong></td>
+        <td>{{ source.name }}</td>
       </tr>
-      <tr title="Number of media items downloaded for the source">
-        <td class="hide-on-small-only">Media items</td>
-        <td><span class="hide-on-med-and-up">Media items<br></span><strong><a href="{% url 'sync:media' %}?filter={{ source.pk }}">{{ media|length }}</a></strong></td>
+      <tr>
+        <td><strong>Media items</strong></td>
+        <td><a href="{% url 'sync:media' %}?filter={{ source.pk }}">{{ media|length }}</a></td>
       </tr>
-      <tr title="Unique key of the source, such as the channel name or playlist ID">
-        <td class="hide-on-small-only">Key</td>
-        <td><span class="hide-on-med-and-up">Key<br></span><strong>{{ source.key }}</strong></td>
+      <tr>
+        <td><strong>Key</strong></td>
+        <td>{{ source.key }}</td>
       </tr>
-      <tr title="Directory the source will save media to">
-        <td class="hide-on-small-only">Directory</td>
-        <td><span class="hide-on-med-and-up">Directory<br></span><strong>{{ source.directory }}</strong></td>
+      <tr>
+        <td><strong>Directory</strong></td>
+        <td>{{ source.directory }}</td>
       </tr>
-      <tr title="Filter text">
-        <td class="hide-on-small-only">Filter text{% if source.filter_text_invert %} <em>Inverted</em>{% endif %}</td>
-        <td><span class="hide-on-med-and-up">Filter text{% if source.filter_text_invert %} <em>Inverted</em>{% endif %}<br></span>
-          <strong>{{ source.filter_text }}</strong></td>
+      <tr>
+        <td><strong>Filter text{% if source.filter_text_invert %} <em>(Inverted)</em>{% endif %}</strong></td>
+        <td>{{ source.filter_text|default:"None" }}</td>
       </tr>
       {% if source.filter_seconds %}
-      <tr title="Do not download videos shorter/longer than this limit seconds">
-        <td class="hide-on-small-only">Filter Seconds</td>
-        <td><span class="hide-on-med-and-up">Filter seconds<br>
-        </span><strong>{{ source.filter_seconds }}s {% if source.filter_seconds_min %}(Minimum length){% else %}(Maximum Length){% endif %}</strong></td>
+      <tr>
+        <td><strong>Filter Seconds</strong></td>
+        <td>{{ source.filter_seconds }}s {% if source.filter_seconds_min %}(Minimum length){% else %}(Maximum Length){% endif %}</td>
       </tr>
       {% endif %}
-      <tr title="Media file name format to use for saving files">
-        <td class="hide-on-small-only">Media format</td>
-        <td><span class="hide-on-med-and-up">Media format<br></span><strong>{{ source.media_format }}</strong></td>
+      <tr>
+        <td><strong>Media format</strong></td>
+        <td>{{ source.media_format }}</td>
       </tr>
-      <tr title="Example file name for media format">
-        <td class="hide-on-small-only">Example filename</td>
-        <td><span class="hide-on-med-and-up">Example filename<br></span><strong>{{ source.get_example_media_format }}</strong></td>
+      <tr>
+        <td><strong>Example filename</strong></td>
+        <td><code>{{ source.get_example_media_format }}</code></td>
       </tr>
       {% if source.download_cap > 0 %}
-      <tr title="Do not download videos older than this cap">
-        <td class="hide-on-small-only">Download cap</td>
-        <td><span class="hide-on-med-and-up">Download cap<br></span><strong>{{ source.get_download_cap_display }}</strong></td>
+      <tr>
+        <td><strong>Download cap</strong></td>
+        <td>{{ source.get_download_cap_display }}</td>
       </tr>
       {% endif %}
-      <tr title="Schedule of how often to index the source for new media">
-        <td class="hide-on-small-only">Index schedule</td>
-        <td><span class="hide-on-med-and-up">Index schedule<br></span><strong>{{ source.get_index_schedule_display }}</strong></td>
+      <tr>
+        <td><strong>Index schedule</strong></td>
+        <td>{{ source.get_index_schedule_display }}</td>
       </tr>
-      <tr title="Index videos from this source">
-        <td class="hide-on-small-only">Index videos?</td>
-        <td><span class="hide-on-med-and-up">Index videos?<br></span><strong>{% if source.index_videos %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      <tr>
+        <td><strong>Index videos?</strong></td>
+        <td><i class="fas fa-{% if source.index_videos %}check{% else %}times{% endif %}"></i></td>
       </tr>
-      <tr title="Index streams from this source">
-        <td class="hide-on-small-only">Index streams?</td>
-        <td><span class="hide-on-med-and-up">Index streams?<br></span><strong>{% if source.index_streams %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      <tr>
+        <td><strong>Index streams?</strong></td>
+        <td><i class="fas fa-{% if source.index_streams %}check{% else %}times{% endif %}"></i></td>
       </tr>
-      <tr title="Download media from this source">
-        <td class="hide-on-small-only">Download media?</td>
-        <td><span class="hide-on-med-and-up">Download media?<br></span><strong>{% if source.download_media %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      <tr>
+        <td><strong>Download media?</strong></td>
+        <td><i class="fas fa-{% if source.download_media %}check{% else %}times{% endif %}"></i></td>
       </tr>
-      <tr title="When then source was created locally in TubeSync">
-        <td class="hide-on-small-only">Created</td>
-        <td><span class="hide-on-med-and-up">Created<br></span><strong>{{ source.created|date:'Y-m-d H:i:s' }}</strong></td>
+      <tr>
+        <td><strong>Created</strong></td>
+        <td>{{ source.created|date:'Y-m-d H:i:s' }}</td>
       </tr>
-      <tr title="When the source last checked for available media">
-        <td class="hide-on-small-only">Last crawl</td>
-        <td><span class="hide-on-med-and-up">Last crawl<br></span><strong>{% if source.last_crawl %}{{ source.last_crawl|date:'Y-m-d H:i:s' }}{% else %}Never{% endif %}</strong></td>
+      <tr>
+        <td><strong>Last crawl</strong></td>
+        <td>{% if source.last_crawl %}{{ source.last_crawl|date:'Y-m-d H:i:s' }}{% else %}Never{% endif %}</td>
       </tr>
-      <tr title="When the source should be next checked for available media">
-        <td class="hide-on-small-only">Target schedule</td>
-        <td><span class="hide-on-med-and-up">Target schedule<br></span><strong>{% if source.target_schedule %}{{ source.target_schedule|date:'l, h:00 A (c)' }}{% else %}Not set{% endif %}</strong></td>
+      <tr>
+        <td><strong>Target schedule</strong></td>
+        <td>{% if source.target_schedule %}{{ source.target_schedule|date:'l, h:00 A (c)' }}{% else %}Not set{% endif %}</td>
       </tr>
-      <tr title="Quality and type of media the source will attempt to sync">
-        <td class="hide-on-small-only">Source resolution</td>
-        <td><span class="hide-on-med-and-up">Source resolution<br></span><strong>{{ source.get_source_resolution_display }}</strong></td>
+      <tr>
+        <td><strong>Source resolution</strong></td>
+        <td>{{ source.get_source_resolution_display }}</td>
       </tr>
       {% if source.is_video %}
-      <tr title="Preferred video codec to download">
-        <td class="hide-on-small-only">Source video codec</td>
-        <td><span class="hide-on-med-and-up">Source video codec<br></span><strong>{{ source.get_source_vcodec_display }}</strong></td>
+      <tr>
+        <td><strong>Source video codec</strong></td>
+        <td>{{ source.get_source_vcodec_display }}</td>
       </tr>
       {% endif %}
-      <tr title="Preferred audio codec to download">
-        <td class="hide-on-small-only">Source audio codec</td>
-        <td><span class="hide-on-med-and-up">Source audio codec<br></span><strong>{{ source.get_source_acodec_display }}</strong></td>
+      <tr>
+        <td><strong>Source audio codec</strong></td>
+        <td>{{ source.get_source_acodec_display }}</td>
       </tr>
-      <tr title="If available from the source media in 60FPS will be preferred">
-        <td class="hide-on-small-only">Prefer 60FPS?</td>
-        <td><span class="hide-on-med-and-up">Prefer 60FPS?<br></span><strong>{% if source.prefer_60fps %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      <tr>
+        <td><strong>Prefer 60FPS?</strong></td>
+        <td><i class="fas fa-{% if source.prefer_60fps %}check{% else %}times{% endif %}"></i></td>
       </tr>
-      <tr title="If available from the source media in HDR will be preferred">
-        <td class="hide-on-small-only">Prefer HDR?</td>
-        <td><span class="hide-on-med-and-up">Prefer HDR?<br></span><strong>{% if source.prefer_hdr %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      <tr>
+        <td><strong>Prefer HDR?</strong></td>
+        <td><i class="fas fa-{% if source.prefer_hdr %}check{% else %}times{% endif %}"></i></td>
       </tr>
-      <tr title="Output file extension">
-        <td class="hide-on-small-only">Output extension</td>
-        <td><span class="hide-on-med-and-up">Output extension<br></span><strong>{{ source.extension }}</strong></td>
+      <tr>
+        <td><strong>Output extension</strong></td>
+        <td>{{ source.extension }}</td>
       </tr>
-      <tr title="What to do if your source resolution or codecs are unavailable">
-        <td class="hide-on-small-only">Fallback</td>
-        <td><span class="hide-on-med-and-up">Fallback<br></span><strong>{{ source.get_fallback_display }}</strong></td>
+      <tr>
+        <td><strong>Fallback</strong></td>
+        <td>{{ source.get_fallback_display }}</td>
       </tr>
-      <tr title="Should media thumbnails be copied over with the media?">
-        <td class="hide-on-small-only">Copy thumbnails?</td>
-        <td><span class="hide-on-med-and-up">Copy thumbnails?<br></span><strong>{% if source.copy_thumbnails %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      <tr>
+        <td><strong>Copy thumbnails?</strong></td>
+        <td><i class="fas fa-{% if source.copy_thumbnails %}check{% else %}times{% endif %}"></i></td>
       </tr>
-      <tr title="Should an NFO file be written with the media?">
-        <td class="hide-on-small-only">Write NFO?</td>
-        <td><span class="hide-on-med-and-up">Write NFO?<br></span><strong>{% if source.write_nfo %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      <tr>
+        <td><strong>Write NFO?</strong></td>
+        <td><i class="fas fa-{% if source.write_nfo %}check{% else %}times{% endif %}"></i></td>
       </tr>
-      <tr title="Should a JSON file be written with the media?">
-        <td class="hide-on-small-only">Write JSON?</td>
-        <td><span class="hide-on-med-and-up">Write JSON?<br></span><strong>{% if source.write_json %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      <tr>
+        <td><strong>Write JSON?</strong></td>
+        <td><i class="fas fa-{% if source.write_json %}check{% else %}times{% endif %}"></i></td>
       </tr>
-      <tr title="Delete media that is no longer on this playlist?">
-        <td class="hide-on-small-only">Delete removed media</td>
-        <td><span class="hide-on-med-and-up">Delete removed media<br></span><strong>{% if source.delete_removed_media %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      <tr>
+        <td><strong>Delete removed media</strong></td>
+        <td><i class="fas fa-{% if source.delete_removed_media %}check{% else %}times{% endif %}"></i></td>
       </tr>
-        <tr title="Delete files on disk when they are removed from TubeSync?">
-        <td class="hide-on-small-only">Delete files on disk</td>
-        <td><span class="hide-on-med-and-up">Delete files on disk<br></span><strong>{% if source.delete_files_on_disk %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      <tr>
+        <td><strong>Delete files on disk</strong></td>
+        <td><i class="fas fa-{% if source.delete_files_on_disk %}check{% else %}times{% endif %}"></i></td>
       </tr>
-      {% if source.delete_old_media and source.days_to_keep > 0 %}
-      <tr title="Days after which your media from this source will be locally deleted">
-        <td class="hide-on-small-only">Delete old media</td>
-        <td><span class="hide-on-med-and-up">Delete old media<br></span><strong>After {{ source.days_to_keep }} days</strong></td>
+      <tr>
+        <td><strong>Delete old media</strong></td>
+        <td>{% if source.delete_old_media and source.days_to_keep > 0 %}After {{ source.days_to_keep }} days{% else %}No, keep forever{% endif %}</td>
       </tr>
-      {% else %}
-      <tr title="Media from this source will never be deleted">
-        <td class="hide-on-small-only">Delete old media</td>
-        <td><span class="hide-on-med-and-up">Delete old media<br></span><strong>No, keep forever</strong></td>
+      <tr>
+        <td><strong>UUID</strong></td>
+        <td><code>{{ source.uuid }}</code></td>
       </tr>
-      {% endif %}
-      <tr title="Unique ID used for this source in TubeSync">
-        <td class="hide-on-small-only">UUID</td>
-        <td><span class="hide-on-med-and-up">UUID<br></span><strong>{{ source.uuid }}</strong></td>
+      <tr>
+        <td><strong>Embed thumbnail?</strong></td>
+        <td><i class="fas fa-{% if source.embed_thumbnail %}check{% else %}times{% endif %}"></i></td>
       </tr>
-      <tr title="{{ _('Embedding thumbnail?') }}">
-        <td class="hide-on-small-only">{{ _("Embed thumbnail?") }}:</td>
-        <td><span class="hide-on-med-and-up">{{ _("Embed thumbnail?") }}<br></span><strong><i class="fas {% if source.embed_thumbnail %}fa-check{% else %}fa-times{% endif %}"></i></strong></td>
+      <tr>
+        <td><strong>Embed metadata?</strong></td>
+        <td><i class="fas fa-{% if source.embed_metadata %}check{% else %}times{% endif %}"></i></td>
       </tr>
-      <tr title="{{ _('Embedding metadata?') }}">
-        <td class="hide-on-small-only">{{ _("Embed metadata?") }}:</td>
-        <td><span class="hide-on-med-and-up">{{ _("Embed metadata?") }}<br></span><strong><i class="fas {% if source.embed_metadata %}fa-check{% else %}fa-times{% endif %}"></i></strong></td>
+      <tr>
+        <td><strong>SponsorBlock?</strong></td>
+        <td><i class="fas fa-{% if source.enable_sponsorblock %}check{% else %}times{% endif %}"></i></td>
       </tr>
-
-      <tr title="{{ _('Is sponsorblock enabled?') }}">
-        <td class="hide-on-small-only">{{ _("SponsorBlock?") }}:</td>
-        <td><span class="hide-on-med-and-up">{{ _("Sponsorblock enabled?") }}<br></span><strong><i class="fas {% if source.enable_sponsorblock %}fa-check{% else %}fa-times{% endif %}"></i></strong></td>
-      </tr>
-
       {% if source.enable_sponsorblock %}
-      <tr title="{{ _('SponsorBlock: What to block?') }}">
-        <td class="hide-on-small-only">{{ _("What blocked?") }}:</td>
-        <td><span class="hide-on-med-and-up">{{ _("What blocked?") }}<br></span><strong>
+      <tr>
+        <td><strong>What blocked?</strong></td>
+        <td>
           {% if source.sponsorblock_categories.all_choice in source.sponsorblock_categories.selected_choices %}
             {% for k,v in source.sponsorblock_categories.possible_choices %}
-              {{ v }}: <i class="fas fa-check"></i><BR>
+              <i class="fas fa-check"></i> {{ v }}<br>
             {% endfor %}
           {% else %}
-            {% for c in source.sponsorblock_categories.selected_choices %} 
+            {% for c in source.sponsorblock_categories.selected_choices %}
               {% for k,v in source.sponsorblock_categories.possible_choices %}
-                {% if k == c %} {{ v }}: <i class="fas fa-check"></i><BR>{% endif %}
+                {% if k == c %}<i class="fas fa-check"></i> {{ v }}<br>{% endif %}
               {% endfor %}
             {% endfor %}
           {% endif %}
-        </strong></td>
+        </td>
       </tr>
       {% endif %}
-
-      <tr title="{{ _('Are Subtitles downloaded?') }}">
-        <td class="hide-on-small-only">{{ _("Download subtitles?") }}:</td>
-        <td><span class="hide-on-med-and-up">{{ _("Download subtitles?") }}:</span><strong><i class="fas {% if source.write_subtitles %}fa-check{% else %}fa-times{% endif %}"></i></strong></td>
+      <tr>
+        <td><strong>Download subtitles?</strong></td>
+        <td><i class="fas fa-{% if source.write_subtitles %}check{% else %}times{% endif %}"></i></td>
       </tr>
-
       {% if source.write_subtitles %}
-      <tr title="{{ _('Are auto subs accepted?') }}">
-        <td class="hide-on-small-only">{{ _("Auto-generated subtitles?") }}:</td>
-        <td><span class="hide-on-med-and-up">{{ _("Auto-generated subtitles?") }}:</span><strong><i class="fas {% if source.auto_subtitles %}fa-check{% else %}fa-times{% endif %}"></i></strong></td>
+      <tr>
+        <td><strong>Auto-generated subtitles?</strong></td>
+        <td><i class="fas fa-{% if source.auto_subtitles %}check{% else %}times{% endif %}"></i></td>
       </tr>
-      <tr title="{{ _('Subs langs?') }}">
-        <td class="hide-on-small-only">{{ _("Subs langs?") }}:</td>
-        <td><span class="hide-on-med-and-up">{{ _("Subs langs?") }}:</span><strong>{{source.sub_langs}}</strong></td>
+      <tr>
+        <td><strong>Subs langs?</strong></td>
+        <td>{{ source.sub_langs }}</td>
       </tr>
       {% endif %}
-      
-    </table>
-  </div>
+    </tbody>
+  </table>
 </div>
-<div class="row no-margin-bottom padding-top">
-  <div class="col s12 l6 margin-bottom">
-    <a href="{% url 'sync:update-source' pk=source.pk %}" class="btn">Edit source <i class="fas fa-pen-square"></i></a>
-  </div>
-  <div class="col s12 l6 margin-bottom">
-    <a href="{% url 'sync:delete-source' pk=source.pk %}" class="btn delete-button">Delete source <i class="fas fa-trash-alt"></i></a>
-  </div>
+
+<div class="buttons mt-5">
+  <a href="{% url 'sync:update-source' pk=source.pk %}" class="button is-primary">
+    <span>Edit source</span>
+    <span class="icon"><i class="fas fa-pen-square"></i></span>
+  </a>
+  <a href="{% url 'sync:delete-source' pk=source.pk %}" class="button is-danger delete-button">
+    <span>Delete source</span>
+    <span class="icon"><i class="fas fa-trash-alt"></i></span>
+  </a>
 </div>
+
 {% if errors %}
-<div class="row">
-  <div class="col s12">
-    <h2>Source has encountered {{ errors|length }} Error{{ errors|length|pluralize }}</h2>
-    <div class="collection">
-      {% for task in errors %}
-        <span class="collection-item error-text">
-          <i class="fas fa-exclamation-triangle"></i> <strong>{{ task.verbose_name }}</strong><br>
-          Error: &quot;{{ task.error_message }}&quot;<br>
-          <i class="far fa-clock"></i> Occured at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong>
-        </span>
-      {% endfor %}
-    </div>
+<div class="box mt-5">
+  <h2 class="title is-5 mb-4">Source has encountered {{ errors|length }} Error{{ errors|length|pluralize }}</h2>
+
+  {% for task in errors %}
+  <div class="notification is-danger mb-3">
+    <span class="icon-text mb-2">
+      <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+      <span><strong>{{ task.verbose_name }}</strong></span>
+    </span>
+    <br>
+    <span>Error: "{{ task.error_message }}"</span>
+    <br>
+    <small class="has-text-grey">
+      <span class="icon-text">
+        <span class="icon"><i class="far fa-clock"></i></span>
+        <span>Occurred at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong></span>
+      </span>
+    </small>
   </div>
+  {% endfor %}
 </div>
 {% endif %}
 {% endblock %}

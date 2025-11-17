@@ -1,4 +1,4 @@
-{% load static %}{% load sass_tags %}<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
@@ -8,46 +8,82 @@
         opacity: 0;
       }
     </style>
-    <link type="text/css" rel="stylesheet" href="{% sass_src 'styles/tubesync.scss' %}" media="screen,projection"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link type="text/css" rel="stylesheet" href="{% static 'styles/tubesync.css' %}" media="screen,projection"/>
     <link rel="icon" href="{% static 'images/favicon.ico' %}" sizes="21x21" type="image/x-icon">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>TubeSync - {% block headtitle %}Synchronize YouTube to your local media server{% endblock %}</title>
+    <script>
+      // Use Bulma's built-in data-theme attribute to control light/dark mode
+      (function() {
+        const darkMode = localStorage.getItem('darkMode') === 'enabled';
+        document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+      })();
+    </script>
   </head>
 
-  <body>
+  <body id="body">
 
-    <div class="app">
-
-      <header>
-        <div class="container">
-          <a href="{% url 'sync:dashboard' %}">
-            {% include 'tubesync.svg' with width='3rem' height='3rem' %}
-            <h1>TubeSync</h1>
+    <header class="py-3">
+      <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <a href="{% url 'sync:dashboard' %}" class="is-flex is-align-items-center">
+            {% include 'tubesync.svg' with width='3rem' height='3rem' class='pr-4' %}
+            <h1 class="title has-text-white mb-0 ml-2">TubeSync</h1>
+          </a>
+          <a role="button" class="navbar-burger is-hidden-tablet" aria-label="menu" aria-expanded="false" data-target="navbarMenu" style="background: transparent; border: none; margin: 0;">
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
           </a>
         </div>
-      </header>
+      </div>
+    </header>
 
-      <nav>
-        <div class="container">
-          <ul>
-            <li><a href="{% url 'sync:dashboard' %}"><i class="fas fa-fw fa-th-large"></i><span class="hide-on-med-and-down"> Dashboard</span></a></li>
-            <li><a href="{% url 'sync:sources' %}"><i class="fas fa-fw fa-play"></i><span class="hide-on-med-and-down"> Sources</span></a></li>
-            <li><a href="{% url 'sync:media' %}"><i class="fas fa-fw fa-film"></i><span class="hide-on-med-and-down"> Media</span></a></li>
-            <li><a href="{% url 'sync:tasks' %}"><i class="far fa-fw fa-clock"></i><span class="hide-on-med-and-down"> Tasks</span></a></li>
-            <li><a href="{% url 'sync:mediaservers' %}"><i class="fas fa-fw fa-stream"></i><span class="hide-on-med-and-down"> Media Servers</span></a></li>
-          </ul>
+    <nav class="navbar" role="navigation" aria-label="main navigation">
+      <div class="container">
+        <div id="navbarMenu" class="navbar-menu">
+          <div class="navbar-start">
+            <a class="navbar-item{% block active_dashboard %}{% endblock %}" href="{% url 'sync:dashboard' %}">
+              <span class="icon"><i class="fas fa-fw fa-th-large"></i></span>
+              <span class="is-hidden-mobile">Dashboard</span>
+            </a>
+            <a class="navbar-item{% block active_sources %}{% endblock %}" href="{% url 'sync:sources' %}">
+              <span class="icon"><i class="fas fa-fw fa-play"></i></span>
+              <span class="is-hidden-mobile">Sources</span>
+            </a>
+            <a class="navbar-item{% block active_media %}{% endblock %}" href="{% url 'sync:media' %}">
+              <span class="icon"><i class="fas fa-fw fa-film"></i></span>
+              <span class="is-hidden-mobile">Media</span>
+            </a>
+            <a class="navbar-item{% block active_tasks %}{% endblock %}" href="{% url 'sync:tasks' %}">
+              <span class="icon"><i class="far fa-fw fa-clock"></i></span>
+              <span class="is-hidden-mobile">Tasks</span>
+            </a>
+            <a class="navbar-item{% block active_mediaservers %}{% endblock %}" href="{% url 'sync:mediaservers' %}">
+              <span class="icon"><i class="fas fa-fw fa-stream"></i></span>
+              <span class="is-hidden-mobile">Media Servers</span>
+            </a>
+          </div>
+          <div class="navbar-end">
+            <a role="button" class="navbar-item" id="dark-mode-toggle" aria-label="Toggle dark mode">
+              <span class="icon"><i class="fas fa-moon" id="dark-mode-icon"></i></span>
+              <span class="is-hidden-mobile">Theme</span>
+            </a>
+          </div>
         </div>
-      </nav>
+      </div>
+    </nav>
 
-      <main>
-        <div class="container">
-          {% block content %}{% endblock %}
-        </div>
-      </main>
+    <main class="py-2">
+      <div class="container">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
 
-    </div>
-
-    <footer>
+    <footer class="pt-2 pb-1">
       <div class="container">
         <p>
           <a href="{% url 'sync:dashboard' %}" class="nowrap">{% include 'tubesync.svg' with width='0.8rem' height='0.8rem' %} TubeSync</a>
@@ -63,6 +99,51 @@
         </p>
       </div>
     </footer>
+
+    <script>
+      (function() {
+        const html = document.documentElement;
+        const darkModeToggle = document.getElementById('dark-mode-toggle');
+        const darkModeIcon = document.getElementById('dark-mode-icon');
+
+        // Update icon on page load
+        const isDark = html.getAttribute('data-theme') === 'dark';
+        if (isDark) {
+          darkModeIcon.classList.remove('fa-moon');
+          darkModeIcon.classList.add('fa-sun');
+        }
+
+        // Toggle dark mode
+        if (darkModeToggle) {
+          darkModeToggle.addEventListener('click', function() {
+            const isDark = html.getAttribute('data-theme') === 'dark';
+
+            if (isDark) {
+              html.setAttribute('data-theme', 'light');
+              localStorage.setItem('darkMode', 'disabled');
+              darkModeIcon.classList.remove('fa-sun');
+              darkModeIcon.classList.add('fa-moon');
+            } else {
+              html.setAttribute('data-theme', 'dark');
+              localStorage.setItem('darkMode', 'enabled');
+              darkModeIcon.classList.remove('fa-moon');
+              darkModeIcon.classList.add('fa-sun');
+            }
+          });
+        }
+
+        // Mobile navbar burger toggle
+        const burger = document.querySelector('.navbar-burger');
+        const navbarMenu = document.getElementById('navbarMenu');
+
+        if (burger && navbarMenu) {
+          burger.addEventListener('click', function() {
+            burger.classList.toggle('is-active');
+            navbarMenu.classList.toggle('is-active');
+          });
+        }
+      })();
+    </script>
 
   </body>
 

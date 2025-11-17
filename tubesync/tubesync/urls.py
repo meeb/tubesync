@@ -1,5 +1,7 @@
 from django.urls import path, include
 from django.contrib import admin
+from django.conf import settings
+from django.conf.urls.static import static
 
 
 admin.site.site_title = 'TubeSync dashboard admin'
@@ -20,3 +22,5 @@ urlpatterns = [
          include('sync.urls', namespace='sync')),
 
 ]
+
+# WhiteNoise handles static file serving (configured with WHITENOISE_USE_FINDERS=True)

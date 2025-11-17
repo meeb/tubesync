@@ -1,0 +1,357 @@
+/* TubeSync CSS Variables and Styles */
+
+/* ============================================
+   Primitive Color Tokens
+   ============================================ */
+:root {
+  --tubesync-surface-dark: #011627;
+  --tubesync-text-on-dark: #fdfffc;
+  --tubesync-light-blue: #1e5c83;
+  --tubesync-text-on-light-blue: #ffffff;
+  --tubesync-red: #e71d36;
+  --tubesync-orange: #ff9c00;
+  --tubesync-text-on-orange: #1a1a1a;
+}
+
+[data-theme="dark"] {
+  --tubesync-surface-dark: #1e2936;
+  --tubesync-text-on-dark: #e8eaed;
+  --tubesync-light-blue: #16496b;
+  --tubesync-text-on-light-blue: #e8eaed;
+  --tubesync-red: #b8152a;
+  --tubesync-orange: #cc7d00;
+  --tubesync-text-on-orange: #ffffff;
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+@font-face {
+  font-family: 'roboto';
+  src: url('../fonts/roboto/roboto-light.woff') format('woff');
+  font-weight: lighter;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'roboto';
+  src: url('../fonts/roboto/roboto-regular.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'roboto';
+  src: url('../fonts/roboto/roboto-bold.woff') format('woff');
+  font-weight: bold;
+  font-style: normal;
+}
+
+html {
+  visibility: visible;
+  opacity: 1;
+  font-family: 'roboto', Arial, Helvetica, sans-serif;
+  font-size: 1.05rem;
+}
+
+body {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+/* ============================================
+   Header & Footer
+   ============================================ */
+header {
+  background-color: var(--tubesync-red);
+  color: var(--tubesync-text-on-dark);
+}
+
+header a {
+  text-decoration: none;
+  color: var(--tubesync-text-on-dark);
+}
+
+header svg.tubesync-logo {
+  float: left;
+}
+
+header svg.tubesync-logo .logo-icon {
+  fill: var(--tubesync-text-on-dark) !important;
+}
+
+@media screen and (max-width: 1023px) {
+  header .container > div {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+footer {
+  background-color: var(--tubesync-red);
+  color: var(--tubesync-text-on-dark);
+}
+
+footer svg path {
+  fill: var(--tubesync-text-on-dark);
+}
+
+footer a {
+  color: var(--tubesync-text-on-dark);
+  text-decoration: none;
+}
+
+footer a:hover {
+  color: var(--tubesync-orange);
+}
+
+footer strong {
+  color: var(--tubesync-text-on-dark);
+}
+
+[data-theme="dark"] footer a {
+  color: var(--tubesync-text-on-dark);
+}
+
+[data-theme="dark"] footer strong {
+  color: var(--tubesync-text-on-dark);
+}
+
+@media screen and (max-width: 1023px) {
+  footer .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+
+/* ============================================
+   Navigation
+   ============================================ */
+nav.navbar {
+  background-color: var(--tubesync-surface-dark);
+}
+
+nav.navbar .navbar-burger {
+  color: var(--tubesync-text-on-dark);
+}
+
+nav.navbar .navbar-menu {
+  background-color: var(--tubesync-surface-dark);
+}
+
+/* Show labels in mobile menu when expanded */
+@media screen and (max-width: 768px) {
+  nav.navbar .navbar-menu.is-active .is-hidden-mobile {
+    display: inline !important;
+  }
+
+  /* Hide entire navbar on mobile, only show menu when active */
+  nav.navbar {
+    display: none;
+  }
+
+  nav.navbar:has(.navbar-menu.is-active) {
+    display: block;
+  }
+}
+
+/* Show full navbar on tablet and up */
+@media screen and (min-width: 769px) {
+  nav.navbar .navbar-menu {
+    display: flex !important;
+  }
+
+  nav.navbar .navbar-start,
+  nav.navbar .navbar-end {
+    display: flex !important;
+  }
+}
+
+header .navbar-burger {
+  color: var(--tubesync-text-on-dark);
+}
+
+nav.navbar .navbar-item {
+  color: var(--tubesync-text-on-dark);
+  display: flex !important;
+  align-items: center !important;
+  user-select: none;
+}
+
+nav.navbar .navbar-item .icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  flex-shrink: 0;
+}
+
+
+nav.navbar .navbar-item.is-active {
+  background-color: var(--tubesync-light-blue) !important;
+  color: var(--tubesync-text-on-light-blue) !important;
+}
+
+nav.navbar .navbar-item:hover {
+  background-color: var(--tubesync-orange) !important;
+  color: var(--tubesync-text-on-orange) !important;
+}
+
+[data-theme="dark"] nav.navbar {
+  background-color: var(--bulma-scheme-main-bis);
+}
+
+[data-theme="dark"] nav.navbar .navbar-menu {
+  background-color: var(--bulma-scheme-main-bis);
+}
+
+/* ============================================
+   Main Content
+   ============================================ */
+
+main {
+  flex: 1;
+}
+
+main a {
+  text-decoration: none;
+}
+
+main .container {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+
+/* ============================================
+   Media Cards
+   ============================================ */
+.mediacard {
+  border: 3px var(--tubesync-text-on-dark) solid;
+  transition: border-color 0.2s;
+}
+
+.mediacard:hover {
+  border-color: var(--tubesync-orange);
+}
+
+.mediacard .card-image img {
+  border-radius: 0 !important;
+}
+
+
+/* ============================================
+   Pagination
+   ============================================ */
+.pagination .pagination-link {
+  border-color: var(--bulma-primary);
+}
+
+.pagination .pagination-link:hover {
+  background-color: var(--tubesync-orange) !important;
+  color: var(--tubesync-text-on-orange) !important;
+  border-color: var(--tubesync-orange) !important;
+}
+
+.pagination .pagination-link.is-current {
+  background-color: var(--tubesync-light-blue);
+  border-color: var(--tubesync-light-blue);
+  color: var(--tubesync-text-on-light-blue);
+}
+
+
+/* ============================================
+   Forms
+   ============================================ */
+
+
+
+.simpleform .label {
+  text-transform: uppercase;
+}
+
+.simpleform .input,
+.simpleform .textarea,
+.simpleform select {
+  border: 2px var(--bulma-primary) solid;
+  border-radius: 2px;
+}
+
+.simpleform .input:focus,
+.simpleform .textarea:focus,
+.simpleform select:focus {
+  border-color: var(--tubesync-orange);
+}
+
+.simpleform .textarea {
+  min-height: 150px;
+}
+
+.delete-button:hover {
+  background-color: var(--tubesync-orange) !important;
+}
+
+[data-theme="dark"] .input,
+[data-theme="dark"] .textarea,
+[data-theme="dark"] select {
+  background-color: var(--bulma-scheme-main-bis);
+  color: var(--bulma-text);
+}
+
+/* ============================================
+   Buttons
+   ============================================ */
+.button.is-primary {
+  background-color: var(--tubesync-light-blue);
+  border-color: var(--tubesync-light-blue);
+  color: var(--tubesync-text-on-light-blue);
+}
+
+.button.is-primary:hover {
+  background-color: var(--tubesync-light-blue);
+  border-color: var(--tubesync-light-blue);
+  filter: brightness(1.1);
+}
+
+.button.is-danger {
+  background-color: var(--tubesync-red);
+  border-color: var(--tubesync-red);
+}
+
+.button.is-danger:hover {
+  background-color: var(--tubesync-red);
+  border-color: var(--tubesync-red);
+  filter: brightness(1.1);
+}
+
+[data-theme="dark"] .button.is-primary {
+  background-color: var(--tubesync-light-blue);
+  border-color: var(--tubesync-light-blue);
+  color: var(--tubesync-text-on-light-blue);
+}
+
+[data-theme="dark"] .button.is-danger {
+  background-color: var(--tubesync-red);
+  border-color: var(--tubesync-red);
+}
+
+/* ============================================
+   Utility Classes (only TubeSync-specific ones)
+   ============================================ */
+.nowrap {
+  white-space: nowrap;
+}
+
+.errors {
+  background-color: var(--bulma-danger);
+}
+
+.errorlist li {
+  color: #fdfffc;
+}
+
+.is-clipped {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

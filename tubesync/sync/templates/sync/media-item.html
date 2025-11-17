@@ -3,26 +3,24 @@
 {% block headtitle %}Media - {{ media.key }}{% endblock %}
 
 {% block content %}
-<div class="row">
-  <div class="col s12">
-    <h1 class="truncate">Media <strong>{{ media.key }}</strong> {{ download_state_icon|safe }}</h1>
-    {% if media.title %}<h2 class="truncate"><strong>{{ media.title }}</strong></h2>{% endif %}
-    <p class="truncate"><strong><a href="{{ media.url }}" target="_blank"><i class="fas fa-link"></i> {{ media.url }}</a></strong></p>
-    <p class="truncate">Downloading to: <strong>{{ media.source.directory_path }}</strong></p>
-    {% if download_state == 'downloaded' %}
+<h1 class="title mb-4">Media <strong>{{ media.key }}</strong> {{ download_state_icon|safe }}</h1>
+<div class="mb-4">
+    {% if media.title %}<h2 class="is-clipped"><strong>{{ media.title }}</strong></h2>{% endif %}
+    <p class="is-clipped"><strong><a href="{{ media.url }}" target="_blank"><i class="fas fa-link"></i> {{ media.url }}</a></strong></p>
+  <p class="is-clipped">Downloading to: <strong>{{ media.source.directory_path }}</strong></p>
+  {% if download_state == 'downloaded' %}
     {% if media.source.is_audio %}
     <audio controls src="{% url 'sync:media-content' pk=media.pk %}"></audio>
     {% else %}
-    <video controls style="width: 100%">
+    <video controls class="is-fullwidth">
       <source src="{% url 'sync:media-content' pk=media.pk %}">
     </video>
     {% endif %}
 
-    <p class="truncate"><a href="{% url 'sync:media-content' pk=media.pk %}" download="{{ media.filename }}"><strong><i class="fas fa-download"></i> Download</strong></a></p>
-    {% elif media.can_download %}
-    <p class="truncate"><a href="{% url 'sync:redownload-media' pk=media.pk %}{% querystring manual=True %}"><strong><i class="fas fa-download"></i> Begin Downloading</strong></a> (please be patient)</p>
-    {% endif %}
-  </div>
+  <p class="is-clipped"><a href="{% url 'sync:media-content' pk=media.pk %}" download="{{ media.filename }}"><strong><i class="fas fa-download"></i> Download</strong></a></p>
+  {% elif media.can_download %}
+  <p class="is-clipped"><a href="{% url 'sync:redownload-media' pk=media.pk %}{% querystring manual=True %}"><strong><i class="fas fa-download"></i> Begin Downloading</strong></a> (please be patient)</p>
+  {% endif %}
 </div>
 {% if media.manual_skip %}{% include 'errorbox.html' with message='Media is marked to be skipped and will not be downloaded.' %}
 {% else %}
@@ -30,171 +28,208 @@
   {% if media.skip %}{% include 'errorbox.html' with message='This media may be skipped due to error(s) or not matching a filter condition.' %}{% endif %}
 {% endif %}
 {% include 'infobox.html' with message=message %}
-<div class="row">
-  <div class="col s12 m7">
-    <div><i class="fas fa-quote-left"></i></div>
-    <p>{% if media.description %}{{ media.description|truncatewords:200 }}{% else %}(Media has no description).{% endif %}</p>
-    <div class="right-align"><i class="fas fa-quote-right"></i></div>
+<div class="columns">
+  <div class="column is-12 is-7-tablet">
+    <div class="content">
+      <blockquote>
+        <p>{% if media.description %}{{ media.description|truncatewords:200 }}{% else %}(Media has no description).{% endif %}</p>
+      </blockquote>
+    </div>
   </div>
-  <div class="col s12 m5">
+  <div class="column is-12 is-5-tablet">
     <div class="card mediacard">
       <div class="card-image">
-        <img src="{% if media.thumb %}{% url 'sync:media-thumb' pk=media.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}">
+        <figure class="image">
+          <img src="{% if media.thumb %}{% url 'sync:media-thumb' pk=media.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}" alt="{{ media.name }}">
+        </figure>
       </div>
-      <div>
-        <a href="{% url 'sync:redownload-thumb' pk=media.pk %}"><i class="fas fa-redo"></i></a>
+      <div class="card-content">
+        <div class="content">
+          <a href="{% url 'sync:redownload-thumb' pk=media.pk %}" class="button is-small is-fullwidth">
+            <span class="icon"><i class="fas fa-redo"></i></span>
+            <span>Refresh thumbnail</span>
+          </a>
+        </div>
       </div>
     </div>
   </div>
 </div>
 {% if task %}
-<div class="row">
-  <div class="col s12">
-    <div class="collection">
-      <span class="collection-item">
+<div class="columns">
+  <div class="column is-12">
+    <div class="content">
+      <p>
         {% if task.start_at == task.end_at %}
         <i class="fas fa-running"></i> <strong>{{ task }}</strong><br>
-        <i class="far fa-clock"></i> Task started at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong>
+        <small><i class="far fa-clock"></i> Task started at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong></small>
         {% else %}
         <i class="fas fa-stopwatch"></i> <strong>{{ task }}</strong><br>
-        <i class="fas fa-redo"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong>{% endif %}
+        <small><i class="fas fa-redo"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong>{% endif %}</small>
         {% endif %}
-      </span>
+      </p>
     </div>
   </div>
 </div>
 {% endif %}
-<div class="row">
-  <div class="col s12">
-    <table class="striped">
-      <tr title="The media source">
-        <td class="hide-on-small-only">Source</td>
-        <td><span class="hide-on-med-and-up">Source<br></span><strong><a href="{% url 'sync:source' pk=media.source.pk %}">{{ media.source }}</a></strong></td>
-      </tr>
-      <tr title="The media duration">
-        <td class="hide-on-small-only">Duration</td>
-        <td><span class="hide-on-med-and-up">Duration<br></span><strong>{{ media.duration_formatted }}</strong></td>
-      </tr>
-      <tr title="The media publication date">
-        <td class="hide-on-small-only">Published</td>
-        <td><span class="hide-on-med-and-up">Published<br></span><strong>{{ media.published |date:'Y-m-d H:i' }}</strong></td>
-      </tr>
-      <tr title="The desired format">
-        <td class="hide-on-small-only">Desired format</td>
-        <td><span class="hide-on-med-and-up">Desired format<br></span><strong>{{ media.source.format_summary }}</strong></td>
-      </tr>
-      <tr title="Fallback setting on the source">
-        <td class="hide-on-small-only">Fallback</td>
-        <td><span class="hide-on-med-and-up">Fallback<br></span><strong>{{ media.source.get_fallback_display }}</strong></td>
-      </tr>
-      <tr title="The media title">
-        <td class="hide-on-small-only">Title</td>
-        <td><span class="hide-on-med-and-up">Title<br></span><strong>{{ media.title }}</strong></td>
-      </tr>
-      {% if not media.source.download_media %}
-      <tr title="Is media marked to be downloaded at the source?">
-        <td class="hide-on-small-only">Source download?</td>
-        <td><span class="hide-on-med-and-up">Source download?<br></span><strong>{% if media.source.download_media %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
-      </tr>
-      {% endif %}
-      {% if media.skip %}
-      <tr title="Is the media marked to be skipped?">
-        <td class="hide-on-small-only">Skipping?</td>
-        <td><span class="hide-on-med-and-up">Skipping?<br></span><strong>{% if media.skip %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
-      </tr>
-      {% else %}
-      <tr title="Has the media been downloaded?">
-        <td class="hide-on-small-only">Downloaded?</td>
-        <td><span class="hide-on-med-and-up">Downloaded?<br></span><strong>{% if media.downloaded %}<i class="fas fa-check"></i>&nbsp;{{ media.download_date |date:'Y-m-d H:i:s' }}{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
-      </tr>
-      {% endif %}
-      {% if media.downloaded %}
-      <tr title="The filename the media will be downloaded as">
-        <td class="hide-on-small-only">Filename</td>
-        <td><span class="hide-on-med-and-up">Filename<br></span><strong>{{ filename_path.name }}</strong></td>
-      </tr>
-      <tr title="The directory the media will be downloaded to">
-        <td class="hide-on-small-only">Directory</td>
-        <td><span class="hide-on-med-and-up">Directory<br></span><strong>{{ media.directory_path }}</strong></td>
-      </tr>
-      <tr title="The filepath the media was saved to">
-        <td class="hide-on-small-only">Database&nbsp;Filepath</td>
-        <td><span class="hide-on-med-and-up">DB&nbsp;Filepath<br></span><strong>{{ media_file_path }}</strong>
-          {% if media_file_path == media.filepath %}
-          <span class="green-text">&nbsp;(matched)</span>
-          {% endif %}
-        </td>
-      </tr>
-      <tr title="Size of the file on disk">
-        <td class="hide-on-small-only">File size</td>
-        <td><span class="hide-on-med-and-up">File size<br></span><strong>{{ media.downloaded_filesize|bytesformat }}</strong></td>
-      </tr>
-      <tr title="Codecs used in the downloaded file">
-        <td class="hide-on-small-only">Downloaded codecs</td>
-        <td><span class="hide-on-med-and-up">Downloaded codecs<br></span><strong>audio:{{ media.downloaded_audio_codec }}{% if media.downloaded_video_codec %}, video:{{ media.downloaded_video_codec }}{% endif %}</strong></td>
-      </tr>
-      <tr title="Container file format used in the download file">
-        <td class="hide-on-small-only">Container</td>
-        <td><span class="hide-on-med-and-up">Container<br></span><strong>{{ media.downloaded_container|upper }}</strong></td>
-      </tr>
-      {% if media.downloaded_video_codec %}
-      <tr title="Frames per second in the downloaded file">
-        <td class="hide-on-small-only">Downloaded FPS</td>
-        <td><span class="hide-on-med-and-up">Downloaded FPS<br></span><strong>{{ media.downloaded_fps }} FPS</strong></td>
-      </tr>
-      <tr title="Does the downloaded file have high dynamic range?">
-        <td class="hide-on-small-only">Downloaded HDR?</td>
-        <td><span class="hide-on-med-and-up">Downloaded HDR?<br></span><strong>{% if media.downloaded_hdr %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
-      </tr>
-      {% endif %}
-      {% else %}
-      <tr title="Can the media be downloaded?">
-        <td class="hide-on-small-only">Can download?</td>
-        <td><span class="hide-on-med-and-up">Can download?<br></span><strong>{% if media.can_download %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
-      </tr>
-      {% endif %}
-      <tr title="The available media formats">
-        <td class="hide-on-small-only">Available formats</td>
-        <td><span class="hide-on-med-and-up">Available formats<br></span>
-          {% for format in media.iter_formats %}
-          <div>
-            ID: <strong>{{ format.id }}</strong>
-            {% if format.vcodec|lower != 'none' %}, {{ format.format_note }} ({{ format.width }}x{{ format.height }}), fps:{{ format.fps|lower }}, video:{{ format.vcodec }} @{{ format.vbr }}k{% endif %}
-            {% if format.acodec|lower != 'none' %}, audio:{{ format.acodec }} {% if format.abr %}@{{ format.abr }}k / {% endif %}{{ format.asr|intcomma }}Hz{% if format.language_code %} [{{ format.language_code }}]{% endif %}{% if format.abr %} {{ format.format_note }}{% endif %}{% endif %}
-            {% if format.id == combined_format or format.id == audio_format or format.id == video_format %}<strong>(matched)</strong>{% endif %}
-          </div>
-          {% empty %}
-          Media has no indexed available formats
-          {% endfor %}
-        </td>
-      </tr>
-      <tr title="Best available format for source requirements">
-        <td class="hide-on-small-only">Matched formats</td>
-        <td><span class="hide-on-med-and-up">Matched formats<br></span>
-          Combined: <strong>{% if combined_format %}{{ combined_format }} {% if combined_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}</strong><br>
-          Audio: <strong>{% if audio_format %}{{ audio_format }} {% if audio_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}</strong><br>
-          Video: <strong>{% if video_format %}{{ video_format }} {% if video_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}
-        </strong></td>
-      </tr>
-    </table>
+<div class="columns">
+  <div class="column is-12">
+    <div class="box">
+      <h2 class="title is-5 mb-4">Media Details</h2>
+      <div class="content">
+        <table class="table is-fullwidth is-striped">
+          <tbody>
+            <tr>
+              <td><strong>Source</strong></td>
+              <td><a href="{% url 'sync:source' pk=media.source.pk %}">{{ media.source }}</a></td>
+            </tr>
+            <tr>
+              <td><strong>Duration</strong></td>
+              <td>{{ media.duration_formatted }}</td>
+            </tr>
+            <tr>
+              <td><strong>Published</strong></td>
+              <td>{{ media.published |date:'Y-m-d H:i' }}</td>
+            </tr>
+            <tr>
+              <td><strong>Desired format</strong></td>
+              <td>{{ media.source.format_summary }}</td>
+            </tr>
+            <tr>
+              <td><strong>Fallback</strong></td>
+              <td>{{ media.source.get_fallback_display }}</td>
+            </tr>
+            <tr>
+              <td><strong>Title</strong></td>
+              <td>{{ media.title }}</td>
+            </tr>
+            {% if not media.source.download_media %}
+            <tr>
+              <td><strong>Source download?</strong></td>
+              <td>{% if media.source.download_media %}<i class="fas fa-check has-text-success"></i>{% else %}<i class="fas fa-times has-text-danger"></i>{% endif %}</td>
+            </tr>
+            {% endif %}
+            {% if media.skip %}
+            <tr>
+              <td><strong>Skipping?</strong></td>
+              <td>{% if media.skip %}<i class="fas fa-check has-text-success"></i>{% else %}<i class="fas fa-times has-text-danger"></i>{% endif %}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td><strong>Downloaded?</strong></td>
+              <td>{% if media.downloaded %}<i class="fas fa-check has-text-success"></i> {{ media.download_date |date:'Y-m-d H:i:s' }}{% else %}<i class="fas fa-times has-text-danger"></i>{% endif %}</td>
+            </tr>
+            {% endif %}
+            {% if media.downloaded %}
+            <tr>
+              <td><strong>Filename</strong></td>
+              <td><code>{{ filename_path.name }}</code></td>
+            </tr>
+            <tr>
+              <td><strong>Directory</strong></td>
+              <td><code>{{ media.directory_path }}</code></td>
+            </tr>
+            <tr>
+              <td><strong>Database Filepath</strong></td>
+              <td><code>{{ media_file_path }}</code>{% if media_file_path == media.filepath %} <span class="tag is-success">matched</span>{% endif %}</td>
+            </tr>
+            <tr>
+              <td><strong>File size</strong></td>
+              <td>{{ media.downloaded_filesize|bytesformat }}</td>
+            </tr>
+            <tr>
+              <td><strong>Downloaded codecs</strong></td>
+              <td>audio:{{ media.downloaded_audio_codec }}{% if media.downloaded_video_codec %}, video:{{ media.downloaded_video_codec }}{% endif %}</td>
+            </tr>
+            <tr>
+              <td><strong>Container</strong></td>
+              <td><span class="tag">{{ media.downloaded_container|upper }}</span></td>
+            </tr>
+            {% if media.downloaded_video_codec %}
+            <tr>
+              <td><strong>Downloaded FPS</strong></td>
+              <td>{{ media.downloaded_fps }} FPS</td>
+            </tr>
+            <tr>
+              <td><strong>Downloaded HDR?</strong></td>
+              <td>{% if media.downloaded_hdr %}<i class="fas fa-check has-text-success"></i>{% else %}<i class="fas fa-times has-text-danger"></i>{% endif %}</td>
+            </tr>
+            {% endif %}
+            {% else %}
+            <tr>
+              <td><strong>Can download?</strong></td>
+              <td>{% if media.can_download %}<i class="fas fa-check has-text-success"></i>{% else %}<i class="fas fa-times has-text-danger"></i>{% endif %}</td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="box">
+      <h2 class="title is-5 mb-4">Available Formats</h2>
+      <div class="content">
+        {% for format in media.iter_formats %}
+        <div class="mb-2">
+          <strong>ID: {{ format.id }}</strong>
+          {% if format.vcodec|lower != 'none' %}, {{ format.format_note }} ({{ format.width }}x{{ format.height }}), fps:{{ format.fps|lower }}, video:{{ format.vcodec }} @{{ format.vbr }}k{% endif %}
+          {% if format.acodec|lower != 'none' %}, audio:{{ format.acodec }} {% if format.abr %}@{{ format.abr }}k / {% endif %}{{ format.asr|intcomma }}Hz{% if format.language_code %} [{{ format.language_code }}]{% endif %}{% if format.abr %} {{ format.format_note }}{% endif %}{% endif %}
+          {% if format.id == combined_format or format.id == audio_format or format.id == video_format %}<span class="tag is-success">matched</span>{% endif %}
+        </div>
+        {% empty %}
+        <p class="has-text-grey">Media has no indexed available formats</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="box">
+      <h2 class="title is-5 mb-4">Matched Formats</h2>
+      <div class="content">
+        <table class="table is-fullwidth">
+          <tbody>
+            <tr>
+              <td><strong>Combined</strong></td>
+              <td><strong>{% if combined_format %}{{ combined_format }} {% if combined_exact %}<span class="tag is-success">exact match</span>{% else %}<span class="tag is-warning">fallback</span>{% endif %}{% else %}<span class="tag is-danger">no match</span>{% endif %}</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Audio</strong></td>
+              <td><strong>{% if audio_format %}{{ audio_format }} {% if audio_exact %}<span class="tag is-success">exact match</span>{% else %}<span class="tag is-warning">fallback</span>{% endif %}{% else %}<span class="tag is-danger">no match</span>{% endif %}</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Video</strong></td>
+              <td><strong>{% if video_format %}{{ video_format }} {% if video_exact %}<span class="tag is-success">exact match</span>{% else %}<span class="tag is-warning">fallback</span>{% endif %}{% else %}<span class="tag is-danger">no match</span>{% endif %}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 {% if media.downloaded %}
-<div class="row">
-  <div class="col s12 l6">
-    <a href="{% url 'sync:redownload-media' pk=media.pk %}" class="btn">Redownload media <i class="fas fa-cloud-download-alt"></i></a>
+<div class="columns">
+  <div class="column is-12 is-6-desktop">
+    <a href="{% url 'sync:redownload-media' pk=media.pk %}" class="button is-primary">
+      <span class="icon"><i class="fas fa-cloud-download-alt"></i></span>
+      <span>Redownload media</span>
+    </a>
   </div>
-  <div class="col s12 l6">
-    <a href="{% url 'sync:skip-media' pk=media.pk %}" class="btn delete-button">Delete and skip media <i class="fas fa-times-circle"></i></a>
+  <div class="column is-12 is-6-desktop">
+    <a href="{% url 'sync:skip-media' pk=media.pk %}" class="button is-danger delete-button">
+      <span class="icon"><i class="fas fa-times-circle"></i></span>
+      <span>Delete and skip media</span>
+    </a>
   </div>
 </div>
 {% else %}
-<div class="row">
-  <div class="col s12">
+<div class="columns">
+  <div class="column is-12">
     {% if media.manual_skip %}
-      <a href="{% url 'sync:enable-media' pk=media.pk %}" class="btn">Unskip media (manually) <i class="fas fa-cloud-download-alt"></i></a>
+      <a href="{% url 'sync:enable-media' pk=media.pk %}" class="button is-primary">
+        <span class="icon"><i class="fas fa-cloud-download-alt"></i></span>
+        <span>Unskip media (manually)</span>
+      </a>
     {% else %}
-      <a href="{% url 'sync:skip-media' pk=media.pk %}" class="btn delete-button">Manually mark media to be skipped <i class="fas fa-times-circle"></i></a>
+      <a href="{% url 'sync:skip-media' pk=media.pk %}" class="button is-danger delete-button">
+        <span class="icon"><i class="fas fa-times-circle"></i></span>
+        <span>Manually mark media to be skipped</span>
+      </a>
     {% endif %}
   </div>
 </div>
