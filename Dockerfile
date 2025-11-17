@@ -454,7 +454,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 
 # Install third party software
 COPY --from=s6-overlay / /
-COPY --from=deno /usr/local/bin/ /usr/local/bin/
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 COPY --from=quickjs /usr/local/sbin/ /usr/local/sbin/
 
@@ -469,9 +468,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     # Installed ffmpeg (using COPY earlier)
     /usr/local/bin/ffmpeg -version && \
     file /usr/local/bin/ff* && \
-    # Installed deno (using COPY earlier)
-    /usr/local/bin/deno --version && \
-    file /usr/local/bin/deno && \
     # Installed quickjs (using COPY earlier)
     /usr/local/sbin/qjs --assimilate && \
     /usr/local/sbin/qjs --help | grep -Fe 'QuickJS version' && \
@@ -604,9 +600,6 @@ RUN set -x && \
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
   printf -- "ffmpeg_version = '%s'\n" "${ffmpeg_version}" >> /app/common/third_party_versions.py && \
-  deno_version=$(/usr/local/bin/deno -V | awk -v 'ev=31' '1 == NR && "deno" == $1 { print $2; ev=0; } END { exit ev; }') && \
-  test -n "${deno_version}" && \
-  printf -- "deno_version = '%s'\n" "${deno_version}" >> /app/common/third_party_versions.py && \
   qjs_version=$(/usr/local/sbin/qjs --help | awk -v 'ev=31' '1 == NR && "version" == $2 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${qjs_version}" && \
   printf -- "qjs_version = '%s'\n" "${qjs_version}" >> /app/common/third_party_versions.py
