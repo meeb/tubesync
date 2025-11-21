@@ -25,7 +25,7 @@
       <p class="title is-3">{{ num_sources|intcomma }}</p>
       <p class="subtitle is-6 mb-3">source{{ num_sources|pluralize }}</p>
       <hr class="my-3">
-      <p class="is-size-7"><strong>{{ num_video_sources|intcomma }}</strong> video, <strong>{{ num_audio_sources|intcomma }}</strong> audio</p>
+      <strong>{{ num_video_sources|intcomma }}</strong> video, <strong>{{ num_audio_sources|intcomma }}</strong> audio
     </a>
   </div>
 
@@ -34,7 +34,7 @@
       <p class="title is-3">{{ num_media|intcomma }}</p>
       <p class="subtitle is-6 mb-3">media item{{ num_media|pluralize }}</p>
       <hr class="my-3">
-      <p class="is-size-7"><strong>{{ num_downloaded_media|intcomma }}</strong> downloaded</p>
+      <strong>{{ num_downloaded_media|intcomma }}</strong> downloaded
     </a>
   </div>
 
@@ -43,7 +43,7 @@
       <p class="title is-3">{{ num_tasks|intcomma }}</p>
       <p class="subtitle is-6 mb-3">scheduled task{{ num_tasks|pluralize }}</p>
       <hr class="my-3">
-      <p class="is-size-7"><strong>{{ num_completed_tasks|intcomma }}</strong> completed</p>
+      <strong>{{ num_completed_tasks|intcomma }}</strong> completed
     </a>
   </div>
 
@@ -52,7 +52,7 @@
       <p class="title is-3">{{ disk_usage_bytes|bytesformat }}</p>
       <p class="subtitle is-6 mb-3">{{ disk_usage_bytes|intcomma }} bytes</p>
       <hr class="my-3">
-      <p class="is-size-7">Avg. <strong>{{ average_bytes_per_media|bytesformat }}</strong> per media</p>
+      Avg. <strong>{{ average_bytes_per_media|bytesformat }}</strong> per media
     </a>
   </div>
 
@@ -95,7 +95,7 @@
 
 <h2 class="title is-4 mt-5">Runtime information</h2>
 <div class="box">
-  <table class="table is-fullwidth is-hoverable">
+  <table class="table is-fullwidth is-hoverable is-striped">
     <tbody>
       <tr>
         <td><strong>User ID</strong></td>

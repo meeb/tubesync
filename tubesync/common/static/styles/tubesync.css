@@ -222,6 +222,11 @@ main .container {
   padding-right: 0.75rem;
 }
 
+a.box,
+a.box .title,
+a.box .subtitle {
+  color: var(--tubesync-light-blue);
+}
 
 /* ============================================
    Media Cards
@@ -264,31 +269,21 @@ main .container {
    Forms
    ============================================ */
 
+.simpleform .columns .column {
+  display: flex;
+  align-items: flex-end;
+}
 
+.simpleform .field {
+  width: 100%;
+}
 
 .simpleform .label {
   text-transform: uppercase;
 }
 
-.simpleform .input,
-.simpleform .textarea,
-.simpleform select {
-  border: 2px var(--bulma-primary) solid;
-  border-radius: 2px;
-}
-
-.simpleform .input:focus,
-.simpleform .textarea:focus,
-.simpleform select:focus {
-  border-color: var(--tubesync-orange);
-}
-
 .simpleform .textarea {
   min-height: 150px;
-}
-
-.delete-button:hover {
-  background-color: var(--tubesync-orange) !important;
 }
 
 [data-theme="dark"] .input,
@@ -301,6 +296,10 @@ main .container {
 /* ============================================
    Buttons
    ============================================ */
+.buttons {
+  gap: 1rem;
+}
+
 .button.is-primary {
   background-color: var(--tubesync-light-blue);
   border-color: var(--tubesync-light-blue);
@@ -316,11 +315,13 @@ main .container {
 .button.is-danger {
   background-color: var(--tubesync-red);
   border-color: var(--tubesync-red);
+  color: #ffffff;
 }
 
 .button.is-danger:hover {
   background-color: var(--tubesync-red);
   border-color: var(--tubesync-red);
+  color: #ffffff;
   filter: brightness(1.1);
 }
 
@@ -333,6 +334,7 @@ main .container {
 [data-theme="dark"] .button.is-danger {
   background-color: var(--tubesync-red);
   border-color: var(--tubesync-red);
+  color: #ffffff;
 }
 
 /* ============================================
@@ -354,4 +356,58 @@ main .container {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ============================================
+   Tables
+   ============================================ */
+.table.is-striped tbody tr:nth-child(odd) {
+  background-color: var(--bulma-scheme-main-bis);
+}
+
+[data-theme="dark"] .table.is-striped tbody tr:nth-child(odd) {
+  background-color: var(--bulma-scheme-main-ter);
+}
+
+/* ============================================
+   Notifications
+   ============================================ */
+[data-theme="dark"] .notification.is-info {
+  background-color: var(--tubesync-light-blue);
+  color: var(--tubesync-text-on-dark);
+}
+
+/* ============================================
+   Responsive Source Cards
+   ============================================ */
+.media-right.source-buttons {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.media-right.source-buttons .buttons {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.media-right.source-buttons .buttons .button {
+  flex: 0 1 auto;
+  min-width: fit-content;
+}
+
+@media screen and (max-width: 768px) {
+  .media.is-flex-direction-column-mobile {
+    flex-direction: column !important;
+  }
+
+  .media.is-flex-direction-column-mobile .media-right {
+    margin-top: 1rem;
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .media-right.source-buttons .buttons .button {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
 }

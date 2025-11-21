@@ -13,31 +13,27 @@
   TubeSync only supports Jellyfin and Plex.
 </p>
 {% include 'infobox.html' with message=message %}
-{% for mst in media_server_types %}
-<div class="columns">
-  <div class="column is-12 mb-4">
+<div class="mb-4">
+  <div class="buttons">
+    {% for mst in media_server_types %}
     <a href="{% url 'sync:add-mediaserver' server_type=mst.long_type %}" class="button is-primary">
       <span class="icon"><i class="fas fa-server"></i></span>
       <span>Add a {{ mst.label }} media server</span>
     </a>
+    {% endfor %}
   </div>
 </div>
-{% endfor %}
-<div class="columns">
-  <div class="column is-12">
-    <div class="menu">
-      <ul class="menu-list">
-        {% for mediaserver in mediaservers %}
-        <li>
-          <a href="{% url 'sync:mediaserver' pk=mediaserver.pk %}">
-            {{ mediaserver.icon|safe }} <strong>{{ mediaserver.get_server_type_display }}</strong> server at <strong>{{ mediaserver.url }}</strong>
-          </a>
-        </li>
-        {% empty %}
-        <li><span class="has-text-grey"><i class="fas fa-info-circle"></i> You haven't added any media servers.</span></li>
-        {% endfor %}
-      </ul>
-    </div>
-  </div>
+<div class="menu">
+  <ul class="menu-list">
+    {% for mediaserver in mediaservers %}
+    <li>
+      <a href="{% url 'sync:mediaserver' pk=mediaserver.pk %}">
+        {{ mediaserver.icon|safe }} <strong>{{ mediaserver.get_server_type_display }}</strong> server at <strong>{{ mediaserver.url }}</strong>
+      </a>
+    </li>
+    {% empty %}
+    <li><div class="notification"><i class="fas fa-info-circle"></i> You haven't added any media servers.</div></li>
+    {% endfor %}
+  </ul>
 </div>
 {% endblock %}

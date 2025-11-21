@@ -1,9 +1,9 @@
 {% if form %}
   {% if form.errors %}
   <div class="notification is-danger">
-    <ul class="errors py-3">
+    <ul class="errors">
       {% for _, error in form.errors.items %}
-      <li class="px-3 pb-2">{{ error }}</li>
+      <li>{{ error }}</li>
       {% endfor %}
     </ul>
   </div>

@@ -22,7 +22,7 @@
     {% for source in sources %}
       <div class="card mb-4">
         <div class="card-content">
-          <div class="media">
+          <div class="media is-flex-direction-column-mobile">
             <div class="media-content">
               <h2 class="title is-5 mb-2">
                 <span class="icon-text">
@@ -49,11 +49,15 @@
                 {% endif %}
               </div>
             </div>
-            <div class="media-right">
+            <div class="media-right source-buttons">
               <div class="buttons">
                 <a href="{% url 'sync:source' pk=source.pk %}" class="button" title="View source details">
                   <span class="icon"><i class="fas fa-info-circle"></i></span>
                   <span>Details</span>
+                </a>
+                <a href="{% url 'sync:update-source' pk=source.pk %}" class="button" title="Edit source">
+                  <span class="icon"><i class="fas fa-pen"></i></span>
+                  <span>Edit</span>
                 </a>
                 <a href="{% url 'sync:media' %}?filter={{ source.pk }}" class="button" title="View media">
                   <span class="icon"><i class="fas fa-film"></i></span>
@@ -62,10 +66,6 @@
                 <a href="{% url 'sync:tasks-completed' %}?filter={{ source.pk }}" class="button" title="View tasks">
                   <span class="icon"><i class="far fa-clock"></i></span>
                   <span>Tasks</span>
-                </a>
-                <a href="{% url 'sync:update-source' pk=source.pk %}" class="button" title="Edit source">
-                  <span class="icon"><i class="fas fa-pen-square"></i></span>
-                  <span>Edit</span>
                 </a>
                 <a href="{% url 'sync:source-sync-now' pk=source.pk %}" class="button is-primary">
                   <span class="icon"><i class="fas fa-sync"></i></span>
