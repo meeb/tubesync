@@ -389,7 +389,6 @@ def download_media(
         'skip_unavailable_fragments': False,
         'sleep_interval': 10,
         'max_sleep_interval': min(15*60, max(60, settings.DOWNLOAD_MEDIA_DELAY)),
-        'sleep_interval_requests': 3,
         'paths': opts.get('paths', dict()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),
         'postprocessor_hooks': opts.get('postprocessor_hooks', list()),
