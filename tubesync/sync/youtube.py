@@ -226,6 +226,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
     )
     for k in OUTTMPL_TYPES.keys():
         outtmpl.setdefault(k, '')
+    sleep_interval_requests = getattr(settings, 'YOUTUBE_INFO_SLEEP_REQUESTS', 1)
     opts.update({
         'ignoreerrors': False, # explicitly set this to catch exceptions
         'ignore_no_formats_error': False, # we must fail first to try again with this enabled
@@ -244,7 +245,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'paths': paths,
         'postprocessors': postprocessors,
         'skip_unavailable_fragments': False,
-        'sleep_interval_requests': 1,
+        'sleep_interval_requests': sleep_interval_requests,
         'verbose': True if settings.DEBUG else False,
         'writeinfojson': True,
     })
@@ -389,7 +390,6 @@ def download_media(
         'skip_unavailable_fragments': False,
         'sleep_interval': 10,
         'max_sleep_interval': min(15*60, max(60, settings.DOWNLOAD_MEDIA_DELAY)),
-        'sleep_interval_requests': 3,
         'paths': opts.get('paths', dict()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),
         'postprocessor_hooks': opts.get('postprocessor_hooks', list()),
