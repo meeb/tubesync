@@ -220,6 +220,7 @@ YOUTUBE_DEFAULTS = {
     },
 }
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
+YOUTUBE_INFO_SLEEP_REQUESTS = 1
 
 
 MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'
