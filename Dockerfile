@@ -577,6 +577,9 @@ RUN --mount=type=tmpfs,target=/cache \
       exit 1 ; \
   fi
 
+# Bundle deno with the image
+##COPY --from=deno /usr/local/bin/ /usr/local/bin/
+
 # Copy root
 COPY config/root /
 
@@ -589,6 +592,11 @@ COPY --from=tubesync-app /app /app
 
 # Build app
 RUN set -x && \
+  # Record the bundled deno version when it was included
+  ( deno_binary="$(command -v deno)" ; \
+    test '!' -n "${deno_binary}" || \
+    /app/install_deno.sh --only-record-version ; \
+  ) && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   test '!' -e /app/db.sqlite3 && \
   # Run any required app commands
