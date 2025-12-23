@@ -149,6 +149,7 @@ RUN set -eu ; \
 \
     set -x ; arch="$(decide_arch)" ; \
     dest='/usr/local/sbin/asfald-latest' ; \
+    TMPDIR="$(dirname "${dest}")" \
     asfald --overwrite --output "${dest}" \
         --pattern '${path}/checksums.txt' -- \
         "https://github.com/asfaload/asfald/releases/latest/download/asfald-${arch}-unknown-linux-musl" && \
@@ -322,7 +323,7 @@ ADD "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
 ##ADD --checksum="${S6_CHECKSUM_NOARCH}" "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
 
 # --checksum wasn't recognized, so use asfald to check the sums instead
-RUN set -eux ; cd "${DESTDIR}/" && \
+RUN set -eux ; TMPDIR="${DESTDIR}" ; export TMPDIR ; cd "${DESTDIR}/" && \
     asfald --hash="${SHA256_S6_AMD64}" -- "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" && \
     asfald --hash="${SHA256_S6_ARM64}" -- "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" && \
     asfald --hash="${SHA256_S6_NOARCH}" -- "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}"
