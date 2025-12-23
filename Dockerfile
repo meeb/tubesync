@@ -187,7 +187,7 @@ RUN set -eu ; \
         'deb http://openresty.org/package/%sdebian %s openresty' \
         "$(decide_arch)" "${DEBIAN_VERSION%-slim}"
 
-FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
+FROM tubesync-asfald AS ffmpeg-download
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 ARG FFMPEG_PREFIX_FILE
@@ -206,22 +206,6 @@ ARG DESTDIR="/downloaded"
 ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
 RUN set -eu ; \
-    apk --no-cache --no-progress add cmd:aria2c cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum" ; \
-\
-    aria2c_options() { \
-        algorithm="${CHECKSUM_ALGORITHM%[0-9]??}" ; \
-        bytes="${CHECKSUM_ALGORITHM#${algorithm}}" ; \
-        hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "${DESTDIR}/${FFMPEG_FILE_SUMS}" )" ; \
-\
-        printf -- '%s\n' "${1}" ; \
-        printf -- '\t%s\n' \
-          'allow-overwrite=true' \
-          'always-resume=false' \
-          'check-integrity=true' \
-          "checksum=${algorithm}-${bytes}=${hash}" \
-; \
-        printf -- '\n' ; \
-    } ; \
 \
     decide_arch() { \
         case "${TARGETARCH}" in \
@@ -232,23 +216,15 @@ RUN set -eu ; \
 \
     FFMPEG_ARCH="$(decide_arch)" ; \
     FFMPEG_PREFIX_FILE="$( printf -- '%s' "${FFMPEG_PREFIX_FILE}" | cut -d '-' -f 1,2 )" ; \
+    cd "${DESTDIR}" && \
     for url in $(awk ' \
       $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; } \
       ' "${DESTDIR}/${FFMPEG_FILE_SUMS}") ; \
     do \
         url="${FFMPEG_URL}/${url# }" ; \
-        aria2c_options "${url}" ; \
-    done > /tmp/downloads ; \
-    cat -v -n /tmp/downloads ; \
+        TMPDIR="${DESTDIR}" asfald-latest -qv -- "${url}" ; \
+    done ; \
     unset -v url ; \
-\
-    aria2c --no-conf=true \
-      --dir "${DESTDIR}" \
-      --lowest-speed-limit='16K' \
-      --max-connection-per-server='2' \
-      --show-console-readout=false \
-      --summary-interval=0 \
-      --input-file /tmp/downloads ; \
 \
     decide_expected() { \
         case "${TARGETARCH}" in \
@@ -259,7 +235,6 @@ RUN set -eu ; \
 \
     FFMPEG_HASH="$(decide_expected)" ; \
 \
-    cd "${DESTDIR}" ; \
     if [ -n "${FFMPEG_HASH}" ] ; \
     then \
         printf -- '%s *%s\n' "${FFMPEG_HASH}" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" >> /tmp/SUMS ; \
