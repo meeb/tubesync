@@ -136,6 +136,24 @@ COPY --from=asfald-download "/verified/${TARGETARCH}/asfald" /usr/local/sbin/
 FROM tubesync-base AS tubesync-asfald
 COPY --from=asfald /usr/local/sbin/ /usr/local/sbin/
 
+ARG TARGETARCH
+RUN set -eu ; \
+\
+    decide_arch() { \
+      case "${TARGETARCH}" in \
+        (amd64) printf -- 'x86_64' ;; \
+        (arm64) printf -- 'aarch64' ;; \
+        (*) exit 1 ;; \
+      esac ; \
+    } ; \
+\
+    set -x ; arch="$(decide_arch)" ; \
+    dest='/usr/local/sbin/asfald-latest' ; \
+    asfald --overwrite --output "${dest}" \
+        --pattern '${path}/checksums.txt' -- \
+        "https://github.com/asfaload/asfald/releases/latest/download/asfald-${arch}-unknown-linux-musl" && \
+    chmod -c 00755 "${dest}" && chown -c root:root "${dest}"
+
 FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
 
 FROM scratch AS uv
