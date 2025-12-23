@@ -213,12 +213,12 @@ RUN set -eu ; \
         bytes="${CHECKSUM_ALGORITHM#${algorithm}}" ; \
         hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "${DESTDIR}/${FFMPEG_FILE_SUMS}" )" ; \
 \
+        printf -- '%s\n' "${1}" ; \
         printf -- '\t%s\n' \
           'allow-overwrite=true' \
           'always-resume=false' \
           'check-integrity=true' \
           "checksum=${algorithm}-${bytes}=${hash}" \
-          'max-connection-per-server=2' \
 ; \
         printf -- '\n' ; \
     } ; \
@@ -237,15 +237,15 @@ RUN set -eu ; \
       ' "${DESTDIR}/${FFMPEG_FILE_SUMS}") ; \
     do \
         url="${FFMPEG_URL}/${url# }" ; \
-        printf -- '%s\n' "${url}" ; \
         aria2c_options "${url}" ; \
-        printf -- '\n' ; \
     done > /tmp/downloads ; \
+    cat -v -n /tmp/downloads ; \
     unset -v url ; \
 \
     aria2c --no-conf=true \
-      --dir /downloaded \
+      --dir "${DESTDIR}" \
       --lowest-speed-limit='16K' \
+      --max-connection-per-server='2' \
       --show-console-readout=false \
       --summary-interval=0 \
       --input-file /tmp/downloads ; \
