@@ -3,6 +3,11 @@
 
 ARG FFMPEG_VERSION="N"
 
+ARG ASFALD_VERSION="0.9.0"
+
+ARG SHA256_ASFALD_AMD64="0b7e1270ecc5a4c37785511b032477ddc3a7cf718b0b2f8542229f39adf2ce6a"
+ARG SHA256_ASFALD_ARM64="7c18868e3b8d0edf134ac101cdbf4b243c31735d3afe58f90f0b5a82394a6154"
+
 ARG S6_VERSION="3.2.0.3"
 
 ARG SHA256_S6_AMD64="01eb9a6dce10b5428655974f1903f48e7ba7074506dfb262e85ffab64a5498f2"
@@ -19,6 +24,7 @@ ARG DEBIAN_VERSION="bookworm-slim"
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 
+ARG ASFALD_CHECKSUM_ALGORITHM="sha256"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 ARG QJS_CHECKSUM_ALGORITHM="sha256"
@@ -63,6 +69,72 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y autopurge && \
     apt-get -y autoclean && \
     rm -f /var/cache/debconf/*.dat-old
+
+FROM alpine:${ALPINE_VERSION} AS asfald-download
+ARG ASFALD_VERSION
+ARG SHA256_ASFALD_AMD64
+ARG SHA256_ASFALD_ARM64
+
+ARG DESTDIR="/downloaded"
+ARG ASFALD_CHECKSUM_ALGORITHM
+ARG CHECKSUM_ALGORITHM="${ASFALD_CHECKSUM_ALGORITHM}"
+
+ARG ASFALD_CHECKSUM_AMD64="${CHECKSUM_ALGORITHM}:${SHA256_ASFALD_AMD64}"
+ARG ASFALD_CHECKSUM_ARM64="${CHECKSUM_ALGORITHM}:${SHA256_ASFALD_ARM64}"
+
+ARG ASFALD_DOWNLOAD_URI="asfaload/asfald/releases/download/v${ASFALD_VERSION}"
+ARG ASFALD_URL="https://github.com/${ASFALD_DOWNLOAD_URI}"
+ARG ASFALD_SUMS_URL="https://gh.checksums.asfaload.com/github.com/${ASFALD_DOWNLOAD_URI}/checksums.txt"
+ARG ASFALD_PREFIX_FILE="asfald-"
+ARG ASFALD_SUFFIX_FILE="-unknown-linux-musl"
+
+ARG ASFALD_FILE_AMD64="${ASFALD_PREFIX_FILE}x86_64${ASFALD_SUFFIX_FILE}"
+ARG ASFALD_FILE_ARM64="${ASFALD_PREFIX_FILE}aarch64${ASFALD_SUFFIX_FILE}"
+
+ADD "${ASFALD_SUMS_URL}" "${DESTDIR}/"
+ADD "${ASFALD_URL}/${ASFALD_FILE_AMD64}" "${DESTDIR}/"
+ADD "${ASFALD_URL}/${ASFALD_FILE_ARM64}" "${DESTDIR}/"
+
+##ADD --checksum="${ASFALD_CHECKSUM_AMD64}" "${ASFALD_URL}/${ASFALD_FILE_AMD64}" "${DESTDIR}/"
+##ADD --checksum="${ASFALD_CHECKSUM_ARM64}" "${ASFALD_URL}/${ASFALD_FILE_ARM64}" "${DESTDIR}/"
+
+# --checksum wasn't recognized, so use busybox to check the sums instead
+ARG TARGETARCH
+RUN set -eu ; \
+    apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" ; \
+\
+    decide_expected() { \
+        case "${TARGETARCH}" in \
+            (amd64) printf -- '%s' "${ASFALD_CHECKSUM_AMD64}" ;; \
+            (arm64) printf -- '%s' "${ASFALD_CHECKSUM_ARM64}" ;; \
+        (*) exit 1 ;; \
+        esac ; \
+    } ; \
+\
+    decide_fn() { \
+      case "${TARGETARCH}" in \
+        (amd64) printf -- '%s\n' "${ASFALD_FILE_AMD64}" ;; \
+        (arm64) printf -- '%s\n' "${ASFALD_FILE_ARM64}" ;; \
+        (*) exit 1 ;; \
+      esac ; \
+    } ; \
+\
+    checksum="$(decide_expected)" ; \
+    file="$(decide_fn)" ; \
+    mkdir -v -p "/verified/${TARGETARCH}" ; \
+    cd "${DESTDIR}/" && \
+    "${CHECKSUM_ALGORITHM}sum" --check --warn --strict --ignore-missing checksums.txt && \
+    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw && \
+    mv -v "${file}" "/verified/${TARGETARCH}/asfald" && \
+    chmod -v 00755 "/verified/${TARGETARCH}/asfald" && \
+    chown -v root:root "/verified/${TARGETARCH}/asfald"
+
+FROM scratch AS asfald
+ARG TARGETARCH
+COPY --from=asfald-download "/verified/${TARGETARCH}/asfald" /usr/local/sbin/
+
+FROM tubesync-base AS tubesync-asfald
+COPY --from=asfald /usr/local/sbin/ /usr/local/sbin/
 
 FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
 
