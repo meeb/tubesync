@@ -380,7 +380,7 @@ RUN set -eu ; \
 ## COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 FROM ghcr.io/meeb/s6-overlay:v${S6_VERSION} AS s6-overlay
 
-FROM alpine:${ALPINE_VERSION} AS quickjs-download
+FROM tubesync-asfald AS quickjs-download
 ARG QJS_VERSION
 ARG SHA256_QJS
 
@@ -390,7 +390,7 @@ ARG CHECKSUM_ALGORITHM="${QJS_CHECKSUM_ALGORITHM}"
 
 ARG QJS_CHECKSUM="${CHECKSUM_ALGORITHM}:${SHA256_QJS}"
 
-ARG QJS_URL="https://bellard.org/quickjs/binary_releases/"
+ARG QJS_URL="https://bellard.org/quickjs/binary_releases"
 ARG QJS_PREFIX_FILE="quickjs-cosmo-"
 ARG QJS_SUFFIX_FILE=".zip"
 
@@ -398,10 +398,10 @@ ARG QJS_FILE="${QJS_PREFIX_FILE}${QJS_VERSION}${QJS_SUFFIX_FILE}"
 
 ##ADD --checksum="${QJS_CHECKSUM}" "${QJS_URL}/${QJS_FILE}" "${DESTDIR}/"
 
-# --checksum wasn't recognized, so use busybox to check the sums instead
-ADD "${QJS_URL}/${QJS_FILE}" "${DESTDIR}/"
-RUN set -eu ; checksum="${QJS_CHECKSUM}" ; file="${QJS_FILE}" ; cd "${DESTDIR}/" && \
-    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
+# --checksum wasn't recognized, so use asfald to check the sums instead
+RUN set -eux ; TMPDIR="${DESTDIR}" ; export TMPDIR ; \
+    mkdir -v -p "${DESTDIR}" && cd "${DESTDIR}/" && \
+    asfald --hash="${SHA256_QJS}" -- "${QJS_URL}/${QJS_FILE}"
 
 FROM alpine:${ALPINE_VERSION} AS quickjs-extracted
 COPY --from=quickjs-download /downloaded /downloaded
