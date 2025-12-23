@@ -3,10 +3,10 @@
 
 ARG FFMPEG_VERSION="N"
 
-ARG ASFALD_VERSION="0.9.0"
+ARG ASFALD_VERSION="0.6.0"
 
-ARG SHA256_ASFALD_AMD64="0b7e1270ecc5a4c37785511b032477ddc3a7cf718b0b2f8542229f39adf2ce6a"
-ARG SHA256_ASFALD_ARM64="7c18868e3b8d0edf134ac101cdbf4b243c31735d3afe58f90f0b5a82394a6154"
+ARG SHA256_ASFALD_AMD64="017cdc44d767bb4733a3bd3fa5f97719e3f58236d006321dfae1924fdda3de9d"
+ARG SHA256_ASFALD_ARM64="4fc112617a71f97592b8760b98c16339d5243577186c970c784fbcab2ef8abd1"
 
 ARG S6_VERSION="3.2.0.3"
 
@@ -273,7 +273,7 @@ RUN set -eux ; \
 FROM scratch AS ffmpeg
 COPY --from=ffmpeg-extracted /extracted /usr/local/bin/
 
-FROM alpine:${ALPINE_VERSION} AS s6-overlay-download
+FROM tubesync-asfald AS s6-overlay-download
 ARG S6_VERSION
 ARG SHA256_S6_AMD64
 ARG SHA256_S6_ARM64
@@ -303,18 +303,11 @@ ADD "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
 ##ADD --checksum="${S6_CHECKSUM_ARM64}" "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
 ##ADD --checksum="${S6_CHECKSUM_NOARCH}" "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
 
-# --checksum wasn't recognized, so use busybox to check the sums instead
-ADD "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" "${DESTDIR}/"
-RUN set -eu ; checksum="${S6_CHECKSUM_AMD64}" ; file="${S6_FILE_AMD64}" ; cd "${DESTDIR}/" && \
-    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
-
-ADD "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
-RUN set -eu ; checksum="${S6_CHECKSUM_ARM64}" ; file="${S6_FILE_ARM64}" ; cd "${DESTDIR}/" && \
-    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
-
-ADD "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
-RUN set -eu ; checksum="${S6_CHECKSUM_NOARCH}" ; file="${S6_FILE_NOARCH}" ; cd "${DESTDIR}/" && \
-    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
+# --checksum wasn't recognized, so use asfald to check the sums instead
+RUN set -eux ; cd "${DESTDIR}/" && \
+    asfald --hash="${SHA256_S6_AMD64}" -- "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" && \
+    asfald --hash="${SHA256_S6_ARM64}" -- "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" && \
+    asfald --hash="${SHA256_S6_NOARCH}" -- "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}"
 
 FROM alpine:${ALPINE_VERSION} AS s6-overlay-extracted
 COPY --from=s6-overlay-download /downloaded /downloaded
