@@ -65,10 +65,14 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     rm -f /var/cache/debconf/*.dat-old
 
 FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
+
+FROM scratch AS uv
+COPY --from=uv-binaries /uv /uvx /usr/local/bin/
+
 FROM denoland/deno:bin AS deno-binaries
 
 FROM scratch AS deno
-COPY --from=deno-binaries /deno /usr/local/bin/deno
+COPY --from=deno-binaries /deno /usr/local/bin/
 
 FROM alpine:${ALPINE_VERSION} AS openresty-debian
 ARG TARGETARCH
@@ -354,9 +358,6 @@ RUN --mount=type=bind,source=fontawesome-free,target=/fontawesome-free \
 FROM scratch AS tubesync-app
 COPY --from=tubesync-prepare-app /app /app
 
-FROM tubesync-base AS tubesync-uv
-COPY --from=uv-binaries /uv /uvx /usr/local/bin/
-
 FROM tubesync-base AS tubesync-openresty
 
 COPY --from=openresty-debian \
@@ -486,13 +487,19 @@ ARG YTDLP_DATE
 
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=cache,id=deno-cache,sharing=locked,target=/cache/deno \
     --mount=type=cache,id=uv-cache,sharing=locked,target=/cache/uv \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
-    --mount=type=bind,source=/uv,target=/usr/local/bin/uv,from=uv-binaries \
+    --mount=type=bind,source=/usr/local/bin/deno,target=/usr/local/bin/deno,from=deno \
+    --mount=type=bind,source=/usr/local/bin/uv,target=/usr/local/bin/uv,from=uv \
+    --mount=type=bind,source=/usr/local/bin/uvx,target=/usr/local/bin/uvx,from=uv \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
+  DENO_DIR=/cache/deno && export DENO_DIR && \
+  deno --version && \
+  uv --version && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -570,6 +577,9 @@ RUN --mount=type=tmpfs,target=/cache \
       exit 1 ; \
   fi
 
+# Bundle deno with the image
+##COPY --from=deno /usr/local/bin/ /usr/local/bin/
+
 # Copy root
 COPY config/root /
 
@@ -582,6 +592,11 @@ COPY --from=tubesync-app /app /app
 
 # Build app
 RUN set -x && \
+  # Record the bundled deno version when it was included
+  ( deno_binary="$(command -v deno)" ; \
+    test '!' -n "${deno_binary}" || \
+    /app/install_deno.sh --only-record-version ; \
+  ) && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   test '!' -e /app/db.sqlite3 && \
   # Run any required app commands
