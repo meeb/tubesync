@@ -4,7 +4,8 @@ set -eu
 cd /app/bgutil-ytdlp-pot-provider/server
 chmod -c 00755 ../node
 
-tmp_app_home="$(realpath -e .)"
+tmp_app_home="$(realpath -e "$(mktemp --directory --tmpdir=.)")"
+trap "rm -rf ${tmp_app_home}" EXIT
 
 command -v deno >/dev/null || \
     /app/install_deno.sh
