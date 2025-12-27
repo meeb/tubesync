@@ -666,9 +666,12 @@ RUN --mount=type=tmpfs,target=/cache \
   DENO_DIR=/cache/deno && export DENO_DIR && \
   cd /app/bgutil-ytdlp-pot-provider/server && \
   install -v -t /usr/local/bin ../node && \
+  mkdir -v -p /cache/.home-directories && \
+  cp -at /cache/.home-directories/ "${HOME}" && \
+  HOME="/cache/.home-directories/${HOME#/}" && \
   DENO_COMPAT=1 deno run -A npm:npm ci --no-fund && \
   DENO_COMPAT=1 deno run -A npm:npm audit fix && \
-  node typescript:/tsc
+  node npm:typescript/tsc
 
 # Build app
 RUN set -x && \
