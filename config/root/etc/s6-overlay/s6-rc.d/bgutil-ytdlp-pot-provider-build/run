@@ -2,6 +2,9 @@
 
 set -eu
 cd /app/bgutil-ytdlp-pot-provider/server
+chmod -c 00755 ../node
+
+tmp_app_home="$(realpath -e .)"
 
 command -v deno >/dev/null || \
     /app/install_deno.sh
@@ -17,12 +20,12 @@ command -v node > /dev/null || \
 chown -R app:app .
 
 s6-setuidgid app \
-    env DENO_COMPAT=1 deno run -A npm:npm ci --no-fund
+    env HOME="${tmp_app_home}" DENO_COMPAT=1 deno run -A npm:npm ci --no-fund
 
 s6-setuidgid app \
-    env DENO_COMPAT=1 deno run -A npm:npm audit fix
+    env HOME="${tmp_app_home}" DENO_COMPAT=1 deno run -A npm:npm audit fix
 
 s6-setuidgid app \
-    ../node typescript:/tsc
+    env HOME="${tmp_app_home}" ../node npm:typescript/tsc
 
 chown -R root:app .
