@@ -1,0 +1,28 @@
+#!/command/with-contenv bash
+
+set -eu
+cd /app/bgutil-ytdlp-pot-provider/server
+
+command -v deno >/dev/null || \
+    /app/install_deno.sh
+
+test '!' -d build || \
+    test '!' -f build/main.js || \
+    test '!' -d node_modules || \
+    exit 0 # nothing needs to be built
+
+command -v node > /dev/null || \
+    install -v -t /usr/local/bin ../node
+
+chown -R app:app .
+
+s6-setuidgid app \
+    env DENO_COMPAT=1 deno run -A npm:npm ci --no-fund
+
+s6-setuidgid app \
+    env DENO_COMPAT=1 deno run -A npm:npm audit fix
+
+s6-setuidgid app \
+    ../node typescript:/tsc
+
+chown -R root:app .
