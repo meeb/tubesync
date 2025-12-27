@@ -662,14 +662,17 @@ COPY --from=tubesync-app /app /app
 RUN --mount=type=tmpfs,target=/cache \
     --mount=type=cache,id=deno-cache,sharing=locked,target=/cache/deno \
   command -v deno || exit 0 ; \
+  # python might be used, so keep the .pyc files in /cache
+  PYTHONPYCACHEPREFIX='/cache/pycache' && export PYTHONPYCACHEPREFIX && \
   set -x && \
-  DENO_DIR=/cache/deno && export DENO_DIR && \
+  XDG_CACHE_HOME='/cache' && export XDG_CACHE_HOME && \
+  DENO_DIR='/cache/deno' && export DENO_DIR && \
   cd /app/bgutil-ytdlp-pot-provider/server && \
   install -v -t /usr/local/bin ../node && \
   mkdir -v -p /cache/.home-directories && \
   cp -at /cache/.home-directories/ "${HOME}" && \
   HOME="/cache/.home-directories/${HOME#/}" && \
-  DENO_COMPAT=1 deno run -A npm:npm ci --no-fund && \
+  DENO_COMPAT=1 deno run -A npm:npm ci --no-audit --no-fund && \
   DENO_COMPAT=1 deno run -A npm:npm audit fix && \
   node npm:typescript/tsc
 
