@@ -59,16 +59,14 @@
   <div class="column is-half-desktop">
     <div class="box">
       <h4 class="title is-5">Latest downloads</h4>
-      <div class="content">
+      <div class="is-fullwidth">
         {% for media in latest_downloads %}
-        <div class="mb-4">
-          <a href="{% url 'sync:media-item' pk=media.pk %}">
-            <strong>{{ media.name }}</strong><br>
-            <small class="has-text-grey">{{ media.download_date|timesince:now }} ago from "{{ media.source.name }}"</small>
-          </a>
-        </div>
+        <a href="{% url 'sync:media-item' pk=media.pk %}" class="download-item is-block is-fullwidth p-3">
+          <div class="is-clipped mb-1"><strong>{{ media.name }}</strong></div>
+          <div class="is-clipped"><strong>{{ media.download_date|timesince:now }} ago</strong> from "{{ media.source.name }}"</div>
+        </a>
         {% empty %}
-        <p class="has-text-grey">No media has been downloaded.</p>
+        <div class="download-item is-block is-fullwidth p-3">No media has been downloaded.</div>
         {% endfor %}
       </div>
     </div>
@@ -77,16 +75,14 @@
   <div class="column is-half-desktop">
     <div class="box">
       <h4 class="title is-5">Largest downloads</h4>
-      <div class="content">
+      <div class="is-fullwidth">
         {% for media in largest_downloads %}
-        <div class="mb-4">
-          <a href="{% url 'sync:media-item' pk=media.pk %}">
-            {{ media.name }}<br>
-            <small class="has-text-grey"><strong>{{ media.downloaded_filesize|bytesformat }}</strong>{% if media.downloaded_format %} in {{ media.downloaded_format }}{% endif %} from "{{ media.source.name }}"</small>
-          </a>
-        </div>
+        <a href="{% url 'sync:media-item' pk=media.pk %}" class="download-item is-block is-fullwidth p-3">
+          <div class="is-clipped mb-1">{{ media.name }}</div>
+          <div class="is-clipped"><strong>{{ media.downloaded_filesize|bytesformat }}</strong>{% if media.downloaded_format %} in {{ media.downloaded_format }}{% endif %} from "{{ media.source.name }}"</div>
+        </a>
         {% empty %}
-        <p class="has-text-grey">No media has been downloaded.</p>
+        <div class="download-item is-block is-fullwidth p-3">No media has been downloaded.</div>
         {% endfor %}
       </div>
     </div>
@@ -98,24 +94,24 @@
   <table class="table is-fullwidth is-hoverable is-striped">
     <tbody>
       <tr>
-        <td><strong>User ID</strong></td>
-        <td>{{ uid }}</td>
+        <td>User ID</td>
+        <td><strong>{{ uid }}</strong></td>
       </tr>
       <tr>
-        <td><strong>Group ID</strong></td>
-        <td>{{ gid }}</td>
+        <td>Group ID</td>
+        <td><strong>{{ gid }}</strong></td>
       </tr>
       <tr>
-        <td><strong>Config directory</strong></td>
-        <td>{{ config_dir }}</td>
+        <td>Config directory</td>
+        <td><strong>{{ config_dir }}</strong></td>
       </tr>
       <tr>
-        <td><strong>Downloads directory</strong></td>
-        <td>{{ downloads_dir }}</td>
+        <td>Downloads directory</td>
+        <td><strong>{{ downloads_dir }}</strong></td>
       </tr>
       <tr>
-        <td><strong>Database</strong></td>
-        <td>{{ database_connection }}{% if database_filesize %} ({{ database_filesize|bytesformat }}){% endif %}</td>
+        <td>Database</td>
+        <td><strong>{{ database_connection }}{% if database_filesize %} ({{ database_filesize|bytesformat }}){% endif %}</strong></td>
       </tr>
     </tbody>
     </table>

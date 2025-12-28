@@ -25,14 +25,14 @@
 
   <body id="body">
 
-    <header class="py-3">
+    <header class="pt-4 pb-4">
       <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="is-flex is-justify-content-space-between is-align-items-center">
           <a href="{% url 'sync:dashboard' %}" class="is-flex is-align-items-center">
             {% include 'tubesync.svg' with width='3rem' height='3rem' class='pr-4' %}
-            <h1 class="title has-text-white mb-0 ml-2">TubeSync</h1>
+            <h1>TubeSync</h1>
           </a>
-          <a role="button" class="navbar-burger is-hidden-tablet" aria-label="menu" aria-expanded="false" data-target="navbarMenu" style="background: transparent; border: none; margin: 0;">
+          <a role="button" class="navbar-burger is-hidden-tablet has-background-transparent is-borderless m-0" aria-label="menu" aria-expanded="false" data-target="navbarMenu">
             <span aria-hidden="true"></span>
             <span aria-hidden="true"></span>
             <span aria-hidden="true"></span>

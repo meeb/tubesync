@@ -81,6 +81,13 @@ header svg.tubesync-logo .logo-icon {
   fill: var(--tubesync-text-on-dark) !important;
 }
 
+header h1 {
+  margin: 0 0 0 var(--bulma-spacing-2);
+  font-size: var(--bulma-size-1);
+  line-height: calc(var(--bulma-size-1) * 0.9);
+  color: var(--tubesync-text-on-dark);
+}
+
 @media screen and (max-width: 1023px) {
   header .container > div {
     padding-left: 0.75rem;
@@ -99,11 +106,13 @@ footer svg path {
 
 footer a {
   color: var(--tubesync-text-on-dark);
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-color: rgba(253, 255, 252, 0.5);
 }
 
 footer a:hover {
   color: var(--tubesync-orange);
+  text-decoration-color: var(--tubesync-orange);
 }
 
 footer strong {
@@ -112,6 +121,7 @@ footer strong {
 
 [data-theme="dark"] footer a {
   color: var(--tubesync-text-on-dark);
+  text-decoration-color: rgba(232, 234, 237, 0.5);
 }
 
 [data-theme="dark"] footer strong {
@@ -222,10 +232,25 @@ main .container {
   padding-right: 0.75rem;
 }
 
+main h1.title {
+  font-weight: var(--bulma-weight-normal);
+}
+
 a.box,
 a.box .title,
 a.box .subtitle {
   color: var(--tubesync-light-blue);
+}
+
+.box .content a {
+  font-weight: 300;
+  line-height: 110%;
+}
+
+hr {
+  background-color: var(--tubesync-light-blue);
+  border: none;
+  height: 1px;
 }
 
 /* ============================================
@@ -268,15 +293,6 @@ a.box .subtitle {
 /* ============================================
    Forms
    ============================================ */
-
-.simpleform .columns .column {
-  display: flex;
-  align-items: flex-end;
-}
-
-.simpleform .field {
-  width: 100%;
-}
 
 .simpleform .label {
   text-transform: uppercase;
@@ -348,14 +364,40 @@ a.box .subtitle {
   background-color: var(--bulma-danger);
 }
 
-.errorlist li {
-  color: #fdfffc;
+.has-background-transparent {
+  background-color: transparent !important;
 }
 
-.is-clipped {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.is-borderless {
+  border: none !important;
+}
+
+.m-0 {
+  margin: 0 !important;
+}
+
+.is-fullheight {
+  height: 100%;
+}
+
+.is-flex-grow-1 {
+  flex-grow: 1;
+}
+
+.is-align-items-flex-start {
+  align-items: flex-start;
+}
+
+.is-align-self-flex-start {
+  align-self: flex-start;
+}
+
+.has-text-decoration-underline {
+  text-decoration: underline;
+}
+
+.has-cursor-pointer {
+  cursor: pointer;
 }
 
 /* ============================================
@@ -410,4 +452,23 @@ a.box .subtitle {
     flex: 1 1 auto;
     min-width: 0;
   }
+}
+
+/* ============================================
+   Download Lists
+   ============================================ */
+.download-item {
+  color: var(--tubesync-light-blue);
+  text-decoration: none;
+  border-bottom: 1px solid var(--bulma-border);
+  transition: background-color 0.2s;
+}
+
+.download-item:last-child {
+  border-bottom: none;
+}
+
+.download-item:hover {
+  background-color: var(--tubesync-orange);
+  color: var(--tubesync-text-on-dark);
 }

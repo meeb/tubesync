@@ -133,15 +133,15 @@
 
 <div class="columns is-multiline">
   <div class="column is-half">
-    <div class="box is-flex is-flex-direction-column" style="height: 100%;">
+    <div class="box is-flex is-flex-direction-column is-fullheight">
       <h2 class="title is-5">Completed</h2>
-      <div style="flex-grow: 1; display: flex; align-items: flex-start;">
+      <div class="is-flex-grow-1 is-flex is-align-items-flex-start">
         <p class="mb-4">
           A record of recently completed tasks is kept for a few days. You can use the button
           below to view recent tasks which have completed successfully.
         </p>
       </div>
-      <a href="{% url 'sync:tasks-completed' %}" class="button is-primary" style="align-self: flex-start;">
+      <a href="{% url 'sync:tasks-completed' %}" class="button is-primary is-align-self-flex-start">
         <span><span class="is-hidden-tablet-only">View </span>Completed tasks</span>
         <span class="icon"><i class="fas fa-check-double"></i></span>
       </a>
@@ -149,14 +149,14 @@
   </div>
 
   <div class="column is-half">
-    <div class="box is-flex is-flex-direction-column" style="height: 100%;">
+    <div class="box is-flex is-flex-direction-column is-fullheight">
       <h2 class="title is-5">Reset</h2>
-      <div style="flex-grow: 1; display: flex; align-items: flex-start;">
+      <div class="is-flex-grow-1 is-flex is-align-items-flex-start">
         <p class="mb-4">
           If you need to, you can reset and reschedule all tasks using the button below.
         </p>
       </div>
-      <a href="{% url 'sync:reset-tasks' %}" class="button is-primary" style="align-self: flex-start;">
+      <a href="{% url 'sync:reset-tasks' %}" class="button is-primary is-align-self-flex-start">
         <span>Reset tasks</span>
         <span class="icon"><i class="fas fa-history"></i></span>
       </a>

@@ -13,8 +13,8 @@
       {% if field.field.widget.input_type == 'hidden' %}
         {{ field }}
       {% else %}
-        <div class="column is-half-tablet is-one-third-desktop{% if field.field.widget.input_type == 'checkbox' %} is-flex is-align-items-center{% endif %}">
-          <div class="field">
+        <div class="column is-half-tablet is-one-third-desktop is-flex is-align-items-flex-end{% if field.field.widget.input_type == 'checkbox' %} is-align-items-center{% endif %}">
+          <div class="field is-fullwidth">
             {% if field.field.widget.input_type == 'checkbox' %}
             <div class="control">
               <label class="checkbox">
@@ -31,7 +31,7 @@
             {% if field.name == 'media_format' %}
             <p class="help help-text">
               <i class="fas fa-info-circle pr-2"></i> File format to use for saving files
-              <a id="show-media-vars" style="cursor: pointer; text-decoration: underline;"><i class="fas fa-list"></i> show available variables</a>
+              <a id="show-media-vars" class="has-text-decoration-underline has-cursor-pointer"><i class="fas fa-list"></i> show available variables</a>
             </p>
             {% elif field.help_text %}
             <p class="help help-text"><i class="fas fa-info-circle pr-2"></i> {{ field.help_text }}</p>
