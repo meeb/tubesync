@@ -1,14 +1,16 @@
 #!/usr/bin/env sh
 
+set -eu
 command -v deno >/dev/null || \
     sleep 24h
 
-case "${1}%${#}" in
+case "${1-}%${#}" in
+    (%0) DENO_COMPAT=1 exec deno repl ;;
     (--version%1) printf -- '%s\n' 'v24.12.0' ; exit ;;
 esac
 
 DENO_COMPAT=1 exec deno run --allow-env --allow-net --allow-sys \
     --allow-ffi="${HOME}" \
-    --allow-read=. --allow-read="${HOME}" --allow-read="${XDG_CACHE_HOME}" \
-    --allow-write=. --allow-write="${HOME}" --allow-write="${XDG_CACHE_HOME}" \
+    --allow-read=. --allow-read="${HOME}" --allow-read="${XDG_CACHE_HOME:-.}" \
+    --allow-write=. --allow-write="${HOME}" --allow-write="${XDG_CACHE_HOME:-.}" \
     "$@"
