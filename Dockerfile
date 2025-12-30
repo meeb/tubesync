@@ -356,7 +356,7 @@ RUN set -eu ; \
 ## COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 FROM ghcr.io/meeb/s6-overlay:v${S6_VERSION} AS s6-overlay
 
-FROM tubesync-asfald AS quickjs-download
+FROM tubesync-asfald AS quickjs-extracted
 ARG QJS_VERSION
 ARG SHA256_QJS
 
@@ -379,25 +379,24 @@ RUN set -eux ; TMPDIR="${DESTDIR}" ; export TMPDIR ; \
     mkdir -v -p "${DESTDIR}" && cd "${DESTDIR}/" && \
     asfald --hash="${SHA256_QJS}" -- "${QJS_URL}/${QJS_FILE}"
 
-FROM alpine:${ALPINE_VERSION} AS quickjs-extracted
-COPY --from=quickjs-download /downloaded /downloaded
-
-ARG QJS_CHECKSUM_ALGORITHM
-ARG CHECKSUM_ALGORITHM="${QJS_CHECKSUM_ALGORITHM}"
-
-RUN set -eu ; \
-\
-    apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" cmd:unzip ; \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    set -eux ; \
+    apt-get update ; \
+    apt-get -y --no-install-recommends install unzip ; \
     mkdir -v /extracted ; \
     cd /extracted ; \
     for f in /downloaded/*.zip ; \
     do \
       unzip "${f}" || exit ; \
     done ; \
-    unset -v f ;
+    unset -v f ; \
+    mkdir -v /assimilated ; \
+    install -v -p -t /assimilated /extracted/qjs ; \
+    /assimilated/qjs --assimilate
 
 FROM scratch AS quickjs
-COPY --from=quickjs-extracted /extracted/qjs /usr/local/sbin/
+COPY --from=quickjs-extracted /assimilated/qjs /usr/local/sbin/
 
 FROM tubesync-base AS tubesync-prepare-app
 
@@ -538,7 +537,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     /usr/local/bin/ffmpeg -version && \
     file /usr/local/bin/ff* && \
     # Installed quickjs (using COPY earlier)
-    /usr/local/sbin/qjs --assimilate && \
     /usr/local/sbin/qjs --help | grep -Fe 'QuickJS version' && \
     file /usr/local/sbin/qjs && \
     # Clean up file
