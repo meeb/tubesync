@@ -445,25 +445,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   apt-get -y autoclean && \
   rm -v -f /var/cache/debconf/*.dat-old
 
-FROM tubesync-base AS tubesync-nginx
-
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
-  set -x && \
-  apt-get update && \
-  apt-get -y --no-install-recommends install \
-    nginx-light \
-    libnginx-mod-http-lua \
-  && \
-  # openresty binary should still work
-  ln -v -s -T ../sbin/nginx /usr/bin/openresty && \
-  # Clean up
-  apt-get -y autopurge && \
-  apt-get -y autoclean && \
-  rm -v -f /var/cache/debconf/*.dat-old
-
-# The preference for openresty over nginx,
-# is for the newer version.
 FROM tubesync-openresty AS tubesync
 
 ARG S6_VERSION
