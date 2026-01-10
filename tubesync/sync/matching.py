@@ -118,6 +118,8 @@ def get_best_video_format(media):
             continue
         if not fmt['vcodec']:
             continue
+        if '-sr' in fmt['id']:
+            continue
         if any(key[0] not in fmt for key in sort_keys):
             continue
         if media.source.source_resolution.strip().upper() == fmt['format']:
@@ -132,6 +134,8 @@ def get_best_video_format(media):
             for fmt in media.iter_formats():
                 # If the format has an audio stream, skip it
                 if fmt['acodec'] is not None:
+                    continue
+                if '-sr' in fmt['id']:
                     continue
                 if (fmt['height'] <= media.source.source_resolution_height and 
                     fmt['height'] >= min_height):
