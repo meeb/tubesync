@@ -422,6 +422,15 @@ RUN mkdir -v /tmp/extracted && \
     ls -alR /app/bgutil-ytdlp-pot-provider && \
     rm -rf /tmp/extracted
 
+ADD 'https://github.com/kikkia/yt-cipher/archive/refs/heads/master.tar.gz' /tmp/yt-cipher-master.tar.gz
+RUN mkdir -v /tmp/extracted && \
+    tar -C /tmp/extracted/ -xvvpf "/tmp/yt-cipher-master.tar.gz" && \
+    mkdir -v -p /app/yt-cipher && \
+    ( cd /tmp/extracted/yt-cipher-*/ && : >> deno.jsonc && mv -v src deno.* *.ts /app/yt-cipher/ ; ) && \
+    ( test -s /app/yt-cipher/deno.jsonc || rm -f /app/yt-cipher/deno.jsonc ; ) && \
+    ls -alR /app/yt-cipher && \
+    rm -rf /tmp/extracted
+
 FROM scratch AS tubesync-app
 COPY --from=tubesync-prepare-app /app /app
 
