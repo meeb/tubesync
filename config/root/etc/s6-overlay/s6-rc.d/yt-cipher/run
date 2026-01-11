@@ -11,5 +11,14 @@ HOST=127.0.0.1
 PORT=8011
 export HOST PORT
 
+# Patching dependencies to prefix them with `npm:`
+# Hopefully, soon, this script won't exist on the default branch.
+if [ -d ejs/src ] && [ -f scripts/patch-ejs.ts ]; then
+    chown -R app:app ejs/src
+    s6-setuidgid app \
+        deno run --allow-read --allow-write ./scripts/patch-ejs.ts
+    chown -R root:app ejs/src
+fi
+
 exec s6-setuidgid app \
     deno run --allow-env --allow-net --allow-read --allow-write server.ts
