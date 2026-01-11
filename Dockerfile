@@ -1,7 +1,13 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
+ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="1.2.2"
 ARG FFMPEG_VERSION="N"
+
+ARG ASFALD_VERSION="0.6.0"
+
+ARG SHA256_ASFALD_AMD64="017cdc44d767bb4733a3bd3fa5f97719e3f58236d006321dfae1924fdda3de9d"
+ARG SHA256_ASFALD_ARM64="4fc112617a71f97592b8760b98c16339d5243577186c970c784fbcab2ef8abd1"
 
 ARG S6_VERSION="3.2.0.3"
 
@@ -19,6 +25,7 @@ ARG DEBIAN_VERSION="bookworm-slim"
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 
+ARG ASFALD_CHECKSUM_ALGORITHM="sha256"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 ARG QJS_CHECKSUM_ALGORITHM="sha256"
@@ -64,11 +71,100 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y autoclean && \
     rm -f /var/cache/debconf/*.dat-old
 
+FROM alpine:${ALPINE_VERSION} AS asfald-download
+ARG ASFALD_VERSION
+ARG SHA256_ASFALD_AMD64
+ARG SHA256_ASFALD_ARM64
+
+ARG DESTDIR="/downloaded"
+ARG ASFALD_CHECKSUM_ALGORITHM
+ARG CHECKSUM_ALGORITHM="${ASFALD_CHECKSUM_ALGORITHM}"
+
+ARG ASFALD_CHECKSUM_AMD64="${CHECKSUM_ALGORITHM}:${SHA256_ASFALD_AMD64}"
+ARG ASFALD_CHECKSUM_ARM64="${CHECKSUM_ALGORITHM}:${SHA256_ASFALD_ARM64}"
+
+ARG ASFALD_DOWNLOAD_URI="asfaload/asfald/releases/download/v${ASFALD_VERSION}"
+ARG ASFALD_URL="https://github.com/${ASFALD_DOWNLOAD_URI}"
+ARG ASFALD_SUMS_URL="https://gh.checksums.asfaload.com/github.com/${ASFALD_DOWNLOAD_URI}/checksums.txt"
+ARG ASFALD_PREFIX_FILE="asfald-"
+ARG ASFALD_SUFFIX_FILE="-unknown-linux-musl"
+
+ARG ASFALD_FILE_AMD64="${ASFALD_PREFIX_FILE}x86_64${ASFALD_SUFFIX_FILE}"
+ARG ASFALD_FILE_ARM64="${ASFALD_PREFIX_FILE}aarch64${ASFALD_SUFFIX_FILE}"
+
+ADD "${ASFALD_SUMS_URL}" "${DESTDIR}/"
+ADD "${ASFALD_URL}/${ASFALD_FILE_AMD64}" "${DESTDIR}/"
+ADD "${ASFALD_URL}/${ASFALD_FILE_ARM64}" "${DESTDIR}/"
+
+##ADD --checksum="${ASFALD_CHECKSUM_AMD64}" "${ASFALD_URL}/${ASFALD_FILE_AMD64}" "${DESTDIR}/"
+##ADD --checksum="${ASFALD_CHECKSUM_ARM64}" "${ASFALD_URL}/${ASFALD_FILE_ARM64}" "${DESTDIR}/"
+
+# --checksum wasn't recognized, so use busybox to check the sums instead
+ARG TARGETARCH
+RUN set -eu ; \
+    apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" ; \
+\
+    decide_expected() { \
+        case "${TARGETARCH}" in \
+            (amd64) printf -- '%s' "${ASFALD_CHECKSUM_AMD64}" ;; \
+            (arm64) printf -- '%s' "${ASFALD_CHECKSUM_ARM64}" ;; \
+        (*) exit 1 ;; \
+        esac ; \
+    } ; \
+\
+    decide_fn() { \
+      case "${TARGETARCH}" in \
+        (amd64) printf -- '%s\n' "${ASFALD_FILE_AMD64}" ;; \
+        (arm64) printf -- '%s\n' "${ASFALD_FILE_ARM64}" ;; \
+        (*) exit 1 ;; \
+      esac ; \
+    } ; \
+\
+    checksum="$(decide_expected)" ; \
+    file="$(decide_fn)" ; \
+    mkdir -v -p "/verified/${TARGETARCH}" ; \
+    cd "${DESTDIR}/" && \
+    "${CHECKSUM_ALGORITHM}sum" --check --warn --strict --ignore-missing checksums.txt && \
+    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw && \
+    mv -v "${file}" "/verified/${TARGETARCH}/asfald" && \
+    chmod -v 00755 "/verified/${TARGETARCH}/asfald" && \
+    chown -v root:root "/verified/${TARGETARCH}/asfald"
+
+FROM scratch AS asfald
+ARG TARGETARCH
+COPY --from=asfald-download "/verified/${TARGETARCH}/asfald" /usr/local/sbin/
+
+FROM tubesync-base AS tubesync-asfald
+COPY --from=asfald /usr/local/sbin/ /usr/local/sbin/
+
+ARG TARGETARCH
+RUN set -eu ; \
+\
+    decide_arch() { \
+      case "${TARGETARCH}" in \
+        (amd64) printf -- 'x86_64' ;; \
+        (arm64) printf -- 'aarch64' ;; \
+        (*) exit 1 ;; \
+      esac ; \
+    } ; \
+\
+    set -x ; arch="$(decide_arch)" ; \
+    dest='/usr/local/sbin/asfald-latest' ; \
+    TMPDIR="$(dirname "${dest}")" \
+    asfald --overwrite --output "${dest}" \
+        --pattern '${path}/checksums.txt' -- \
+        "https://github.com/asfaload/asfald/releases/latest/download/asfald-${arch}-unknown-linux-musl" && \
+    chmod -c 00755 "${dest}" && chown -c root:root "${dest}"
+
 FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
+
+FROM scratch AS uv
+COPY --from=uv-binaries /uv /uvx /usr/local/bin/
+
 FROM denoland/deno:bin AS deno-binaries
 
 FROM scratch AS deno
-COPY --from=deno-binaries /deno /usr/local/bin/deno
+COPY --from=deno-binaries /deno /usr/local/bin/
 
 FROM alpine:${ALPINE_VERSION} AS openresty-debian
 ARG TARGETARCH
@@ -92,7 +188,7 @@ RUN set -eu ; \
         'deb http://openresty.org/package/%sdebian %s openresty' \
         "$(decide_arch)" "${DEBIAN_VERSION%-slim}"
 
-FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
+FROM tubesync-asfald AS ffmpeg-download
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 ARG FFMPEG_PREFIX_FILE
@@ -111,22 +207,6 @@ ARG DESTDIR="/downloaded"
 ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
 RUN set -eu ; \
-    apk --no-cache --no-progress add cmd:aria2c cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum" ; \
-\
-    aria2c_options() { \
-        algorithm="${CHECKSUM_ALGORITHM%[0-9]??}" ; \
-        bytes="${CHECKSUM_ALGORITHM#${algorithm}}" ; \
-        hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "${DESTDIR}/${FFMPEG_FILE_SUMS}" )" ; \
-\
-        printf -- '\t%s\n' \
-          'allow-overwrite=true' \
-          'always-resume=false' \
-          'check-integrity=true' \
-          "checksum=${algorithm}-${bytes}=${hash}" \
-          'max-connection-per-server=2' \
-; \
-        printf -- '\n' ; \
-    } ; \
 \
     decide_arch() { \
         case "${TARGETARCH}" in \
@@ -137,23 +217,15 @@ RUN set -eu ; \
 \
     FFMPEG_ARCH="$(decide_arch)" ; \
     FFMPEG_PREFIX_FILE="$( printf -- '%s' "${FFMPEG_PREFIX_FILE}" | cut -d '-' -f 1,2 )" ; \
+    cd "${DESTDIR}" && \
     for url in $(awk ' \
       $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; } \
       ' "${DESTDIR}/${FFMPEG_FILE_SUMS}") ; \
     do \
         url="${FFMPEG_URL}/${url# }" ; \
-        printf -- '%s\n' "${url}" ; \
-        aria2c_options "${url}" ; \
-        printf -- '\n' ; \
-    done > /tmp/downloads ; \
+        TMPDIR="${DESTDIR}" asfald-latest -qv -- "${url}" ; \
+    done ; \
     unset -v url ; \
-\
-    aria2c --no-conf=true \
-      --dir /downloaded \
-      --lowest-speed-limit='16K' \
-      --show-console-readout=false \
-      --summary-interval=0 \
-      --input-file /tmp/downloads ; \
 \
     decide_expected() { \
         case "${TARGETARCH}" in \
@@ -164,7 +236,6 @@ RUN set -eu ; \
 \
     FFMPEG_HASH="$(decide_expected)" ; \
 \
-    cd "${DESTDIR}" ; \
     if [ -n "${FFMPEG_HASH}" ] ; \
     then \
         printf -- '%s *%s\n' "${FFMPEG_HASH}" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" >> /tmp/SUMS ; \
@@ -197,7 +268,7 @@ RUN set -eux ; \
 FROM scratch AS ffmpeg
 COPY --from=ffmpeg-extracted /extracted /usr/local/bin/
 
-FROM alpine:${ALPINE_VERSION} AS s6-overlay-download
+FROM tubesync-asfald AS s6-overlay-download
 ARG S6_VERSION
 ARG SHA256_S6_AMD64
 ARG SHA256_S6_ARM64
@@ -227,18 +298,11 @@ ADD "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
 ##ADD --checksum="${S6_CHECKSUM_ARM64}" "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
 ##ADD --checksum="${S6_CHECKSUM_NOARCH}" "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
 
-# --checksum wasn't recognized, so use busybox to check the sums instead
-ADD "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" "${DESTDIR}/"
-RUN set -eu ; checksum="${S6_CHECKSUM_AMD64}" ; file="${S6_FILE_AMD64}" ; cd "${DESTDIR}/" && \
-    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
-
-ADD "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
-RUN set -eu ; checksum="${S6_CHECKSUM_ARM64}" ; file="${S6_FILE_ARM64}" ; cd "${DESTDIR}/" && \
-    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
-
-ADD "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
-RUN set -eu ; checksum="${S6_CHECKSUM_NOARCH}" ; file="${S6_FILE_NOARCH}" ; cd "${DESTDIR}/" && \
-    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
+# --checksum wasn't recognized, so use asfald to check the sums instead
+RUN set -eux ; TMPDIR="${DESTDIR}" ; export TMPDIR ; cd "${DESTDIR}/" && \
+    asfald --hash="${SHA256_S6_AMD64}" -- "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" && \
+    asfald --hash="${SHA256_S6_ARM64}" -- "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" && \
+    asfald --hash="${SHA256_S6_NOARCH}" -- "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}"
 
 FROM alpine:${ALPINE_VERSION} AS s6-overlay-extracted
 COPY --from=s6-overlay-download /downloaded /downloaded
@@ -292,7 +356,7 @@ RUN set -eu ; \
 ## COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
 FROM ghcr.io/meeb/s6-overlay:v${S6_VERSION} AS s6-overlay
 
-FROM alpine:${ALPINE_VERSION} AS quickjs-download
+FROM tubesync-asfald AS quickjs-extracted
 ARG QJS_VERSION
 ARG SHA256_QJS
 
@@ -302,7 +366,7 @@ ARG CHECKSUM_ALGORITHM="${QJS_CHECKSUM_ALGORITHM}"
 
 ARG QJS_CHECKSUM="${CHECKSUM_ALGORITHM}:${SHA256_QJS}"
 
-ARG QJS_URL="https://bellard.org/quickjs/binary_releases/"
+ARG QJS_URL="https://bellard.org/quickjs/binary_releases"
 ARG QJS_PREFIX_FILE="quickjs-cosmo-"
 ARG QJS_SUFFIX_FILE=".zip"
 
@@ -310,30 +374,29 @@ ARG QJS_FILE="${QJS_PREFIX_FILE}${QJS_VERSION}${QJS_SUFFIX_FILE}"
 
 ##ADD --checksum="${QJS_CHECKSUM}" "${QJS_URL}/${QJS_FILE}" "${DESTDIR}/"
 
-# --checksum wasn't recognized, so use busybox to check the sums instead
-ADD "${QJS_URL}/${QJS_FILE}" "${DESTDIR}/"
-RUN set -eu ; checksum="${QJS_CHECKSUM}" ; file="${QJS_FILE}" ; cd "${DESTDIR}/" && \
-    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
+# --checksum wasn't recognized, so use asfald to check the sums instead
+RUN set -eux ; TMPDIR="${DESTDIR}" ; export TMPDIR ; \
+    mkdir -v -p "${DESTDIR}" && cd "${DESTDIR}/" && \
+    asfald --hash="${SHA256_QJS}" -- "${QJS_URL}/${QJS_FILE}"
 
-FROM alpine:${ALPINE_VERSION} AS quickjs-extracted
-COPY --from=quickjs-download /downloaded /downloaded
-
-ARG QJS_CHECKSUM_ALGORITHM
-ARG CHECKSUM_ALGORITHM="${QJS_CHECKSUM_ALGORITHM}"
-
-RUN set -eu ; \
-\
-    apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" cmd:unzip ; \
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    set -eux ; \
+    apt-get update ; \
+    apt-get -y --no-install-recommends install unzip ; \
     mkdir -v /extracted ; \
     cd /extracted ; \
     for f in /downloaded/*.zip ; \
     do \
       unzip "${f}" || exit ; \
     done ; \
-    unset -v f ;
+    unset -v f ; \
+    mkdir -v /assimilated ; \
+    install -v -p -t /assimilated /extracted/qjs ; \
+    /assimilated/qjs --assimilate
 
 FROM scratch AS quickjs
-COPY --from=quickjs-extracted /extracted/qjs /usr/local/sbin/
+COPY --from=quickjs-extracted /assimilated/qjs /usr/local/sbin/
 
 FROM tubesync-base AS tubesync-prepare-app
 
@@ -351,11 +414,16 @@ RUN --mount=type=bind,source=fontawesome-free,target=/fontawesome-free \
   rm -v /app/tubesync/local_settings.py.example && \
   mv -v /app/tubesync/local_settings.py.container /app/tubesync/local_settings.py
 
+ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION
+ADD "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/archive/refs/tags/${BGUTIL_YTDLP_POT_PROVIDER_VERSION}.tar.gz" /tmp/
+RUN mkdir -v /tmp/extracted && \
+    tar -C /tmp/extracted/ -xvvpf "/tmp/${BGUTIL_YTDLP_POT_PROVIDER_VERSION}.tar.gz" && \
+    mv -v /tmp/extracted/*/server /app/bgutil-ytdlp-pot-provider/ && \
+    ls -alR /app/bgutil-ytdlp-pot-provider && \
+    rm -rf /tmp/extracted
+
 FROM scratch AS tubesync-app
 COPY --from=tubesync-prepare-app /app /app
-
-FROM tubesync-base AS tubesync-uv
-COPY --from=uv-binaries /uv /uvx /usr/local/bin/
 
 FROM tubesync-base AS tubesync-openresty
 
@@ -377,25 +445,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   apt-get -y autoclean && \
   rm -v -f /var/cache/debconf/*.dat-old
 
-FROM tubesync-base AS tubesync-nginx
-
-RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
-  set -x && \
-  apt-get update && \
-  apt-get -y --no-install-recommends install \
-    nginx-light \
-    libnginx-mod-http-lua \
-  && \
-  # openresty binary should still work
-  ln -v -s -T ../sbin/nginx /usr/bin/openresty && \
-  # Clean up
-  apt-get -y autopurge && \
-  apt-get -y autoclean && \
-  rm -v -f /var/cache/debconf/*.dat-old
-
-# The preference for openresty over nginx,
-# is for the newer version.
 FROM tubesync-openresty AS tubesync
 
 ARG S6_VERSION
@@ -469,7 +518,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     /usr/local/bin/ffmpeg -version && \
     file /usr/local/bin/ff* && \
     # Installed quickjs (using COPY earlier)
-    /usr/local/sbin/qjs --assimilate && \
     /usr/local/sbin/qjs --help | grep -Fe 'QuickJS version' && \
     file /usr/local/sbin/qjs && \
     # Clean up file
@@ -486,13 +534,19 @@ ARG YTDLP_DATE
 
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=cache,id=deno-cache,sharing=locked,target=/cache/deno \
     --mount=type=cache,id=uv-cache,sharing=locked,target=/cache/uv \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
-    --mount=type=bind,source=/uv,target=/usr/local/bin/uv,from=uv-binaries \
+    --mount=type=bind,source=/usr/local/bin/deno,target=/usr/local/bin/deno,from=deno \
+    --mount=type=bind,source=/usr/local/bin/uv,target=/usr/local/bin/uv,from=uv \
+    --mount=type=bind,source=/usr/local/bin/uvx,target=/usr/local/bin/uvx,from=uv \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
+  DENO_DIR=/cache/deno && export DENO_DIR && \
+  deno --version && \
+  uv --version && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -570,6 +624,9 @@ RUN --mount=type=tmpfs,target=/cache \
       exit 1 ; \
   fi
 
+# Bundle deno with the image
+##COPY --from=deno /usr/local/bin/ /usr/local/bin/
+
 # Copy root
 COPY config/root /
 
@@ -580,8 +637,31 @@ COPY patches/yt_dlp/ \
 # Copy app
 COPY --from=tubesync-app /app /app
 
+# Build the bgutil-ytdlp-pot-provider server when deno is bundled
+RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=cache,id=deno-cache,sharing=locked,target=/cache/deno \
+  command -v deno || exit 0 ; \
+  # python might be used, so keep the .pyc files in /cache
+  PYTHONPYCACHEPREFIX='/cache/pycache' && export PYTHONPYCACHEPREFIX && \
+  set -x && \
+  XDG_CACHE_HOME='/cache' && export XDG_CACHE_HOME && \
+  DENO_DIR='/cache/deno' && export DENO_DIR && \
+  cd /app/bgutil-ytdlp-pot-provider/server && \
+  install -v -t /usr/local/bin ../node && \
+  mkdir -v -p /cache/.home-directories && \
+  cp -at /cache/.home-directories/ "${HOME}" && \
+  HOME="/cache/.home-directories/${HOME#/}" && \
+  DENO_COMPAT=1 deno run -A npm:npm ci --no-audit --no-fund && \
+  DENO_COMPAT=1 deno run -A npm:npm audit fix && \
+  node npm:typescript/tsc
+
 # Build app
 RUN set -x && \
+  # Record the bundled deno version when it was included
+  ( deno_binary="$(command -v deno)" ; \
+    test '!' -n "${deno_binary}" || \
+    /app/install_deno.sh --only-record-version ; \
+  ) && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   test '!' -e /app/db.sqlite3 && \
   # Run any required app commands

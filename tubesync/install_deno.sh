@@ -48,6 +48,10 @@ work_dir="$(mktemp -d)"
 trap "rm -rf -- '${work_dir}'" EXIT
 cd "${work_dir}"
 
-download_deno "${deno_archive}"
-extract_deno "${deno_archive}" '/usr/local/bin'
-record_deno_version '/usr/local/bin/deno'
+if [ '--only-record-version' != "${1-unset}" ]; then
+    download_deno "${deno_archive}"
+    extract_deno "${deno_archive}" '/usr/local/bin'
+    record_deno_version '/usr/local/bin/deno'
+else
+    record_deno_version "$(command -v deno)"
+fi
