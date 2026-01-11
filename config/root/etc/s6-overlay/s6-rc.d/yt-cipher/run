@@ -1,0 +1,15 @@
+#!/command/with-contenv bash
+
+set -e
+cd /app/yt-cipher
+chown -R root:app .
+
+command -v deno >/dev/null || \
+    /app/install_deno.sh
+
+HOST=127.0.0.1
+PORT=8011
+export HOST PORT
+
+exec s6-setuidgid app \
+    deno run --allow-env --allow-net --allow-read --allow-write server.ts
