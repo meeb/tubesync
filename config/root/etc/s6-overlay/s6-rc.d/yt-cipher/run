@@ -15,17 +15,19 @@ HOST=127.0.0.1
 PORT=8011
 export HOST PORT
 
-# Patching dependencies to prefix them with `npm:`
-# Hopefully, soon, this script won't exist on the default branch.
-if [ -d ejs/src ] && [ -f scripts/patch-ejs.ts ]; then
-    chown -R app:app ejs/src
+# Create files in a parallel directory structure
+rm -rf /dev/shm/yt-cipher
+mkdir -p /dev/shm/yt-cipher
+cd /dev/shm/yt-cipher
+cp -rs -t ./ /app/yt-cipher/*
+find . '!' -type l -exec chown app:app '{}' +
+
+# Add dependencies to avoid patching
+if [ -f ejs/package.json ]; then
     command -v jq >/dev/null || install_jq
     jq_filter='.dependencies|to_entries|map("npm:" + .key + "@" + .value)|.[]'
     s6-setuidgid app \
         jq -r "${jq_filter}" ejs/package.json | s6-setuidgid app xargs -r -t deno add
-    s6-setuidgid app \
-        deno run --allow-read --allow-write ./scripts/patch-ejs.ts
-    chown -R root:app ejs/src
 fi
 
 exec s6-setuidgid app \
