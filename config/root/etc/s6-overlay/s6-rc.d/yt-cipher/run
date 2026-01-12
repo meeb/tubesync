@@ -1,5 +1,9 @@
 #!/command/with-contenv bash
 
+install_jq() {
+    apt-get update && apt-get install -y jq
+}
+
 set -e
 cd /app/yt-cipher
 chown -R root:app .
@@ -15,6 +19,10 @@ export HOST PORT
 # Hopefully, soon, this script won't exist on the default branch.
 if [ -d ejs/src ] && [ -f scripts/patch-ejs.ts ]; then
     chown -R app:app ejs/src
+    command -v jq >/dev/null || install_jq
+    jq_filter='.dependencies|to_entries|map("npm:" + .key + "@" + .value)|.[]'
+    s6-setuidgid app \
+        jq -r "${jq_filter}" ejs/package.json | s6-setuidgid app xargs -r -t deno add
     s6-setuidgid app \
         deno run --allow-read --allow-write ./scripts/patch-ejs.ts
     chown -R root:app ejs/src
