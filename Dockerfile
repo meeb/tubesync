@@ -3,6 +3,7 @@
 
 ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="1.2.2"
 ARG FFMPEG_VERSION="N"
+ARG YTDLP_EJS_VERSION="0.3.2"
 
 ARG ASFALD_VERSION="0.6.0"
 
@@ -420,6 +421,19 @@ RUN mkdir -v /tmp/extracted && \
     tar -C /tmp/extracted/ -xvvpf "/tmp/${BGUTIL_YTDLP_POT_PROVIDER_VERSION}.tar.gz" && \
     mv -v /tmp/extracted/*/server /app/bgutil-ytdlp-pot-provider/ && \
     ls -alR /app/bgutil-ytdlp-pot-provider && \
+    rm -rf /tmp/extracted
+
+ARG YTDLP_EJS_VERSION
+ADD "https://github.com/yt-dlp/ejs/archive/refs/tags/${YTDLP_EJS_VERSION}.tar.gz" /tmp/ejs.tar.gz
+ADD 'https://github.com/kikkia/yt-cipher/archive/refs/heads/master.tar.gz' /tmp/yt-cipher-master.tar.gz
+RUN mkdir -v /tmp/extracted && \
+    tar -C /tmp/extracted/ -xvvpf '/tmp/yt-cipher-master.tar.gz' && \
+    tar -C /tmp/extracted/ -xvvpf '/tmp/ejs.tar.gz' && \
+    mkdir -v -p /app/yt-cipher/ejs && \
+    ( cd /tmp/extracted/ejs-*/ && mv -v * /app/yt-cipher/ejs/ ; ) && \
+    ( cd /tmp/extracted/yt-cipher-*/ && : >> deno.jsonc && mv -v src deno.* *.ts /app/yt-cipher/ ; ) && \
+    ( test -s /app/yt-cipher/deno.jsonc || rm -f /app/yt-cipher/deno.jsonc ; ) && \
+    ls -alR /app/yt-cipher && \
     rm -rf /tmp/extracted
 
 FROM scratch AS tubesync-app
