@@ -118,6 +118,10 @@ def get_best_video_format(media):
             continue
         if not fmt['vcodec']:
             continue
+        # Disqualify AI-upscaled "super resolution" formats
+        # ID: 248-sr , 1080p, AI-upscaled, TV (1920x1080), fps:25, video:VP9 @1409.292k
+        # ID: 399-sr , 1080p, AI-upscaled, TV (1920x1080), fps:25, video:AV1 @1155.505k
+        # https://github.com/meeb/tubesync/issues/1357
         if '-sr' in fmt['id']:
             continue
         if any(key[0] not in fmt for key in sort_keys):
@@ -135,6 +139,8 @@ def get_best_video_format(media):
                 # If the format has an audio stream, skip it
                 if fmt['acodec'] is not None:
                     continue
+                # Disqualify AI-upscaled "super resolution" formats
+                # See above for more details.
                 if '-sr' in fmt['id']:
                     continue
                 if (fmt['height'] <= media.source.source_resolution_height and 
