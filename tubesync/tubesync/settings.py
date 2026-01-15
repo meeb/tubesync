@@ -208,6 +208,9 @@ YOUTUBE_DEFAULTS = {
     'max_sleep_interval': (60)*5,
     'sleep_interval': 0.25,
     'extractor_args': {
+        'youtube': {
+            'raise_incomplete_data': ['true'],
+        },
         'youtubepot-bgutilhttp': {
             'base_url': ['http://127.0.0.1:4416'],
         },
