@@ -123,6 +123,12 @@ urlpatterns = [
     ),
 
     path(
+        'task/<int:pk>/abort',
+        TasksView.as_view(),
+        name='revoke-task',
+    ),
+
+    path(
         'task/<int:pk>/schedule/now',
         TaskScheduleView.as_view(),
         name='run-task',
