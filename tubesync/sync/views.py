@@ -885,6 +885,8 @@ class TasksView(ListView):
     messages = {
         'filter': _('Viewing tasks filtered for source: <strong>{name}</strong>'),
         'reset': _('All tasks have been reset'),
+        'revoked': _('Revoked task: {task_id}'),
+        'scheduled': _('Scheduled task: {name}'),
     }
 
     def __init__(self, *args, **kwargs):
@@ -901,11 +903,26 @@ class TasksView(ListView):
                 self.filter_source = Source.objects.get(pk=filter_by)
             except Source.DoesNotExist:
                 self.filter_source = None
-            if not message_key or 'filter' == message_key:
-                message = self.messages.get('filter', '')
-                self.message = message.format(
-                    name=self.filter_source.name
-                )
+            else:
+                if not message_key or 'filter' == message_key:
+                    message = self.messages.get('filter', '')
+                    self.message = message.format(
+                        name=self.filter_source.name
+                    )
+
+        if message_key in ('revoked', 'scheduled'):
+            fmt_vars = dict(
+                pk=request.GET.get('pk', 'Unknown'),
+                task_id=request.GET.get('task_id', 'Unknown'),
+            )
+            try:
+                task = TaskHistory.objects.get(pk=fmt_vars['pk'])
+            except TaskHistory.DoesNotExist:
+                fmt_vars['name'] = fmt_vars['pk']
+            else:
+                fmt_vars['name'] = task.verbose_name or task.task_id or task.pk
+                fmt_vars['task_id'] = task.task_id
+            self.message = self.message.format(fmt_vars)
 
         return super().dispatch(request, *args, **kwargs)
 
@@ -1014,6 +1031,37 @@ class TasksView(ListView):
                 self.kwargs[page_kwarg] = 'last'
         return super().paginate_queryset(queryset, page_size)
 
+    def get(self, *args, **kwargs):
+        path = args[0].path
+        if path.startswith('/task/') and path.endswith('/abort'):
+            try:
+                task = TaskHistory.objects.get(pk=kwargs["pk"])
+            except TaskHistory.DoesNotExist:
+                return HttpResponseNotFound()
+            else:
+                huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+                huey_queues = { q.name: q for q in map(get_queue, huey_queue_names)) }
+                q = huey_queues.get(task.queue)
+                if q is None:
+                    msg = f'TasksView: queue not found: {task.pk=} {task.queue=}'
+                    log.warning(msg)
+                    return HttpResponseNotFound()
+                # revoke the task we want to abort
+                q.revoke_by_id(id=task.task_id, revoke_once=True)
+                vn = task.verbose_name or task.task_id or task.pk
+                if not vn.startswith('[revoked] '):
+                    task.verbose_name = f'[revoked] {vn}'
+                    task.save()
+                return append_uri_params(
+                    reverse_lazy('sync:tasks'),
+                    dict(
+                        message='revoked',
+                        pk=str(task.pk),
+                        task_id=str(task.task_id),
+                    ),
+                )
+        else:
+            return super().get(self, *args, **kwargs)
 
 class CompletedTasksView(ListView):
     '''
@@ -1145,6 +1193,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
             dict(
                 message='scheduled',
                 pk=str(self.object.pk),
+                task_id=str(self.object.task_id),
             ),
         )
 
@@ -1169,17 +1218,15 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         if form.errors:
             return super().form_invalid(form)
 
-        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
-        huey_queues = list(map(get_queue, huey_queue_names))
         pk = self.object.pk
         queue = self.object.queue
         task_id = self.object.task_id
-        matching = { q for q in huey_queues if q.name == queue }
-        try:
-            q = matching.pop()
-        except KeyError as e:
+        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+        huey_queues = { q.name: q for q in map(get_queue, huey_queue_names)) }
+        q = huey_queues.get(queue)
+        if q is None:
             msg = f'TaskScheduleView: queue not found: {pk=} {queue=}'
-            log.exception(msg, exc_info=e)
+            log.warning(msg)
         else:
             eta = max(self.now, when)
             if q.reschedule(task_id, eta):
