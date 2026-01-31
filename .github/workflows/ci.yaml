@@ -235,7 +235,7 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
-          tags: ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:latest
+          tags: ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:${{ github.event.repository.default_branch == github.ref_name && 'latest' || 'test' }}
           cache-from: |
             type=registry,ref=ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:latest
             type=registry,ref=ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:latest
