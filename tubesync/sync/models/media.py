@@ -1022,10 +1022,10 @@ class Media(models.Model):
         if not format_str:
             raise NoFormatException(f'Cannot download, media "{self.pk}" ({self}) has '
                                     f'no valid format available')
-        # Download the media with youtube-dl
+        # Download the media with yt-dlp
         download_youtube_media(self.url, format_str, self.source.extension,
                                str(self.filepath), self.source.write_json,
-                               self.source.sponsorblock_categories.selected_choices, self.source.embed_thumbnail,
+                               self.source.sponsorblock_categories.expand_choices, self.source.embed_thumbnail,
                                self.source.embed_metadata, self.source.enable_sponsorblock,
                               self.source.write_subtitles, self.source.auto_subtitles,self.source.sub_langs )
         # Return the download paramaters

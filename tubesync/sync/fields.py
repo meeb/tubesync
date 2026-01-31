@@ -179,21 +179,32 @@ class CommaSepChoiceField(models.CharField):
         if set(s_value) != set(value):
             self.log.warn(f'CommaSepChoiceField:get_prep_value: values did not match. '
                           f'CommaSepChoiceField({value}) versus CharField({s_value})')
-        return self.__class__._tuple__str__(data)
+        return self.__class__._tuple___str__(data)
 
     
     # extra functions not used by any parent classes
     @staticmethod
-    def _tuple__str__(data):
+    def _tuple___str__(data):
         if not isinstance(data, CommaSepChoice):
             return data
         value = data.selected_choices
         if not isinstance(value, list):
             return ''
-        if data.all_choice in value:
+        if data.allow_all and data.all_choice in value:
             return data.all_choice
         ordered_unique = list(dict.fromkeys(value))
         return data.separator.join(ordered_unique)
+
+    @staticmethod
+    def _tuple_expand_choices(data):
+        if data.allow_all and data.all_choice in data.selected_choices:
+            return list(dict(data.possible_choices))
+        else:
+            return data.selected_choices
+
+    @property
+    def expand_choices(self):
+        return self.__class__._tuple_expand_choices(self)
 
     def get_all_choices(self):
         choice_list = list()
@@ -208,5 +219,6 @@ class CommaSepChoiceField(models.CharField):
         return choice_list
 
 
-CommaSepChoice.__str__ = CommaSepChoiceField._tuple__str__
+CommaSepChoice.__str__ = CommaSepChoiceField._tuple___str__
+CommaSepChoice.expand_choices = property(fget=CommaSepChoiceField._tuple_expand_choices)
 
