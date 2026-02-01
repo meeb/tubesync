@@ -58,6 +58,7 @@ def map_task_to_instance(task):
         'sync.tasks.download_media_metadata': Media,
         'sync.tasks.save_all_media_for_source': Source,
         'sync.tasks.rename_all_media_for_source': Source,
+        'sync.tasks.refresh_formats': Media,
     }
     MODEL_URL_MAP = {
         Source: 'sync:source',
