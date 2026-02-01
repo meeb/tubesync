@@ -6,7 +6,6 @@ svc_path() (
     realpath -e -s "$@"
 )
 
-_services="$(/command/s6-rc-db atomics user user2)"
 is_a_longrun() {
     if [ 'longrun' = "$(/command/s6-rc-db type "$1")" ]
     then
@@ -24,7 +23,6 @@ only_longruns() {
         fi
     done
 }
-_longruns="$(only_longruns ${_services})"
 
 if [ 0 -eq $# ]
 then
@@ -33,8 +31,8 @@ fi
 
 for arg in "$@"
 do
-    _svcs="$(/command/s6-rc -e list "${arg}")"
-    for service in $(svc_path $(only_longruns ${_svcs}))
+    _svcs="$(only_longruns $(/command/s6-rc -e list "${arg}"))"
+    for service in $(svc_path ${_svcs})
     do
         printf -- 'Restarting %-28s' "${service#${_dir}/}..."
         _began="$( date '+%s' )"
@@ -44,5 +42,4 @@ do
             "$( expr "${_ended}" - "${_began}" )"
     done
 done
-unset -v _began _ended _svcs arg service
-unset -v _dir _longruns _services
+unset -v _began _dir _ended _svcs arg service
