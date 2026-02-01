@@ -41,7 +41,7 @@ _longruns="$(only_longruns ${_services})"
 
 if [ 0 -eq $# ]
 then
-    set -- $(only_longruns $(/command/s6-rc -a list))
+    set -- $(only_longruns $(/command/s6-rc -e -a list))
 fi
 
 for arg in "$@"
@@ -49,7 +49,7 @@ do
     _svcs="${arg}"
     if is_a_bundle "${arg}"
     then
-        _svcs="$(only_longruns $(/command/s6-rc list "${arg}"))"
+        _svcs="$(only_longruns $(/command/s6-rc -e list "${arg}"))"
     fi
     for service in $(svc_path ${_svcs})
     do
