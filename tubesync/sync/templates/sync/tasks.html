@@ -86,6 +86,9 @@
             </span> Priority:&nbsp;{{ task.priority }}&nbsp;Queue:&nbsp;{{ task.queue }}<br>
             <i class="far fa-clock"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong>
           </a>
+          <a href="{% url 'sync:revoke-task' pk=task.pk %}">
+            <i class="far fa-stop-circle"></i>
+          </a>
           <a href="{% url 'sync:run-task' pk=task.pk %}">
             <i class="far fa-play-circle"></i>
           {% endif %}
