@@ -36,7 +36,8 @@ do
     do
         printf -- 'Restarting %-28s' "${service#${_dir}/}..."
         _began="$( date '+%s' )"
-        /command/s6-svc -wr -r "${service}"
+        # always start the service rather than waiting indefinitely
+        /command/s6-svc -wr -r -U "${service}"
         _ended="$( date '+%s' )"
         printf -- '\tcompleted (in %2.1d seconds).\n' \
             "$( expr "${_ended}" - "${_began}" )"
