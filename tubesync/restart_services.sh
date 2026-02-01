@@ -6,13 +6,7 @@ svc_path() (
     realpath -e -s "$@"
 )
 
-_bundles="$(
-    find '/etc/s6-overlay/s6-rc.d' -mindepth 2 -maxdepth 2 \
-        -name 'type' \
-        -execdir grep -F -q -e bundle '{}' ';' \
-        -printf '%P\n' | \
-        sed -e 's,/type$,,' ;
-)"
+_bundles="$(/command/s6-rc-db list bundles)"
 is_a_bundle() {
     local bundle
     for bundle in ${_bundles}
@@ -25,9 +19,29 @@ is_a_bundle() {
     return 1
 }
 
+_services="$(/command/s6-rc-db atomics user user2)"
+is_a_longrun() {
+    if [ 'longrun' = "$(/command/s6-rc-db type "$1")" ]
+    then
+        return 0
+    fi
+    return 1
+}
+only_longruns() {
+    local service
+    for service in "$@"
+    do
+        if is_a_longrun "${service}"
+        then
+            printf -- '%s\n' "${service}"
+        fi
+    done
+}
+_longruns="$(only_longruns ${_services})"
+
 if [ 0 -eq $# ]
 then
-    set -- $(/command/s6-rc list user | grep -v -e '-init$')
+    set -- $(only_longruns $(/command/s6-rc -a list))
 fi
 
 for arg in "$@"
@@ -35,7 +49,7 @@ do
     _svcs="${arg}"
     if is_a_bundle "${arg}"
     then
-        _svcs="$(/command/s6-rc list "${arg}" | grep -v -e '-init$')"
+        _svcs="$(only_longruns $(/command/s6-rc list "${arg}"))"
     fi
     for service in $(svc_path ${_svcs})
     do
@@ -48,4 +62,4 @@ do
     done
 done
 unset -v _began _ended _svcs arg service
-unset -v _bundles _dir
+unset -v _bundles _dir _longruns _services
