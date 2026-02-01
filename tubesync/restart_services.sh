@@ -26,7 +26,7 @@ only_longruns() {
 
 if [ 0 -eq $# ]
 then
-    set -- $(/command/s6-rc -e -a list)
+    set -- $(only_longruns $(/command/s6-rc -e -a list))
 fi
 
 for arg in "$@"
