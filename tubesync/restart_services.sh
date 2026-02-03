@@ -6,46 +6,41 @@ svc_path() (
     realpath -e -s "$@"
 )
 
-_bundles="$(
-    find '/etc/s6-overlay/s6-rc.d' -mindepth 2 -maxdepth 2 \
-        -name 'type' \
-        -execdir grep -F -q -e bundle '{}' ';' \
-        -printf '%P\n' | \
-        sed -e 's,/type$,,' ;
-)"
-is_a_bundle() {
-    local bundle
-    for bundle in ${_bundles}
+is_a_longrun() {
+    if [ 'longrun' = "$(/command/s6-rc-db type "$1")" ]
+    then
+        return 0
+    fi
+    return 1
+}
+only_longruns() {
+    local service
+    for service in "$@"
     do
-        if [ "$1" = "${bundle}" ]
+        if is_a_longrun "${service}"
         then
-            return 0
+            printf -- '%s\n' "${service}"
         fi
     done
-    return 1
 }
 
 if [ 0 -eq $# ]
 then
-    set -- $(/command/s6-rc list user | grep -v -e '-init$')
+    set -- $(only_longruns $(/command/s6-rc -e -a list))
 fi
 
 for arg in "$@"
 do
-    _svcs="${arg}"
-    if is_a_bundle "${arg}"
-    then
-        _svcs="$(/command/s6-rc list "${arg}" | grep -v -e '-init$')"
-    fi
+    _svcs="$(only_longruns $(/command/s6-rc -e list "${arg}"))"
     for service in $(svc_path ${_svcs})
     do
         printf -- 'Restarting %-28s' "${service#${_dir}/}..."
         _began="$( date '+%s' )"
-        /command/s6-svc -wr -r "${service}"
+        # always start the service rather than waiting indefinitely
+        /command/s6-svc -wr -r -U "${service}"
         _ended="$( date '+%s' )"
         printf -- '\tcompleted (in %2.1d seconds).\n' \
             "$( expr "${_ended}" - "${_began}" )"
     done
 done
-unset -v _began _ended _svcs arg service
-unset -v _bundles _dir
+unset -v _began _dir _ended _svcs arg service

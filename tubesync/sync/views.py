@@ -34,6 +34,7 @@ from .tasks import (
     map_task_to_instance, get_error_message,
     get_running_tasks, get_media_download_task, get_source_completed_tasks,
     check_source_directory_exists, index_source, download_media_image, download_media_file,
+    refresh_formats,
 )
 from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
                         YouTube_SourceType, youtube_long_source_types,
@@ -623,6 +624,15 @@ class MediaItemView(DetailView):
         combined_exact, combined_format = self.object.get_best_combined_format()
         audio_exact, audio_format = self.object.get_best_audio_format()
         video_exact, video_format = self.object.get_best_video_format()
+        data['combined_format_dict'] = {'id': str(combined_format)}
+        data['audio_format_dict'] = {'id': str(audio_format)}
+        data['video_format_dict'] = {'id': str(video_format)}
+        context_keys = { k for k in data.keys() if k.endswith('_format_dict') }
+        for fmt in self.object.iter_formats():
+            for k in context_keys:
+                v = data[k]
+                if v.get('id') == fmt.get('id'):
+                    data[k] = fmt
         task = get_media_download_task(self.object.pk)
         data['task'] = task
         data['download_state'] = self.object.get_download_state(task)
@@ -683,12 +693,27 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
         # Try to download manually, when can_download was true
         media = self.object
         if media.can_download:
+            attempted_key = '_refresh_formats_attempted'
+            media.save_to_metadata(attempted_key, 1)
+            refreshed_key = 'formats_epoch'
+            media.save_to_metadata(refreshed_key, 1)
+            TaskHistory.schedule(
+                refresh_formats,
+                str(media.pk),
+                priority=90,
+                remove_duplicates=False,
+                retries=1,
+                retry_delay=300,
+                vn_fmt=_('Refreshing formats (manually) for "{}"'),
+                vn_args=(media.key,),
+            )
             TaskHistory.schedule(
                 download_media_file,
                 str(media.pk),
                 override=True,
                 priority=90,
                 remove_duplicates=True,
+                delay=10,
                 retries=3,
                 retry_delay=600,
                 vn_fmt=_('Downloading media (manually) for "{}"'),
@@ -860,6 +885,8 @@ class TasksView(ListView):
     messages = {
         'filter': _('Viewing tasks filtered for source: <strong>{name}</strong>'),
         'reset': _('All tasks have been reset'),
+        'revoked': _('Revoked task: {task_id}'),
+        'scheduled': _('Scheduled task: {name}'),
     }
 
     def __init__(self, *args, **kwargs):
@@ -876,11 +903,26 @@ class TasksView(ListView):
                 self.filter_source = Source.objects.get(pk=filter_by)
             except Source.DoesNotExist:
                 self.filter_source = None
-            if not message_key or 'filter' == message_key:
-                message = self.messages.get('filter', '')
-                self.message = message.format(
-                    name=self.filter_source.name
-                )
+            else:
+                if not message_key or 'filter' == message_key:
+                    message = self.messages.get('filter', '')
+                    self.message = message.format(
+                        name=self.filter_source.name
+                    )
+
+        if message_key in ('revoked', 'scheduled'):
+            fmt_vars = dict(
+                pk=request.GET.get('pk', 'Unknown'),
+                task_id=request.GET.get('task_id', 'Unknown'),
+            )
+            try:
+                task = TaskHistory.objects.get(pk=fmt_vars['pk'])
+            except TaskHistory.DoesNotExist:
+                fmt_vars['name'] = fmt_vars['pk']
+            else:
+                fmt_vars['name'] = task.verbose_name or task.task_id or task.pk
+                fmt_vars['task_id'] = task.task_id
+            self.message = self.message.format(**fmt_vars)
 
         return super().dispatch(request, *args, **kwargs)
 
@@ -989,6 +1031,37 @@ class TasksView(ListView):
                 self.kwargs[page_kwarg] = 'last'
         return super().paginate_queryset(queryset, page_size)
 
+    def get(self, *args, **kwargs):
+        path = args[0].path
+        if path.startswith('/task/') and path.endswith('/abort'):
+            try:
+                task = TaskHistory.objects.get(pk=kwargs["pk"])
+            except TaskHistory.DoesNotExist:
+                return HttpResponseNotFound()
+            else:
+                huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+                huey_queues = { q.name: q for q in map(get_queue, huey_queue_names) }
+                q = huey_queues.get(task.queue)
+                if q is None:
+                    msg = f'TasksView: queue not found: {task.pk=} {task.queue=}'
+                    log.warning(msg)
+                    return HttpResponseNotFound()
+                # revoke the task we want to abort
+                q.revoke_by_id(id=task.task_id, revoke_once=True)
+                vn = task.verbose_name or task.task_id or task.pk
+                if not vn.startswith('[revoked] '):
+                    task.verbose_name = f'[revoked] {vn}'
+                    task.save()
+                return HttpResponseRedirect(append_uri_params(
+                    reverse_lazy('sync:tasks'),
+                    dict(
+                        message='revoked',
+                        pk=str(task.pk),
+                        task_id=str(task.task_id),
+                    ),
+                ))
+        else:
+            return super().get(self, *args, **kwargs)
 
 class CompletedTasksView(ListView):
     '''
@@ -1120,6 +1193,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
             dict(
                 message='scheduled',
                 pk=str(self.object.pk),
+                task_id=str(self.object.task_id),
             ),
         )
 
@@ -1144,17 +1218,15 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         if form.errors:
             return super().form_invalid(form)
 
-        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
-        huey_queues = list(map(get_queue, huey_queue_names))
         pk = self.object.pk
         queue = self.object.queue
         task_id = self.object.task_id
-        matching = { q for q in huey_queues if q.name == queue }
-        try:
-            q = matching.pop()
-        except KeyError as e:
+        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+        huey_queues = { q.name: q for q in map(get_queue, huey_queue_names) }
+        q = huey_queues.get(queue)
+        if q is None:
             msg = f'TaskScheduleView: queue not found: {pk=} {queue=}'
-            log.exception(msg, exc_info=e)
+            log.warning(msg)
         else:
             eta = max(self.now, when)
             if q.reschedule(task_id, eta):

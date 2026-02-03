@@ -10,7 +10,7 @@ CONFIG_BASE_DIR = BASE_DIR
 DOWNLOADS_BASE_DIR = BASE_DIR
 
 
-VERSION = '0.15.11'
+VERSION = '0.16.2'
 SECRET_KEY = ''
 DEBUG = 'true' == getenv('TUBESYNC_DEBUG').strip().lower()
 ALLOWED_HOSTS = []
@@ -205,9 +205,14 @@ YOUTUBE_DEFAULTS = {
     'updatetime': True,     # Set mtime in recent versions
     'update_self': False,   # Updates are handled by pip
     'geo_verification_proxy': getenv('geo_verification_proxy').strip() or None,
+    'sleep_interval_requests': 3,
+    'sleep_interval_subtitles': (60)*2,
     'max_sleep_interval': (60)*5,
     'sleep_interval': 0.25,
     'extractor_args': {
+        'youtube': {
+            'raise_incomplete_data': ['true'],
+        },
         'youtubepot-bgutilhttp': {
             'base_url': ['http://127.0.0.1:4416'],
         },
@@ -215,8 +220,13 @@ YOUTUBE_DEFAULTS = {
     'postprocessor_args': {
         'videoremuxer+ffmpeg': ['-bsf:v', 'setts=pts=DTS'],
     },
+    'js_runtimes': {
+        'deno': {'path': None,},
+        'quickjs': {'path': None,},
+    },
 }
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
+YOUTUBE_INFO_SLEEP_REQUESTS = 1
 
 
 MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'

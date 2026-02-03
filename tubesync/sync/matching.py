@@ -21,6 +21,9 @@ def get_best_combined_format(media):
         and video formats if possible. Combined formats are the easiest to check
         for as they must exactly match the source profile be be valid.
     '''
+    matches = set()
+    by_fmt_id = dict()
+    by_language = dict()
     for fmt in media.iter_formats():
         # Check height matches
         if media.source.source_resolution_height != fmt['height']:
@@ -40,8 +43,28 @@ def get_best_combined_format(media):
             if not fmt['is_hdr']:
                 continue
         # If we reach here, we have a combined match!
-        return True, fmt['id']
-    return False, False
+        matches.add(fmt['id'])
+        by_fmt_id[fmt['id']] = fmt
+        by_language[fmt['language_code']] = fmt
+        if 'format_note' in fmt and '(default)' in fmt['format_note']:
+            by_fmt_id['default'] = fmt
+
+    # nothing matched, return early
+    if not matches:
+        return False, False
+
+    # prefer default
+    if 'default' in by_fmt_id:
+        return True, by_fmt_id['default']['id']
+
+    # try for English
+    for lc in ('en-US', 'en',):
+        if lc in by_language:
+            return True, by_language[lc]['id']
+
+    # use any available matching format
+    return True, matches.pop()
+    
 
 
 def get_best_audio_format(media):
@@ -95,6 +118,12 @@ def get_best_video_format(media):
             continue
         if not fmt['vcodec']:
             continue
+        # Disqualify AI-upscaled "super resolution" formats
+        # ID: 248-sr , 1080p, AI-upscaled, TV (1920x1080), fps:25, video:VP9 @1409.292k
+        # ID: 399-sr , 1080p, AI-upscaled, TV (1920x1080), fps:25, video:AV1 @1155.505k
+        # https://github.com/meeb/tubesync/issues/1357
+        if '-sr' in fmt['id']:
+            continue
         if any(key[0] not in fmt for key in sort_keys):
             continue
         if media.source.source_resolution.strip().upper() == fmt['format']:
@@ -109,6 +138,10 @@ def get_best_video_format(media):
             for fmt in media.iter_formats():
                 # If the format has an audio stream, skip it
                 if fmt['acodec'] is not None:
+                    continue
+                # Disqualify AI-upscaled "super resolution" formats
+                # See above for more details.
+                if '-sr' in fmt['id']:
                     continue
                 if (fmt['height'] <= media.source.source_resolution_height and 
                     fmt['height'] >= min_height):

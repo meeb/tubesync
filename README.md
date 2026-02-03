@@ -333,10 +333,11 @@ Notable libraries and software used:
  * [Django](https://www.djangoproject.com/)
  * [yt-dlp](https://github.com/yt-dlp/yt-dlp)
  * [ffmpeg](https://ffmpeg.org/)
+ * [QuickJS](https://bellard.org/quickjs/)
  * [Django Huey](https://github.com/gaiacoop/django-huey)
  * [Huey](https://github.com/coleifer/huey)
  * [django-sass](https://github.com/coderedcorp/django-sass/)
- * The container bundles with `s6-init` and `nginx`
+ * The container bundles with `s6-init` and `openresty`
 
 See the [Pipfile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full list.
 
