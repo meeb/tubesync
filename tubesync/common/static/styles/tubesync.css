@@ -141,44 +141,14 @@ nav.navbar {
   background-color: var(--tubesync-surface-dark);
 }
 
-nav.navbar .navbar-burger {
-  color: var(--tubesync-text-on-dark);
-}
-
 nav.navbar .navbar-menu {
   background-color: var(--tubesync-surface-dark);
+  display: flex !important;
 }
 
-/* Show labels in mobile menu when expanded */
-@media screen and (max-width: 768px) {
-  nav.navbar .navbar-menu.is-active .is-hidden-mobile {
-    display: inline !important;
-  }
-
-  /* Hide entire navbar on mobile, only show menu when active */
-  nav.navbar {
-    display: none;
-  }
-
-  nav.navbar:has(.navbar-menu.is-active) {
-    display: block;
-  }
-}
-
-/* Show full navbar on tablet and up */
-@media screen and (min-width: 769px) {
-  nav.navbar .navbar-menu {
-    display: flex !important;
-  }
-
-  nav.navbar .navbar-start,
-  nav.navbar .navbar-end {
-    display: flex !important;
-  }
-}
-
-header .navbar-burger {
-  color: var(--tubesync-text-on-dark);
+nav.navbar .navbar-start,
+nav.navbar .navbar-end {
+  display: flex !important;
 }
 
 nav.navbar .navbar-item {

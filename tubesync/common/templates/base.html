@@ -10,28 +10,20 @@
     <title>TubeSync - {% block headtitle %}Synchronize YouTube to your local media server{% endblock %}</title>
   </head>
 
-  <body id="body">
+  <body>
 
     <header class="pt-4 pb-4">
       <div class="container">
-        <div class="is-flex is-justify-content-space-between is-align-items-center">
-          <a href="{% url 'sync:dashboard' %}" class="is-flex is-align-items-center">
-            {% include 'tubesync.svg' with width='3rem' height='3rem' class='pr-4' %}
-            <h1>TubeSync</h1>
-          </a>
-          <a role="button" class="navbar-burger is-hidden-tablet has-background-transparent is-borderless m-0" aria-label="menu" aria-expanded="false" data-target="navbarMenu">
-            <span aria-hidden="true"></span>
-            <span aria-hidden="true"></span>
-            <span aria-hidden="true"></span>
-            <span aria-hidden="true"></span>
-          </a>
-        </div>
+        <a href="{% url 'sync:dashboard' %}" class="is-flex is-align-items-center">
+          {% include 'tubesync.svg' with width='3rem' height='3rem' class='pr-4' %}
+          <h1>TubeSync</h1>
+        </a>
       </div>
     </header>
 
     <nav class="navbar" role="navigation" aria-label="main navigation">
       <div class="container">
-        <div id="navbarMenu" class="navbar-menu">
+        <div class="navbar-menu is-active">
           <div class="navbar-start">
             <a class="navbar-item{% block active_dashboard %}{% endblock %}" href="{% url 'sync:dashboard' %}">
               <span class="icon"><i class="fas fa-fw fa-th-large"></i></span>
@@ -86,20 +78,6 @@
         </p>
       </div>
     </footer>
-
-    <script>
-      // Mobile navbar burger toggle
-      (function() {
-        var burger = document.querySelector('.navbar-burger');
-        var navbarMenu = document.getElementById('navbarMenu');
-        if (burger && navbarMenu) {
-          burger.addEventListener('click', function() {
-            burger.classList.toggle('is-active');
-            navbarMenu.classList.toggle('is-active');
-          });
-        }
-      })();
-    </script>
 
   </body>
 
