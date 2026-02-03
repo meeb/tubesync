@@ -1,4 +1,4 @@
-python=pipenv run python
+python=/usr/bin/env python
 docker=/usr/bin/docker
 name=tubesync
 image=$(name):latest
