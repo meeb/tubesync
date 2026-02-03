@@ -1033,7 +1033,7 @@ class TasksView(ListView):
 
     def get(self, *args, **kwargs):
         path = args[0].path
-        if path.startswith('/task/') and path.endswith('/abort'):
+        if path.startswith('/task/') and path.endswith('/cancel'):
             try:
                 task = TaskHistory.objects.get(pk=kwargs["pk"])
             except TaskHistory.DoesNotExist:
