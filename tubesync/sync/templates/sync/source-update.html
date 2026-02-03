@@ -3,7 +3,7 @@
 {% block headtitle %}Update source - {{ source.name }}{% endblock %}
 
 {% block content %}
-<h1 class="title mb-4">Update source <strong>{{ source.name }}</strong></h1>
+<h1 class="title">Update source <strong>{{ source.name }}</strong></h1>
 <p class="mb-4">
   You can use this form to update your source. A source is what's polled on regular
   basis to find new media to download, such as a channel or playlist. Any changes
@@ -13,72 +13,14 @@
 <form method="post" action="{% url 'sync:update-source' pk=source.pk %}" class="simpleform">
   {% csrf_token %}
   {% include 'simpleform.html' with form=form %}
-  <div class="field pt-4 is-flex is-justify-content-space-between is-align-items-center">
-    <div>
-      <a href="{% url 'sync:delete-source' pk=source.pk %}" class="button is-danger">
-        <span class="icon"><i class="fas fa-trash-alt"></i></span>
-        <span>Delete Source</span>
-      </a>
-    </div>
-    <div>
+  <div class="field pt-4">
+    <div class="control">
       <button class="button is-primary" type="submit" name="action">
-        <span class="icon"><i class="fas fa-save"></i></span>
-        <span>Save</span>
+        <span class="icon"><i class="fas fa-pen-square"></i></span>
+        <span>Update source</span>
       </button>
     </div>
   </div>
 </form>
-
-<div id="media-vars-modal" class="modal">
-  <div class="modal-background" id="close-modal-bg"></div>
-  <div class="modal-card">
-    <header class="modal-card-head">
-      <p class="modal-card-title">Available Media Name Variables</p>
-      <button class="delete" aria-label="close" id="close-modal"></button>
-    </header>
-    <section class="modal-card-body">
-      <div class="content">
-        <table class="table is-striped is-fullwidth">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Description</th>
-              <th>Output example</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% include 'sync/_mediaformatvars.html' %}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  </div>
-</div>
-
-<script>
-(function() {
-  const modal = document.getElementById('media-vars-modal');
-  const showBtn = document.getElementById('show-media-vars');
-  const closeBtn = document.getElementById('close-modal');
-  const closeBg = document.getElementById('close-modal-bg');
-
-  if (showBtn) {
-    showBtn.addEventListener('click', function() {
-      modal.classList.add('is-active');
-    });
-  }
-
-  if (closeBtn) {
-    closeBtn.addEventListener('click', function() {
-      modal.classList.remove('is-active');
-    });
-  }
-
-  if (closeBg) {
-    closeBg.addEventListener('click', function() {
-      modal.classList.remove('is-active');
-    });
-  }
-})();
-</script>
+{% include 'sync/_mediaformatvars.html' %}
 {% endblock %}

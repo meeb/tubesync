@@ -8,37 +8,24 @@
     </ul>
   </div>
   {% endif %}
-  <div class="columns is-multiline">
-    {% for field in form %}
-      {% if field.field.widget.input_type == 'hidden' %}
+  {% for field in form %}
+  {% if field.field.widget.input_type == 'hidden' %}{{ field }}{% else %}
+  <div class="field mb-4">
+    {% if field.field.widget.input_type == 'checkbox' %}
+    <div class="control">
+      <label class="checkbox">
         {{ field }}
-      {% else %}
-        <div class="column is-half-tablet is-one-third-desktop is-flex is-align-items-flex-end{% if field.field.widget.input_type == 'checkbox' %} is-align-items-center{% endif %}">
-          <div class="field is-fullwidth">
-            {% if field.field.widget.input_type == 'checkbox' %}
-            <div class="control">
-              <label class="checkbox">
-                {{ field }}
-                {{ field.label }}
-              </label>
-            </div>
-            {% else %}
-            <label class="label">{{ field.label }}</label>
-            <div class="control{% if field.field.widget.input_type == 'select' %} select is-medium is-fullwidth{% endif %}">
-              {{ field }}
-            </div>
-            {% endif %}
-            {% if field.name == 'media_format' %}
-            <p class="help help-text">
-              <i class="fas fa-info-circle pr-2"></i> File format to use for saving files
-              <a id="show-media-vars" class="has-text-decoration-underline has-cursor-pointer"><i class="fas fa-list"></i> show available variables</a>
-            </p>
-            {% elif field.help_text %}
-            <p class="help help-text"><i class="fas fa-info-circle pr-2"></i> {{ field.help_text }}</p>
-            {% endif %}
-          </div>
-        </div>
-      {% endif %}
-    {% endfor %}
+        {{ field.label }}
+      </label>
+    </div>
+    {% else %}
+    <label class="label">{{ field.label }}</label>
+    <div class="control{% if field.field.widget.input_type == 'select' %} select is-fullwidth{% endif %}">
+      {{ field }}
+    </div>
+    {% endif %}
+    {% if field.help_text %}<p class="help"><i class="fas fa-info-circle"></i> {{ field.help_text }}</p>{% endif %}
   </div>
+  {% endif %}
+  {% endfor %}
 {% endif %}

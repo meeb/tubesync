@@ -3,22 +3,20 @@
 {% block headtitle %}Add a YouTube Source{% endblock %}
 
 {% block content %}
-<h1 class="title mb-4">Add Source</h1>
+<h1 class="title">Add Source</h1>
 <p class="mb-4">
   Enter any YouTube channel or playlist URL below.
 </p>
-<div class="content mb-4">
-  <div class="is-italic">Example supported formats:</div>
-  <ul>
-    <li><strong>YouTube Channel:</strong> <code>https://www.youtube.com/@rossmanngroup</code></li>
-    <li><strong>YouTube Channel by ID:</strong> <code>https://www.youtube.com/channel/UCl2mFZoRqjw_ELax4Yisf6w</code></li>
-    <li><strong>YouTube Playlist:</strong> <code>https://www.youtube.com/playlist?list=PLkVbIsAWN2lsmovRO20_gtfUfgWi-XnnT</code></li>
-  </ul>
-</div>
+<p><strong>Supported formats:</strong></p>
+<ul class="mb-4">
+  <li><strong>YouTube Channel:</strong> <code>https://www.youtube.com/@rossmanngroup</code></li>
+  <li><strong>YouTube Channel by ID:</strong> <code>https://www.youtube.com/channel/UCl2mFZoRqjw_ELax4Yisf6w</code></li>
+  <li><strong>YouTube Playlist:</strong> <code>https://www.youtube.com/playlist?list=PLkVbIsAWN2lsmovRO20_gtfUfgWi-XnnT</code></li>
+</ul>
 <form method="post" action="{% url 'sync:validate-source' %}" class="simpleform">
   {% csrf_token %}
   {% include 'simpleform.html' with form=form %}
-  <div class="field pt-4 has-text-centered">
+  <div class="field pt-4">
     <div class="control">
       <button class="button is-primary" type="submit" name="action">
         <span class="icon"><i class="fas fa-check"></i></span>
