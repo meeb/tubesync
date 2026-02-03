@@ -136,7 +136,7 @@ You can save space using column compression using the following steps while usin
 
  1. Stop tubesync 
  2. Execute `ALTER TABLE sync_media MODIFY metadata LONGTEXT COMPRESSED;` on database tubesync
- 3. Start tunesync and confirm the connection still works.
+ 3. Start tubesync and confirm the connection still works.
 
 ## Docker Compose
 
