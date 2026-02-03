@@ -48,8 +48,6 @@
 }
 
 html {
-  visibility: visible;
-  opacity: 1;
   font-family: 'roboto', Arial, Helvetica, sans-serif;
   font-size: 1.05rem;
 }

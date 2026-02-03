@@ -1,26 +1,13 @@
 {% load static %}<!DOCTYPE html>
-<html>
+<html data-theme="{{ theme }}">
   <head>
     <meta charset="utf-8" />
-    <style>
-      html{
-        visibility: hidden;
-        opacity: 0;
-      }
-    </style>
     <link rel="stylesheet" href="{% static 'vendor/bulma/bulma.min.css' %}" />
     <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}" />
     <link type="text/css" rel="stylesheet" href="{% static 'styles/tubesync.css' %}" media="screen,projection"/>
     <link rel="icon" href="{% static 'images/favicon.ico' %}" sizes="21x21" type="image/x-icon">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>TubeSync - {% block headtitle %}Synchronize YouTube to your local media server{% endblock %}</title>
-    <script>
-      // Use Bulma's built-in data-theme attribute to control light/dark mode
-      (function() {
-        const darkMode = localStorage.getItem('darkMode') === 'enabled';
-        document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
-      })();
-    </script>
   </head>
 
   <body id="body">
@@ -68,8 +55,8 @@
             </a>
           </div>
           <div class="navbar-end">
-            <a role="button" class="navbar-item" id="dark-mode-toggle" aria-label="Toggle dark mode">
-              <span class="icon"><i class="fas fa-moon" id="dark-mode-icon"></i></span>
+            <a class="navbar-item" href="{% url 'common:toggle-theme' %}" aria-label="Toggle dark mode">
+              <span class="icon"><i class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i></span>
               <span class="is-hidden-mobile">Theme</span>
             </a>
           </div>
@@ -101,41 +88,10 @@
     </footer>
 
     <script>
+      // Mobile navbar burger toggle
       (function() {
-        const html = document.documentElement;
-        const darkModeToggle = document.getElementById('dark-mode-toggle');
-        const darkModeIcon = document.getElementById('dark-mode-icon');
-
-        // Update icon on page load
-        const isDark = html.getAttribute('data-theme') === 'dark';
-        if (isDark) {
-          darkModeIcon.classList.remove('fa-moon');
-          darkModeIcon.classList.add('fa-sun');
-        }
-
-        // Toggle dark mode
-        if (darkModeToggle) {
-          darkModeToggle.addEventListener('click', function() {
-            const isDark = html.getAttribute('data-theme') === 'dark';
-
-            if (isDark) {
-              html.setAttribute('data-theme', 'light');
-              localStorage.setItem('darkMode', 'disabled');
-              darkModeIcon.classList.remove('fa-sun');
-              darkModeIcon.classList.add('fa-moon');
-            } else {
-              html.setAttribute('data-theme', 'dark');
-              localStorage.setItem('darkMode', 'enabled');
-              darkModeIcon.classList.remove('fa-moon');
-              darkModeIcon.classList.add('fa-sun');
-            }
-          });
-        }
-
-        // Mobile navbar burger toggle
-        const burger = document.querySelector('.navbar-burger');
-        const navbarMenu = document.getElementById('navbarMenu');
-
+        var burger = document.querySelector('.navbar-burger');
+        var navbarMenu = document.getElementById('navbarMenu');
         if (burger && navbarMenu) {
           burger.addEventListener('click', function() {
             burger.classList.toggle('is-active');
