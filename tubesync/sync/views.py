@@ -1046,7 +1046,7 @@ class TasksView(ListView):
                     msg = f'TasksView: queue not found: {task.pk=} {task.queue=}'
                     log.warning(msg)
                     return HttpResponseNotFound()
-                # revoke the task we want to abort
+                # revoke the task we want to cancel
                 q.revoke_by_id(id=task.task_id, revoke_once=True)
                 vn = task.verbose_name or task.task_id or task.pk
                 if not vn.startswith('[revoked] '):
