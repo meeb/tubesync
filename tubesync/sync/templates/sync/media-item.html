@@ -29,14 +29,14 @@
 {% endif %}
 {% include 'infobox.html' with message=message %}
 <div class="columns">
-  <div class="column is-12 is-7-tablet">
+  <div class="column is-6">
     <div class="content">
       <blockquote>
         <p>{% if media.description %}{{ media.description|truncatewords:200 }}{% else %}(Media has no description).{% endif %}</p>
       </blockquote>
     </div>
   </div>
-  <div class="column is-12 is-5-tablet">
+  <div class="column is-6">
     <div class="card mediacard">
       <div class="card-image">
         <figure class="image">
@@ -204,13 +204,13 @@
 </div>
 {% if media.downloaded %}
 <div class="columns">
-  <div class="column is-12 is-6-desktop">
+  <div class="column is-6">
     <a href="{% url 'sync:redownload-media' pk=media.pk %}" class="button is-primary">
       <span class="icon"><i class="fas fa-cloud-download-alt"></i></span>
       <span>Redownload media</span>
     </a>
   </div>
-  <div class="column is-12 is-6-desktop">
+  <div class="column is-6">
     <a href="{% url 'sync:skip-media' pk=media.pk %}" class="button is-danger delete-button">
       <span class="icon"><i class="fas fa-times-circle"></i></span>
       <span>Delete and skip media</span>
