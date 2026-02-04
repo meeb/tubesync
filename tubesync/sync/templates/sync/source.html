@@ -81,6 +81,10 @@
         <td class="hide-on-small-only">Index streams?</td>
         <td><span class="hide-on-med-and-up">Index streams?<br></span><strong>{% if source.index_streams %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
       </tr>
+      <tr title="Also sync Shorts for this channel (via its Shorts playlist)">
+        <td class="hide-on-small-only">Include Shorts?</td>
+        <td><span class="hide-on-med-and-up">Include Shorts?<br></span><strong>{% if source.include_shorts %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
       <tr title="Download media from this source">
         <td class="hide-on-small-only">Download media?</td>
         <td><span class="hide-on-med-and-up">Download media?<br></span><strong>{% if source.download_media %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>

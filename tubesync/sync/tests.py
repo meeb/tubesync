@@ -336,6 +336,22 @@ class FrontEndTestCase(TestCase):
         response = c.get(f'/source/{source_uuid}')
         self.assertEqual(response.status_code, 404)
 
+    def test_include_shorts_auto_add_remove(self):
+        source = Source.objects.create(
+            source_type=Val(YouTube_SourceType.CHANNEL_ID),
+            key='UCabc123456',
+            name='testname',
+            directory='testdirectory',
+            include_shorts=True,
+        )
+        shorts_source = Source.objects.get(shorts_parent=source)
+        self.assertEqual(shorts_source.source_type, Val(YouTube_SourceType.PLAYLIST))
+        self.assertEqual(shorts_source.key, 'UUSHabc123456')
+        self.assertFalse(shorts_source.include_shorts)
+        source.include_shorts = False
+        source.save()
+        self.assertFalse(Source.objects.filter(shorts_parent=source).exists())
+
     def test_media(self):
         # Media overview page
         c = Client()

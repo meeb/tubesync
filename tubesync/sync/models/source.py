@@ -155,6 +155,11 @@ class Source(db.models.Model):
         default=False,
         help_text=_('Index live stream media from this source'),
     )
+    include_shorts = db.models.BooleanField(
+        _('include shorts'),
+        default=False,
+        help_text=_('Also sync Shorts for this channel (UC... IDs only, via its Shorts playlist)'),
+    )
     download_cap = db.models.IntegerField(
         _('download cap'),
         choices=CapChoices.choices,
@@ -317,6 +322,14 @@ class Source(db.models.Model):
         default='all',
         help_text=_('Select the SponsorBlock categories that you wish to be removed from downloaded videos.'),
     )
+    shorts_parent = db.models.ForeignKey(
+        'self',
+        on_delete=db.models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='shorts_children',
+        help_text=_('Parent channel source for Shorts-derived playlists'),
+    )
 
     def __str__(self):
         return self.name
@@ -366,6 +379,13 @@ class Source(db.models.Model):
     @property
     def is_video(self):
         return not self.is_audio
+
+    @staticmethod
+    def shorts_playlist_id_from_channel_id(channel_id):
+        channel_id = str(channel_id or '').strip()
+        if not channel_id.startswith('UC') or len(channel_id) <= 2:
+            return None
+        return f'UUSH{channel_id[2:]}'
 
     @property
     def download_cap_date(self):
@@ -601,4 +621,3 @@ class Source(db.models.Model):
                     entries.extend(reversed(streams[: allowed_streams]))
 
         return entries
-
