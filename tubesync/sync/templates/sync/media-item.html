@@ -186,11 +186,11 @@
           <tbody>
             <tr>
               <td><strong>Combined</strong></td>
-              <td><strong>{% if combined_format %}{{ combined_format }} {% if combined_exact %}<span class="tag is-success">exact match</span>{% else %}<span class="tag is-warning">fallback</span>{% endif %}{% else %}<span class="tag is-danger">no match</span>{% endif %}</strong></td>
+              <td><strong>{% if combined_format %}{{ combined_format }}{% if combined_format_dict.language_code %} [{{ combined_format_dict.language_code }}]{% endif %} {% if combined_exact %}<span class="tag is-success">exact match</span>{% else %}<span class="tag is-warning">fallback</span>{% endif %}{% else %}<span class="tag is-danger">no match</span>{% endif %}</strong></td>
             </tr>
             <tr>
               <td><strong>Audio</strong></td>
-              <td><strong>{% if audio_format %}{{ audio_format }} {% if audio_exact %}<span class="tag is-success">exact match</span>{% else %}<span class="tag is-warning">fallback</span>{% endif %}{% else %}<span class="tag is-danger">no match</span>{% endif %}</strong></td>
+              <td><strong>{% if audio_format %}{{ audio_format }}{% if audio_format_dict.language_code %} [{{ audio_format_dict.language_code }}]{% endif %} {% if audio_exact %}<span class="tag is-success">exact match</span>{% else %}<span class="tag is-warning">fallback</span>{% endif %}{% else %}<span class="tag is-danger">no match</span>{% endif %}</strong></td>
             </tr>
             <tr>
               <td><strong>Video</strong></td>

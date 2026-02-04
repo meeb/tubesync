@@ -117,10 +117,16 @@
         </small>
       </a>
     </div>
-    <a href="{% url 'sync:run-task' pk=task.pk %}" class="button is-primary">
-      <span class="icon"><i class="fas fa-play"></i></span>
-      <span>Run now</span>
-    </a>
+    <div class="buttons">
+      <a href="{% url 'sync:revoke-task' pk=task.pk %}" class="button" title="Revoke task">
+        <span class="icon"><i class="far fa-stop-circle"></i></span>
+        <span>Revoke</span>
+      </a>
+      <a href="{% url 'sync:run-task' pk=task.pk %}" class="button is-primary">
+        <span class="icon"><i class="fas fa-play"></i></span>
+        <span>Run</span>
+      </a>
+    </div>
   </div>
   {% empty %}
   <div class="notification">
