@@ -567,6 +567,7 @@ RUN --mount=type=tmpfs,target=/cache \
   default-libmysqlclient-dev \
   g++ \
   gcc \
+  git \
   libjpeg-dev \
   libonig-dev \
   libpq-dev \
@@ -611,6 +612,7 @@ RUN --mount=type=tmpfs,target=/cache \
   default-libmysqlclient-dev \
   g++ \
   gcc \
+  git \
   libjpeg-dev \
   libonig-dev \
   libpq-dev \

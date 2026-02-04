@@ -3,6 +3,10 @@
 playlist_id="${1}"
 total_entries="${2}"
 
+if [[ "${playlist_id}" == UUSH* ]]; then
+    exit 0
+fi
+
 # select YOUTUBE_*DIR settings
 # convert None to ''
 # convert PosixPath('VALUE') to 'VALUE'
@@ -24,6 +28,14 @@ downloaded_entries="$( find /dev/shm "${WHERE}" \
     -exec basename '{}' ';' | \
     sed -e 's/^postprocessor_[[].*[]]_//;s/_temp.*\.json$//;' | \
     cut -d '_' -f 1 )"
+
+if ! [[ "${total_entries}" =~ ^[0-9]+$ ]] || [ "${total_entries}" -le 0 ]; then
+    exit 0
+fi
+
+if [ -z "${downloaded_entries}" ]; then
+    exit 0
+fi
 
 find /dev/shm "${WHERE}" \
     -path '*/infojson/playlist/postprocessor_*_temp\.info\.json' \

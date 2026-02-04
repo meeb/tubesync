@@ -95,6 +95,21 @@ def _sync_shorts_source(source):
     new_source.index_streams = False
     new_source.shorts_parent = source
     new_source.save()
+    TaskHistory.schedule(
+        index_source,
+        str(new_source.pk),
+        delay=600,
+        remove_duplicates=True,
+        vn_fmt=_('Index media from source "{}"'),
+        vn_args=(new_source.name,),
+    )
+    TaskHistory.schedule(
+        save_all_media_for_source,
+        str(new_source.pk),
+        remove_duplicates=True,
+        vn_fmt=_('Checking all media for "{}"'),
+        vn_args=(new_source.name,),
+    )
 
 @receiver(pre_save, sender=Source)
 def source_pre_save(sender, instance, **kwargs):

@@ -160,6 +160,11 @@ class Source(db.models.Model):
         default=False,
         help_text=_('Also sync Shorts for this channel (UC... IDs only, via its Shorts playlist)'),
     )
+    auto_quality = db.models.BooleanField(
+        _('auto quality'),
+        default=False,
+        help_text=_('Automatically select the best available audio/video quality'),
+    )
     download_cap = db.models.IntegerField(
         _('download cap'),
         choices=CapChoices.choices,
