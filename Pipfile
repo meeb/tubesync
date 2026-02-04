@@ -20,7 +20,7 @@ mysqlclient = "*"
 PySocks = "*"
 urllib3 = {extras = ["socks"], version = "*"}
 requests = {extras = ["socks"], version = "*"}
-yt-dlp = {extras = ["default", "curl-cffi"], version = "*"}
+yt-dlp = {git = "https://github.com/yt-dlp/yt-dlp.git", ref = "master", extras = ["default", "curl-cffi"]}
 emoji = "*"
 brotli = "*"
 html5lib = "*"

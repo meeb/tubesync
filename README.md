@@ -1,5 +1,8 @@
 # TubeSync
 
+This repository is a fork of `meeb/tubesync`. It is licensed under AGPL-3.0; see
+`LICENSE` for details.
+
 TubeSync is a PVR (personal video recorder) for YouTube. Or, like Sonarr but for
 YouTube (with a built-in download client). It is designed to synchronize channels and
 playlists from YouTube to local directories and update your media server once media is

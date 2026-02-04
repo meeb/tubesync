@@ -11,6 +11,7 @@ from common.logger import log
 from common.models import TaskHistory
 from common.utils import glob_quote, mkdir_p
 from .models import Source, Media, Metadata
+from .choices import Val, YouTube_SourceType
 from .tasks import (
     get_media_download_task, get_media_metadata_task, get_media_thumbnail_task,
     delete_all_media_for_source, save_all_media_for_source,
@@ -20,6 +21,95 @@ from .tasks import (
 from .utils import delete_file
 from .filtering import filter_media
 
+
+def _unique_source_field_value(field_name, base_value, suffix_func):
+    max_len = Source._meta.get_field(field_name).max_length
+    for idx in range(1, 1000):
+        suffix = suffix_func(idx)
+        base_len = max_len - len(suffix)
+        trimmed_base = base_value[:max(base_len, 0)]
+        candidate = f'{trimmed_base}{suffix}'
+        if not Source.objects.filter(**{field_name: candidate}).exists():
+            return candidate
+    raise ValueError(f'Unable to generate unique {field_name} for Shorts source')
+
+
+def _shorts_playlist_id_from_source(source):
+    if source.shorts_parent_id:
+        return None
+    if source.source_type not in (
+        Val(YouTube_SourceType.CHANNEL),
+        Val(YouTube_SourceType.CHANNEL_ID),
+    ):
+        return None
+    return Source.shorts_playlist_id_from_channel_id(source.key)
+
+
+def _sync_shorts_source(source):
+    playlist_id = _shorts_playlist_id_from_source(source)
+    shorts_children = Source.objects.filter(shorts_parent=source)
+    if not playlist_id:
+        if shorts_children.exists():
+            for child in shorts_children:
+                child.delete()
+        return
+
+    for child in shorts_children.exclude(key=playlist_id):
+        child.delete()
+
+    existing = Source.objects.filter(
+        source_type=Val(YouTube_SourceType.PLAYLIST),
+        key=playlist_id,
+    ).first()
+
+    if not source.include_shorts:
+        for child in shorts_children:
+            child.delete()
+        return
+
+    if existing:
+        return
+
+    def name_suffix(idx):
+        return ' (Shorts)' if idx == 1 else f' (Shorts {idx})'
+
+    def dir_suffix(idx):
+        return '-shorts' if idx == 1 else f'-shorts-{idx}'
+
+    shorts_name = _unique_source_field_value('name', source.name, name_suffix)
+    shorts_directory = _unique_source_field_value('directory', source.directory, dir_suffix)
+    new_source = Source()
+    copy_fields = set(map(lambda f: f.name, source._meta.fields)) - {
+        'uuid', 'created', 'last_crawl', 'source_type', 'key', 'name', 'directory',
+        'include_shorts', 'shorts_parent',
+    }
+    for field in copy_fields:
+        setattr(new_source, field, getattr(source, field))
+    new_source.source_type = Val(YouTube_SourceType.PLAYLIST)
+    new_source.key = playlist_id
+    new_source.name = shorts_name
+    new_source.directory = shorts_directory
+    new_source.include_shorts = False
+    new_source.copy_channel_images = False
+    new_source.index_videos = True
+    new_source.index_streams = False
+    new_source.shorts_parent = source
+    new_source.save()
+    TaskHistory.schedule(
+        index_source,
+        str(new_source.pk),
+        delay=600,
+        remove_duplicates=True,
+        vn_fmt=_('Index media from source "{}"'),
+        vn_args=(new_source.name,),
+    )
+    TaskHistory.schedule(
+        save_all_media_for_source,
+        str(new_source.pk),
+        remove_duplicates=True,
+        vn_fmt=_('Checking all media for "{}"'),
+        vn_args=(new_source.name,),
+    )
 
 @receiver(pre_save, sender=Source)
 def source_pre_save(sender, instance, **kwargs):
@@ -131,6 +221,7 @@ def source_post_save(sender, instance, created, **kwargs):
             source.name,
         ),
     )
+    _sync_shorts_source(source)
 
 
 @receiver(pre_delete, sender=Source)
@@ -139,7 +230,13 @@ def source_pre_delete(sender, instance, **kwargs):
     # the Media models post_delete signal
     source = instance
     log.info(f'Deactivating source: {instance.name}')
+    instance.include_shorts = False
     instance.deactivate()
+
+    shorts_children = Source.objects.filter(shorts_parent=instance)
+    if shorts_children.exists():
+        for child in shorts_children:
+            child.delete()
 
     # Fetch the media source
     sqs = Source.objects.filter(filter_text=str(source.pk))
@@ -417,4 +514,3 @@ def media_post_delete(sender, instance, **kwargs):
                 log.debug(f'Deleting metadata for "{skipped_media.key}": {skipped_media.pk}')
                 # delete the old metadata
                 instance_qs.delete()
-

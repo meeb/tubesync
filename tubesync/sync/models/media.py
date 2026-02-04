@@ -367,6 +367,10 @@ class Media(models.Model):
             combination of source requirements and available audio and video formats.
             Returns boolean False if there is no valid downloadable combo.
         '''
+        if self.source.auto_quality:
+            if self.source.is_audio:
+                return 'bestaudio/best'
+            return 'bestvideo*+bestaudio/best'
         if self.source.is_audio:
             audio_match, audio_format = self.get_best_audio_format()
             if audio_format:
@@ -1190,4 +1194,3 @@ Media.failed_format = failed_format
 Media.refresh_formats = refresh_formats
 Media.wait_for_premiere = wait_for_premiere
 Media.write_nfo_file = write_nfo_file
-
