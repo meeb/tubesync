@@ -76,16 +76,6 @@ else:
     SQLITE_DELAY_FLOAT = 5
 
 
-DEFAULT_THREADS = 1
-BACKGROUND_TASK_ASYNC_THREADS = getenv('TUBESYNC_WORKERS', DEFAULT_THREADS, integer=True)
-if BACKGROUND_TASK_ASYNC_THREADS > 1:
-    DATABASES['default']['_msgs'] = database_dict.get('_msgs', list())
-    DATABASES['default']['_msgs'].append((logging.WARNING,
-        'Using more than 1 worker is generally a bad idea.',
-    ))
-    BACKGROUND_TASK_RUN_ASYNC = True
-
-
 MEDIA_ROOT = CONFIG_BASE_DIR / 'media'
 DOWNLOAD_ROOT = DOWNLOADS_BASE_DIR
 YOUTUBE_DL_CACHEDIR = CONFIG_BASE_DIR / 'cache/yt-dlp'
