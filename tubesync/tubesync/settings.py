@@ -11,9 +11,10 @@ DOWNLOADS_BASE_DIR = BASE_DIR
 
 
 VERSION = '0.16.2'
-SECRET_KEY = ''
 DEBUG = 'true' == getenv('TUBESYNC_DEBUG').strip().lower()
 ALLOWED_HOSTS = []
+# This is not ever meant to be a public web interface so this isn't too critical
+SECRET_KEY = getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret')
 
 
 INSTALLED_APPS = [
