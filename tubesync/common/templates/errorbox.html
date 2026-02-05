@@ -1,10 +1,8 @@
 {% if message %}
-<div class="row">
-  <div class="col s12">
-    <div class="card errorbox">
-      <div class="card-content">
-        <i class="fas fa-fw fa-exclamation-triangle"></i> {{ message|safe }}
-      </div>
+<div class="columns">
+  <div class="column is-12">
+    <div class="notification is-danger errorbox">
+      <i class="fas fa-fw fa-exclamation-triangle"></i> {{ message|safe }}
     </div>
   </div>
 </div>

@@ -1,0 +1,442 @@
+/* TubeSync CSS Variables and Styles */
+
+/* ============================================
+   Primitive Color Tokens
+   ============================================ */
+:root {
+  --tubesync-surface-dark: #011627;
+  --tubesync-text-on-dark: #fdfffc;
+  --tubesync-light-blue: #1e5c83;
+  --tubesync-text-on-light-blue: #ffffff;
+  --tubesync-red: #e71d36;
+  --tubesync-orange: #ff9c00;
+  --tubesync-text-on-orange: #1a1a1a;
+}
+
+[data-theme="dark"] {
+  --tubesync-surface-dark: #1e2936;
+  --tubesync-text-on-dark: #e8eaed;
+  --tubesync-light-blue: #2a7ab8;
+  --tubesync-text-on-light-blue: #e8eaed;
+  --tubesync-red: #b8152a;
+  --tubesync-orange: #856308;
+  --tubesync-text-on-orange: #ffffff;
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+@font-face {
+  font-family: 'roboto';
+  src: url('../fonts/roboto/roboto-light.woff') format('woff');
+  font-weight: lighter;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'roboto';
+  src: url('../fonts/roboto/roboto-regular.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'roboto';
+  src: url('../fonts/roboto/roboto-bold.woff') format('woff');
+  font-weight: bold;
+  font-style: normal;
+}
+
+html {
+  font-family: 'roboto', Arial, Helvetica, sans-serif;
+  font-size: 1.05rem;
+}
+
+body {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+/* ============================================
+   Header & Footer
+   ============================================ */
+header {
+  background-color: var(--tubesync-red);
+  color: var(--tubesync-text-on-dark);
+}
+
+header a {
+  text-decoration: none;
+  color: var(--tubesync-text-on-dark);
+}
+
+header svg.tubesync-logo {
+  float: left;
+}
+
+header svg.tubesync-logo .logo-icon {
+  fill: var(--tubesync-text-on-dark) !important;
+}
+
+header h1 {
+  margin: 0 0 0 var(--bulma-spacing-2);
+  font-size: var(--bulma-size-1);
+  line-height: calc(var(--bulma-size-1) * 0.9);
+  color: var(--tubesync-text-on-dark);
+}
+
+@media screen and (max-width: 1023px) {
+  header .container > div {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+footer {
+  background-color: var(--tubesync-red);
+  color: var(--tubesync-text-on-dark);
+}
+
+footer svg path {
+  fill: var(--tubesync-text-on-dark);
+}
+
+footer a {
+  color: var(--tubesync-text-on-dark);
+  text-decoration: underline;
+  text-decoration-color: rgba(253, 255, 252, 0.5);
+}
+
+footer a:hover {
+  color: var(--tubesync-orange);
+  text-decoration-color: var(--tubesync-orange);
+}
+
+footer strong {
+  color: var(--tubesync-text-on-dark);
+}
+
+[data-theme="dark"] footer a {
+  color: var(--tubesync-text-on-dark);
+  text-decoration-color: rgba(232, 234, 237, 0.5);
+}
+
+[data-theme="dark"] footer strong {
+  color: var(--tubesync-text-on-dark);
+}
+
+@media screen and (max-width: 1023px) {
+  footer .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+
+/* ============================================
+   Navigation
+   ============================================ */
+nav.navbar {
+  background-color: var(--tubesync-surface-dark);
+}
+
+nav.navbar .navbar-menu {
+  background-color: var(--tubesync-surface-dark);
+  display: flex !important;
+}
+
+nav.navbar .navbar-start,
+nav.navbar .navbar-end {
+  display: flex !important;
+}
+
+nav.navbar .navbar-item {
+  color: var(--tubesync-text-on-dark);
+  display: flex !important;
+  align-items: center !important;
+  user-select: none;
+}
+
+nav.navbar .navbar-item .icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  flex-shrink: 0;
+}
+
+
+nav.navbar .navbar-item.is-active {
+  background-color: var(--tubesync-light-blue) !important;
+  color: var(--tubesync-text-on-light-blue) !important;
+}
+
+nav.navbar .navbar-item:hover {
+  background-color: var(--tubesync-orange) !important;
+  color: var(--tubesync-text-on-orange) !important;
+}
+
+[data-theme="dark"] nav.navbar {
+  background-color: var(--bulma-scheme-main-bis);
+}
+
+[data-theme="dark"] nav.navbar .navbar-menu {
+  background-color: var(--bulma-scheme-main-bis);
+}
+
+/* ============================================
+   Main Content
+   ============================================ */
+
+main {
+  flex: 1;
+}
+
+main a {
+  text-decoration: none;
+}
+
+main .container {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+main h1.title {
+  font-weight: var(--bulma-weight-normal);
+}
+
+a.box,
+a.box .title,
+a.box .subtitle {
+  color: var(--tubesync-light-blue);
+}
+
+.box .content a {
+  font-weight: 300;
+  line-height: 110%;
+}
+
+hr {
+  background-color: var(--tubesync-light-blue);
+  border: none;
+  height: 1px;
+}
+
+/* ============================================
+   Media Cards
+   ============================================ */
+.mediacard {
+  border: 3px var(--tubesync-text-on-dark) solid;
+  transition: border-color 0.2s;
+}
+
+.mediacard:hover {
+  border-color: var(--tubesync-orange);
+}
+
+.mediacard .card-image img {
+  border-radius: 0 !important;
+}
+
+
+/* ============================================
+   Pagination
+   ============================================ */
+.pagination .pagination-link {
+  border-color: var(--bulma-primary);
+}
+
+.pagination .pagination-link:hover {
+  background-color: var(--tubesync-orange) !important;
+  color: var(--tubesync-text-on-orange) !important;
+  border-color: var(--tubesync-orange) !important;
+}
+
+.pagination .pagination-link.is-current {
+  background-color: var(--tubesync-light-blue);
+  border-color: var(--tubesync-light-blue);
+  color: var(--tubesync-text-on-light-blue);
+}
+
+
+/* ============================================
+   Forms
+   ============================================ */
+
+.simpleform .label {
+  text-transform: uppercase;
+}
+
+.simpleform .textarea {
+  min-height: 150px;
+}
+
+[data-theme="dark"] .input,
+[data-theme="dark"] .textarea,
+[data-theme="dark"] select {
+  background-color: var(--bulma-scheme-main-bis);
+  color: var(--bulma-text);
+}
+
+/* ============================================
+   Buttons
+   ============================================ */
+.buttons {
+  gap: 1rem;
+}
+
+.button.is-primary {
+  background-color: var(--tubesync-light-blue);
+  border-color: var(--tubesync-light-blue);
+  color: var(--tubesync-text-on-light-blue);
+}
+
+.button.is-primary:hover {
+  background-color: var(--tubesync-light-blue);
+  border-color: var(--tubesync-light-blue);
+  filter: brightness(1.1);
+}
+
+.button.is-danger {
+  background-color: var(--tubesync-red);
+  border-color: var(--tubesync-red);
+  color: #ffffff;
+}
+
+.button.is-danger:hover {
+  background-color: var(--tubesync-red);
+  border-color: var(--tubesync-red);
+  color: #ffffff;
+  filter: brightness(1.1);
+}
+
+[data-theme="dark"] .button.is-primary {
+  background-color: var(--tubesync-light-blue);
+  border-color: var(--tubesync-light-blue);
+  color: var(--tubesync-text-on-light-blue);
+}
+
+[data-theme="dark"] .button.is-danger {
+  background-color: var(--tubesync-red);
+  border-color: var(--tubesync-red);
+  color: #ffffff;
+}
+
+/* ============================================
+   Utility Classes (only TubeSync-specific ones)
+   ============================================ */
+.nowrap {
+  white-space: nowrap;
+}
+
+.errors {
+  background-color: var(--bulma-danger);
+}
+
+.has-background-transparent {
+  background-color: transparent !important;
+}
+
+.is-borderless {
+  border: none !important;
+}
+
+.m-0 {
+  margin: 0 !important;
+}
+
+.is-fullheight {
+  height: 100%;
+}
+
+.is-flex-grow-1 {
+  flex-grow: 1;
+}
+
+.is-align-items-flex-start {
+  align-items: flex-start;
+}
+
+.is-align-self-flex-start {
+  align-self: flex-start;
+}
+
+.has-text-decoration-underline {
+  text-decoration: underline;
+}
+
+.has-cursor-pointer {
+  cursor: pointer;
+}
+
+/* ============================================
+   Tables
+   ============================================ */
+.table.is-striped tbody tr:nth-child(odd) {
+  background-color: var(--bulma-scheme-main-bis);
+}
+
+[data-theme="dark"] .table.is-striped tbody tr:nth-child(odd) {
+  background-color: var(--bulma-scheme-main-ter);
+}
+
+/* ============================================
+   Notifications
+   ============================================ */
+[data-theme="dark"] .notification.is-info {
+  background-color: var(--tubesync-light-blue);
+  color: var(--tubesync-text-on-dark);
+}
+
+/* ============================================
+   Responsive Source Cards
+   ============================================ */
+.media-right.source-buttons {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.media-right.source-buttons .buttons {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.media-right.source-buttons .buttons .button {
+  flex: 0 1 auto;
+  min-width: fit-content;
+}
+
+@media screen and (max-width: 768px) {
+  .media.is-flex-direction-column-mobile {
+    flex-direction: column !important;
+  }
+
+  .media.is-flex-direction-column-mobile .media-right {
+    margin-top: 1rem;
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .media-right.source-buttons .buttons .button {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+/* ============================================
+   Download Lists
+   ============================================ */
+.download-item {
+  color: var(--tubesync-light-blue);
+  text-decoration: none;
+  border-bottom: 1px solid var(--bulma-border);
+  transition: background-color 0.2s;
+}
+
+.download-item:last-child {
+  border-bottom: none;
+}
+
+.download-item:hover {
+  background-color: var(--tubesync-orange);
+  color: var(--tubesync-text-on-dark);
+}
