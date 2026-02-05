@@ -122,7 +122,7 @@
         <span class="icon"><i class="far fa-stop-circle"></i></span>
         <span>Cancel</span>
       </a>
-      <a href="{% url 'sync:run-task' pk=task.pk %}" class="button is-primary">
+      <a href="{% url 'sync:run-task' pk=task.pk %}" class="button" title="Reschedule task">
         <span class="icon"><i class="fas fa-play"></i></span>
         <span>Reschedule</span>
       </a>
