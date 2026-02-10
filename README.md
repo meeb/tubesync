@@ -235,6 +235,9 @@ under the "media servers" tab.
 
 # Logging and debugging
 
+> [!TIP]
+> Even more detailed logs are produced when the environment variable `TUBESYNC_DEBUG` is set to `True`.
+
 TubeSync outputs useful logs, errors and debugging information to the console. You can
 view these with:
 
@@ -242,7 +245,7 @@ view these with:
 $ docker logs --follow tubesync
 ```
 
-To include logs with an issue report, please exteact a file and attach it to the issue.
+To include logs with an issue report, please extract a file and attach it to the issue.
 The command below creates the `TubeSync.logs.txt` file with the logs from the `tubesync` container:
 
 ```bash
