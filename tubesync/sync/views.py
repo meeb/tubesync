@@ -3,6 +3,7 @@ import os
 from base64 import b64decode
 import pathlib
 import sys
+import uuid
 from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponseNotFound, HttpResponseRedirect
 from django.views.generic import TemplateView, ListView, DetailView
@@ -12,8 +13,8 @@ from django.views.generic.detail import SingleObjectMixin
 from django.core.exceptions import SuspiciousFileOperation
 from django.http import HttpResponse
 from django.urls import reverse_lazy
-from django.db import connection, IntegrityError
-from django.db.models import F, Q, Count, Sum, When, Case
+from django.db import connection, transaction, IntegrityError
+from django.db.models import F, Q, Count, Sum, When, Case, Subquery
 from django.forms import Form, ValidationError
 from django.utils.text import slugify
 from django.utils._os import safe_join
@@ -43,6 +44,50 @@ from . import signals # noqa
 from . import youtube
 
 
+def get_histories_from_huey_ids(huey_task_ids):
+    """
+    Filters TaskHistory by Huey IDs. Returns a QuerySet safe for a single request cycle.
+    Indexes and tables are automatically purged by the DB when the connection closes.
+    """
+    task_history_table = TaskHistory._meta.db_table
+    unique_suffix = uuid.uuid4().hex[:8]
+    input_tmp = f"tmp_huey_ids_{unique_suffix}"
+    results_tmp = f"tmp_history_pks_{unique_suffix}"
+
+    # Use atomic to pin the connection for the duration of the setup
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            # 1. Input Table: Stores normalized Huey IDs
+            cursor.execute(f"CREATE TEMPORARY TABLE {input_tmp} (tid VARCHAR(255) PRIMARY KEY)")
+            
+            # Single iteration: normalize to lower-case string
+            id_generator = ((str(tid).lower(),) for tid in huey_task_ids)
+            cursor.executemany(f"INSERT INTO {input_tmp} VALUES (?)", id_generator)
+
+            # 2. Results Table: Stores matching TaskHistory PKs
+            # We use LOWER(task_id) to ensure case-insensitive matching on all DB types
+            cursor.execute(f"""
+                CREATE TEMPORARY TABLE {results_tmp} AS 
+                SELECT id FROM {task_history_table} 
+                WHERE LOWER(task_id) IN (SELECT tid FROM {input_tmp})
+            """)
+            
+            # 3. Create Index for the final QuerySet performance
+            # This index is automatically destroyed when results_tmp is dropped.
+            cursor.execute(f"CREATE INDEX idx_{results_tmp} ON {results_tmp}(id)")
+
+            # 4. Explicitly drop the input table to free memory/temp space immediately
+            cursor.execute(f"DROP TABLE IF EXISTS {input_tmp}")
+
+    # 5. Return Lazy QuerySet
+    # The 'results_tmp' table and its index 'idx_...' persist until the 
+    # connection is closed at the end of the request.
+    return TaskHistory.objects.filter(
+        id__in=Subquery(
+            TaskHistory.objects.raw(f"SELECT id FROM {results_tmp}")
+        )
+    )
+
 def get_waiting_tasks():
     huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
     huey_queues = list(map(get_queue, huey_queue_names))
@@ -53,9 +98,7 @@ def get_waiting_tasks():
             q.scheduled()
         )
     }
-    return TaskHistory.objects.filter(
-        task_id__in=huey_task_ids,
-    )
+    return get_histories_from_huey_ids(huey_task_ids)
 
 
 class DashboardView(TemplateView):
