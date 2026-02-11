@@ -101,8 +101,9 @@ def get_histories_from_huey_ids(huey_task_ids):
             ##cursor.executemany(f"INSERT INTO {input_tmp} VALUES (%s)", validated_id_generator())
             # Batch stream
             batch_size = 40_000
+            stream = validated_id_generator()
             while True:
-                batch = [ islice(validated_id_generator(), batch_size) ]
+                batch = list(islice(stream, batch_size))
                 if not batch:
                     break
                 cursor.executemany(f"INSERT INTO {input_tmp} VALUES (%s)", batch)
@@ -147,7 +148,7 @@ def get_waiting_tasks():
 
     def deduplicating_id_generator():
         seen = set()
-        for q in queues:
+        for q in huey_queues:
             # chain() handles the two sources without creating a new list
             for task in chain(q.pending(), q.scheduled()):
                 tid = str(task.id)
