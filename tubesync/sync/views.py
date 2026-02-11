@@ -47,42 +47,47 @@ from . import youtube
 
 def get_histories_from_huey_ids(huey_task_ids):
     """
-    Filters TaskHistory by Huey IDs. Returns a QuerySet safe for a single request cycle.
-    Indexes and tables are automatically purged by the DB when the connection closes.
+    Robustly matches Huey task.id values to TaskHistory records.
+    
+    Optimized for large datasets across SQLite, PostgreSQL, and MariaDB.
+    Bypasses SQL variable limits by using request-cycle temporary tables.
     """
+    # 1. Guard clause for empty input - returns a valid, empty QuerySet
+    if not huey_task_ids:
+        return TaskHistory.objects.none()
+
+    # 2. Dynamic metadata and unique naming
     task_history_table = TaskHistory._meta.db_table
     unique_suffix = uuid.uuid4().hex[:8]
     input_tmp = f"tmp_huey_ids_{unique_suffix}"
     results_tmp = f"tmp_history_pks_{unique_suffix}"
 
-    # Use atomic to pin the connection for the duration of the setup
+    # 3. Database operations
     with transaction.atomic():
         with connection.cursor() as cursor:
-            # 1. Input Table: Stores normalized Huey IDs
+            # Stage 1: Store and normalize input IDs
             cursor.execute(f"CREATE TEMPORARY TABLE {input_tmp} (tid VARCHAR(255) PRIMARY KEY)")
             
-            # Single iteration: normalize to lower-case string
+            # Single iteration: ensures dashed strings and lowercase for case-sensitive DBs
             id_generator = ((str(tid).lower(),) for tid in huey_task_ids)
             cursor.executemany(f"INSERT INTO {input_tmp} VALUES (?)", id_generator)
 
-            # 2. Results Table: Stores matching TaskHistory PKs
-            # We use LOWER(task_id) to ensure case-insensitive matching on all DB types
+            # Stage 2: Filter to a PK-only results table
+            # LOWER() on task_id ensures robust matching on PostgreSQL
             cursor.execute(f"""
                 CREATE TEMPORARY TABLE {results_tmp} AS 
                 SELECT id FROM {task_history_table} 
                 WHERE LOWER(task_id) IN (SELECT tid FROM {input_tmp})
             """)
             
-            # 3. Create Index for the final QuerySet performance
-            # This index is automatically destroyed when results_tmp is dropped.
+            # Index the result PKs to ensure dashboard pagination and ordering are fast
             cursor.execute(f"CREATE INDEX idx_{results_tmp} ON {results_tmp}(id)")
 
-            # 4. Explicitly drop the input table to free memory/temp space immediately
+            # Immediate cleanup of the input string table to save memory
             cursor.execute(f"DROP TABLE IF EXISTS {input_tmp}")
 
-    # 5. Return Lazy QuerySet
-    # The 'results_tmp' table and its index 'idx_...' persist until the 
-    # connection is closed at the end of the request.
+    # 4. Return a Lazy QuerySet via RawSQL to bypass RawQuerySet.clone() limitations.
+    # The 'results_tmp' table persists until the connection closes after the request.
     return TaskHistory.objects.filter(
         id__in=RawSQL(f"SELECT id FROM {results_tmp}", [])
     )
