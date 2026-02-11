@@ -63,21 +63,30 @@ def get_histories_from_huey_ids(huey_task_ids):
     results_tmp = f"tmp_history_pks_{unique_suffix}"
 
     # 3. Database operations
+    def validated_id_generator():
+        for tid in huey_task_ids:
+            try:
+                # Validates format and normalizes to lowercase dashed string
+                yield (str(uuid.UUID(str(tid))).lower(),)
+            except (ValueError, TypeError, AttributeError):
+                # Skip malformed IDs and log for troubleshooting
+                log.warning(f"Skipping malformed Huey task ID: {tid}")
+                continue
+
     with transaction.atomic():
         with connection.cursor() as cursor:
             # Stage 1: Store and normalize input IDs
-            cursor.execute(f"CREATE TEMPORARY TABLE {input_tmp} (tid VARCHAR(255) PRIMARY KEY)")
+            cursor.execute(f"CREATE TEMPORARY TABLE {input_tmp} (tid VARCHAR(40) PRIMARY KEY)")
             
             # Single iteration: ensures dashed strings and lowercase for case-sensitive DBs
-            id_generator = ((str(tid).lower(),) for tid in huey_task_ids)
-            cursor.executemany(f"INSERT INTO {input_tmp} VALUES (?)", id_generator)
+            cursor.executemany(f"INSERT INTO {input_tmp} VALUES (%s)", validated_id_generator())
 
             # Stage 2: Filter to a PK-only results table
-            # LOWER() on task_id ensures robust matching on PostgreSQL
+            cursor.execute(f"CREATE TEMPORARY TABLE {results_tmp} (id BIGINT)")
             cursor.execute(f"""
-                CREATE TEMPORARY TABLE {results_tmp} AS 
+                INSERT INTO {results_tmp} (id)
                 SELECT id FROM {task_history_table} 
-                WHERE LOWER(task_id) IN (SELECT tid FROM {input_tmp})
+                WHERE task_id IN (SELECT tid FROM {input_tmp})
             """)
             
             # Index the result PKs to ensure dashboard pagination and ordering are fast
