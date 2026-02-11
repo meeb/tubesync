@@ -14,7 +14,8 @@ from django.core.exceptions import SuspiciousFileOperation
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.db import connection, transaction, IntegrityError
-from django.db.models import F, Q, Count, Sum, When, Case, Subquery
+from django.db.models import F, Q, Count, Sum, When, Case
+from django.db.models.expressions import RawSQL
 from django.forms import Form, ValidationError
 from django.utils.text import slugify
 from django.utils._os import safe_join
@@ -83,9 +84,7 @@ def get_histories_from_huey_ids(huey_task_ids):
     # The 'results_tmp' table and its index 'idx_...' persist until the 
     # connection is closed at the end of the request.
     return TaskHistory.objects.filter(
-        id__in=Subquery(
-            TaskHistory.objects.raw(f"SELECT id FROM {results_tmp}")
-        )
+        id__in=RawSQL(f"SELECT id FROM {results_tmp}", [])
     )
 
 def get_waiting_tasks():
