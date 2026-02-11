@@ -104,13 +104,17 @@ def get_histories_from_huey_ids(huey_task_ids):
 def get_waiting_tasks():
     huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
     huey_queues = list(map(get_queue, huey_queue_names))
-    huey_task_ids = {
-        str(t.id) for q in huey_queues for t in set(
-            q.pending()
-        ).union(
-            q.scheduled()
-        )
-    }
+    def id_generator():
+        for q in huey_queues:
+            # Stream pending tasks
+            for task in q.pending():
+                yield str(task.id)
+            
+            # Stream scheduled tasks
+            for task in q.scheduled():
+                yield str(task.id)
+            
+    huey_task_ids = set(id_generator())
     return get_histories_from_huey_ids(huey_task_ids)
 
 
