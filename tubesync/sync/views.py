@@ -1,6 +1,7 @@
 import glob
 import os
 from base64 import b64decode
+from itertools import chain, islice
 import pathlib
 import sys
 import uuid
@@ -45,6 +46,23 @@ from . import signals # noqa
 from . import youtube
 
 
+def is_empty(iterator):
+    """
+    Checks if an iterator is empty without fully consuming it.
+    Returns: (is_empty_boolean, iterator)
+    """
+    try:
+        # 1. Attempt to get the first item
+        first_item = next(iterator)
+    except StopIteration:
+        # 2. Generator was empty
+        return True, iter([])
+
+    # 3. Put the first item back at the start of a new iterator
+    # Chaining the single item with the original remaining stream
+    reconstructed_iterator = chain([first_item], iterator)
+    return False, reconstructed_iterator
+
 def get_histories_from_huey_ids(huey_task_ids):
     """
     Robustly matches Huey task.id values to TaskHistory records.
@@ -53,7 +71,8 @@ def get_histories_from_huey_ids(huey_task_ids):
     Bypasses SQL variable limits by using request-cycle temporary tables.
     """
     # 1. Guard clause for empty input - returns a valid, empty QuerySet
-    if not huey_task_ids:
+    empty, huey_task_ids = is_empty(huey_task_ids)
+    if empty:
         return TaskHistory.objects.none()
 
     # 2. Dynamic metadata and unique naming
@@ -79,7 +98,14 @@ def get_histories_from_huey_ids(huey_task_ids):
             cursor.execute(f"CREATE TEMPORARY TABLE {input_tmp} (tid VARCHAR(40) PRIMARY KEY)")
             
             # Single iteration: ensures dashed strings and lowercase for case-sensitive DBs
-            cursor.executemany(f"INSERT INTO {input_tmp} VALUES (%s)", validated_id_generator())
+            ##cursor.executemany(f"INSERT INTO {input_tmp} VALUES (%s)", validated_id_generator())
+            # Batch stream
+            batch_size = 40_000
+            while True:
+                batch = [ islice(validated_id_generator(), batch_size) ]
+                if not batch:
+                    break
+                cursor.executemany(f"INSERT INTO {input_tmp} VALUES (%s)", batch)
 
             # Stage 2: Filter to a PK-only results table
             cursor.execute(f"CREATE TEMPORARY TABLE {results_tmp} (id BIGINT)")
@@ -104,9 +130,9 @@ def get_histories_from_huey_ids(huey_task_ids):
 def get_waiting_tasks():
     huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
     huey_queues = list(map(get_queue, huey_queue_names))
-    total_tasks = sum(q.pending_count() + q.scheduled_count() for q in huey_queues)
-    
-    if 0 == total_tasks:
+
+    # Fast Guard: Check counts across all Huey queues
+    if not any(0 < (q.pending_count() + q.scheduled_count()) for q in huey_queues):
         return TaskHistory.objects.none()
 
     def id_generator():
@@ -118,8 +144,19 @@ def get_waiting_tasks():
             # Stream scheduled tasks
             for task in q.scheduled():
                 yield str(task.id)
+
+    def deduplicating_id_generator():
+        seen = set()
+        for q in queues:
+            # chain() handles the two sources without creating a new list
+            for task in chain(q.pending(), q.scheduled()):
+                tid = str(task.id)
+                if tid not in seen:
+                    seen.add(tid)
+                    yield tid
+        seen.clear()
             
-    huey_task_ids = set(id_generator())
+    huey_task_ids = deduplicating_id_generator()
     return get_histories_from_huey_ids(huey_task_ids)
 
 
