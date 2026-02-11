@@ -104,6 +104,11 @@ def get_histories_from_huey_ids(huey_task_ids):
 def get_waiting_tasks():
     huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
     huey_queues = list(map(get_queue, huey_queue_names))
+    total_tasks = sum(q.pending_count() + q.scheduled_count() for q in huey_queues)
+    
+    if 0 == total_tasks:
+        return TaskHistory.objects.none()
+
     def id_generator():
         for q in huey_queues:
             # Stream pending tasks
