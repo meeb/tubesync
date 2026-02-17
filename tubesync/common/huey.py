@@ -242,6 +242,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
             filename=f'/config/tasks/{name}.db',
             fsync=True,
             isolation_level='IMMEDIATE', # _create_connection sets this to None
+            journal_mode='TRUNCATE', # Huey normally uses WAL
             strict_fifo=True,
             timeout=60,
         ),
