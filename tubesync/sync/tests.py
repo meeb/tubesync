@@ -1446,7 +1446,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expeceted_match_type)
 
     def test_video_next_best_format_matching(self):
-        self.source.fallback = Val(Fallback.NEXT_BEST)
+        self.source.fallback = Val(Fallback.NEXT_BEST_RESOLUTION)
         # Test no 60fps, no HDR metadata
         self.media.metadata = all_test_metadata['boring']
         self.media.save()
