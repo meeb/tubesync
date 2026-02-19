@@ -639,8 +639,18 @@ class Media(models.Model):
     @property
     def reduce_data(self):
         now = timezone.now()
+        using_table = False
         try:
             data = json.loads(self.metadata or "{}")
+            old_mdl = len(self.metadata or "")
+            if data.get('_using_table', False):
+                try:
+                    data.update(self.new_metadata.with_formats)
+                except ObjectDoesNotExist:
+                    pass
+                else:
+                    using_table = True
+                    old_mdl = len(str(data))
             if '_reduce_data_ran_at' in data.keys():
                 total_seconds = data['_reduce_data_ran_at']
                 assert isinstance(total_seconds, int), type(total_seconds)
@@ -660,7 +670,6 @@ class Media(models.Model):
             from common.logger import log
             # log the results of filtering / compacting on metadata size
             new_mdl = len(compact_json)
-            old_mdl = len(self.metadata or "")
             if old_mdl > new_mdl:
                 delta = old_mdl - new_mdl
                 log.info(f'{self.key}: metadata compacted by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
@@ -669,7 +678,10 @@ class Media(models.Model):
                 delta = old_mdl - new_mdl
                 log.info(f'{self.key}: metadata reduced by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
                 if getattr(settings, 'SHRINK_OLD_MEDIA_METADATA', False):
-                    self.metadata = filtered_json
+                    if using_table:
+                        self.ingest_metadata(filtered_data)
+                    else:
+                        self.metadata = filtered_json
                     return filtered_data
             return data
 
