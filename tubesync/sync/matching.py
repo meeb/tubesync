@@ -5,13 +5,20 @@
 '''
 
 
-from .choices import Val, Fallback
-from common.utils import multi_key_sort
 from django.conf import settings
+from common.utils import multi_key_sort
+from .choices import Val, Fallback
+from .utils import resolve_priority_order
 
 
-default_english_lco = ('en-US', 'en-CA', 'en-GB', 'en',)
-english_language_codes = getattr(settings, 'ENGLISH_LANGUAGE_CODE_ORDER', default_english_lco)
+english_language_codes = resolve_priority_order(
+    getattr(
+        settings,
+        'ENGLISH_LANGUAGE_CODE_ORDER',
+        settings.DEFAULT_ENGLISH_LCO,
+    ),
+    settings.DEFAULT_ENGLISH_LCO,
+)
 min_height = getattr(settings, 'VIDEO_HEIGHT_CUTOFF', 360)
 fallback_hd_cutoff = getattr(settings, 'VIDEO_HEIGHT_IS_HD', 500)
 

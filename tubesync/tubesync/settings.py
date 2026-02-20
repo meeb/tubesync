@@ -231,6 +231,16 @@ RENAME_ALL_SOURCES = True
 RENAME_SOURCES = list()
 
 
+# An example for changing the ordering for audio tracks.
+#ENGLISH_LANGUAGE_CODE_ORDER = (
+#    'en-orig',
+#    'en-US', 'en-CA', 'en-PH', 'en-IE',
+#    'en-GB', 'en-AU', 'en-NZ', 'en-ZA', 'en-IN',
+#    'en-SG', 'en-HK', 'en-MY',
+#    'en', 'eng',
+#)
+
+
 # WARNING WARNING WARNING
 # Below this line, the logic and formulas must remain as they are.
 # Changing them is very likely to break the software in weird ways.
@@ -265,6 +275,49 @@ BACKGROUND_TASK_ASYNC_THREADS = 1
 
 
 MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'
+
+
+DEFAULT_ENGLISH_LCO = (
+    'en-orig',  # 1. Original Audio (YouTube Priority)
+    'en-US',    # 2. American English (Base)
+    'en-CA',    # 3. Canadian English (North American Family)
+    'en-PH',    # 4. Philippine English (American-aligned)
+    'en-IE',    # 5. Irish English (Rhotic/North Atlantic)
+    'en-GB',    # 6. British English (Primary Commonwealth)
+    'en-AU',    # 7. Australian English (Commonwealth)
+    'en-NZ',    # 8. New Zealand English (Commonwealth)
+    'en-ZA',    # 9. South African English (Commonwealth)
+    'en-IN',    # 10. Indian English (Commonwealth)
+    'en-SG',    # 11. Singapore English (Commonwealth)
+    'en-HK',    # 12. Hong Kong English (Commonwealth)
+    'en-MY',    # 13. Malaysia English (Commonwealth)
+    'en-JM',    # 14. Jamaica
+    'en-BZ',    # 15. Belize
+    'en-TT',    # 16. Trinidad and Tobago
+    'en-MT',    # 17. Malta
+    'en-ZW',    # 18. Zimbabwe
+    'en-KE',    # 19. Kenya
+    'en-NG',    # 20. Nigeria
+    'en-BW',    # 21. Botswana
+    'en-GM',    # 22. Gambia
+    'en-GH',    # 23. Ghana
+    'en',       # 24. Standard 2-letter fallback (ISO 639-1)
+    'en-021',   # 25. Northern America (Direct US/CA alignment)
+    'en-019',   # 26. Americas (Hemispheric North/South alignment)
+    'en-013',   # 27. Central America (Strong US influence)
+    'en-029',   # 28. Caribbean (Mix of US/UK influence)
+    'en-419',   # 29. Latin America & Caribbean
+    'en-150',   # 30. Europe (General European English)
+    'en-053',   # 31. Australia and New Zealand (Commonwealth Pacific)
+    'en-009',   # 32. Oceania
+    'en-035',   # 33. South-eastern Asia (Commonwealth Asia)
+    'en-142',   # 34. Asia
+    'en-030',   # 35. Eastern Asia
+    'en-002',   # 36. Africa
+    'en-011',   # 37. Western Africa
+    'en-001',   # 38. World (International English)
+    'eng',      # 39. Standard 3-letter fallback (ISO 639-2)
+)
 
 
 from .dbutils import patch_ensure_connection # noqa
