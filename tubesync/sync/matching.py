@@ -10,6 +10,8 @@ from common.utils import multi_key_sort
 from django.conf import settings
 
 
+default_english_lco = ('en-US', 'en-CA', 'en-GB', 'en',)
+english_language_codes = getattr(settings, 'ENGLISH_LANGUAGE_CODE_ORDER', default_english_lco)
 min_height = getattr(settings, 'VIDEO_HEIGHT_CUTOFF', 360)
 fallback_hd_cutoff = getattr(settings, 'VIDEO_HEIGHT_IS_HD', 500)
 
@@ -58,7 +60,7 @@ def get_best_combined_format(media):
         return True, by_fmt_id['default']['id']
 
     # try for English
-    for lc in ('en-US', 'en',):
+    for lc in english_language_codes:
         if lc in by_language:
             return True, by_language[lc]['id']
 
