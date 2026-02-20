@@ -6,9 +6,8 @@
 
 
 from django.conf import settings
-from common.utils import multi_key_sort
+from common.utils import multi_key_sort, resolve_priority_order
 from .choices import Val, Fallback
-from .utils import resolve_priority_order
 
 
 english_language_codes = resolve_priority_order(
