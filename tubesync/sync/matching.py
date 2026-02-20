@@ -16,6 +16,25 @@ min_height = getattr(settings, 'VIDEO_HEIGHT_CUTOFF', 360)
 fallback_hd_cutoff = getattr(settings, 'VIDEO_HEIGHT_IS_HD', 500)
 
 
+def get_fallback_id(by_fmt_id, /, by_language = {}, *, exact = False, fallback_id = False):
+    assert isinstance(by_fmt_id, dict), type(by_fmt_id)
+    assert isinstance(by_language, dict), type(by_language)
+    assert exact in (True, False,), 'invalid value for exact'
+
+    # prefer default
+    if 'default' in by_fmt_id and 'id' in by_fmt_id['default']:
+        return exact, by_fmt_id['default']['id']
+
+    # try for English
+    for lc in english_language_codes:
+        if lc in by_language:
+            return exact, by_language[lc]
+
+    # use the fallback ID or report no results by default
+    if fallback_id or (exact is False and fallback_id is False):
+        return exact, fallback_id
+
+
 def get_best_combined_format(media):
     '''
         Attempts to see if there is a single, combined audio and video format that
@@ -47,7 +66,7 @@ def get_best_combined_format(media):
         # If we reach here, we have a combined match!
         matches.add(fmt['id'])
         by_fmt_id[fmt['id']] = fmt
-        by_language[fmt['language_code']] = fmt
+        by_language[fmt['language_code']] = fmt['id']
         if 'format_note' in fmt and '(default)' in fmt['format_note']:
             by_fmt_id['default'] = fmt
 
@@ -55,18 +74,8 @@ def get_best_combined_format(media):
     if not matches:
         return False, False
 
-    # prefer default
-    if 'default' in by_fmt_id:
-        return True, by_fmt_id['default']['id']
-
-    # try for English
-    for lc in english_language_codes:
-        if lc in by_language:
-            return True, by_language[lc]['id']
-
     # use any available matching format
-    return True, matches.pop()
-    
+    return get_fallback_id(by_fmt_id, by_language, exact=True, fallback_id=matches.pop())
 
 
 def get_best_audio_format(media):
@@ -75,30 +84,36 @@ def get_best_audio_format(media):
         has a 'fallback' of fail this can return no match.
     '''
     # Reverse order all audio-only formats
-    audio_formats = []
+    audio_formats = set()
+    by_fmt_acodec = dict()
+    by_fmt_id = dict()
+    by_language = dict()
     for fmt in media.iter_formats():
         # If the format has a video stream, skip it
         if fmt['vcodec'] is not None:
             continue
         if not fmt['acodec']:
             continue
-        audio_formats.append(fmt)
+        audio_formats.add(fmt['id'])
+        by_fmt_id[fmt['id']] = fmt
+        by_fmt_acodec[fmt['acodec']] = fmt['id']
+        by_language[fmt['language_code']] = fmt['id']
+        if 'format_note' in fmt and '(default)' in fmt['format_note']:
+            by_fmt_id['default'] = fmt
     if not audio_formats:
         # Media has no audio formats at all
         return False, False
-    audio_formats = list(reversed(audio_formats))
     # Find the first audio format with a matching codec
-    for fmt in audio_formats:
-        if media.source.source_acodec == fmt['acodec']:
-            # Matched!
-            return True, fmt['id']
+    if (fmt_id := by_fmt_acodec.get(media.source.source_acodec)) is not None:
+        # Matched!
+        return True, fmt_id
     # No codecs matched
-    if media.source.can_fallback:
-        # Can fallback, find the next non-matching codec
-        return False, audio_formats[0]['id']
-    else:
+    if not media.source.can_fallback:
         # Can't fallback
         return False, False
+
+    # Can fallback, find the next non-matching codec
+    return get_fallback_id(by_fmt_id, by_language, exact=False, fallback_id=audio_formats.pop())
 
 
 def get_best_video_format(media):
