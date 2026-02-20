@@ -126,6 +126,15 @@ def get_best_video_format(media):
     # Check if the source wants audio only, fast path to return
     if media.source.is_audio:
         return False, False
+    source_resolution = media.source.source_resolution.strip().upper()
+    source_resolution_height = media.source.source_resolution_height
+    source_vcodec = media.source.source_vcodec
+    def matched_resolution(fmt):
+        if fmt['format'] == source_resolution:
+            return True
+        elif fmt['height'] == source_resolution_height:
+            return True
+        return False
     # Filter video-only formats by resolution that matches the source
     video_formats = []
     sort_keys = [('height', False), ('vcodec', True), ('vbr', False)] # key, reverse
@@ -143,43 +152,34 @@ def get_best_video_format(media):
             continue
         if any(key[0] not in fmt for key in sort_keys):
             continue
-        if media.source.source_resolution.strip().upper() == fmt['format']:
-            video_formats.append(fmt)
-        elif media.source.source_resolution_height == fmt['height']:
+        if matched_resolution(fmt):
             video_formats.append(fmt)
     # Check we matched some streams
     if not video_formats:
         # No streams match the requested resolution, see if we can fallback
-        if media.source.can_fallback:
-            # Find the next-best format matches by height
-            for fmt in media.iter_formats():
-                # If the format has an audio stream, skip it
-                if fmt['acodec'] is not None:
-                    continue
-                # Disqualify AI-upscaled "super resolution" formats
-                # See above for more details.
-                if '-sr' in fmt['id']:
-                    continue
-                if (fmt['height'] <= media.source.source_resolution_height and 
-                    fmt['height'] >= min_height):
-                    video_formats.append(fmt)
-        else:
+        if not media.source.can_fallback:
             # Can't fallback
             return False, False
+        # Find the next-best format matches by height
+        for fmt in media.iter_formats():
+            # If the format has an audio stream, skip it
+            if fmt['acodec'] is not None:
+                continue
+            # Disqualify AI-upscaled "super resolution" formats
+            # See above for more details.
+            if '-sr' in fmt['id']:
+                continue
+            accept_height = (
+                fmt['height'] >= min_height and
+                fmt['height'] <= source_resolution_height
+            )
+            if accept_height:
+                video_formats.append(fmt)
     if not video_formats:
         # Still no matches
         return False, False
     video_formats = multi_key_sort(video_formats, sort_keys, True)
-    source_resolution = media.source.source_resolution.strip().upper()
-    source_resolution_height = media.source.source_resolution_height
-    source_vcodec = media.source.source_vcodec
     exact_match, best_match = None, None
-    def matched_resolution(fmt):
-        if fmt['format'] == source_resolution:
-            return True
-        elif fmt['height'] == source_resolution_height:
-            return True
-        return False
     # Of our filtered video formats, check for resolution + codec + hdr + fps match
     if media.source.prefer_60fps and media.source.prefer_hdr:
         for fmt in video_formats:
