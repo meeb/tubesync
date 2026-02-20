@@ -452,10 +452,13 @@ def get_best_video_format(media):
             return True, best_match['id']
         elif media.source.can_fallback:
             # Allow the fallback if it meets requirements
-            if (media.source.fallback == Val(Fallback.NEXT_BEST_HD) and
+            if (media.source.fallback == Val(Fallback.REQUIRE_HD) and
                 best_match['height'] >= fallback_hd_cutoff):
                 return False, best_match['id']
-            elif media.source.fallback == Val(Fallback.NEXT_BEST):
+            elif (media.source.fallback == Val(Fallback.REQUIRE_CODEC) and
+                source_vcodec == best_match['vcodec']):
+                return False, best_match['id']
+            elif media.source.fallback == Val(Fallback.NEXT_BEST_RESOLUTION):
                 return False, best_match['id']
     # Nope, failed to find match
     return False, False
