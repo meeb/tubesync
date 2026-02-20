@@ -227,9 +227,6 @@ COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 YOUTUBE_INFO_SLEEP_REQUESTS = 1
 
 
-MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'
-
-
 RENAME_ALL_SOURCES = True
 RENAME_SOURCES = list()
 
@@ -265,6 +262,9 @@ DOWNLOAD_MEDIA_DELAY = 1 + round(MAX_RUN_TIME / 100)
 BACKGROUND_TASK_RUN_ASYNC = False
 BACKGROUND_TASK_ASYNC_THREADS = 1
 # MAX_BACKGROUND_TASK_ASYNC_THREADS = 1
+
+
+MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'
 
 
 from .dbutils import patch_ensure_connection # noqa
