@@ -378,6 +378,10 @@ class AddSourceView(EditSourceMixin, CreateView):
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
+        # Inject the adjustable media format default
+        self.prepopulated_data['media_format'] = getattr(
+            settings, 'MEDIA_FORMATSTR', settings.MEDIA_FORMATSTR_DEFAULT
+        )
         source_type = request.GET.get('source_type', '')
         if source_type and source_type in YouTube_SourceType.values:
             self.prepopulated_data['source_type'] = source_type
