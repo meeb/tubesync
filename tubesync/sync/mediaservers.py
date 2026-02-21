@@ -85,7 +85,7 @@ class PlexMediaServer(MediaServer):
              'section IDs <a href="https://support.plex.tv/articles/201242707-plex-'
              'media-scanner-via-command-line/#toc-1" target="_blank">here</a> or '
              '<a href="https://www.plexopedia.com/plex-media-server/api/server/libraries/" '
-             'target="_blank">here</a></p>.')
+             'target="_blank">here</a>.</p>')
 
     def make_request(self, uri='/', /, *, headers={}, params={}):
         url, kwargs = self.make_request_args(uri=uri, headers=headers, token_param='X-Plex-Token', params=params)
@@ -205,7 +205,7 @@ class JellyfinMediaServer(MediaServer):
 
     def make_request(self, uri='/', /, *, headers={}, params={}, data={}, json=None, method='GET'):
         assert method in {'GET', 'POST'}, f'Unimplemented method: {method}'
-        
+
         headers.update({'Content-Type': 'application/json'})
         url, kwargs = self.make_request_args(uri=uri, token_header='X-Emby-Token', headers=headers, params=params)
         # From the Emby source code;
