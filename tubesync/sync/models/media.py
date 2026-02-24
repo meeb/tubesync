@@ -393,9 +393,13 @@ class Media(models.Model):
                             fmt.get('vcodec') and
                             self.source.can_fallback and
                             (
-                                (self.source.fallback == Val(Fallback.NEXT_BEST)) or
+                                (self.source.fallback == Val(Fallback.NEXT_BEST_RESOLUTION)) or
                                 (
-                                    self.source.fallback == Val(Fallback.NEXT_BEST_HD) and
+                                    self.source.fallback == Val(Fallback.REQUIRE_CODEC) and
+                                    self.source.source_vcodec == fmt.get('vcodec')
+                                ) or
+                                (
+                                    self.source.fallback == Val(Fallback.REQUIRE_HD) and
                                     (fmt.get('height') or 0) >= fallback_hd_cutoff
                                 )
                             )
