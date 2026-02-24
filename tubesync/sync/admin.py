@@ -21,6 +21,12 @@ class SourceAdmin(admin.ModelAdmin):
 @admin.register(Media)
 class MediaAdmin(admin.ModelAdmin):
 
+    # https://docs.djangoproject.com/en/5.2/ref/contrib/admin/actions/
+    # - skip
+    # - unskip
+    # - clear metadata
+    # - redownload
+    # actions = []
     ordering = ('-created',)
     list_display = ('uuid', 'key', 'source', 'can_download', 'skip', 'downloaded')
     readonly_fields = ('uuid', 'created')
