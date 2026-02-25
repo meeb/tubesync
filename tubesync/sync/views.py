@@ -1,6 +1,7 @@
 import glob
 import os
 from base64 import b64decode
+from itertools import islice
 import pathlib
 import sys
 import uuid
@@ -23,7 +24,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
-from common.utils import append_uri_params, mkdir_p, multi_key_sort
+from common.utils import append_uri_params, is_empty_iterator, mkdir_p, multi_key_sort
 from django_huey import DJANGO_HUEY, get_queue
 from common.huey import h_q_reset_tasks
 from common.logger import log
@@ -53,7 +54,8 @@ def get_histories_from_huey_ids(huey_task_ids):
     Bypasses SQL variable limits by using request-cycle temporary tables.
     """
     # 1. Guard clause for empty input - returns a valid, empty QuerySet
-    if not huey_task_ids:
+    empty, huey_task_ids = is_empty_iterator(huey_task_ids)
+    if empty:
         return TaskHistory.objects.none()
 
     # 2. Dynamic metadata and unique naming
@@ -79,7 +81,11 @@ def get_histories_from_huey_ids(huey_task_ids):
             cursor.execute(f"CREATE TEMPORARY TABLE {input_tmp} (tid VARCHAR(40) PRIMARY KEY)")
             
             # Single iteration: ensures dashed strings and lowercase for case-sensitive DBs
-            cursor.executemany(f"INSERT INTO {input_tmp} VALUES (%s)", validated_id_generator())
+            # Batch stream
+            batch_size = 40_000
+            stream = validated_id_generator()
+            while batch := list(islice(stream, batch_size)):
+                cursor.executemany(f"INSERT INTO {input_tmp} VALUES (%s)", batch)
 
             # Stage 2: Filter to a PK-only results table
             cursor.execute(f"CREATE TEMPORARY TABLE {results_tmp} (id BIGINT)")
@@ -104,13 +110,30 @@ def get_histories_from_huey_ids(huey_task_ids):
 def get_waiting_tasks():
     huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
     huey_queues = list(map(get_queue, huey_queue_names))
-    huey_task_ids = {
-        str(t.id) for q in huey_queues for t in set(
-            q.pending()
-        ).union(
-            q.scheduled()
-        )
-    }
+
+    # Fast Guard: Check counts across all Huey queues
+    if not any(0 < (q.pending_count() + q.scheduled_count()) for q in huey_queues):
+        return TaskHistory.objects.none()
+
+    def id_generator(queue):
+        # Stream pending tasks
+        for task in queue.pending():
+            yield str(task.id)
+            
+        # Stream scheduled tasks
+        for task in queue.scheduled():
+            yield str(task.id)
+
+    def deduplicating_id_generator():
+        seen = set()
+        for q in huey_queues:
+            for tid in id_generator(q):
+                if tid not in seen:
+                    seen.add(tid)
+                    yield tid
+        seen.clear()
+            
+    huey_task_ids = deduplicating_id_generator()
     return get_histories_from_huey_ids(huey_task_ids)
 
 
