@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceView,
+from .views import (DashboardView, SourcesView, SourceSyncNowView,
+                    ValidateSourceView, AddSourceView,
                     SourceView, UpdateSourceView, DeleteSourceView, MediaView,
                     MediaThumbView, MediaItemView, MediaRedownloadView, MediaSkipView,
                     MediaEnableView, MediaContent, TasksView, CompletedTasksView,
