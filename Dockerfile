@@ -447,6 +447,12 @@ COPY --from=openresty-debian \
 COPY --from=openresty-debian \
     /etc/apt/sources.list.d/openresty.list /etc/apt/sources.list.d/openresty.list
 
+RUN mkdir -v -p /etc/crypto-policies/back-ends && \
+    cp -v -p /usr/share/apt/default-sequoia.config \
+        /etc/crypto-policies/back-ends/apt-sequoia.config && \
+    sed -i -e '/^sha1\./s/2026-/2027-/;' \
+        /etc/crypto-policies/back-ends/apt-sequoia.config
+
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
   set -x && \
