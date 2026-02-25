@@ -21,7 +21,8 @@ ARG QJS_VERSION="2025-09-13"
 ARG SHA256_QJS="fed9715220d616d1a178e1c2e6bd62e8e850626b4fe337cf417940fd32b35802"
 
 ARG ALPINE_VERSION="latest"
-ARG DEBIAN_VERSION="bookworm-slim"
+ARG DEBIAN_VERSION="13-slim"
+ARG OPENRESTY_DEBIAN_VERSION="bookworm"
 
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
@@ -168,8 +169,8 @@ FROM scratch AS deno
 COPY --from=deno-binaries /deno /usr/local/bin/
 
 FROM alpine:${ALPINE_VERSION} AS openresty-debian
+ARG OPENRESTY_DEBIAN_VERSION
 ARG TARGETARCH
-ARG DEBIAN_VERSION
 ADD 'https://openresty.org/package/pubkey.gpg' '/downloaded/pubkey.gpg'
 RUN set -eu ; \
     decide_arch() { \
@@ -187,7 +188,7 @@ RUN set -eu ; \
     mkdir -v -p '/etc/apt/sources.list.d' && \
     printf -- >| '/etc/apt/sources.list.d/openresty.list' \
         'deb http://openresty.org/package/%sdebian %s openresty' \
-        "$(decide_arch)" "${DEBIAN_VERSION%-slim}"
+        "$(decide_arch)" "${OPENRESTY_DEBIAN_VERSION}"
 
 FROM tubesync-asfald AS ffmpeg-download
 ARG FFMPEG_DATE
