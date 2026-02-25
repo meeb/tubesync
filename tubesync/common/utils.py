@@ -8,6 +8,7 @@ import string
 import time
 from django.core.paginator import Paginator
 from functools import partial
+from itertools import chain
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from urllib.parse import urlunsplit, urlencode, urlparse
@@ -68,6 +69,23 @@ def glob_quote(filestr, /):
         raise TypeError(f'expected a str, got "{type(filestr)}"')
 
     return filestr.translate(str.maketrans(_glob_specials))
+
+
+def is_empty_iterator(iterator):
+    """
+    Checks if an iterator is empty without fully consuming it.
+    Returns: (is_empty_boolean, iterator)
+    """
+    returned_iterator = iterator
+    try:
+        first_item = next(iterator)
+    except StopIteration:
+        return True, iter([])
+    else:
+        # Put the first item back at the start of a new iterator
+        # Chaining the single item with the original remaining stream
+        returned_iterator = chain([first_item], iterator)
+    return False, returned_iterator
 
 
 def list_of_dictionaries(arg_list, /, arg_function=lambda x: x):
