@@ -1,26 +1,26 @@
 {% if form %}
   {% if form.errors %}
-  <ul class="errors">
-    {% for _, error in form.errors.items %}
-    <li>{{ error }}</li>
-    {% endfor %}
-  </ul>
+  <div class="errors">
+    <ul class="space-y-1">
+      {% for _, error in form.errors.items %}
+      <li>{{ error }}</li>
+      {% endfor %}
+    </ul>
+  </div>
   {% endif %}
   {% for field in form %}
   {% if field.field.widget.input_type == 'hidden' %}{{ field }}{% else %}
-  <div class="row">
-    <div class="input-field col s12">
-      {% if field.field.widget.input_type == 'checkbox' %}
-      <label>
-        {{ field }}
-        <span>{{ field.label }}</span>
-      </label>
-      {% else %}
-      {{ field.label_tag }}
+  <div class="mb-4">
+    {% if field.field.widget.input_type == 'checkbox' %}
+    <label class="flex items-center gap-2 cursor-pointer">
       {{ field }}
-      {% endif %}
-      {% if field.help_text %}<span class="help-text"><i class="fas fa-info-circle"></i> {{ field.help_text }}</span>{% endif %}
-    </div>
+      <span class="text-sm text-foreground">{{ field.label }}</span>
+    </label>
+    {% else %}
+    <label class="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">{{ field.label }}</label>
+    {{ field }}
+    {% endif %}
+    {% if field.help_text %}<p class="mt-1.5 text-sm text-muted-foreground"><i class="fas fa-info-circle"></i> {{ field.help_text }}</p>{% endif %}
   </div>
   {% endif %}
   {% endfor %}

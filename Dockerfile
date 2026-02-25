@@ -486,7 +486,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libonig5 \
   pkgconf \
   python3 \
-  python3-libsass \
   python3-pip-whl \
   python3-socks \
   curl \
@@ -679,7 +678,6 @@ RUN set -x && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   test '!' -e /app/db.sqlite3 && \
   # Run any required app commands
-  /usr/bin/python3 -B /app/manage.py compilescss && \
   /usr/bin/python3 -B /app/manage.py collectstatic --no-input --link && \
   rm -rf /config /downloads /run/app && \
   # Create config, downloads and run dirs

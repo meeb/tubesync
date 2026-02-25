@@ -13,7 +13,6 @@ django-appconf==1.2.0; python_version >= '3.9'
 django-basicauth==0.5.3
 django-compressor==4.6.0; python_version >= '3.10'
 django-huey==1.3.1; python_version >= '3.8'
-django-sass-processor[management-command]==1.4.2
 emoji==2.15.0; python_version >= '3.8'
 gunicorn==25.1.0; python_version >= '3.10'
 html5lib==1.1; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3, 3.4'
