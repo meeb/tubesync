@@ -1,0 +1,4 @@
+-i https://pypi.org/simple
+autopep8==2.3.2; python_version >= '3.9'
+pycodestyle==2.14.0; python_version >= '3.9'
+libsass>=0.23.0

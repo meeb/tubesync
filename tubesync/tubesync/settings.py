@@ -50,27 +50,7 @@ ROOT_URLCONF = 'tubesync.urls'
 FORCE_SCRIPT_NAME = None
 
 
-DJANGO_HUEY = {
-    'default': TaskQueue.LIMIT.value,
-    'queues': dict(),
-    'verbose': None if DEBUG else False,
-}
-for queue_name in TaskQueue.values:
-    queues = DJANGO_HUEY['queues']
-    if TaskQueue.LIMIT.value == queue_name:
-        queues[queue_name] = sqlite_tasks(queue_name, prefix='net')
-    elif TaskQueue.NET.value == queue_name:
-        queues[queue_name] = sqlite_tasks(queue_name, thread=True, workers=0)
-    else:
-        queues[queue_name] = sqlite_tasks(queue_name, thread=True)
-for django_huey_queue in DJANGO_HUEY['queues'].values():
-    connection = django_huey_queue.get('connection')
-    if connection:
-        filepath = Path('/.' + connection.get('filename') or '').resolve(strict=False)
-        filepath.parent.mkdir(exist_ok=True, parents=True)
-    consumer = django_huey_queue.get('consumer')
-    if consumer:
-        consumer['verbose'] = DJANGO_HUEY.get('verbose', False)
+HUEY_TASKS_DIR = None  # Set in local_settings.py, defaults to /config/tasks
 
 
 TEMPLATES = [
@@ -253,6 +233,29 @@ except ImportError as e:
     import sys
     sys.stderr.write(f'Unable to import local_settings: {e}\n')
     sys.exit(1)
+
+
+DJANGO_HUEY = {
+    'default': TaskQueue.LIMIT.value,
+    'queues': dict(),
+    'verbose': None if DEBUG else False,
+}
+for queue_name in TaskQueue.values:
+    queues = DJANGO_HUEY['queues']
+    if TaskQueue.LIMIT.value == queue_name:
+        queues[queue_name] = sqlite_tasks(queue_name, prefix='net', tasks_dir=HUEY_TASKS_DIR)
+    elif TaskQueue.NET.value == queue_name:
+        queues[queue_name] = sqlite_tasks(queue_name, thread=True, workers=0, tasks_dir=HUEY_TASKS_DIR)
+    else:
+        queues[queue_name] = sqlite_tasks(queue_name, thread=True, tasks_dir=HUEY_TASKS_DIR)
+for django_huey_queue in DJANGO_HUEY['queues'].values():
+    connection = django_huey_queue.get('connection')
+    if connection:
+        filepath = Path('/.' + connection.get('filename') or '').resolve(strict=False)
+        filepath.parent.mkdir(exist_ok=True, parents=True)
+    consumer = django_huey_queue.get('consumer')
+    if consumer:
+        consumer['verbose'] = DJANGO_HUEY.get('verbose', False)
 
 
 try:

@@ -403,7 +403,7 @@ FROM tubesync-base AS tubesync-prepare-app
 
 COPY tubesync /app
 
-RUN --mount=type=bind,source=fontawesome-free,target=/fontawesome-free \
+RUN --mount=type=bind,source=assets/fontawesome-free,target=/fontawesome-free \
   set -x && \
   # turn any symbolic links into files
   ( \
