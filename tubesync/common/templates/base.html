@@ -1,65 +1,60 @@
-{% load static %}{% load sass_tags %}<!DOCTYPE html>
-<html>
+{% load static %}<!DOCTYPE html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <style>
-      html{
-        visibility: hidden;
-        opacity: 0;
-      }
-    </style>
-    <link type="text/css" rel="stylesheet" href="{% sass_src 'styles/tubesync.scss' %}" media="screen,projection"/>
-    <link rel="icon" href="{% static 'images/favicon.ico' %}" sizes="21x21" type="image/x-icon">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="stylesheet" href="{% static 'styles/fontawesome.min.css' %}" />
+    <link rel="stylesheet" href="{% static 'styles/output.css' %}" />
+    <link rel="icon" href="{% static 'images/favicon.ico' %}" sizes="21x21" type="image/x-icon">
     <title>TubeSync - {% block headtitle %}Synchronize YouTube to your local media server{% endblock %}</title>
   </head>
 
   <body>
 
-    <div class="app">
+    <!-- Header -->
+    <header class="bg-header text-header-foreground">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5">
+        <a href="{% url 'sync:dashboard' %}" class="flex items-center gap-3 text-header-foreground hover:text-header-foreground">
+          {% include 'tubesync.svg' with width='2.5rem' height='2.5rem' %}
+          <span class="text-3xl font-bold tracking-tight">TubeSync</span>
+        </a>
+      </div>
+    </header>
 
-      <header>
-        <div class="container">
-          <a href="{% url 'sync:dashboard' %}">
-            {% include 'tubesync.svg' with width='3rem' height='3rem' %}
-            <h1>TubeSync</h1>
-          </a>
-        </div>
-      </header>
+    <!-- Navigation -->
+    <nav class="bg-nav text-nav-foreground border-b border-white/10">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <ul class="flex items-center gap-1 h-12 -mx-2 overflow-x-auto">
+          <li><a href="{% url 'sync:dashboard' %}" class="flex items-center gap-2 px-3 h-10 rounded-md text-nav-foreground/80 hover:bg-white/10 hover:text-nav-foreground text-sm font-medium transition-colors"><i class="fas fa-fw fa-th-large"></i><span class="hidden sm:inline">Dashboard</span></a></li>
+          <li><a href="{% url 'sync:sources' %}" class="flex items-center gap-2 px-3 h-10 rounded-md text-nav-foreground/80 hover:bg-white/10 hover:text-nav-foreground text-sm font-medium transition-colors"><i class="fas fa-fw fa-play"></i><span class="hidden sm:inline">Sources</span></a></li>
+          <li><a href="{% url 'sync:media' %}" class="flex items-center gap-2 px-3 h-10 rounded-md text-nav-foreground/80 hover:bg-white/10 hover:text-nav-foreground text-sm font-medium transition-colors"><i class="fas fa-fw fa-film"></i><span class="hidden sm:inline">Media</span></a></li>
+          <li><a href="{% url 'sync:tasks' %}" class="flex items-center gap-2 px-3 h-10 rounded-md text-nav-foreground/80 hover:bg-white/10 hover:text-nav-foreground text-sm font-medium transition-colors"><i class="far fa-fw fa-clock"></i><span class="hidden sm:inline">Tasks</span></a></li>
+          <li><a href="{% url 'sync:mediaservers' %}" class="flex items-center gap-2 px-3 h-10 rounded-md text-nav-foreground/80 hover:bg-white/10 hover:text-nav-foreground text-sm font-medium transition-colors"><i class="fas fa-fw fa-stream"></i><span class="hidden sm:inline">Media Servers</span></a></li>
+        </ul>
+      </div>
+    </nav>
 
-      <nav>
-        <div class="container">
-          <ul>
-            <li><a href="{% url 'sync:dashboard' %}"><i class="fas fa-fw fa-th-large"></i><span class="hide-on-med-and-down"> Dashboard</span></a></li>
-            <li><a href="{% url 'sync:sources' %}"><i class="fas fa-fw fa-play"></i><span class="hide-on-med-and-down"> Sources</span></a></li>
-            <li><a href="{% url 'sync:media' %}"><i class="fas fa-fw fa-film"></i><span class="hide-on-med-and-down"> Media</span></a></li>
-            <li><a href="{% url 'sync:tasks' %}"><i class="far fa-fw fa-clock"></i><span class="hide-on-med-and-down"> Tasks</span></a></li>
-            <li><a href="{% url 'sync:mediaservers' %}"><i class="fas fa-fw fa-stream"></i><span class="hide-on-med-and-down"> Media Servers</span></a></li>
-          </ul>
-        </div>
-      </nav>
+    <!-- Main content -->
+    <main class="flex-1 py-8">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
 
-      <main>
-        <div class="container">
-          {% block content %}{% endblock %}
-        </div>
-      </main>
-
-    </div>
-
-    <footer>
-      <div class="container">
-        <p>
-          <a href="{% url 'sync:dashboard' %}" class="nowrap">{% include 'tubesync.svg' with width='0.8rem' height='0.8rem' %} TubeSync</a>
+    <!-- Footer -->
+    <footer class="bg-footer text-footer-foreground border-t border-white/5">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 text-sm">
+        <p class="mb-3">
+          <a href="{% url 'sync:dashboard' %}" class="nowrap text-footer-foreground hover:text-white">{% include 'tubesync.svg' with width='0.8rem' height='0.8rem' %} TubeSync</a>
           is an open source synchronisation tool to automatically download videos from online video platforms. &copy; {% now 'Y' %} TubeSync developers.
-          The original code under a <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank">GPLv3 licence</a> is available at
-          <a href="https://github.com/meeb/tubesync" class="nowrap" target="_blank"><i class="fab fa-github"></i> https://github.com/meeb/tubesync</a>.
+          The original code under a <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" class="text-footer-foreground hover:text-white underline">GPLv3 licence</a> is available at
+          <a href="https://github.com/meeb/tubesync" class="nowrap text-footer-foreground hover:text-white underline" target="_blank"><i class="fab fa-github"></i> https://github.com/meeb/tubesync</a>.
         </p>
         <p>
-          <a href="https://github.com/meeb/tubesync" class="nowrap" target="_blank"><i class="fab fa-github"></i> TubeSync</a> version <strong>{{ app_version }}</strong> with
-          <a href="https://github.com/yt-dlp/yt-dlp" class="nowrap" target="_blank"><i class="fas fa-link"></i> yt-dlp</a> version <strong>{{ yt_dlp_version }}</strong>,
-          <a href="https://ffmpeg.org/" class="nowrap" target="_blank"><i class="fas fa-link"></i> FFmpeg</a> version <strong>{{ ffmpeg_version }}</strong> and
-          <a href="https://deno.com/" class="nowrap" target="_blank"><i class="fas fa-link"></i> deno</a> version <strong>{{ deno_version }}</strong>.
+          <a href="https://github.com/meeb/tubesync" class="nowrap text-footer-foreground hover:text-white" target="_blank"><i class="fab fa-github"></i> TubeSync</a> version <strong class="text-white">{{ app_version }}</strong> with
+          <a href="https://github.com/yt-dlp/yt-dlp" class="nowrap text-footer-foreground hover:text-white" target="_blank"><i class="fas fa-link"></i> yt-dlp</a> version <strong class="text-white">{{ yt_dlp_version }}</strong>,
+          <a href="https://ffmpeg.org/" class="nowrap text-footer-foreground hover:text-white" target="_blank"><i class="fas fa-link"></i> FFmpeg</a> version <strong class="text-white">{{ ffmpeg_version }}</strong> and
+          <a href="https://deno.com/" class="nowrap text-footer-foreground hover:text-white" target="_blank"><i class="fas fa-link"></i> deno</a> version <strong class="text-white">{{ deno_version }}</strong>.
         </p>
       </div>
     </footer>

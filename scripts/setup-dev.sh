@@ -44,11 +44,36 @@ else
     echo "==> local_settings.py already exists, skipping"
 fi
 
-# 5. Run migrations
+# 5. Download Tailwind CSS CLI if not present
+if [ ! -x "$REPO_ROOT/tailwindcss" ]; then
+    echo "==> Downloading Tailwind CSS CLI"
+    ARCH="$(uname -m)"
+    OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    case "$OS-$ARCH" in
+        linux-x86_64)  TW_BIN="tailwindcss-linux-x64" ;;
+        linux-aarch64) TW_BIN="tailwindcss-linux-arm64" ;;
+        darwin-arm64)  TW_BIN="tailwindcss-macos-arm64" ;;
+        darwin-x86_64) TW_BIN="tailwindcss-macos-x64" ;;
+        *)             echo "    Unsupported platform: $OS-$ARCH"; TW_BIN="" ;;
+    esac
+    if [ -n "$TW_BIN" ]; then
+        curl -sL "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/$TW_BIN" -o "$REPO_ROOT/tailwindcss"
+        chmod +x "$REPO_ROOT/tailwindcss"
+        echo "    Downloaded $TW_BIN"
+    fi
+else
+    echo "==> Tailwind CSS CLI already present"
+fi
+
+# 6. Compile Tailwind CSS
+echo "==> Compiling Tailwind CSS"
+"$REPO_ROOT/tailwindcss" --input "$REPO_ROOT/tubesync/common/static/styles/tubesync.css" --output "$REPO_ROOT/tubesync/common/static/styles/output.css"
+
+# 7. Run migrations
 echo "==> Running database migrations"
 $PYTHON "$REPO_ROOT/tubesync/manage.py" migrate --run-syncdb -v 0
 
-# 6. Collect static files
+# 8. Collect static files
 echo "==> Collecting static files"
 $PYTHON "$REPO_ROOT/tubesync/manage.py" collectstatic --noinput -v 0
 
