@@ -514,6 +514,10 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   update-alternatives --install /usr/local/bin/vim vim /usr/bin/vim.tiny 15 && \
   update-alternatives --install /usr/local/bin/vim vim /usr/bin/vis 35 && \
   rm -v /usr/local/bin/babi /bin/nano /usr/bin/vim.tiny && \
+  printf >| /usr/local/bin/sqlite3 -- '%s\n' '#!/usr/bin/env sh' '' \
+    'if [ -x /usr/bin/sqlite3 ]; then exec /usr/bin/sqlite3 "$@" ; fi;' '' \
+    'exec /usr/bin/env python3 -m sqlite3 "$@"' && \
+  chmod -c 00755 /usr/local/bin/sqlite3 && \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
