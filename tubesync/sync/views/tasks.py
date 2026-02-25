@@ -16,7 +16,8 @@ from common.logger import log
 from django_huey import DJANGO_HUEY, get_queue
 from .utils import get_waiting_tasks
 from ..models import Source
-from ..forms import ResetTasksForm, ScheduleTaskForm
+from django import forms
+from ..forms import ScheduleTaskForm
 from ..tasks import (
     map_task_to_instance, get_error_message,
     get_running_tasks, check_source_directory_exists,
@@ -270,7 +271,7 @@ class ResetTasks(FormView):
     '''
 
     template_name = 'sync/tasks-reset.html'
-    form_class = ResetTasksForm
+    form_class = forms.Form
 
     def form_valid(self, form):
         # Delete all tasks
