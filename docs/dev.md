@@ -11,56 +11,82 @@ tests, and contribute to TubeSync.
 - `mysql_config` or `mariadb_config` if you need the MySQL/MariaDB driver
   (Debian/Ubuntu: `libmysqlclient-dev`)
 
-## Initial setup
-
-1. Clone the repository:
+## Quick setup
 
 ```bash
 git clone https://github.com/meeb/tubesync.git
 cd tubesync
+./scripts/setup-dev.sh
 ```
 
-2. Install Python dependencies:
+This script handles everything: creates a `.venv` virtualenv, installs dependencies
+from `requirements.txt`, applies the yt-dlp patches, copies `local_settings.py`, runs
+migrations, and collects static files.
+
+Once done:
 
 ```bash
-pipenv install --dev
+source .venv/bin/activate
+cd tubesync && python manage.py runserver
 ```
 
-Or, if you prefer using `uv` + `pip` (same as CI):
+## Manual setup
+
+If you prefer doing it step by step:
+
+1. Clone and create a virtualenv:
 
 ```bash
-python -m pip install uv
-pipenv lock
-pipenv requirements | tee requirements.txt
-uv pip install --system --strict --requirements requirements.txt
+git clone https://github.com/meeb/tubesync.git
+cd tubesync
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-3. Copy the local settings file:
+2. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+```
+
+3. Apply yt-dlp patches (required -- TubeSync ships patches that get copied into the
+   installed `yt_dlp` package):
+
+```bash
+cp -a patches/yt_dlp/* "$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/yt_dlp/"
+```
+
+4. Copy the local settings file:
 
 ```bash
 cp tubesync/tubesync/local_settings.py.example tubesync/tubesync/local_settings.py
 ```
 
-This configures a local SQLite database and sensible defaults for development.
-
-4. Run database migrations:
+5. Run migrations and collect static files:
 
 ```bash
 cd tubesync
 python manage.py migrate
-```
-
-5. Collect static files:
-
-```bash
 python manage.py collectstatic --noinput
 ```
 
-Or use the Makefile shortcut:
+Or use the Makefile shortcut for static files: `make build`
 
-```bash
-make build
-```
+## Local settings
+
+`local_settings.py` configures paths so everything stays inside the project directory:
+
+| Setting | Dev value | Container value |
+|---------|-----------|-----------------|
+| `CONFIG_BASE_DIR` | `tubesync/` (project dir) | `/config` |
+| `DOWNLOADS_BASE_DIR` | `tubesync/` (project dir) | `/downloads` |
+| `HUEY_TASKS_DIR` | `tubesync/tasks/` | `/config/tasks` |
+| `DOWNLOAD_ROOT` | `tubesync/downloads/` | `/downloads` |
+| Database | `tubesync/db.sqlite3` | `/config/db.sqlite3` |
+
+All data files (database, task queues, downloads) are created inside the project
+directory so nothing touches system paths like `/config` or `/downloads`.
 
 ## Running the development server
 
@@ -121,6 +147,7 @@ tubesync/
 │   ├── tubesync/          # Django project config (settings, urls, wsgi)
 │   ├── common/            # Shared app (base templates, utils, middleware, task queue)
 │   └── sync/              # Main app (sources, media, downloads, media servers)
+├── assets/                # Vendored third-party assets (Font Awesome)
 ├── docs/                  # Documentation
 │   └── assets/            # Screenshots and images
 ├── patches/               # Patches applied to yt-dlp
