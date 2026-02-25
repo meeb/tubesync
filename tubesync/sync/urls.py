@@ -1,8 +1,10 @@
 from django.urls import path
-from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceView,
+from .views import (DashboardView, SourcesView, SourceSyncNowView,
+                    ValidateSourceView, AddSourceView,
                     SourceView, UpdateSourceView, DeleteSourceView, MediaView,
                     MediaThumbView, MediaItemView, MediaRedownloadView, MediaSkipView,
-                    MediaEnableView, MediaContent, TasksView, CompletedTasksView, ResetTasks,
+                    MediaEnableView, MediaContent, TasksView, RevokeTaskView,
+                    CompletedTasksView, ResetTasks,
                     TaskScheduleView, MediaServersView, AddMediaServerView, MediaServerView,
                     DeleteMediaServerView, UpdateMediaServerView)
 
@@ -36,7 +38,7 @@ urlpatterns = [
 
     path(
         'source-sync-now/<uuid:pk>',
-        SourcesView.as_view(),
+        SourceSyncNowView.as_view(),
         name='source-sync-now',
     ),
 
@@ -124,7 +126,7 @@ urlpatterns = [
 
     path(
         'task/<int:pk>/cancel',
-        TasksView.as_view(),
+        RevokeTaskView.as_view(),
         name='revoke-task',
     ),
 

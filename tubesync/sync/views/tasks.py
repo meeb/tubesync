@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.http import HttpResponseNotFound, HttpResponseRedirect
+from django.views import View
 from django.views.generic import ListView
 from django.views.generic.edit import FormView
 from django.views.generic.detail import SingleObjectMixin
@@ -182,37 +183,39 @@ class TasksView(ListView):
                 self.kwargs[page_kwarg] = 'last'
         return super().paginate_queryset(queryset, page_size)
 
-    def get(self, *args, **kwargs):
-        path = args[0].path
-        if path.startswith('/task/') and path.endswith('/cancel'):
-            try:
-                task = TaskHistory.objects.get(pk=kwargs["pk"])
-            except TaskHistory.DoesNotExist:
-                return HttpResponseNotFound()
-            else:
-                huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
-                huey_queues = { q.name: q for q in map(get_queue, huey_queue_names) }
-                q = huey_queues.get(task.queue)
-                if q is None:
-                    msg = f'TasksView: queue not found: {task.pk=} {task.queue=}'
-                    log.warning(msg)
-                    return HttpResponseNotFound()
-                # revoke the task we want to cancel
-                q.revoke_by_id(id=task.task_id, revoke_once=True)
-                vn = task.verbose_name or task.task_id or task.pk
-                if not vn.startswith('[revoked] '):
-                    task.verbose_name = f'[revoked] {vn}'
-                    task.save()
-                return HttpResponseRedirect(append_uri_params(
-                    reverse_lazy('sync:tasks'),
-                    dict(
-                        message='revoked',
-                        pk=str(task.pk),
-                        task_id=str(task.task_id),
-                    ),
-                ))
-        else:
-            return super().get(self, *args, **kwargs)
+class RevokeTaskView(View):
+    '''
+        Revokes (cancels) a single queued task, then redirects back to the
+        tasks list.
+    '''
+
+    def get(self, request, pk):
+        try:
+            task = TaskHistory.objects.get(pk=pk)
+        except TaskHistory.DoesNotExist:
+            return HttpResponseNotFound()
+        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+        huey_queues = { q.name: q for q in map(get_queue, huey_queue_names) }
+        q = huey_queues.get(task.queue)
+        if q is None:
+            msg = f'RevokeTaskView: queue not found: {task.pk=} {task.queue=}'
+            log.warning(msg)
+            return HttpResponseNotFound()
+        # revoke the task we want to cancel
+        q.revoke_by_id(id=task.task_id, revoke_once=True)
+        vn = task.verbose_name or task.task_id or task.pk
+        if not vn.startswith('[revoked] '):
+            task.verbose_name = f'[revoked] {vn}'
+            task.save()
+        return HttpResponseRedirect(append_uri_params(
+            reverse_lazy('sync:tasks'),
+            dict(
+                message='revoked',
+                pk=str(task.pk),
+                task_id=str(task.task_id),
+            ),
+        ))
+
 
 class CompletedTasksView(ListView):
     '''

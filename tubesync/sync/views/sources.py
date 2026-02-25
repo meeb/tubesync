@@ -1,6 +1,7 @@
 import pathlib
 from django.conf import settings
 from django.http import HttpResponseNotFound, HttpResponseRedirect
+from django.views import View
 from django.views.generic import ListView, DetailView
 from django.views.generic.edit import FormView, FormMixin, CreateView, UpdateView, DeleteView
 from django.core.exceptions import SuspiciousFileOperation
@@ -36,25 +37,6 @@ class SourcesView(ListView):
         'source-refreshed': _('The source has been scheduled to be synced now.')
     }
 
-    def get(self, *args, **kwargs):
-        if args[0].path.startswith("/source-sync-now/"):
-            source = Source.objects.get(pk=kwargs["pk"])
-            if source is None:
-                return HttpResponseNotFound()
-
-            TaskHistory.schedule(
-                index_source,
-                str(source.pk),
-                delay=30,
-                vn_fmt=_('Index media from source "{}" once'),
-                vn_args=(source.name,),
-            )
-            url = reverse_lazy('sync:sources')
-            url = append_uri_params(url, {'message': 'source-refreshed'})
-            return HttpResponseRedirect(url)
-        else:
-            return super().get(self, *args, **kwargs)
-
     def __init__(self, *args, **kwargs):
         self.message = None
         super().__init__(*args, **kwargs)
@@ -75,6 +57,29 @@ class SourcesView(ListView):
         data = super().get_context_data(*args, **kwargs)
         data['message'] = self.message
         return data
+
+
+class SourceSyncNowView(View):
+    '''
+        Triggers an immediate index of a source, then redirects back to the
+        sources list.
+    '''
+
+    def get(self, request, pk):
+        try:
+            source = Source.objects.get(pk=pk)
+        except Source.DoesNotExist:
+            return HttpResponseNotFound()
+        TaskHistory.schedule(
+            index_source,
+            str(source.pk),
+            delay=30,
+            vn_fmt=_('Index media from source "{}" once'),
+            vn_args=(source.name,),
+        )
+        url = reverse_lazy('sync:sources')
+        url = append_uri_params(url, {'message': 'source-refreshed'})
+        return HttpResponseRedirect(url)
 
 
 class ValidateSourceView(FormView):
