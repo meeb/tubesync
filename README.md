@@ -30,23 +30,23 @@ ghcr.io/meeb/tubesync:latest
 
 ### Dashboard
 
-![TubeSync Dashboard](docs/dashboard-v0.5.png)
+![TubeSync Dashboard](docs/assets/dashboard-v0.5.png)
 
 ### Sources overview
 
-![TubeSync sources overview](docs/sources-v0.5.png)
+![TubeSync sources overview](docs/assets/sources-v0.5.png)
 
 ### Source details
 
-![TubeSync source details](docs/source-v0.5.png)
+![TubeSync source details](docs/assets/source-v0.5.png)
 
 ### Media overview
 
-![TubeSync media overview](docs/media-v0.5.png)
+![TubeSync media overview](docs/assets/media-v0.5.png)
 
 ### Media details
 
-![TubeSync media-details](docs/media-item-v0.5.png)
+![TubeSync media-details](docs/assets/media-item-v0.5.png)
 
 </details>
 
@@ -231,19 +231,27 @@ docker logs -t tubesync > TubeSync.logs.txt 2>&1
 ```
 
 
-# Advanced usage guides
+# Documentation
 
-Once you're happy using TubeSync there are some advanced usage guides for more complex
-and less common features:
+### Getting started
 
- * [Using Plex](https://github.com/meeb/tubesync/blob/main/docs/plex-notes.md)
- * [Import existing media into TubeSync](https://github.com/meeb/tubesync/blob/main/docs/import-existing-media.md)
- * [Sync or create missing metadata files](https://github.com/meeb/tubesync/blob/main/docs/create-missing-metadata.md)
- * [Reset tasks from the command line](https://github.com/meeb/tubesync/blob/main/docs/reset-tasks.md)
- * [Using PostgreSQL, MySQL or MariaDB as database backends](https://github.com/meeb/tubesync/blob/main/docs/other-database-backends.md)
- * [YouTube Proof-of-Origin Tokens](https://github.com/meeb/tubesync/blob/main/docs/youtube-pot.md)
- * [Using cookies](https://github.com/meeb/tubesync/blob/main/docs/using-cookies.md)
- * [Reset metadata](https://github.com/meeb/tubesync/blob/main/docs/reset-metadata.md)
+ * [Development guide](docs/dev.md) - Local setup, running tests, contributing
+ * [Environment variables](docs/environment-variables.md) - Full configuration reference
+
+### Usage guides
+
+ * [Using Plex](docs/plex-notes.md) - Plex integration with YouTube-Agent
+ * [Using cookies](docs/using-cookies.md) - Authenticate with YouTube via cookies
+ * [Writing custom filters](docs/custom-filters.md) - Filter media with custom Python code
+ * [YouTube Proof-of-Origin Tokens](docs/youtube-pot.md) - PoT setup for rate-limiting
+
+### Administration
+
+ * [Import existing media](docs/import-existing-media.md) - Import already-downloaded files
+ * [Sync or create missing metadata](docs/create-missing-metadata.md) - Re-generate metadata files
+ * [Reset tasks](docs/reset-tasks.md) - Reset stuck or failed tasks from the CLI
+ * [Reset metadata](docs/reset-metadata.md) - Reset cached metadata
+ * [Using PostgreSQL, MySQL or MariaDB](docs/other-database-backends.md) - External database setup
 
 
 # Warnings
@@ -362,29 +370,9 @@ Make sure that you have `mysql_config` or `mariadb_config` available, as require
 
 # Advanced configuration
 
-There are a number of other environment variables you can set. These are, mostly,
-**NOT** required to be set in the default container installation, they are really only
-useful if you are manually installing TubeSync in some other environment. These are:
-
-| Name                         | What                                                          | Example                                                                       |
-| ---------------------------- | ------------------------------------------------------------- |-------------------------------------------------------------------------------|
-| DJANGO_SECRET_KEY            | Django's SECRET_KEY                                           | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l                   |
-| DJANGO_URL_PREFIX            | Run TubeSync in a sub-URL on the web server                   | /somepath/                                                                    |
-| TUBESYNC_DEBUG               | Enable debugging                                              | True                                                                          |
-| TUBESYNC_HOSTS               | Django's ALLOWED_HOSTS, defaults to `*`                       | tubesync.example.com,otherhost.com                 |
-| TUBESYNC_RESET_DOWNLOAD_DIR  | Toggle resetting `/downloads` permissions, defaults to True   | True                                                                          |
-| TUBESYNC_VIDEO_HEIGHT_CUTOFF | Smallest video height in pixels permitted to download         | 240                                                                           |
-| TUBESYNC_RENAME_SOURCES      | Rename media files from selected sources                      | Source1_directory,Source2_directory                |
-| TUBESYNC_RENAME_ALL_SOURCES  | Rename media files from all sources                           | True                                                                          |
-| TUBESYNC_DIRECTORY_PREFIX    | Enable `video` and `audio` directory prefixes in `/downloads` | True                                                                          |
-| TUBESYNC_SHRINK_NEW          | Filter unneeded information from newly retrieved metadata     | True                                                                          |
-| TUBESYNC_SHRINK_OLD          | Filter unneeded information from metadata loaded from the database | True                                                                     |
-| GUNICORN_WORKERS             | Number of `gunicorn` (web request) workers to spawn           | 3                                                                             |
-| LISTEN_HOST                  | IP address for `gunicorn` to listen on                        | 127.0.0.1                                                                     |
-| LISTEN_PORT                  | Port number for `gunicorn` to listen on                       | 8080                                                                          |
-| HTTP_USER                    | Sets the username for HTTP basic authentication               | some-username                                                                 |
-| HTTP_PASS                    | Sets the password for HTTP basic authentication               | some-secure-password                                                          |
-| DATABASE_CONNECTION          | Optional external database connection details                 | postgresql://user:pass@host:port/database          |
+See the full [environment variables reference](docs/environment-variables.md) for all
+available configuration options (database, web server, downloads, metadata, debugging,
+etc.).
 
 
 # Manual, non-containerised, installation
