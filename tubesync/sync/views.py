@@ -1,7 +1,7 @@
 import glob
 import os
 from base64 import b64decode
-from itertools import chain, islice
+from itertools import islice
 import pathlib
 import sys
 import uuid
@@ -24,7 +24,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
-from common.utils import append_uri_params, mkdir_p, multi_key_sort
+from common.utils import append_uri_params, is_empty_iterator, mkdir_p, multi_key_sort
 from django_huey import DJANGO_HUEY, get_queue
 from common.huey import h_q_reset_tasks
 from common.logger import log
@@ -46,23 +46,6 @@ from . import signals # noqa
 from . import youtube
 
 
-def is_empty(iterator):
-    """
-    Checks if an iterator is empty without fully consuming it.
-    Returns: (is_empty_boolean, iterator)
-    """
-    try:
-        # 1. Attempt to get the first item
-        first_item = next(iterator)
-    except StopIteration:
-        # 2. Generator was empty
-        return True, iter([])
-
-    # 3. Put the first item back at the start of a new iterator
-    # Chaining the single item with the original remaining stream
-    reconstructed_iterator = chain([first_item], iterator)
-    return False, reconstructed_iterator
-
 def get_histories_from_huey_ids(huey_task_ids):
     """
     Robustly matches Huey task.id values to TaskHistory records.
@@ -71,7 +54,7 @@ def get_histories_from_huey_ids(huey_task_ids):
     Bypasses SQL variable limits by using request-cycle temporary tables.
     """
     # 1. Guard clause for empty input - returns a valid, empty QuerySet
-    empty, huey_task_ids = is_empty(huey_task_ids)
+    empty, huey_task_ids = is_empty_iterator(huey_task_ids)
     if empty:
         return TaskHistory.objects.none()
 
@@ -98,14 +81,10 @@ def get_histories_from_huey_ids(huey_task_ids):
             cursor.execute(f"CREATE TEMPORARY TABLE {input_tmp} (tid VARCHAR(40) PRIMARY KEY)")
             
             # Single iteration: ensures dashed strings and lowercase for case-sensitive DBs
-            ##cursor.executemany(f"INSERT INTO {input_tmp} VALUES (%s)", validated_id_generator())
             # Batch stream
             batch_size = 40_000
             stream = validated_id_generator()
-            while True:
-                batch = list(islice(stream, batch_size))
-                if not batch:
-                    break
+            while batch := list(islice(stream, batch_size)):
                 cursor.executemany(f"INSERT INTO {input_tmp} VALUES (%s)", batch)
 
             # Stage 2: Filter to a PK-only results table
@@ -136,22 +115,19 @@ def get_waiting_tasks():
     if not any(0 < (q.pending_count() + q.scheduled_count()) for q in huey_queues):
         return TaskHistory.objects.none()
 
-    def id_generator():
-        for q in huey_queues:
-            # Stream pending tasks
-            for task in q.pending():
-                yield str(task.id)
+    def id_generator(queue):
+        # Stream pending tasks
+        for task in queue.pending():
+            yield str(task.id)
             
-            # Stream scheduled tasks
-            for task in q.scheduled():
-                yield str(task.id)
+        # Stream scheduled tasks
+        for task in queue.scheduled():
+            yield str(task.id)
 
     def deduplicating_id_generator():
         seen = set()
         for q in huey_queues:
-            # chain() handles the two sources without creating a new list
-            for task in chain(q.pending(), q.scheduled()):
-                tid = str(task.id)
+            for tid in id_generator(q):
                 if tid not in seen:
                     seen.add(tid)
                     yield tid
