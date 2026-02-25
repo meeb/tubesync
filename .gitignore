@@ -149,3 +149,4 @@ Pipfile.lock
 # Compiled CSS
 /tubesync/common/static/styles/*.css
 tubesync/tubesync/local_settings.py
+tubesync/tubesync/downloads
