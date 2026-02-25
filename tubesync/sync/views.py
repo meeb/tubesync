@@ -1,10 +1,8 @@
 import glob
 import os
 from base64 import b64decode
-from itertools import islice
 import pathlib
 import sys
-import uuid
 from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponseNotFound, HttpResponseRedirect
 from django.views.generic import TemplateView, ListView, DetailView
@@ -14,9 +12,8 @@ from django.views.generic.detail import SingleObjectMixin
 from django.core.exceptions import SuspiciousFileOperation
 from django.http import HttpResponse
 from django.urls import reverse_lazy
-from django.db import connection, transaction, IntegrityError
+from django.db import connection, IntegrityError
 from django.db.models import F, Q, Count, Sum, When, Case
-from django.db.models.expressions import RawSQL
 from django.forms import Form, ValidationError
 from django.utils.text import slugify
 from django.utils._os import safe_join
@@ -46,67 +43,6 @@ from . import signals # noqa
 from . import youtube
 
 
-def get_histories_from_huey_ids(huey_task_ids):
-    """
-    Robustly matches Huey task.id values to TaskHistory records.
-    
-    Optimized for large datasets across SQLite, PostgreSQL, and MariaDB.
-    Bypasses SQL variable limits by using request-cycle temporary tables.
-    """
-    # 1. Guard clause for empty input - returns a valid, empty QuerySet
-    empty, huey_task_ids = is_empty_iterator(huey_task_ids)
-    if empty:
-        return TaskHistory.objects.none()
-
-    # 2. Dynamic metadata and unique naming
-    task_history_table = TaskHistory._meta.db_table
-    unique_suffix = uuid.uuid4().hex[:8]
-    input_tmp = f"tmp_huey_ids_{unique_suffix}"
-    results_tmp = f"tmp_history_pks_{unique_suffix}"
-
-    # 3. Database operations
-    def validated_id_generator():
-        for tid in huey_task_ids:
-            try:
-                # Validates format and normalizes to lowercase dashed string
-                yield (str(uuid.UUID(str(tid))).lower(),)
-            except (ValueError, TypeError, AttributeError):
-                # Skip malformed IDs and log for troubleshooting
-                log.warning(f"Skipping malformed Huey task ID: {tid}")
-                continue
-
-    with transaction.atomic():
-        with connection.cursor() as cursor:
-            # Stage 1: Store and normalize input IDs
-            cursor.execute(f"CREATE TEMPORARY TABLE {input_tmp} (tid VARCHAR(40) PRIMARY KEY)")
-            
-            # Single iteration: ensures dashed strings and lowercase for case-sensitive DBs
-            # Batch stream
-            batch_size = 40_000
-            stream = validated_id_generator()
-            while batch := list(islice(stream, batch_size)):
-                cursor.executemany(f"INSERT INTO {input_tmp} VALUES (%s)", batch)
-
-            # Stage 2: Filter to a PK-only results table
-            cursor.execute(f"CREATE TEMPORARY TABLE {results_tmp} (id BIGINT)")
-            cursor.execute(f"""
-                INSERT INTO {results_tmp} (id)
-                SELECT id FROM {task_history_table} 
-                WHERE task_id IN (SELECT tid FROM {input_tmp})
-            """)
-            
-            # Index the result PKs to ensure dashboard pagination and ordering are fast
-            cursor.execute(f"CREATE INDEX idx_{results_tmp} ON {results_tmp}(id)")
-
-            # Immediate cleanup of the input string table to save memory
-            cursor.execute(f"DROP TABLE IF EXISTS {input_tmp}")
-
-    # 4. Return a Lazy QuerySet via RawSQL to bypass RawQuerySet.clone() limitations.
-    # The 'results_tmp' table persists until the connection closes after the request.
-    return TaskHistory.objects.filter(
-        id__in=RawSQL(f"SELECT id FROM {results_tmp}", [])
-    )
-
 def get_waiting_tasks():
     huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
     huey_queues = list(map(get_queue, huey_queue_names))
@@ -134,7 +70,7 @@ def get_waiting_tasks():
         seen.clear()
             
     huey_task_ids = deduplicating_id_generator()
-    return get_histories_from_huey_ids(huey_task_ids)
+    return TaskHistory.objects.from_huey_ids(huey_task_ids)
 
 
 class DashboardView(TemplateView):
