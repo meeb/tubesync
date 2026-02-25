@@ -10,7 +10,7 @@ CONFIG_BASE_DIR = BASE_DIR
 DOWNLOADS_BASE_DIR = BASE_DIR
 
 
-VERSION = '0.16.2'
+VERSION = '0.17.0'
 DEBUG = 'true' == getenv('TUBESYNC_DEBUG').strip().lower()
 ALLOWED_HOSTS = []
 # This is not ever meant to be a public web interface so this isn't too critical
