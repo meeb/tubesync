@@ -16,7 +16,6 @@ from datetime import timedelta
 from shutil import copyfile, rmtree
 from django import db
 from django.conf import settings
-from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -666,53 +665,22 @@ def download_source_images(source_id):
         f'Avatar: {avatar} '
         f'Banner: {banner} '
         f'Thumbnail: {thumbnail}')
-    if thumbnail is not None:
-        url = thumbnail
+    images = (
+        (thumbnail, ('thumbnail.jpg',)),
+        (banner,    ('banner.jpg', 'background.jpg')),
+        (avatar,    ('poster.jpg', 'season-poster.jpg')),
+    )
+    for url, file_names in images:
+        if url is None:
+            continue
         i = get_remote_image(url)
         image_file = BytesIO()
         i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
-
-        for file_name in ["thumbnail.jpg",]:
-            # Reset file pointer to the beginning for the next save
+        for file_name in file_names:
             image_file.seek(0)
-            # Create a Django ContentFile from BytesIO stream
-            django_file = ContentFile(image_file.read())
             file_path = source.directory_path / file_name
             with open(file_path, 'wb') as f:
-                f.write(django_file.read())
-        i = image_file = None
-
-    if banner is not None:
-        url = banner
-        i = get_remote_image(url)
-        image_file = BytesIO()
-        i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
-
-        for file_name in ["banner.jpg", "background.jpg"]:
-            # Reset file pointer to the beginning for the next save
-            image_file.seek(0)
-            # Create a Django ContentFile from BytesIO stream
-            django_file = ContentFile(image_file.read())
-            file_path = source.directory_path / file_name
-            with open(file_path, 'wb') as f:
-                f.write(django_file.read())
-        i = image_file = None
-
-    if avatar is not None:
-        url = avatar
-        i = get_remote_image(url)
-        image_file = BytesIO()
-        i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
-
-        for file_name in ["poster.jpg", "season-poster.jpg"]:
-            # Reset file pointer to the beginning for the next save
-            image_file.seek(0)
-            # Create a Django ContentFile from BytesIO stream
-            django_file = ContentFile(image_file.read())
-            file_path = source.directory_path / file_name
-            with open(file_path, 'wb') as f:
-                f.write(django_file.read())
-        i = image_file = None
+                f.write(image_file.read())
 
     log.info(f'Thumbnail downloaded for source with ID: {source_id} / {source}')
 
