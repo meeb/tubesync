@@ -147,7 +147,6 @@ tubesync/
 │   ├── tubesync/          # Django project config (settings, urls, wsgi)
 │   ├── common/            # Shared app (base templates, utils, middleware, task queue)
 │   └── sync/              # Main app (sources, media, downloads, media servers)
-├── assets/                # Vendored third-party assets (Font Awesome)
 ├── docs/                  # Documentation
 │   └── assets/            # Screenshots and images
 ├── patches/               # Patches applied to yt-dlp
