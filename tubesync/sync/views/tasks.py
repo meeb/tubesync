@@ -183,6 +183,7 @@ class TasksView(ListView):
                 self.kwargs[page_kwarg] = 'last'
         return super().paginate_queryset(queryset, page_size)
 
+
 class RevokeTaskView(View):
     '''
         Revokes (cancels) a single queued task, then redirects back to the
@@ -215,6 +216,7 @@ class RevokeTaskView(View):
                 task_id=str(task.task_id),
             ),
         ))
+
 
 class CompletedTasksView(ListView):
     '''
