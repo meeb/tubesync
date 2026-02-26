@@ -216,7 +216,6 @@ class RevokeTaskView(View):
             ),
         ))
 
-
 class CompletedTasksView(ListView):
     '''
         List of tasks which have been completed with an optional per-source filter.
