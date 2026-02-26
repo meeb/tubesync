@@ -1,8 +1,4 @@
-import uuid
-from django.db import connection, transaction
-from django.db.models.expressions import RawSQL
 from common.models import TaskHistory
-from common.logger import log
 from django_huey import DJANGO_HUEY, get_queue
 
 
