@@ -57,7 +57,22 @@ if [ ! -x "$REPO_ROOT/tailwindcss" ]; then
         *)             echo "    Unsupported platform: $OS-$ARCH"; TW_BIN="" ;;
     esac
     if [ -n "$TW_BIN" ]; then
-        curl -sL "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/$TW_BIN" -o "$REPO_ROOT/tailwindcss"
+        asfald_uri='asfaload/asfald/releases/download/v0.6.0'
+        case "${OS}" in
+            (linux) fn="asfald-${ARCH}-unknown-${OS}-musl.tar.gz" ;;
+            (darwin) fn="asfald-${ARCH}-apple-${OS}.tar.gz" ;;
+        esac
+        extract_asfald() {
+            local gtar=; case "$(tar --version 2>/dev/null)" in (*'(GNU tar)'*) gtar=t;; esac; tar --strip-components=1 ${gtar:+--wildcards} -xvvpf "${1}" 'asfald-*/asfald';
+        }
+        "${PYTHON}" -c 'import sys; v=sys.version_info; (v.major==3 and v.minor>=10) or (print(f"Error: Python 3.10+ required for Django 5. Found {v.major}.{v.minor}", file=sys.stderr), sys.exit(1))' || exit 1
+        curl -sSLO -- "https://github.com/${asfald_uri}/${fn}"
+        curl -sSL -- "https://gh.checksums.asfaload.com/github.com/${asfald_uri}/checksums.txt" | "${PYTHON}" "${REPO_ROOT}/tubesync/shasum.py" -a sha256 - &&
+            extract_asfald "${fn}" &&
+            TMPDIR="$(mktemp -d "${REPO_ROOT}/.tmp.XXXXXXXX")" ./asfald -o "${REPO_ROOT}/tailwindcss" -p '${path}/sha256sums.txt' "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/${TW_BIN}"
+        rm -v -f "${fn}" ./asfald
+        unset -v asfald_uri fn
+        rmdir -v "${REPO_ROOT}"/.tmp.*
         chmod +x "$REPO_ROOT/tailwindcss"
         echo "    Downloaded $TW_BIN"
     fi
