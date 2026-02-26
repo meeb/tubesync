@@ -3,35 +3,29 @@
 {% block headtitle %}Tasks - Completed{% endblock %}
 
 {% block content %}
-<div class="row">
-  <div class="col s12">
-    <h1 class="truncate">Completed tasks</h1>
-  </div>
-</div>
+<h1 class="truncate">Completed tasks</h1>
+
 {% include 'infobox.html' with message=message %}
-<div class="row">
-  <div class="col s12">
-    <div class="collection">
-    {% for task in tasks %}
-      
-      <span class="collection-item">
+
+<div class="divide-y divide-border rounded-lg border border-border overflow-hidden mb-6">
+  {% for task in tasks %}
+    <div class="p-4">
       {% if task.has_error %}
-        <i class="fas fa-exclamation-triangle"></i> <strong>{% if task.verbose_name %}{{ task.verbose_name }}{% else %}{{ task.name }}{% endif %}</strong><br>
-        Queue: &quot;{{ task.queue }}&quot;<br>
-        Error: &quot;{{ task.error_message }}&quot;<br>
+        <i class="fas fa-exclamation-triangle text-destructive"></i> <strong>{% if task.verbose_name %}{{ task.verbose_name }}{% else %}{{ task.name }}{% endif %}</strong><br>
+        <span class="text-sm text-muted-foreground">Queue: &quot;{{ task.queue }}&quot;</span><br>
+        <span class="text-sm text-destructive">Error: &quot;{{ task.error_message }}&quot;</span><br>
       {% else %}
-        <i class="fas fa-check"></i> <strong>{% if task.verbose_name %}{{ task.verbose_name }}{% else %}{{ task.name }}{% endif %}</strong><br>
-        Queue: &quot;{{ task.queue }}&quot;<br>
+        <i class="fas fa-check text-green-600"></i> <strong>{% if task.verbose_name %}{{ task.verbose_name }}{% else %}{{ task.name }}{% endif %}</strong><br>
+        <span class="text-sm text-muted-foreground">Queue: &quot;{{ task.queue }}&quot;</span><br>
       {% endif %}
-        Task locked for: {{ task.end_at|sub:task.start_at|timedelta }}<br>
-        <i class="far fa-clock"></i> Task locked at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong><br>
-        <i class="fas fa-hourglass-end"></i> Task ended at <strong>{{ task.end_at|date:'Y-m-d H:i:s' }}</strong>
-      </span>
-    {% empty %}
-      <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There have been no completed tasks{% if source %} that match the specified source filter{% endif %}.</span>
-    {% endfor %}
+      <span class="text-sm text-muted-foreground">Task locked for: {{ task.end_at|sub:task.start_at|timedelta }}</span><br>
+      <span class="text-sm text-muted-foreground"><i class="far fa-clock"></i> Task locked at <strong class="text-foreground">{{ task.start_at|date:'Y-m-d H:i:s' }}</strong></span><br>
+      <span class="text-sm text-muted-foreground"><i class="fas fa-hourglass-end"></i> Task ended at <strong class="text-foreground">{{ task.end_at|date:'Y-m-d H:i:s' }}</strong></span>
     </div>
-  </div>
+  {% empty %}
+    <div class="p-4 text-muted-foreground"><i class="fas fa-info-circle"></i> There have been no completed tasks{% if source %} that match the specified source filter{% endif %}.</div>
+  {% endfor %}
 </div>
+
 {% include 'pagination.html' with filter=source.pk %}
 {% endblock %}
