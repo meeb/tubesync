@@ -15,7 +15,7 @@ CHUNK_SIZE = (1024) * 32 # KiB
 PROG_NAME = Path(__file__).stem
 
 # Versioning
-VERSION = (1, 0, 0)
+VERSION = (1, 0, 1)
 VERSION_STR = "v" + ".".join(map(str, VERSION))
 
 def parse_args():
@@ -34,44 +34,69 @@ def parse_args():
                         version=f"%(prog)s {VERSION_STR}")
     return parser.parse_args()
 
+def get_algo_suggestion(word, available):
+    """Encapsulates the ranking and matching logic."""
+
+    def get_stable_matches(word, possibilities, *, n = 3, cutoff = 0.6, lookup = None):
+        size = len(possibilities)
+        if lookup is None:
+            lookup = {name: i for i, name in enumerate(possibilities)}
+        matches = difflib.get_close_matches(word, possibilities, n=size, cutoff=cutoff)
+        def score_and_priority(name):
+            score = difflib.SequenceMatcher(None, word, name).ratio()
+            word_nums = re.findall(r'\d+', word)
+            name_nums = re.findall(r'\d+', name)
+            struct_boost = (cutoff / 2) if word_nums and all(num in name_nums for num in word_nums) else 0
+            weighted_score = struct_boost + score
+            bucket = int(10 * weighted_score)
+            return (-bucket, lookup.get(name, size), -weighted_score)
+        return sorted(matches, key=score_and_priority)[:n]
+
+    def algo_priority_key(name):
+        nums = re.findall(r'\d+', name)
+        # Use the first number found (e.g., 3 for sha3_512)
+        size = int(nums[0]) if nums else 0
+        # Use the second number found (e.g., 512 for sha3_512)
+        sub_size = int(nums[1]) if 1 < len(nums) else 0
+
+        # Ranking Logic
+        if not name.startswith('sha'):
+            return (4, -size, -sub_size)
+        elif 'sha1' == name: # lowest priority sha
+            rank = 3
+        elif 'sha384' == name: # disambiguation
+            rank = 2
+        elif name.startswith('sha3'): # match sha-3
+            rank = 0
+        elif name.startswith('shake'):
+            rank = 1
+        else:
+            rank = 2
+
+        # Primary bit-depth proximity to 256-bit
+        dist_256 = abs(size - 256)
+        # Secondary bit-depth proximity to 256-bit
+        dist_sub_256 = abs(sub_size - 256) if sub_size else 0
+
+        # Sort by: Family Rank (asc), then proximity to 256-bit (asc)
+        return (rank, dist_256, dist_sub_256)
+
+    algo_sorted = sorted(available, key=algo_priority_key)
+    algo_lookup = {name: i for i, name in enumerate(algo_sorted)}
+    matches = get_stable_matches(word, algo_sorted, lookup=algo_lookup, n=1)
+    return matches[0] if matches else None
+
 def validate_algo(algo_name):
     """Checks if the algorithm is supported; suggests matches with custom family priority."""
     available = hashlib.algorithms_available
     algo_lower = algo_name.lower()
 
     if algo_lower not in available:
-        def algo_priority_key(name):
-            nums = re.findall(r'\d+', name)
-            # Use the first number found (e.g., 512 for sha512_224)
-            size = int(nums[0]) if nums else 0
-
-            # Ranking Logic
-            if not name.startswith('sha'):
-                rank = 5
-            elif 'sha1' == name: # lowest priority sha
-                rank = 4
-            elif 'sha384' == name: # disambiguation
-                rank = 3
-            elif 'sha256' == name: # match sha-2
-                rank = 0
-            elif name.startswith('sha3'): # match sha-3
-                rank = 1
-            elif name.startswith('shake'):
-                rank = 2
-            else:
-                rank = 3
-
-            # Sort by: Rank (asc), then secondary bit-depth if applicable (desc)
-            # Sub-size tie-breaker (e.g., 256 in sha512_256)
-            sub_size = int(nums[1]) if 1 < len(nums) else 0
-            return (rank, -size, -sub_size)
-
-        sorted_possibilities = sorted(available, key=algo_priority_key)
-        matches = difflib.get_close_matches(algo_lower, sorted_possibilities, n=1, cutoff=0.5)
+        suggestion = get_algo_suggestion(algo_lower, available)
 
         error_msg = f"{PROG_NAME}: Error: Unsupported algorithm '{algo_name}'"
-        if matches:
-            error_msg += f". Did you mean '{matches[0]}?'"
+        if suggestion:
+            error_msg += f". Did you mean '{suggestion}?'"
 
         print(error_msg, file=sys.stderr)
         sys.exit(1)
@@ -110,9 +135,11 @@ def get_input_and_format(file_arg):
 def verify_checksums(lines, is_tag, label, algorithm):
     """Performs strict verification of hashes against local files."""
     exit_code = 0
+    files_verified = 0
     format_errors = 0
     checksum_failures = 0
     is_windows = "Windows" == platform.system()
+    hexdigest_args = []
 
     if is_tag:
         pattern = re.compile(rf'^{algorithm.upper()} \((.+)\) = ([a-fA-F0-9]+)$')
@@ -155,7 +182,11 @@ def verify_checksums(lines, is_tag, label, algorithm):
                 for chunk in iter(lambda: fb.read(CHUNK_SIZE), b""):
                     hasher.update(chunk)
 
-            if hasher.hexdigest() == expected_hash.lower():
+            hexdigest_args.clear()
+            if algorithm.startswith('shake'):
+                hexdigest_args.append(32)
+            if hasher.hexdigest(*hexdigest_args) == expected_hash.lower():
+                files_verified += 1
                 print(f"{target_path}: OK")
             else:
                 print(f"{target_path}: FAILED")
@@ -173,6 +204,10 @@ def verify_checksums(lines, is_tag, label, algorithm):
             print(prefix + msg.format(alt), file=sys.stderr)
     warning("line{0} improperly formatted", " is", "s are", count=format_errors)
     warning("computed checksum{0} did NOT match", "", "s", count=checksum_failures)
+    if 0 == files_verified:
+        exit_code = 1
+        msg = f"{PROG_NAME}: WARNING: {label}: no file was verified"
+        print(msg, file=sys.stderr)
 
     sys.exit(exit_code)
 
