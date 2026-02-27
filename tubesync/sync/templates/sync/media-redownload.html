@@ -3,27 +3,24 @@
 {% block headtitle %}Redownload media - {{ media }}{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Redownload media <strong>{{ media }}</strong></h1>
-    <p>
-      You can delete the downloaded file for your media <strong>{{ media }}</strong> and
-      schedule it to be redownloaded. You might want to use this if you moved the original
-      file on disk and want to download it again, or, if you changed your source settings
-      such as changed the desired resolution and want to redownload the media in a different
-      format.
-    </p>
-  </div>
-</div>
-<div class="row">
-  <form method="post" action="{% url 'sync:redownload-media' pk=media.pk %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Really delete and redownload media <i class="fas fa-trash-alt"></i></button>
-      </div>
+<h1 class="title mb-4">Redownload media <strong>{{ media }}</strong></h1>
+<p class="mb-4">
+  You can delete the downloaded file for your media <strong>{{ media }}</strong> and
+  schedule it to be redownloaded. You might want to use this if you moved the original
+  file on disk and want to download it again, or, if you changed your source settings
+  such as changed the desired resolution and want to redownload the media in a different
+  format.
+</p>
+<form method="post" action="{% url 'sync:redownload-media' pk=media.pk %}" class="simpleform">
+  {% csrf_token %}
+  {% include 'simpleform.html' with form=form %}
+  <div class="field pt-4 has-text-centered">
+    <div class="control">
+      <button class="button is-primary" type="submit" name="action">
+        <span class="icon"><i class="fas fa-redo"></i></span>
+        <span>Really delete and redownload media</span>
+      </button>
     </div>
-  </form>
-</div>
+  </div>
+</form>
 {% endblock %}

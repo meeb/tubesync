@@ -1,89 +1,150 @@
 {% extends 'base.html' %}{% load static %}
 
+{% block active_media %} is-active{% endblock %}
+
 {% block headtitle %}Media{% if source %} - {{ source }}{% endif %}{% endblock %}
 
 {% block content %}
-<div class="row">
-  <div class="col s12 m6">
-    <h1 class="truncate">Media</h1>
+<div class="columns is-vcentered mb-4">
+  <div class="column">
+    <h1 class="title">Media</h1>
   </div>
-  <div class="col s12 m3">
-    {% if show_skipped %}
-    <a href="{% url 'sync:media' %}{% querystring show_skipped=None %}" class="btn"><i class="far fa-eye-slash"></i> Hide skipped media</a>
-    {% else %}
-    <a href="{% url 'sync:media' %}{% querystring show_skipped='yes' %}" class="btn"><i class="far fa-eye"></i> Show skipped media</a>
-    {% endif %}
-  </div>
-  <div class="col s12 m3">
-    {% if only_skipped %}
-    <a href="{% url 'sync:media' %}{% querystring only_skipped=None %}" class="btn"><i class="far fa-eye-slash"></i> Only skipped media</a>
-    {% else %}
-    <a href="{% url 'sync:media' %}{% querystring only_skipped='yes' %}" class="btn"><i class="far fa-eye"></i> Only skipped media</a>
-    {% endif %}
+  <div class="column is-narrow">
+    <div class="buttons">
+      {% if show_skipped %}
+      <a href="{% url 'sync:media' %}{% querystring show_skipped=None %}" class="button">
+        <span class="icon"><i class="far fa-eye-slash"></i></span>
+        <span>Hide skipped</span>
+      </a>
+      {% else %}
+      <a href="{% url 'sync:media' %}{% querystring show_skipped='yes' %}" class="button">
+        <span class="icon"><i class="far fa-eye"></i></span>
+        <span>Show skipped</span>
+      </a>
+      {% endif %}
+      {% if only_skipped %}
+      <a href="{% url 'sync:media' %}{% querystring only_skipped=None %}" class="button is-primary">
+        <span class="icon"><i class="far fa-eye"></i></span>
+        <span>All media</span>
+      </a>
+      {% else %}
+      <a href="{% url 'sync:media' %}{% querystring only_skipped='yes' %}" class="button">
+        <span class="icon"><i class="far fa-eye-slash"></i></span>
+        <span>Only skipped</span>
+      </a>
+      {% endif %}
+    </div>
   </div>
 </div>
-<div class="row input-field s12" style="padding-top: 20px; padding-bottom: 10px; border-top: 2px dashed slategray; border-bottom: 2px dashed slategray;">
-  <form method="get" class="simpleform">
-    <!-- {% csrf_token %} -->
+
+<div class="box mb-5">
+  <form method="get">
     {% if only_skipped %}
     <input type="hidden" name="only_skipped" value="yes" />
     {% endif %}
     {% if show_skipped %}
     <input type="hidden" name="show_skipped" value="yes" />
     {% endif %}
-    <div class="col m9">
-      <label>
-        <span class="no-text-transform" style="font-size: 1.25rem !important;">Search for:</span>
-        <input name="query" type="text" size=30 placeholder="A key or title containing this text"{% if query %} value="{{ query }}"{% endif %} />
-      </label>
-    </div>
-    <div class="col m3" style="height: 75px; display: flex; flex-direction: column; align-items: flex-end;">
-      <label>
-        <input name="search_description" type="checkbox" value="yes" {% if search_description %}checked {% endif %}/>
-        <span class="no-text-transform" style="height: 25px; font-size: 1.25rem !important;">In description?</span>
-      </label>
-      <input value="Go" class="btn" style="height: 50px;" type="submit" />
+    <div class="field is-horizontal">
+      <div class="field-body">
+        <div class="field">
+          <label class="label">Search for:</label>
+          <div class="control is-expanded">
+            <input name="query" class="input" type="text" placeholder="A key or title containing this text"{% if query %} value="{{ query }}"{% endif %} />
+          </div>
+        </div>
+        <div class="field is-narrow">
+          <label class="label">Options</label>
+          <div class="control">
+            <label class="checkbox">
+              <input name="search_description" type="checkbox" value="yes"{% if search_description %} checked{% endif %} />
+              In description?
+            </label>
+          </div>
+        </div>
+        <div class="field is-narrow">
+          <label class="label">&nbsp;</label>
+          <div class="control">
+            <button type="submit" class="button is-primary">
+              <span class="icon"><i class="fas fa-search"></i></span>
+              <span>Search</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </form>
 </div>
 {% include 'infobox.html' with message=message %}
-<div class="row no-margin-bottom">
+<div class="columns is-multiline">
   {% for m in media %}
-  <div class="col s12 m6 l4 xl3">
-    <div class="card mediacard">
-      <a href="{% url 'sync:media-item' pk=m.pk %}" title="{{ m.source.name }} / {{ m.name }}">
+  <div class="column is-half-tablet is-one-third-desktop is-one-quarter-widescreen">
+    <a href="{% url 'sync:media-item' pk=m.pk %}" title="{{ m.source.name }} / {{ m.name }}">
+      <div class="card mediacard">
         <div class="card-image">
-          <img src="{% if m.thumb %}{% url 'sync:media-thumb' pk=m.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}">
-          <span class="card-title truncate">{{ m.source }}<br>
-            <span>{{ m.name }}</span><br>
-            <span>
+          <figure class="image">
+            <img src="{% if m.thumb %}{% url 'sync:media-thumb' pk=m.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}" alt="{{ m.name }}">
+          </figure>
+        </div>
+        <div class="card-content">
+          <p class="title is-6 is-clipped mb-1">{{ m.source }}</p>
+          <p class="subtitle is-7 is-clipped mb-2">{{ m.name }}</p>
+          <div class="content is-small">
             {% if m.downloaded %}
-              <i class="fas fa-check-circle" title="Downloaded"></i> {{ m.download_date|date:'Y-m-d' }}
+              <span class="icon-text">
+                <span class="icon has-text-success"><i class="fas fa-check-circle"></i></span>
+                <span>{{ m.download_date|date:'Y-m-d' }}</span>
+              </span>
             {% else %}
               {% if m.manual_skip %}
-              <span class="error-text"><i class="fas fa-times" title="Skipping media"></i> Manually skipped</span>
+              <span class="has-text-danger">
+                <span class="icon-text">
+                  <span class="icon"><i class="fas fa-times"></i></span>
+                  <span>Manually skipped</span>
+                </span>
+              </span>
               {% elif m.skip %}
-              <span class="error-text"><i class="fas fa-times" title="Skipping media"></i> Skipped by system</span>
+              <span class="has-text-danger">
+                <span class="icon-text">
+                  <span class="icon"><i class="fas fa-times"></i></span>
+                  <span>Skipped by system</span>
+                </span>
+              </span>
               {% elif not m.source.download_media %}
-              <span class="error-text"><i class="fas fa-times" title="Not downloading media for this source"></i> Disabled at source</span>
+              <span class="has-text-danger">
+                <span class="icon-text">
+                  <span class="icon"><i class="fas fa-times"></i></span>
+                  <span>Disabled at source</span>
+                </span>
+              </span>
               {% elif not m.has_metadata %}
-              <i class="far fa-clock" title="Waiting for metadata"></i> Fetching metadata
+              <span class="icon-text">
+                <span class="icon"><i class="far fa-clock"></i></span>
+                <span>Fetching metadata</span>
+              </span>
               {% elif m.can_download %}
-              <i class="far fa-clock" title="Waiting to download or downloading"></i> Downloading
+              <span class="icon-text">
+                <span class="icon"><i class="far fa-clock"></i></span>
+                <span>Downloading</span>
+              </span>
               {% else %}
-              <span class="error-text"><i class="fas fa-exclamation-triangle" title="No matching formats to download"></i> No matching formats</span>
+              <span class="has-text-danger">
+                <span class="icon-text">
+                  <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+                  <span>No matching formats</span>
+                </span>
+              </span>
               {% endif %}
             {% endif %}
-            </span>
-          </span>
+          </div>
         </div>
-      </a>
-    </div>
+      </div>
+    </a>
   </div>
   {% empty %}
-  <div class="col s12">
-    <div class="collection">
-      <span class="collection-item no-items"><i class="fas fa-info-circle"></i> No media has been indexed{% if source %} that matches the specified source filter{% endif %}.</span>
+  <div class="column is-12">
+    <div class="notification is-info is-light">
+      <i class="fas fa-info-circle"></i> No media has been indexed{% if source %} that matches the specified source filter{% endif %}.
     </div>
   </div>
   {% endfor %}
