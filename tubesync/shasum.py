@@ -2,6 +2,7 @@
 
 import argparse
 import difflib
+import errno
 import hashlib
 import platform
 import queue
@@ -18,7 +19,7 @@ CHUNK_SIZE = (1024) * 32 # KiB
 PROG_NAME = Path(__file__).stem
 
 # Versioning
-VERSION = (1, 1, 2)
+VERSION = (1, 1, 3)
 VERSION_STR = "v" + ".".join(map(str, VERSION))
 
 def _std_base(*args, **kwargs):
@@ -205,9 +206,20 @@ def get_input_and_format(file_arg):
 
     return line_data, is_tag, label
 
+def path_resolve(path_str, *, strict=False):
+    resolved = Path(path_str).resolve(strict=strict)
+    if sys.version_info >= (3, 13) and not strict and resolved.is_symlink():
+        try:
+            resolved.resolve(strict=True)
+        except OSError as e:
+            if e.errno == errno.ELOOP:
+                raise RuntimeError(f"Symlink loop detected: {path_str}") from e
+            raise
+    return resolved
+
 def verify_checksums(line_data, is_tag, label, algorithm):
     """Performs strict verification of hashes against local files."""
-    abs_cwd = Path().resolve(strict=True)
+    abs_cwd = path_resolve(Path.cwd(), strict=True)
     checksum_failures = 0
     exit_code = 0
     file_buffers = 32
@@ -291,7 +303,7 @@ def verify_checksums(line_data, is_tag, label, algorithm):
         # Resolve to absolute path and check if it's within CWD
         msg = f"{label}:{line_no}: WARNING: "
         try:
-            abs_target = target_path.resolve(strict=False)
+            abs_target = path_resolve(target_path, strict=False)
             if abs_cwd not in abs_target.parents and abs_target != abs_cwd:
                 msg += "skipping path that is outside the current directory"
                 stderr(msg)
