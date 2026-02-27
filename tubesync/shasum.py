@@ -18,7 +18,7 @@ CHUNK_SIZE = (1024) * 32 # KiB
 PROG_NAME = Path(__file__).stem
 
 # Versioning
-VERSION = (1, 1, 1)
+VERSION = (1, 1, 2)
 VERSION_STR = "v" + ".".join(map(str, VERSION))
 
 def _std_base(*args, **kwargs):
@@ -174,9 +174,9 @@ def get_input_and_format(file_arg):
         lines = p.read_text(encoding='utf-8-sig').splitlines()
 
     # Standard: Starts with hex (min 32 chars for MD5) followed by space/asterisk
-    std_prefix = re.compile(r'^[a-fA-F0-9]{32,}\s+[\ \*]')
+    std_prefix = re.compile(r'^[a-fA-F0-9]{32,} [\ \*]')
     # Tag: Starts with Alpha-numeric, ends with '=' and hex
-    tag_suffix = re.compile(r'^[a-zA-Z0-9]+\s+\(.+\)\s+=\s+[a-fA-F0-9]+$')
+    tag_suffix = re.compile(r'^[a-zA-Z0-9]+ ?\(.+\) ?= [a-fA-F0-9]+$')
     line_data = { 'counts': {}, }
     def record_line(n, line, key, /, value = None, *, set_format = False):
         if n not in line_data:
@@ -222,8 +222,8 @@ def verify_checksums(line_data, is_tag, label, algorithm):
     tasks = []
 
     if is_tag:
-        pattern = re.compile(rf'^{algorithm.upper()} \((.+)\) = ([a-fA-F0-9]+)$')
-        algo_extractor = re.compile(r'^([a-zA-Z0-9]+) \(')
+        pattern = re.compile(rf'^{algorithm.upper()} ?\((.+)\) ?= ([a-fA-F0-9]+)$')
+        algo_extractor = re.compile(r'^([a-zA-Z0-9]+) ?\(')
     else:
         pattern = re.compile(r'^([a-fA-F0-9]+) ([ \*])(.+)$')
 
