@@ -20,7 +20,7 @@ jobs:
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
       ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Get tag
         id: tag
         uses: ./.github/actions/get-tag
@@ -79,13 +79,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Log into GitHub Container Registry
-        run: echo "${{ secrets.REGISTRY_ACCESS_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+        env:
+          DOCKER_REGISTRY: https://ghcr.io
+          DOCKER_USERNAME: ${{ github.repository_owner }}
+          DOCKER_TOKEN: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+        run: echo "${DOCKER_TOKEN}" | docker login --password-stdin --username "${DOCKER_USERNAME}" "${DOCKER_REGISTRY}"
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:${{ needs.info.outputs.tag }}
+          tags: ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:${{ needs.info.outputs.tag }}
           cache-from: |
             type=registry,ref=ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:latest
             type=gha
