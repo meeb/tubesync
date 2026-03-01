@@ -33,6 +33,19 @@ ARG S6_CHECKSUM_ALGORITHM="sha256"
 ARG QJS_CHECKSUM_ALGORITHM="sha256"
 
 
+FROM debian:${DEBIAN_VERSION} AS tubesync-prepare-etc
+
+COPY patches/ /var/tmp/patches/
+RUN --mount=type=tmpfs,target=/cache \
+    set -eux && cd /var/tmp/patches/ && \
+    ./fettle.pl --dry-run ./docker/tubesync-base/debconf.diff && \
+    ./fettle.pl ./docker/tubesync-base/debconf.diff && \
+    ./fettle.pl --clean ./docker/tubesync-base/debconf.diff
+
+FROM scratch AS tubesync-etc
+
+COPY --from=tubesync-prepare-etc /etc/ /etc/
+
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
 ARG TARGETARCH
@@ -49,6 +62,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_NO_COMPILE=1 \
     PIP_ROOT_USER_ACTION='ignore'
 
+COPY --from=tubesync-etc /etc/debconf.conf /etc/debconf.conf
+
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
     # to be careful, ensure that these files aren't from a different architecture
@@ -59,7 +74,9 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     # hopefully soon, this will be included in Debian images
     printf -- >| /etc/apt/apt.conf.d/docker-disable-pkgcache \
         'Dir::Cache::%spkgcache "";\n' '' src ; \
-	chmod a+r /etc/apt/apt.conf.d/docker-disable-pkgcache ; \
+    chmod a+r /etc/apt/apt.conf.d/docker-disable-pkgcache ; \
+    # Create the directory for debconf
+    mkdir -v /var/cache/debconf/docker-templates ; \
     set -x && \
     apt-get update && \
     # Install locales
@@ -70,8 +87,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     locale-gen && \
     # Clean up
     apt-get -y autopurge && \
-    apt-get -y autoclean && \
-    rm -f /var/cache/debconf/*.dat-old
+    apt-get -y autoclean
 
 FROM alpine:${ALPINE_VERSION} AS asfald-download
 ARG ASFALD_VERSION
@@ -463,8 +479,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   && \
   # Clean up
   apt-get -y autopurge && \
-  apt-get -y autoclean && \
-  rm -v -f /var/cache/debconf/*.dat-old
+  apt-get -y autoclean
 
 FROM tubesync-openresty AS tubesync
 
@@ -523,8 +538,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   useradd -M -d /app -s /bin/false -g app app && \
   # Clean up
   apt-get -y autopurge && \
-  apt-get -y autoclean && \
-  rm -v -f /var/cache/debconf/*.dat-old
+  apt-get -y autoclean
 
 # Install third party software
 COPY --from=s6-overlay / /
@@ -549,8 +563,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y autoremove --purge file && \
     # Clean up
     apt-get -y autopurge && \
-    apt-get -y autoclean && \
-    rm -v -f /var/cache/debconf/*.dat-old
+    apt-get -y autoclean
 
 # Switch workdir to the the app
 WORKDIR /app
@@ -639,7 +652,6 @@ RUN --mount=type=tmpfs,target=/cache \
       -exec du -h '{}' ';' \
       -exec ldd '{}' ';' \
     >| /cache/python-shared-objects 2>&1 && \
-  rm -v -f /var/cache/debconf/*.dat-old && \
   rm -v -rf /tmp/* ; \
   if grep >/dev/null -Fe ' => not found' /cache/python-shared-objects ; \
   then \
