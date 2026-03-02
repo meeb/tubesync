@@ -670,8 +670,8 @@ RUN --mount=type=tmpfs,target=/cache \
   mkdir -v -p /cache/.home-directories && \
   cp -at /cache/.home-directories/ "${HOME}" && \
   HOME="/cache/.home-directories/${HOME#/}" && \
-  DENO_COMPAT=1 deno run -A npm:npm ci --no-audit --no-fund && \
-  DENO_COMPAT=1 deno run -A npm:npm audit fix && \
+  DENO_COMPAT=1 deno run --no-config -A npm:npm ci --no-audit --no-fund && \
+  DENO_COMPAT=1 deno run --no-config -A npm:npm audit fix && \
   node npm:typescript/tsc
 
 # Build app
