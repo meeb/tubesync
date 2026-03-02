@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="1.2.2"
+ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="1.3.0"
 ARG FFMPEG_VERSION="N"
 ARG YTDLP_EJS_VERSION="0.3.2"
 
@@ -611,12 +611,6 @@ RUN --mount=type=tmpfs,target=/cache \
     uv --no-config --no-progress --no-managed-python \
     pip install --strict --system --break-system-packages \
     --requirements /cache/requirements.txt && \
-  # remove the getpot_bgutil_script plugin
-  find /usr/local/lib \
-  -name 'getpot_bgutil_script.py' \
-  -path '*/yt_dlp_plugins/extractor/getpot_bgutil_script.py' \
-  -type f -print -delete \
-  && \
   # Clean up
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
