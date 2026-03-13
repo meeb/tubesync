@@ -184,10 +184,10 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Log into GitHub Container Registry
         env:
           DOCKER_REGISTRY: https://ghcr.io
@@ -211,7 +211,7 @@ jobs:
             done
       - name: Build image for `dive`
         id: build-dive-image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
@@ -236,7 +236,7 @@ jobs:
       - name: Build and push
         id: build-push
         timeout-minutes: 60
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           platforms: linux/amd64,linux/arm64
           push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
@@ -253,3 +253,24 @@ jobs:
             FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
             FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
+
+#permissions:
+#  contents: read
+#jobs:
+#  build:
+#    if: ${{ !cancelled() && 'success' == needs.info.result }}
+#    needs: ['info', 'test']
+#    uses: docker/github-builder/.github/workflows/build.yml@v1
+#    permissions:
+#      contents: read # to fetch the repository content
+#      id-token: write # for signing attestation(s) with GitHub OIDC Token
+#    with:
+#      cache-mode: max
+#      output: image
+#      push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
+#      meta-images: name/app
+#    secrets:
+#      registry-auths: |
+#        - registry: docker.io
+#          username: ${{ vars.DOCKERHUB_USERNAME }}
+#          password: ${{ secrets.DOCKERHUB_TOKEN }}
