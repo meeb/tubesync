@@ -1,14 +1,10 @@
-{% load static %}{% load sass_tags %}<!DOCTYPE html>
-<html>
+{% load static %}<!DOCTYPE html>
+<html data-theme="{{ theme }}">
   <head>
     <meta charset="utf-8" />
-    <style>
-      html{
-        visibility: hidden;
-        opacity: 0;
-      }
-    </style>
-    <link type="text/css" rel="stylesheet" href="{% sass_src 'styles/tubesync.scss' %}" media="screen,projection"/>
+    <link rel="stylesheet" href="{% static 'vendor/bulma/bulma.min.css' %}" />
+    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}" />
+    <link type="text/css" rel="stylesheet" href="{% static 'styles/tubesync.css' %}" media="screen,projection"/>
     <link rel="icon" href="{% static 'images/favicon.ico' %}" sizes="21x21" type="image/x-icon">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>TubeSync - {% block headtitle %}Synchronize YouTube to your local media server{% endblock %}</title>
@@ -16,38 +12,57 @@
 
   <body>
 
-    <div class="app">
+    <header class="pt-4 pb-4">
+      <div class="container">
+        <a href="{% url 'sync:dashboard' %}" class="is-flex is-align-items-center">
+          {% include 'tubesync.svg' with width='3rem' height='3rem' class='pr-4' %}
+          <h1>TubeSync</h1>
+        </a>
+      </div>
+    </header>
 
-      <header>
-        <div class="container">
-          <a href="{% url 'sync:dashboard' %}">
-            {% include 'tubesync.svg' with width='3rem' height='3rem' %}
-            <h1>TubeSync</h1>
-          </a>
+    <nav class="navbar" role="navigation" aria-label="main navigation">
+      <div class="container">
+        <div class="navbar-menu is-active">
+          <div class="navbar-start">
+            <a class="navbar-item{% block active_dashboard %}{% endblock %}" href="{% url 'sync:dashboard' %}">
+              <span class="icon"><i class="fas fa-fw fa-th-large"></i></span>
+              <span class="is-hidden-mobile">Dashboard</span>
+            </a>
+            <a class="navbar-item{% block active_sources %}{% endblock %}" href="{% url 'sync:sources' %}">
+              <span class="icon"><i class="fas fa-fw fa-play"></i></span>
+              <span class="is-hidden-mobile">Sources</span>
+            </a>
+            <a class="navbar-item{% block active_media %}{% endblock %}" href="{% url 'sync:media' %}">
+              <span class="icon"><i class="fas fa-fw fa-film"></i></span>
+              <span class="is-hidden-mobile">Media</span>
+            </a>
+            <a class="navbar-item{% block active_tasks %}{% endblock %}" href="{% url 'sync:tasks' %}">
+              <span class="icon"><i class="far fa-fw fa-clock"></i></span>
+              <span class="is-hidden-mobile">Tasks</span>
+            </a>
+            <a class="navbar-item{% block active_mediaservers %}{% endblock %}" href="{% url 'sync:mediaservers' %}">
+              <span class="icon"><i class="fas fa-fw fa-stream"></i></span>
+              <span class="is-hidden-mobile">Media Servers</span>
+            </a>
+          </div>
+          <div class="navbar-end">
+            <a class="navbar-item" href="{% url 'common:toggle-theme' %}" aria-label="Toggle dark mode">
+              <span class="icon"><i class="fas {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i></span>
+              <span class="is-hidden-mobile">Theme</span>
+            </a>
+          </div>
         </div>
-      </header>
+      </div>
+    </nav>
 
-      <nav>
-        <div class="container">
-          <ul>
-            <li><a href="{% url 'sync:dashboard' %}"><i class="fas fa-fw fa-th-large"></i><span class="hide-on-med-and-down"> Dashboard</span></a></li>
-            <li><a href="{% url 'sync:sources' %}"><i class="fas fa-fw fa-play"></i><span class="hide-on-med-and-down"> Sources</span></a></li>
-            <li><a href="{% url 'sync:media' %}"><i class="fas fa-fw fa-film"></i><span class="hide-on-med-and-down"> Media</span></a></li>
-            <li><a href="{% url 'sync:tasks' %}"><i class="far fa-fw fa-clock"></i><span class="hide-on-med-and-down"> Tasks</span></a></li>
-            <li><a href="{% url 'sync:mediaservers' %}"><i class="fas fa-fw fa-stream"></i><span class="hide-on-med-and-down"> Media Servers</span></a></li>
-          </ul>
-        </div>
-      </nav>
+    <main class="py-2">
+      <div class="container">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
 
-      <main>
-        <div class="container">
-          {% block content %}{% endblock %}
-        </div>
-      </main>
-
-    </div>
-
-    <footer>
+    <footer class="pt-2 pb-1">
       <div class="container">
         <p>
           <a href="{% url 'sync:dashboard' %}" class="nowrap">{% include 'tubesync.svg' with width='0.8rem' height='0.8rem' %} TubeSync</a>

@@ -1,38 +1,39 @@
 {% extends 'base.html' %}
 
+{% block active_mediaservers %} is-active{% endblock %}
+
 {% block headtitle %}Media servers{% endblock %}
 
 {% block content %}
-<div class="row">
-  <div class="col s12">
-    <h1 class="truncate">Media servers</h1>
-    <p>
-      Media servers are services like Plex which you may be running on your network. If
-      you add your media server TubeSync will notify your media server to rescan or
-      refresh its libraries every time media is successfully downloaded. Currently,
-      TubeSync only supports Jellyfin and Plex.
-    </p>
-  </div>
-</div>
+<h1 class="title mb-4">Media servers</h1>
+<p class="mb-4">
+  Media servers are services like Plex which you may be running on your network. If
+  you add your media server TubeSync will notify your media server to rescan or
+  refresh its libraries every time media is successfully downloaded. Currently,
+  TubeSync only supports Jellyfin and Plex.
+</p>
 {% include 'infobox.html' with message=message %}
-{% for mst in media_server_types %}
-<div class="row">
-  <div class="col s12 margin-bottom">
-    <a href="{% url 'sync:add-mediaserver' server_type=mst.long_type %}" class="btn">Add a {{ mst.label }} media server <i class="fas fa-server"></i></a>
+<div class="mb-4">
+  <div class="buttons">
+    {% for mst in media_server_types %}
+    <a href="{% url 'sync:add-mediaserver' server_type=mst.long_type %}" class="button is-primary">
+      <span class="icon"><i class="fas fa-server"></i></span>
+      <span>Add a {{ mst.label }} media server</span>
+    </a>
+    {% endfor %}
   </div>
 </div>
-{% endfor %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <div class="collection">
+<div class="menu">
+  <ul class="menu-list">
     {% for mediaserver in mediaservers %}
-      <a href="{% url 'sync:mediaserver' pk=mediaserver.pk %}" class="collection-item">
+    <li>
+      <a href="{% url 'sync:mediaserver' pk=mediaserver.pk %}">
         {{ mediaserver.icon|safe }} <strong>{{ mediaserver.get_server_type_display }}</strong> server at <strong>{{ mediaserver.url }}</strong>
       </a>
+    </li>
     {% empty %}
-      <span class="collection-item no-items"><i class="fas fa-info-circle"></i> You haven't added any media servers.</span>
+    <li><div class="notification"><i class="fas fa-info-circle"></i> You haven't added any media servers.</div></li>
     {% endfor %}
-    </div>
-  </div>
+  </ul>
 </div>
 {% endblock %}
