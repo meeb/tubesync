@@ -61,6 +61,15 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
         'Dir::Cache::%spkgcache "";\n' '' src ; \
 	chmod a+r /etc/apt/apt.conf.d/docker-disable-pkgcache ; \
     set -x && \
+    # When a new release is out but the debian image hasn't
+    # updated yet, upgrades cause more wasted space than
+    # we want to accept. This should prevent apt from
+    # upgrading packages that shipped with the image.
+    dpkg -s | \
+      grep -B 3 -e '^Status: install ok installed$' | \
+      grep -e '^Package: ' | \
+      cut -d : -f 2- | \
+      xargs -r -t apt-mark hold && \
     apt-get update && \
     # Install locales
     LC_ALL='C.UTF-8' LANG='C.UTF-8' LANGUAGE='C.UTF-8' \
