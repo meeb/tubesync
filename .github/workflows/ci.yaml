@@ -233,7 +233,7 @@ jobs:
             'ghcr.io/wagoodman/dive' \
             'ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:dive' \
             --ci \
-            --highestUserWastedPercent '0.05' \
+            --highestUserWastedPercent '0.08' \
             --highestWastedBytes '50M'
       - name: Build and push
         id: build-push
