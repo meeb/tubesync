@@ -70,6 +70,8 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
       grep -e '^Package: ' | \
       cut -d : -f 2- | \
       xargs -r -t apt-mark hold && \
+    # We must allow these upgrades
+    apt-mark unhold libc6 libssl3t64 && \
     apt-get update && \
     # Install locales
     LC_ALL='C.UTF-8' LANG='C.UTF-8' LANGUAGE='C.UTF-8' \
