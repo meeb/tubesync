@@ -265,7 +265,8 @@ class AssetType(models.TextChoices):
 
 
 class AssetCodec(models.TextChoices):
-    JPEG = 'jpeg', _('JPEG')
+    JPEG = 'jpg', _('JPEG')
+    WEBP = 'webp', _('WEBP')
     PNG = 'png', _('PNG')
     OPUS = 'OPUS', _('Opus')
     MP4A = 'MP4A', _('MP4A')
