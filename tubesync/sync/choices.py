@@ -274,6 +274,7 @@ class AssetCodec(models.TextChoices):
     VP9 = 'VP9', _('VP9')
     AVC1 = 'AVC1', _('AVC1 (H.264)')
     VTT = 'vtt', _('WebVTT')
+    TTML = 'ttml', _('TTML')
     SRT = 'srt', _('SubRip')
     ASS = 'ass', _('Advanced SubStation Alpha')
 
