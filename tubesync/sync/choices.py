@@ -269,7 +269,7 @@ class AssetCodec(models.TextChoices):
     WEBP = 'webp', _('WEBP')
     PNG = 'png', _('PNG')
     OPUS = 'OPUS', _('Opus')
-    MP4A = 'MP4A', _('MP4A')
+    MP4A = 'M4A', _('MP4A')
     AV1 = 'AV1', _('AV1')
     VP9 = 'VP9', _('VP9')
     AVC1 = 'AVC1', _('AVC1 (H.264)')
