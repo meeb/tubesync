@@ -267,7 +267,8 @@ class AssetCodec(models.TextChoices):
     JPEG = 'jpeg', _('JPEG')
     OPUS = 'OPUS', _('Opus')
     MP4A = 'MP4A', _('MP4A')
-    VP9 = 'vp9', _('VP9')
+    AV1 = 'AV1', _('AV1')
+    VP9 = 'VP9', _('VP9')
     AVC1 = 'AVC1', _('AVC1 (H.264)')
 
 
