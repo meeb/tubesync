@@ -268,7 +268,7 @@ class AssetCodec(models.TextChoices):
     OPUS = 'OPUS', _('Opus')
     MP4A = 'MP4A', _('MP4A')
     VP9 = 'vp9', _('VP9')
-    AV1 = 'av1', _('AV1')
+    AVC1 = 'AVC1', _('AVC1 (H.264)')
 
 
 SourceResolutionInteger = SourceResolution._integer_mapping()
