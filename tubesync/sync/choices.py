@@ -257,6 +257,19 @@ class YouTube_VideoCodec(models.TextChoices):
     AVC1 = 'AVC1', _('AVC1 (H.264)')
 
 
+class AssetType(models.TextChoices):
+    THUMBNAIL = 'thumbnail', _('Thumbnail')
+    AUDIO = 'audio', _('Audio')
+    VIDEO = 'video', _('Video')
+
+
+class AssetCodec(models.TextChoices):
+    JPEG = 'jpeg', _('JPEG')
+    OPUS = 'opus', _('Opus')
+    VP9 = 'vp9', _('VP9')
+    AV1 = 'av1', _('AV1')
+
+
 SourceResolutionInteger = SourceResolution._integer_mapping()
 youtube_long_source_types = YouTube_SourceType._long_type_mapping()
 youtube_validation_urls = YouTube_SourceType._validation_urls()
