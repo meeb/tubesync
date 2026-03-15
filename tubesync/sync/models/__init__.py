@@ -10,6 +10,7 @@ from ._migrations import (
 # The order starts with independent classes
 # then the classes that depend on them follow.
 
+from .codec import Codec
 from .media_server import MediaServer
 
 from .source import Source
@@ -19,7 +20,6 @@ from .metadata_format import MetadataFormat
 
 __all__ = [
     'get_media_file_path', 'get_media_thumb_path',
-    'media_file_storage', 'MediaServer', 'Source',
+    'media_file_storage', 'Codec', 'MediaServer', 'Source',
     'Media', 'Metadata', 'MetadataFormat',
 ]
-
