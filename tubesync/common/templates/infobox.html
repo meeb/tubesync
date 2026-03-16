@@ -1,10 +1,8 @@
 {% if message %}
-<div class="row">
-  <div class="col s12">
-    <div class="card infobox">
-      <div class="card-content">
-        <i class="fas fa-fw fa-info-circle"></i> {{ message|safe }}
-      </div>
+<div class="columns m-2">
+  <div class="column is-12">
+    <div class="notification is-info">
+      <i class="fas fa-fw fa-info-circle"></i> {{ message|safe }}
     </div>
   </div>
 </div>

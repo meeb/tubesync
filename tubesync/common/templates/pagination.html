@@ -1,11 +1,9 @@
 {% if paginator.num_pages > 1 %}
-<div class="row">
-  <div class="col s12">
-    <div class="pagination">
-      {% for i in paginator.page_range %}
-        <a class="pagenum{% if i == page_obj.number %} currentpage{% endif %}" href="{% if i == paginator.num_pages %}{% querystring page='last' %}{% else %}{% querystring page=i %}{% endif %}">{{ i }}</a>
-      {% endfor %}
-    </div>
+<nav class="pagination is-centered mt-5" role="navigation" aria-label="pagination">
+  <div class="pagination-list">
+    {% for i in paginator.page_range %}
+    <a class="pagination-link{% if i == page_obj.number %} is-current{% endif %}" href="{% if i == paginator.num_pages %}{% querystring page='last' %}{% else %}{% querystring page=i %}{% endif %}">{{ i }}</a>
+    {% endfor %}
   </div>
-</div>
+</nav>
 {% endif %}

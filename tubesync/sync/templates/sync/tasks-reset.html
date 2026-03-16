@@ -3,29 +3,28 @@
 {% block headtitle %}Reset tasks{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Reset tasks</h1>
-    <p>
-      If your TubeSync installation has gotten itself into any form of synchronisation
-      state issues (such you moved then restored files on disk) and the state in
-      TubeSync isn't up to date you can use this button to force a state reset.
-    </p>
-    <p>
-      This will delete all current tasks then all souces will be checked for their
-      states and new tasks to be created where required.
-    </p>
-  </div>
+<h1 class="title mb-4">Reset tasks</h1>
+<div class="content mb-4">
+  <p>
+    If your TubeSync installation has gotten itself into any form of synchronisation
+    state issues (such you moved then restored files on disk) and the state in
+    TubeSync isn't up to date you can use this button to force a state reset.
+  </p>
+  <p>
+    This will delete all current tasks then all souces will be checked for their
+    states and new tasks to be created where required.
+  </p>
 </div>
-<div class="row">
-  <form method="post" action="{% url 'sync:reset-tasks' %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Really reset tasks <i class="fas fa-history"></i></button>
-      </div>
+<form method="post" action="{% url 'sync:reset-tasks' %}" class="simpleform">
+  {% csrf_token %}
+  {% include 'simpleform.html' with form=form %}
+  <div class="field pt-4 has-text-centered">
+    <div class="control">
+      <button class="button is-primary" type="submit" name="action">
+        <span class="icon"><i class="fas fa-history"></i></span>
+        <span>Really reset tasks</span>
+      </button>
     </div>
-  </form>
-</div>
+  </div>
+</form>
 {% endblock %}
