@@ -13,6 +13,8 @@ on:
 jobs:
   noResponse:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     steps:
       - uses: tcely/no-response@v0.1.0
         with:
