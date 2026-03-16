@@ -17,7 +17,7 @@ jobs:
       - uses: MBilalShafi/no-response@v0.0.6
         with:
           token: ${{ github.token }}
-          # auto close issues with no response from author for 7 days
+          # auto close issues with no response from author for N days
           daysUntilClose: 30
           # label to use to track when a response is required (once a response is made, this label will be auto removed)
           # if the label doesn't exist, it will be auto-created
