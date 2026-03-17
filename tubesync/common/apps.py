@@ -1,6 +1,9 @@
 from django.apps import AppConfig
 
-
 class CommonConfig(AppConfig):
+    """
+    Django AppConfig for the 'common' application.
+    """
 
-    name = 'common'
+    # The name of the application
+    name: str = 'common'
