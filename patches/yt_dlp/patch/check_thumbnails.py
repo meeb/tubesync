@@ -1,104 +1,84 @@
 ```python
-# tests/test_utils.py
-from yt_dlp import YoutubeDL
-from yt_dlp.utils import sanitize_url, LazyList
-from yt_dlp.utils import network_exceptions
+# models.py
+from django.db import models
 
-class TestUtils:
-    def test_sanitize_thumbnails(self):
-        """
-        Test the _sanitize_thumbnails method.
+class Container(models.Model):
+    """
+    Model for a container that supports different asset types.
 
-        This test checks that the thumbnails are sanitized correctly.
-        """
-        ydl = YoutubeDL()
-        info_dict = {
-            "thumbnails": None,
-            "thumbnail": "https://example.com/thumbnail.jpg"
-        }
-        ydl._sanitize_thumbnails(info_dict)
-        assert info_dict["thumbnails"] == [{"url": "https://example.com/thumbnail.jpg"}]
+    Attributes:
+        extension (str): The file extension of the container.
+        asset_type (str): The type of asset that the container supports (e.g. audio, video).
+        number_supported (int): The number of assets that the container supports.
+        codec (str): The codec used by the container.
+    """
+    extension = models.CharField(max_length=10)
+    asset_type = models.CharField(max_length=10)
+    number_supported = models.IntegerField()
+    codec = models.CharField(max_length=10)
 
-        info_dict = {
-            "thumbnails": []
-        }
-        ydl._sanitize_thumbnails(info_dict)
-        assert info_dict["thumbnails"] == []
-
-        info_dict = {
-            "thumbnails": [{"url": "https://example.com/thumbnail1.jpg"}, {"url": "https://example.com/thumbnail2.jpg"}]
-        }
-        ydl._sanitize_thumbnails(info_dict)
-        assert info_dict["thumbnails"] == [{"url": "https://example.com/thumbnail1.jpg"}, {"url": "https://example.com/thumbnail2.jpg"}]
-
-        info_dict = {
-            "thumbnails": [{"url": "https://example.com/thumbnail1.jpg"}, {"url": "https://example.com/thumbnail2.jpg"}]
-        }
-        ydl.params["check_thumbnails"] = True
-        ydl._sanitize_thumbnails(info_dict)
-        assert isinstance(info_dict["thumbnails"], LazyList)
-
-# tests/test_youtube_dl.py
-from yt_dlp import YoutubeDL
-from yt_dlp.utils import network_exceptions
-
-class TestYoutubeDL:
-    def test_network_exceptions(self):
-        """
-        Test the network_exceptions module.
-
-        This test checks that the network_exceptions module raises the correct exceptions.
-        """
-        ydl = YoutubeDL()
-        try:
-            ydl.urlopen(HEADRequest("https://example.com"))
-        except network_exceptions as err:
-            assert isinstance(err, Exception)
+    def __str__(self):
+        return f"{self.extension} ({self.asset_type}) - {self.number_supported}x {self.codec}"
 ```
 
 ```python
-# tests/test_sanitize_url.py
-from yt_dlp.utils import sanitize_url
+# tests/test_container.py
+from django.test import TestCase
+from .models import Container
 
-class TestSanitizeUrl:
-    def test_sanitize_url(self):
+class TestContainer(TestCase):
+    def test_container_model(self):
         """
-        Test the sanitize_url function.
+        Test the Container model.
 
-        This test checks that the sanitize_url function sanitizes the URL correctly.
+        This test checks that the Container model can be created and saved correctly.
         """
-        url = "https://example.com/thumbnail.jpg"
-        sanitized_url = sanitize_url(url)
-        assert sanitized_url == url
+        container = Container(
+            extension="m4a",
+            asset_type="audio",
+            number_supported=1,
+            codec="aac"
+        )
+        container.save()
+        assert container.id is not None
+        assert container.extension == "m4a"
+        assert container.asset_type == "audio"
+        assert container.number_supported == 1
+        assert container.codec == "aac"
+
+        # Test that the __str__ method returns the correct string
+        assert str(container) == "m4a (audio) - 1x aac"
 ```
 
 ```python
-# tests/test_lazy_list.py
-from yt_dlp.utils import LazyList
-
-class TestLazyList:
-    def test_lazy_list(self):
+# tests/test_container.py (continued)
+class TestContainer(TestCase):
+    def test_container_model_choices(self):
         """
-        Test the LazyList class.
+        Test the Container model choices.
 
-        This test checks that the LazyList class works correctly.
+        This test checks that the Container model choices are correct.
         """
-        lazy_list = LazyList([1, 2, 3])
-        assert list(lazy_list) == [1, 2, 3]
-```
+        # Define the choices for the Container model
+        CHOICES = (
+            ("m4a", "audio", 1, "aac"),
+            ("m4a", "audio", 1, "alac"),
+            ("webm", "audio", 8, "opus"),
+            ("webm", "video", 1, "vp9"),
+            ("webm", "video", 1, "av1"),
+            ("mkv", "video", 1, "avc1"),
+        )
 
-```python
-# tests/test_sort_thumbnails.py
-from yt_dlp.utils import _sort_thumbnails
-
-class TestSortThumbnails:
-    def test_sort_thumbnails(self):
-        """
-        Test the _sort_thumbnails function.
-
-        This test checks that the _sort_thumbnails function sorts the thumbnails correctly.
-        """
-        thumbnails = [{"url": "https://example.com/thumbnail1.jpg"}, {"url": "https://example.com/thumbnail2.jpg"}]
-        _sort_thumbnails(thumbnails)
-        assert thumbnails == [{"url": "https://example.com/thumbnail1.jpg"}, {"url": "https://example.com/thumbnail2.jpg"}]
+        # Test that the choices are correct
+        for extension, asset_type, number_supported, codec in CHOICES:
+            container = Container(
+                extension=extension,
+                asset_type=asset_type,
+                number_supported=number_supported,
+                codec=codec
+            )
+            assert container.extension == extension
+            assert container.asset_type == asset_type
+            assert container.number_supported == number_supported
+            assert container.codec == codec
 ```

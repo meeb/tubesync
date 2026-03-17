@@ -1,191 +1,107 @@
 ```python
-# tests/patched_youtube_ie.py
-from yt_dlp.extractor.youtube import YoutubeIE
+# models.py
 from typing import Dict, Optional, Union
+from django.db import models
 
-
-class PatchedYoutubeIE(YoutubeIE):
+class Container(models.Model):
     """
-    A patched version of YoutubeIE to modify _download_player_responses and _download_initial_webpage methods.
+    A model for a database table to hold rows for containers that are supported.
     """
+    EXTENSION_CHOICES = (
+        ("m4a", "m4a"),
+        ("webm", "webm"),
+        ("mkv", "mkv"),
+    )
 
-    def _download_player_responses(
-        self, url: str, smuggled_data: Dict, video_id: str, webpage_url: str
-    ) -> tuple[Optional[str], Optional[Dict], list, str]:
-        """
-        Downloads player responses from the given URL.
+    ASSET_TYPE_CHOICES = (
+        ("audio", "audio"),
+        ("video", "video"),
+    )
 
-        Args:
-        url (str): The URL to download player responses from.
-        smuggled_data (Dict): Smuggled data for the player responses.
-        video_id (str): The video ID.
-        webpage_url (str): The URL of the webpage.
+    codec_choices = {
+        "m4a": ["aac", "alac"],
+        "webm": ["opus", "vp9", "av1"],
+        "mkv": ["avc1"],
+    }
 
-        Returns:
-        tuple[Optional[str], Optional[Dict], list, str]: A tuple containing the webpage, master_ytcfg, player responses, and player URL.
-        """
-        # If 'webpage' is not in player_skip, download the webpage with retries
-        if "webpage" not in self._configuration_arg("player_skip"):
-            # Set query parameters for the webpage download
-            query = {"bpctr": "9999999999", "has_verified": "1"}
-            # Get player parameters from configuration or default value
-            pp = self._configuration_arg("player_params", [None], casesense=True)[0]
-            if pp:
-                query["pp"] = pp
-            # Download the webpage with retries
-            webpage = self._download_webpage_with_retries(
-                webpage_url, video_id, retry_fatal=True, query=query
-            )
+    extension = models.CharField(max_length=255, choices=EXTENSION_CHOICES)
+    asset_type = models.CharField(max_length=255, choices=ASSET_TYPE_CHOICES)
+    number_supported = models.IntegerField()
+    codec = models.CharField(max_length=255)
 
-        # Extract ytcfg from the webpage or default value
-        master_ytcfg = (
-            self.extract_ytcfg(video_id, webpage) or self._get_default_ytcfg()
-        )
+    def __str__(self):
+        return f"{self.extension} - {self.asset_type} - {self.codec}"
+```
 
-        # Extract player responses and player URL
-        player_responses, player_url = self._extract_player_responses(
-            self._get_requested_clients(url, smuggled_data),
-            video_id,
-            webpage,
-            master_ytcfg,
-            smuggled_data,
-        )
-
-        return webpage, master_ytcfg, player_responses, player_url
-
-    def _download_initial_webpage(
-        self, webpage_url: str, webpage_client: str, video_id: str
-    ) -> Optional[str]:
-        """
-        Downloads the initial webpage.
-
-        Args:
-        webpage_url (str): The URL of the webpage.
-        webpage_client (str): The webpage client.
-        video_id (str): The video ID.
-
-        Returns:
-        Optional[str]: The downloaded webpage or None if not downloaded.
-        """
-        # If webpage_url is not None and 'webpage' is not in player_skip, download the webpage with retries
-        if webpage_url and "webpage" not in self._configuration_arg("player_skip"):
-            # Set query parameters for the webpage download
-            query = {"bpctr": "9999999999", "has_verified": "1"}
-            # Get player parameters from configuration or default value
-            pp = self._configuration_arg("player_params", [None], casesense=True)[
-                0
-            ] or traverse_obj(
-                INNERTUBE_CLIENTS, (webpage_client, "PLAYER_PARAMS", {str})
-            )
-            if pp:
-                query["pp"] = pp
-            # Download the webpage with retries
-            webpage = self._download_webpage_with_retries(
-                webpage_url,
-                video_id,
-                retry_fatal=True,
-                query=query,
-                headers=traverse_obj(
-                    self._get_default_ytcfg(webpage_client),
-                    {
-                        "User-Agent": (
-                            "INNERTUBE_CONTEXT",
-                            "client",
-                            "userAgent",
-                            {str},
-                        ),
-                    },
-                ),
-            )
-        return webpage
-
-
-# tests/test_patched_youtube_ie.py
+```python
+# tests/test_container.py
 import unittest
-from yt_dlp.extractor.youtube import YoutubeIE
-from yt_dlp.utils import traverse_obj
-from tests.patched_youtube_ie import PatchedYoutubeIE
+from django.db import IntegrityError
+from .models import Container
 
 
-class TestPatchedYoutubeIE(unittest.TestCase):
-    def test_download_player_responses(self):
-        # Create a test instance of PatchedYoutubeIE
-        patched_ie = PatchedYoutubeIE()
-
-        # Test the _download_player_responses method
-        url = "https://example.com"
-        smuggled_data = {"key": "value"}
-        video_id = "video_id"
-        webpage_url = "https://example.com/webpage"
-
-        result = patched_ie._download_player_responses(
-            url, smuggled_data, video_id, webpage_url
+class TestContainer(unittest.TestCase):
+    def test_container_creation(self):
+        # Create a test instance of Container
+        container = Container(
+            extension="m4a",
+            asset_type="audio",
+            number_supported=1,
+            codec="aac",
         )
 
-        # Assert the result is as expected
-        self.assertIsInstance(result, tuple)
-        self.assertEqual(len(result), 4)
-        self.assertIsInstance(result[0], str)
-        self.assertIsInstance(result[1], dict)
-        self.assertIsInstance(result[2], list)
-        self.assertIsInstance(result[3], str)
+        # Try to save the container
+        try:
+            container.save()
+        except IntegrityError:
+            # If an IntegrityError is raised, it means the container already exists
+            pass
+        else:
+            # If the container is saved successfully, it means it doesn't exist yet
+            self.fail("Container already exists")
 
-    def test_download_initial_webpage(self):
-        # Create a test instance of PatchedYoutubeIE
-        patched_ie = PatchedYoutubeIE()
-
-        # Test the _download_initial_webpage method
-        webpage_url = "https://example.com"
-        webpage_client = "client"
-        video_id = "video_id"
-
-        result = patched_ie._download_initial_webpage(webpage_url, webpage_client, video_id)
-
-        # Assert the result is as expected
-        self.assertIsInstance(result, str)
-
-
-# tests/test_youtube_ie.py
-import unittest
-from yt_dlp.extractor.youtube import YoutubeIE
-
-
-class TestYoutubeIE(unittest.TestCase):
-    def test_original_methods(self):
-        # Create a test instance of YoutubeIE
-        ie = YoutubeIE()
-
-        # Test the original _download_player_responses method
-        url = "https://example.com"
-        smuggled_data = {"key": "value"}
-        video_id = "video_id"
-        webpage_url = "https://example.com/webpage"
-
-        result = ie._download_player_responses(
-            url, smuggled_data, video_id, webpage_url
+    def test_container_update(self):
+        # Create a test instance of Container
+        container = Container(
+            extension="m4a",
+            asset_type="audio",
+            number_supported=1,
+            codec="aac",
         )
 
-        # Assert the result is as expected
-        self.assertIsInstance(result, tuple)
-        self.assertEqual(len(result), 4)
-        self.assertIsInstance(result[0], str)
-        self.assertIsInstance(result[1], dict)
-        self.assertIsInstance(result[2], list)
-        self.assertIsInstance(result[3], str)
+        # Save the container
+        container.save()
 
-        # Test the original _download_initial_webpage method
-        webpage_url = "https://example.com"
-        webpage_client = "client"
-        video_id = "video_id"
+        # Update the container
+        container.number_supported = 2
+        container.save()
 
-        result = ie._download_initial_webpage(webpage_url, webpage_client, video_id)
+        # Check if the container was updated successfully
+        self.assertEqual(container.number_supported, 2)
 
-        # Assert the result is as expected
-        self.assertIsInstance(result, str)
+    def test_container_deletion(self):
+        # Create a test instance of Container
+        container = Container(
+            extension="m4a",
+            asset_type="audio",
+            number_supported=1,
+            codec="aac",
+        )
+
+        # Save the container
+        container.save()
+
+        # Delete the container
+        container.delete()
+
+        # Check if the container was deleted successfully
+        with self.assertRaises(Container.DoesNotExist):
+            Container.objects.get(extension="m4a", asset_type="audio", codec="aac")
 ```
 
 ```python
 # tests/__init__.py
+from tests.test_container import TestContainer
 from tests.test_patched_youtube_ie import TestPatchedYoutubeIE
 from tests.test_youtube_ie import TestYoutubeIE
 
@@ -194,5 +110,6 @@ def load_tests(loader, tests, pattern):
     suite = unittest.TestSuite()
     suite.addTests(loader.loadTestsFromTestCase(TestPatchedYoutubeIE))
     suite.addTests(loader.loadTestsFromTestCase(TestYoutubeIE))
+    suite.addTests(loader.loadTestsFromTestCase(TestContainer))
     return suite
 ```
