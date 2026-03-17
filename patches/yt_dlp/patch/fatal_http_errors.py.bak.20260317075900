@@ -1,5 +1,3 @@
-```python
-# tests/patched_youtube_ie.py
 from yt_dlp.extractor.youtube import YoutubeIE
 from typing import Dict, Optional, Union
 
@@ -100,99 +98,9 @@ class PatchedYoutubeIE(YoutubeIE):
         return webpage
 
 
-# tests/test_patched_youtube_ie.py
-import unittest
-from yt_dlp.extractor.youtube import YoutubeIE
-from yt_dlp.utils import traverse_obj
-from tests.patched_youtube_ie import PatchedYoutubeIE
+# Patch the original methods
+YoutubeIE.__unpatched___download_player_responses = YoutubeIE._download_player_responses
+YoutubeIE._download_player_responses = PatchedYoutubeIE._download_player_responses
 
-
-class TestPatchedYoutubeIE(unittest.TestCase):
-    def test_download_player_responses(self):
-        # Create a test instance of PatchedYoutubeIE
-        patched_ie = PatchedYoutubeIE()
-
-        # Test the _download_player_responses method
-        url = "https://example.com"
-        smuggled_data = {"key": "value"}
-        video_id = "video_id"
-        webpage_url = "https://example.com/webpage"
-
-        result = patched_ie._download_player_responses(
-            url, smuggled_data, video_id, webpage_url
-        )
-
-        # Assert the result is as expected
-        self.assertIsInstance(result, tuple)
-        self.assertEqual(len(result), 4)
-        self.assertIsInstance(result[0], str)
-        self.assertIsInstance(result[1], dict)
-        self.assertIsInstance(result[2], list)
-        self.assertIsInstance(result[3], str)
-
-    def test_download_initial_webpage(self):
-        # Create a test instance of PatchedYoutubeIE
-        patched_ie = PatchedYoutubeIE()
-
-        # Test the _download_initial_webpage method
-        webpage_url = "https://example.com"
-        webpage_client = "client"
-        video_id = "video_id"
-
-        result = patched_ie._download_initial_webpage(webpage_url, webpage_client, video_id)
-
-        # Assert the result is as expected
-        self.assertIsInstance(result, str)
-
-
-# tests/test_youtube_ie.py
-import unittest
-from yt_dlp.extractor.youtube import YoutubeIE
-
-
-class TestYoutubeIE(unittest.TestCase):
-    def test_original_methods(self):
-        # Create a test instance of YoutubeIE
-        ie = YoutubeIE()
-
-        # Test the original _download_player_responses method
-        url = "https://example.com"
-        smuggled_data = {"key": "value"}
-        video_id = "video_id"
-        webpage_url = "https://example.com/webpage"
-
-        result = ie._download_player_responses(
-            url, smuggled_data, video_id, webpage_url
-        )
-
-        # Assert the result is as expected
-        self.assertIsInstance(result, tuple)
-        self.assertEqual(len(result), 4)
-        self.assertIsInstance(result[0], str)
-        self.assertIsInstance(result[1], dict)
-        self.assertIsInstance(result[2], list)
-        self.assertIsInstance(result[3], str)
-
-        # Test the original _download_initial_webpage method
-        webpage_url = "https://example.com"
-        webpage_client = "client"
-        video_id = "video_id"
-
-        result = ie._download_initial_webpage(webpage_url, webpage_client, video_id)
-
-        # Assert the result is as expected
-        self.assertIsInstance(result, str)
-```
-
-```python
-# tests/__init__.py
-from tests.test_patched_youtube_ie import TestPatchedYoutubeIE
-from tests.test_youtube_ie import TestYoutubeIE
-
-
-def load_tests(loader, tests, pattern):
-    suite = unittest.TestSuite()
-    suite.addTests(loader.loadTestsFromTestCase(TestPatchedYoutubeIE))
-    suite.addTests(loader.loadTestsFromTestCase(TestYoutubeIE))
-    return suite
-```
+YoutubeIE.__unpatched___download_initial_webpage = YoutubeIE._download_initial_webpage
+YoutubeIE._download_initial_webpage = PatchedYoutubeIE._download_initial_webpage

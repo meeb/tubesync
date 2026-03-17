@@ -1,4 +1,3 @@
-```python
 # TubeSync
 ================
 
@@ -38,7 +37,7 @@ TubeSync is a PVR (personal video recorder) for YouTube. It is designed to synch
 3.  Copy `tubesync/tubesync/local_settings.py.example` to `tubesync/tubesync/local_settings.py` and edit it as appropriate
 4.  Run migrations with `./manage.py migrate`
 5.  Collect static files with `./manage.py collectstatic`
-6.  Set up your preferred WSGI server, such as `gunicorn` pointing it to the application in `tubesync/tubesync/wsgi.py`
+6.  Set up your prefered WSGI server, such as `gunicorn` pointing it to the application in `tubesync/tubesync/wsgi.py`
 7.  Set up your proxy server such as `nginx` and forward it to the WSGI server
 8.  Check the web interface is working
 9.  Run `./manage.py process_tasks` as the background task worker to index and download media
@@ -101,14 +100,14 @@ TubeSync is a PVR (personal video recorder) for YouTube. It is designed to synch
 ## Advanced Usage Guides
 -------------------------
 
-*   [Using Plex](docs/plex-notes.md)
-*   [Import existing media into TubeSync](docs/import-existing-media.md)
-*   [Sync or create missing metadata files](docs/create-missing-metadata.md)
-*   [Reset tasks from the command line](docs/reset-tasks.md)
-*   [Using PostgreSQL, MySQL or MariaDB as database backends](docs/other-database-backends.md)
-*   [YouTube Proof-of-Origin Tokens](docs/youtube-pot.md)
-*   [Using cookies](docs/using-cookies.md)
-*   [Reset metadata](docs/reset-metadata.md)
+*   [Using Plex](https://github.com/meeb/tubesync/blob/main/docs/plex-notes.md)
+*   [Import existing media into TubeSync](https://github.com/meeb/tubesync/blob/main/docs/import-existing-media.md)
+*   [Sync or create missing metadata files](https://github.com/meeb/tubesync/blob/main/docs/create-missing-metadata.md)
+*   [Reset tasks from the command line](https://github.com/meeb/tubesync/blob/main/docs/reset-tasks.md)
+*   [Using PostgreSQL, MySQL or MariaDB as database backends](https://github.com/meeb/tubesync/blob/main/docs/other-database-backends.md)
+*   [YouTube Proof-of-Origin Tokens](https://github.com/meeb/tubesync/blob/main/docs/youtube-pot.md)
+*   [Using cookies](https://github.com/meeb/tubesync/blob/main/docs/using-cookies.md)
+*   [Reset metadata](https://github.com/meeb/tubesync/blob/main/docs/reset-metadata.md)
 
 ## FAQ
 ----
@@ -128,4 +127,3 @@ TubeSync is a PVR (personal video recorder) for YouTube. It is designed to synch
 ------------
 
 All properly formatted and sensible pull requests, issues and comments are welcome.
-```

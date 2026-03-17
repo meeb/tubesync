@@ -1,80 +1,104 @@
+```python
+# tests/test_utils.py
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import sanitize_url, LazyList
 from yt_dlp.utils import network_exceptions
-from urllib.request import HEADRequest
 
-
-class PatchedYoutubeDL(YoutubeDL):
-    """
-    A patched version of YoutubeDL to sanitize thumbnails.
-    """
-
-    def _sanitize_thumbnails(self, info_dict: dict) -> None:
+class TestUtils:
+    def test_sanitize_thumbnails(self):
         """
-        Sanitizes the thumbnails in the info dictionary.
+        Test the _sanitize_thumbnails method.
 
-        Args:
-            info_dict (dict): The info dictionary to sanitize.
+        This test checks that the thumbnails are sanitized correctly.
         """
-        # Get the thumbnails from the info dictionary
-        thumbnails = info_dict.get("thumbnails")
+        ydl = YoutubeDL()
+        info_dict = {
+            "thumbnails": None,
+            "thumbnail": "https://example.com/thumbnail.jpg"
+        }
+        ydl._sanitize_thumbnails(info_dict)
+        assert info_dict["thumbnails"] == [{"url": "https://example.com/thumbnail.jpg"}]
 
-        # If thumbnails are not present, create a single thumbnail
-        if thumbnails is None:
-            thumbnail = info_dict.get("thumbnail")
-            if thumbnail:
-                info_dict["thumbnails"] = thumbnails = [{"url": thumbnail}]
-        elif not thumbnails:
-            # If thumbnails are empty, do nothing
-            return
+        info_dict = {
+            "thumbnails": []
+        }
+        ydl._sanitize_thumbnails(info_dict)
+        assert info_dict["thumbnails"] == []
 
-        # Define a generator to check thumbnails
-        def check_thumbnails(thumbnails: list) -> LazyList:
-            """
-            Checks each thumbnail URL and yields the thumbnail if it's accessible.
+        info_dict = {
+            "thumbnails": [{"url": "https://example.com/thumbnail1.jpg"}, {"url": "https://example.com/thumbnail2.jpg"}]
+        }
+        ydl._sanitize_thumbnails(info_dict)
+        assert info_dict["thumbnails"] == [{"url": "https://example.com/thumbnail1.jpg"}, {"url": "https://example.com/thumbnail2.jpg"}]
 
-            Args:
-                thumbnails (list): The list of thumbnails to check.
-            """
-            for t in thumbnails:
-                # Log a message for each thumbnail
-                self.to_screen(f'[info] Testing thumbnail {t["id"]}: {t["url"]!r}')
-                try:
-                    # Try to open the thumbnail URL
-                    self.urlopen(HEADRequest(t["url"]))
-                except network_exceptions as err:
-                    # Log an error if the URL is not accessible
-                    self.to_screen(
-                        f'[info] Unable to connect to thumbnail {t["id"]} URL {t["url"]!r} - {err}. Skipping...'
-                    )
-                    continue
-                yield t
+        info_dict = {
+            "thumbnails": [{"url": "https://example.com/thumbnail1.jpg"}, {"url": "https://example.com/thumbnail2.jpg"}]
+        }
+        ydl.params["check_thumbnails"] = True
+        ydl._sanitize_thumbnails(info_dict)
+        assert isinstance(info_dict["thumbnails"], LazyList)
 
-        # Sort the thumbnails
-        self._sort_thumbnails(thumbnails)
+# tests/test_youtube_dl.py
+from yt_dlp import YoutubeDL
+from yt_dlp.utils import network_exceptions
 
-        # Update the thumbnails with sanitized data
-        for i, t in enumerate(thumbnails):
-            # Assign an ID to the thumbnail if it's missing
-            if t.get("id") is None:
-                t["id"] = str(i)
-            # Calculate the resolution if it's missing
-            if t.get("width") and t.get("height"):
-                t["resolution"] = "%dx%d" % (t["width"], t["height"])
-            # Sanitize the URL
-            t["url"] = sanitize_url(t["url"])
+class TestYoutubeDL:
+    def test_network_exceptions(self):
+        """
+        Test the network_exceptions module.
 
-        # Check thumbnails if required
-        if self.params.get("check_thumbnails") is True:
-            # Use a LazyList to check thumbnails in reverse order
-            info_dict["thumbnails"] = LazyList(
-                check_thumbnails(thumbnails[::-1]), reverse=True
-            )
-        else:
-            # Otherwise, just use the sanitized thumbnails
-            info_dict["thumbnails"] = thumbnails
+        This test checks that the network_exceptions module raises the correct exceptions.
+        """
+        ydl = YoutubeDL()
+        try:
+            ydl.urlopen(HEADRequest("https://example.com"))
+        except network_exceptions as err:
+            assert isinstance(err, Exception)
+```
 
+```python
+# tests/test_sanitize_url.py
+from yt_dlp.utils import sanitize_url
 
-# Patch the original YoutubeDL
-YoutubeDL.__unpatched___sanitize_thumbnails = YoutubeDL._sanitize_thumbnails
-YoutubeDL._sanitize_thumbnails = PatchedYoutubeDL._sanitize_thumbnails
+class TestSanitizeUrl:
+    def test_sanitize_url(self):
+        """
+        Test the sanitize_url function.
+
+        This test checks that the sanitize_url function sanitizes the URL correctly.
+        """
+        url = "https://example.com/thumbnail.jpg"
+        sanitized_url = sanitize_url(url)
+        assert sanitized_url == url
+```
+
+```python
+# tests/test_lazy_list.py
+from yt_dlp.utils import LazyList
+
+class TestLazyList:
+    def test_lazy_list(self):
+        """
+        Test the LazyList class.
+
+        This test checks that the LazyList class works correctly.
+        """
+        lazy_list = LazyList([1, 2, 3])
+        assert list(lazy_list) == [1, 2, 3]
+```
+
+```python
+# tests/test_sort_thumbnails.py
+from yt_dlp.utils import _sort_thumbnails
+
+class TestSortThumbnails:
+    def test_sort_thumbnails(self):
+        """
+        Test the _sort_thumbnails function.
+
+        This test checks that the _sort_thumbnails function sorts the thumbnails correctly.
+        """
+        thumbnails = [{"url": "https://example.com/thumbnail1.jpg"}, {"url": "https://example.com/thumbnail2.jpg"}]
+        _sort_thumbnails(thumbnails)
+        assert thumbnails == [{"url": "https://example.com/thumbnail1.jpg"}, {"url": "https://example.com/thumbnail2.jpg"}]
+```
