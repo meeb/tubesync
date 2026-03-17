@@ -6,7 +6,6 @@
 
 
 import logging
-import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -517,12 +516,20 @@ with open(metadata_60fps_hdr_filepath, 'rt') as file:
 metadata_20230629_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_2023-06-29.json'
 with open(metadata_20230629_filepath, 'rt') as file:
     metadata_20230629 = file.read()
+metadata_issue_499_1080p50_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_issue_499_1080p50.json'
+with open(metadata_issue_499_1080p50_filepath, 'rt') as file:
+    metadata_issue_499_1080p50 = file.read()
+metadata_issue_499_premium_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_issue_499_premium.json'
+with open(metadata_issue_499_premium_filepath, 'rt') as file:
+    metadata_issue_499_premium = file.read()
 all_test_metadata = {
     'boring': metadata,
     'hdr': metadata_hdr,
     '60fps': metadata_60fps,
     '60fps+hdr': metadata_60fps_hdr,
     '20230629': metadata_20230629,
+    'issue499_1080p50': metadata_issue_499_1080p50,
+    'issue499_premium': metadata_issue_499_premium,
 }
 
 
@@ -672,71 +679,38 @@ class FilepathTestCase(TestCase):
     def test_resolution_token_prefers_height_over_format_note(self):
         self.source.media_format = '{resolution}.{ext}'
 
-        def build_metadata(video_format_note):
-            return json.dumps({
-                'title': 'Test',
-                'fulltitle': 'Test',
-                'upload_date': '20240317',
-                'duration': 1,
-                'uploader': 'u',
-                'epoch': 1,
-                'formats': [
-                    {
-                        'format_id': '399',
-                        'format_note': video_format_note,
-                        'format': f'399 - {video_format_note}',
-                        'height': 1080,
-                        'width': 1920,
-                        'vcodec': 'vp9',
-                        'acodec': 'none',
-                        'fps': 50,
-                        'tbr': 1000,
-                    },
-                    {
-                        'format_id': '251',
-                        'format_note': 'audio',
-                        'format': '251 - audio',
-                        'height': None,
-                        'width': None,
-                        'vcodec': 'none',
-                        'acodec': 'opus',
-                        'abr': 128,
-                        'asr': 48000,
-                    },
-                ],
-            })
+        def create_media(key, metadata_key, downloaded_fields=None):
+            downloaded_fields = downloaded_fields or dict()
+            media = Media(key=key, source=self.source, **downloaded_fields)
+            metadata_dict = media.metadata_loads(all_test_metadata[metadata_key])
+            media.metadata = media.metadata_dumps(metadata_dict)
+            media.save()
+            return media
 
-        media_50fps = Media.objects.create(
-            key='test50fps',
-            source=self.source,
-            metadata=build_metadata('1080p50'),
-        )
+        media_50fps = create_media('test50fps', 'issue499_1080p50')
         self.assertEqual(media_50fps.format_dict['resolution'], '1080p')
         self.assertEqual(media_50fps.filename, '1080p.mkv')
 
-        media_premium = Media.objects.create(
-            key='testpremium',
-            source=self.source,
-            metadata=build_metadata('premium'),
-        )
+        media_premium = create_media('testpremium', 'issue499_premium')
         self.assertEqual(media_premium.format_dict['resolution'], '1080p')
         self.assertEqual(media_premium.filename, '1080p.mkv')
 
-        downloaded_premium = Media.objects.create(
-            key='downloadedpremium',
-            source=self.source,
-            metadata=build_metadata('premium'),
-            downloaded=True,
-            download_date=timezone.now(),
-            downloaded_format='PREMIUM',
-            downloaded_height=1080,
-            downloaded_width=1920,
-            downloaded_audio_codec='opus',
-            downloaded_video_codec='vp9',
-            downloaded_container='mkv',
-            downloaded_fps=50,
-            downloaded_hdr=False,
-            downloaded_filesize=123,
+        downloaded_premium = create_media(
+            'downloadedpremium',
+            'issue499_premium',
+            downloaded_fields=dict(
+                downloaded=True,
+                download_date=timezone.now(),
+                downloaded_format='PREMIUM',
+                downloaded_height=1080,
+                downloaded_width=1920,
+                downloaded_audio_codec='opus',
+                downloaded_video_codec='vp9',
+                downloaded_container='mkv',
+                downloaded_fps=50,
+                downloaded_hdr=False,
+                downloaded_filesize=123,
+            ),
         )
         downloaded_premium.downloaded = True
         self.assertEqual(downloaded_premium.format_dict['resolution'], '1080p')
