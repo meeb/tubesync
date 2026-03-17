@@ -45,26 +45,16 @@ class DatabaseConnectionError(Exception):
 
 
 class BgTaskWorkerError(Exception):
-    '''
-        Raised when the worker process is not in a normal working state.
-    '''
+    # Raised when the worker process is not in a normal working state.
     pass
 
 
 class HueyConsumerError(Exception):
-    '''
-        Raised when the consumer process is not in a normal working state.
-    '''
+    # Raised when the consumer process is not in a normal working state.
     pass
 
 
 class FormatUnavailableError(Exception):
-    '''
-        Raised when a specific format is unavailable.
-
-        :param exc: The underlying exception that caused the format to be unavailable.
-        :param format: The unavailable format.
-    '''
     def __init__(self, *args, exc=None, format=None, **kwargs):
         self.exc = exc
         self.format = format
@@ -72,13 +62,9 @@ class FormatUnavailableError(Exception):
 
 
 class QuerySetEmptyError(Exception):
-    '''
-        Raised when a primary key was missing when iterating a query set.
-
-        :param exc: The underlying exception that caused the query set to be empty.
-        :param key: The missing primary key.
-    '''
+    # Raised when a primary key was missing when iterating a query set.
     def __init__(self, *args, exc=None, key=None, **kwargs):
         self.exc = exc
         self.key = key
         super().__init__(*args, **kwargs)
+
