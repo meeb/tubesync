@@ -6,14 +6,26 @@ from django.db import connection, models, transaction
 from django.utils import timezone
 
 from ..json import JSONEncoder
+
 # from common.json import JSONEncoder
 from ..utils import is_empty_iterator
-#from common.utils import is_empty_iterator
+
+# from common.utils import is_empty_iterator
+
 
 # cls = TaskHistory
 # TaskHistory is defined below this function in this file
-def th_schedule(cls, task_wrapper, /, *args, remove_duplicates=False, vn_args=(), vn_fmt=None, **kwargs):
-    assert vn_fmt is not None, 'vn_fmt is required'
+def th_schedule(
+    cls,
+    task_wrapper,
+    /,
+    *args,
+    remove_duplicates=False,
+    vn_args=(),
+    vn_fmt=None,
+    **kwargs,
+):
+    assert vn_fmt is not None, "vn_fmt is required"
     if vn_fmt is None:
         return False
     defaults = dict(
@@ -22,30 +34,33 @@ def th_schedule(cls, task_wrapper, /, *args, remove_duplicates=False, vn_args=()
         verbose_name=str(vn_fmt).format(*vn_args),
     )
     # support using the delay setting from the decorator
-    if not ('delay' in kwargs or 'eta' in kwargs):
-        kwargs['delay'] = task_wrapper.settings.get('delay') or int()
+    if not ("delay" in kwargs or "eta" in kwargs):
+        kwargs["delay"] = task_wrapper.settings.get("delay") or int()
     task_obj = task_wrapper.s(*args, **kwargs)
     task_id = str(task_obj.id)
     scheduled_at = task_wrapper.huey.scheduled_at_from_task(task_obj)
     if scheduled_at:
-        defaults['scheduled_at'] = scheduled_at
-    defaults['end_at'] = timezone.datetime.now(timezone.timezone.utc)
-    defaults['name'] = f'{task_obj.__module__}.{task_obj.name}'
-    defaults['priority'] = task_obj.priority
-    defaults['task_params'] = list((
-        list(task_obj.args),
-        repr(task_obj.kwargs),
-    ))
+        defaults["scheduled_at"] = scheduled_at
+    defaults["end_at"] = timezone.datetime.now(timezone.timezone.utc)
+    defaults["name"] = f"{task_obj.__module__}.{task_obj.name}"
+    defaults["priority"] = task_obj.priority
+    defaults["task_params"] = list(
+        (
+            list(task_obj.args),
+            repr(task_obj.kwargs),
+        )
+    )
     cls.objects.update_or_create(
         task_id=task_id,
         defaults=defaults,
         create_defaults={
-            'task_id': task_id,
+            "task_id": task_id,
             **defaults,
         },
     )
     task_wrapper.huey.enqueue(task_obj)
     return True
+
 
 # self = TaskHistoryQuerySet
 # TaskHistoryQuerySet is defined below this function in this file
@@ -76,13 +91,16 @@ def thqs_from_huey_ids(self, /, huey_task_ids):
             except (ValueError, TypeError, AttributeError):
                 # Skip malformed IDs and log for troubleshooting
                 from common.logger import log
+
                 log.warning(f"Skipping malformed Huey task ID: {tid}")
                 continue
 
     with transaction.atomic():
         with connection.cursor() as cursor:
             # Stage 1: Store and normalize input IDs
-            cursor.execute(f"CREATE TEMPORARY TABLE {input_tmp} (tid VARCHAR(40) PRIMARY KEY)")
+            cursor.execute(
+                f"CREATE TEMPORARY TABLE {input_tmp} (tid VARCHAR(40) PRIMARY KEY)"
+            )
 
             # Single iteration: ensures dashed strings and lowercase for case-sensitive DBs
             # Batch stream
@@ -124,9 +142,9 @@ class TaskHistoryQuerySet(models.QuerySet):
         if now is None:
             now = timezone.now()
         qs = self.filter(
-            start_at=models.F('end_at'),
-            scheduled_at__lte=models.F('end_at'),
-        ).order_by('end_at')
+            start_at=models.F("end_at"),
+            scheduled_at__lte=models.F("end_at"),
+        ).order_by("end_at")
         if within:
             if not isinstance(within, timedelta):
                 within = timedelta(seconds=within)
@@ -203,7 +221,9 @@ class TaskHistory(models.Model):
 
     @classmethod
     def schedule(cls, task_wrapper, /, *args, vn_args=(), vn_fmt=None, **kwargs):
-        return th_schedule(cls, task_wrapper, *args, vn_fmt=vn_fmt, vn_args=vn_args, **kwargs)
+        return th_schedule(
+            cls, task_wrapper, *args, vn_fmt=vn_fmt, vn_args=vn_args, **kwargs
+        )
 
     def save(self, *args, **kwargs):
         self.queue = self.queue or None
@@ -217,9 +237,7 @@ class TaskHistory(models.Model):
         return bool(self.last_error)
 
     def __str__(self):
-        return u'{} - {}'.format(
+        return "{} - {}".format(
             self.verbose_name or self.name,
             self.end_at,
         )
-
-

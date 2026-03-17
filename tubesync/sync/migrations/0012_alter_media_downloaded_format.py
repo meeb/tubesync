@@ -6,13 +6,19 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0011_auto_20220201_1654'),
+        ("sync", "0011_auto_20220201_1654"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='media',
-            name='downloaded_format',
-            field=models.CharField(blank=True, help_text='Video format (resolution) of the downloaded media', max_length=30, null=True, verbose_name='downloaded format'),
+            model_name="media",
+            name="downloaded_format",
+            field=models.CharField(
+                blank=True,
+                help_text="Video format (resolution) of the downloaded media",
+                max_length=30,
+                null=True,
+                verbose_name="downloaded format",
+            ),
         ),
     ]

@@ -6,13 +6,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0020_auto_20231024_1825'),
+        ("sync", "0020_auto_20231024_1825"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='source',
-            name='copy_channel_images',
-            field=models.BooleanField(default=False, help_text='Copy channel banner and avatar. These may be detected and used by some media servers', verbose_name='copy channel images'),
+            model_name="source",
+            name="copy_channel_images",
+            field=models.BooleanField(
+                default=False,
+                help_text="Copy channel banner and avatar. These may be detected and used by some media servers",
+                verbose_name="copy channel images",
+            ),
         ),
     ]

@@ -7,13 +7,17 @@ import sync.fields
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0016_auto_20230214_2052'),
+        ("sync", "0016_auto_20230214_2052"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='source',
-            name='sponsorblock_categories',
-            field=sync.fields.CommaSepChoiceField(default='all', help_text='Select the sponsorblocks you want to enforce', separator=''),
+            model_name="source",
+            name="sponsorblock_categories",
+            field=sync.fields.CommaSepChoiceField(
+                default="all",
+                help_text="Select the sponsorblocks you want to enforce",
+                separator="",
+            ),
         ),
     ]

@@ -4,35 +4,46 @@ import django.utils.timezone
 import sync.fields
 from django.db import migrations, models
 
+
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0033_alter_mediaserver_options_alter_source_source_acodec_and_more'),
+        ("sync", "0033_alter_mediaserver_options_alter_source_source_acodec_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='source',
-            name='target_schedule',
+            model_name="source",
+            name="target_schedule",
             field=models.DateTimeField(
-                blank=True, db_index=True, default=django.utils.timezone.now,
-                help_text='Date and time when the task to index the source should begin',
-                verbose_name='target schedule',
+                blank=True,
+                db_index=True,
+                default=django.utils.timezone.now,
+                help_text="Date and time when the task to index the source should begin",
+                verbose_name="target schedule",
             ),
         ),
         migrations.AlterField(
-            model_name='source',
-            name='sponsorblock_categories',
+            model_name="source",
+            name="sponsorblock_categories",
             field=sync.fields.CommaSepChoiceField(
-                all_choice='all', all_label='(All Categories)', allow_all=True, default='all',
-                help_text='Select the SponsorBlock categories that you wish to be removed from downloaded videos.',
-                max_length=128, possible_choices=[
-                    ('sponsor', 'Sponsor'), ('intro', 'Intermission/Intro Animation'), ('outro', 'Endcards/Credits'),
-                    ('selfpromo', 'Unpaid/Self Promotion'), ('preview', 'Preview/Recap'), ('filler', 'Filler Tangent'),
-                    ('interaction', 'Interaction Reminder'), ('music_offtopic', 'Non-Music Section'),
+                all_choice="all",
+                all_label="(All Categories)",
+                allow_all=True,
+                default="all",
+                help_text="Select the SponsorBlock categories that you wish to be removed from downloaded videos.",
+                max_length=128,
+                possible_choices=[
+                    ("sponsor", "Sponsor"),
+                    ("intro", "Intermission/Intro Animation"),
+                    ("outro", "Endcards/Credits"),
+                    ("selfpromo", "Unpaid/Self Promotion"),
+                    ("preview", "Preview/Recap"),
+                    ("filler", "Filler Tangent"),
+                    ("interaction", "Interaction Reminder"),
+                    ("music_offtopic", "Non-Music Section"),
                 ],
-                verbose_name='removed categories',
+                verbose_name="removed categories",
             ),
         ),
     ]
-

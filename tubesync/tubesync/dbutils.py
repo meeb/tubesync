@@ -7,16 +7,16 @@ def patch_ensure_connection():
     for name, config in settings.DATABASES.items():
 
         # Don't patch for PostgreSQL, it doesn't need it and can cause issues
-        if config['ENGINE'] == 'django.db.backends.postgresql':
+        if config["ENGINE"] == "django.db.backends.postgresql":
             continue
 
-        module = importlib.import_module(config['ENGINE'] + '.base')
+        module = importlib.import_module(config["ENGINE"] + ".base")
 
         def ensure_connection(self):
             if self.connection is not None:
                 try:
                     with CursorWrapper(self.create_cursor(), self) as cursor:
-                        cursor.execute('SELECT 1;')
+                        cursor.execute("SELECT 1;")
                     return
                 except Exception:
                     pass

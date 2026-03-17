@@ -6,23 +6,40 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0023_media_duration_filter'),
+        ("sync", "0023_media_duration_filter"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='media',
-            name='manual_skip',
-            field=models.BooleanField(db_index=True, default=False, help_text='Media marked as "skipped", won\'t be downloaded', verbose_name='manual_skip'),
+            model_name="media",
+            name="manual_skip",
+            field=models.BooleanField(
+                db_index=True,
+                default=False,
+                help_text='Media marked as "skipped", won\'t be downloaded',
+                verbose_name="manual_skip",
+            ),
         ),
         migrations.AlterField(
-            model_name='media',
-            name='title',
-            field=models.CharField(blank=True, default='', help_text='Video title', max_length=200, verbose_name='title'),
+            model_name="media",
+            name="title",
+            field=models.CharField(
+                blank=True,
+                default="",
+                help_text="Video title",
+                max_length=200,
+                verbose_name="title",
+            ),
         ),
         migrations.AlterField(
-            model_name='source',
-            name='filter_text',
-            field=models.CharField(blank=True, default='', help_text='Regex compatible filter string for video titles', max_length=200, verbose_name='filter string'),
+            model_name="source",
+            name="filter_text",
+            field=models.CharField(
+                blank=True,
+                default="",
+                help_text="Regex compatible filter string for video titles",
+                max_length=200,
+                verbose_name="filter string",
+            ),
         ),
     ]

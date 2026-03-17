@@ -7,28 +7,53 @@ import sync.fields
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0015_auto_20230213_0603'),
+        ("sync", "0015_auto_20230213_0603"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='source',
-            name='embed_metadata',
-            field=models.BooleanField(default=False, help_text='Embed metadata from source into file', verbose_name='embed metadata'),
+            model_name="source",
+            name="embed_metadata",
+            field=models.BooleanField(
+                default=False,
+                help_text="Embed metadata from source into file",
+                verbose_name="embed metadata",
+            ),
         ),
         migrations.AddField(
-            model_name='source',
-            name='embed_thumbnail',
-            field=models.BooleanField(default=False, help_text='Embed thumbnail into the file', verbose_name='embed thumbnail'),
+            model_name="source",
+            name="embed_thumbnail",
+            field=models.BooleanField(
+                default=False,
+                help_text="Embed thumbnail into the file",
+                verbose_name="embed thumbnail",
+            ),
         ),
         migrations.AddField(
-            model_name='source',
-            name='enable_sponsorblock',
-            field=models.BooleanField(default=True, help_text='Use SponsorBlock?', verbose_name='enable sponsorblock'),
+            model_name="source",
+            name="enable_sponsorblock",
+            field=models.BooleanField(
+                default=True,
+                help_text="Use SponsorBlock?",
+                verbose_name="enable sponsorblock",
+            ),
         ),
         migrations.AddField(
-            model_name='source',
-            name='sponsorblock_categories',
-            field=sync.fields.CommaSepChoiceField(default='all', possible_choices=(('all', 'All'), ('sponsor', 'Sponsor'), ('intro', 'Intermission/Intro Animation'), ('outro', 'Endcards/Credits'), ('selfpromo', 'Unpaid/Self Promotion'), ('preview', 'Preview/Recap'), ('filler', 'Filler Tangent'), ('interaction', 'Interaction Reminder'), ('music_offtopic', 'Non-Music Section'))),
+            model_name="source",
+            name="sponsorblock_categories",
+            field=sync.fields.CommaSepChoiceField(
+                default="all",
+                possible_choices=(
+                    ("all", "All"),
+                    ("sponsor", "Sponsor"),
+                    ("intro", "Intermission/Intro Animation"),
+                    ("outro", "Endcards/Credits"),
+                    ("selfpromo", "Unpaid/Self Promotion"),
+                    ("preview", "Preview/Recap"),
+                    ("filler", "Filler Tangent"),
+                    ("interaction", "Interaction Reminder"),
+                    ("music_offtopic", "Non-Music Section"),
+                ),
+            ),
         ),
     ]

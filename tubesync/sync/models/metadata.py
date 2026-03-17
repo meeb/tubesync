@@ -9,32 +9,37 @@ from .media import Media, Source
 
 
 class Metadata(db.models.Model):
-    '''
-        Metadata for an indexed `Media` item.
-    '''
+    """
+    Metadata for an indexed `Media` item.
+    """
+
     class Meta:
-        db_table = 'sync_media_metadata'
-        verbose_name = _('Metadata about Media')
-        verbose_name_plural = _('Metadata about Media')
+        db_table = "sync_media_metadata"
+        verbose_name = _("Metadata about Media")
+        verbose_name_plural = _("Metadata about Media")
         unique_together = (
-            ('media', 'site', 'key'),
-            ('source', 'site', 'key', ),
+            ("media", "site", "key"),
+            (
+                "source",
+                "site",
+                "key",
+            ),
         )
         get_latest_by = ["-retrieved", "-created"]
 
     uuid = db.models.UUIDField(
-        _('uuid'),
+        _("uuid"),
         primary_key=True,
         editable=False,
         default=uuid.uuid4,
-        help_text=_('UUID of the metadata'),
+        help_text=_("UUID of the metadata"),
     )
     source = db.models.ForeignKey(
         Source,
         on_delete=db.models.CASCADE,
         related_name="videos",
         related_query_name="video",
-        help_text=_('Source from which the video was retrieved'),
+        help_text=_("Source from which the video was retrieved"),
         blank=True,
         null=True,
     )
@@ -42,76 +47,79 @@ class Metadata(db.models.Model):
         Media,
         # on_delete=models.DO_NOTHING,
         on_delete=db.models.SET_NULL,
-        related_name='new_metadata',
-        help_text=_('Media the metadata belongs to'),
+        related_name="new_metadata",
+        help_text=_("Media the metadata belongs to"),
         blank=True,
         null=True,
         parent_link=False,
     )
     site = db.models.CharField(
-        _('site'),
+        _("site"),
         max_length=256,
         blank=True,
         db_index=True,
         null=False,
-        default='Youtube',
-        help_text=_('Site from which the metadata was retrieved'),
+        default="Youtube",
+        help_text=_("Site from which the metadata was retrieved"),
     )
     key = db.models.CharField(
-        _('key'),
+        _("key"),
         max_length=256,
         blank=True,
         db_index=True,
         null=False,
-        default='',
-        help_text=_('Media identifier at the site from which the metadata was retrieved'),
+        default="",
+        help_text=_(
+            "Media identifier at the site from which the metadata was retrieved"
+        ),
     )
     created = db.models.DateTimeField(
-        _('created'),
+        _("created"),
         auto_now_add=True,
         db_index=True,
-        help_text=_('Date and time the metadata was created'),
+        help_text=_("Date and time the metadata was created"),
     )
     retrieved = db.models.DateTimeField(
-        _('retrieved'),
+        _("retrieved"),
         db_index=True,
         default=timezone.now,
-        help_text=_('Date and time the metadata was retrieved'),
+        help_text=_("Date and time the metadata was retrieved"),
     )
     uploaded = db.models.DateTimeField(
-        _('uploaded'),
+        _("uploaded"),
         db_index=True,
         null=True,
-        help_text=_('Date and time the media was uploaded'),
+        help_text=_("Date and time the media was uploaded"),
     )
     published = db.models.DateTimeField(
-        _('published'),
+        _("published"),
         db_index=True,
         null=True,
-        help_text=_('Date and time the media was published'),
+        help_text=_("Date and time the media was published"),
     )
     value = db.models.JSONField(
-        _('value'),
+        _("value"),
         encoder=JSONEncoder,
         null=False,
         default=dict,
-        help_text=_('JSON metadata object'),
+        help_text=_("JSON metadata object"),
     )
-
 
     def __str__(self):
         template = '"{}" from {} at: {}'
         return template.format(
             self.key,
             self.site,
-            self.retrieved.isoformat(timespec='seconds'),
+            self.retrieved.isoformat(timespec="seconds"),
         )
 
     @db.transaction.atomic(durable=False)
     def ingest_formats(self, formats=list(), /):
         number = 0
         for number, format in enumerate(formats, start=1):
-            mdf, created = self.format.get_or_create(site=self.site, key=self.key, number=number)
+            mdf, created = self.format.get_or_create(
+                site=self.site, key=self.key, number=number
+            )
             mdf.value = format
             mdf.save()
         if number > 0:
@@ -120,8 +128,8 @@ class Metadata(db.models.Model):
 
     @property
     def with_formats(self):
-        formats = self.format.all().order_by('number')
-        formats_list = [ f.value for f in qs_gen(formats) ]
+        formats = self.format.all().order_by("number")
+        formats_list = [f.value for f in qs_gen(formats)]
         metadata = self.value.copy()
         metadata.update(dict(formats=formats_list))
         return metadata
@@ -131,27 +139,37 @@ class Metadata(db.models.Model):
         assert isinstance(data, dict), type(data)
 
         try:
-            self.retrieved = timestamp_to_datetime(
-                self.media.get_metadata_first_value(
-                    'epoch',
-                    arg_dict=data,
+            self.retrieved = (
+                timestamp_to_datetime(
+                    self.media.get_metadata_first_value(
+                        "epoch",
+                        arg_dict=data,
+                    )
                 )
-            ) or self.created
+                or self.created
+            )
         except AssertionError:
             self.retrieved = self.created
 
         try:
-            self.published = timestamp_to_datetime(
-                self.media.get_metadata_first_value(
-                    ('release_timestamp', 'timestamp',),
-                    arg_dict=data,
+            self.published = (
+                timestamp_to_datetime(
+                    self.media.get_metadata_first_value(
+                        (
+                            "release_timestamp",
+                            "timestamp",
+                        ),
+                        arg_dict=data,
+                    )
                 )
-            ) or self.media.published or self.retrieved
+                or self.media.published
+                or self.retrieved
+            )
         except AssertionError:
             self.published = self.media.published or self.retrieved
 
-        self.value = data.copy() # try not to have side-effects for the caller
-        formats_key = self.media.get_metadata_field('formats')
+        self.value = data.copy()  # try not to have side-effects for the caller
+        formats_key = self.media.get_metadata_field("formats")
         formats = self.value.pop(formats_key, list())
         self.uploaded = min(
             self.published,
@@ -162,4 +180,3 @@ class Metadata(db.models.Model):
         self.ingest_formats(formats)
 
         return self.with_formats
-

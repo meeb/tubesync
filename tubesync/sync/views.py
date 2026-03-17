@@ -4,10 +4,20 @@ from base64 import b64decode
 import pathlib
 import sys
 from django.conf import settings
-from django.http import FileResponse, Http404, HttpResponseNotFound, HttpResponseRedirect
+from django.http import (
+    FileResponse,
+    Http404,
+    HttpResponseNotFound,
+    HttpResponseRedirect,
+)
 from django.views.generic import TemplateView, ListView, DetailView
-from django.views.generic.edit import (FormView, FormMixin, CreateView, UpdateView,
-                                       DeleteView)
+from django.views.generic.edit import (
+    FormView,
+    FormMixin,
+    CreateView,
+    UpdateView,
+    DeleteView,
+)
 from django.views.generic.detail import SingleObjectMixin
 from django.core.exceptions import SuspiciousFileOperation
 from django.http import HttpResponse
@@ -26,25 +36,45 @@ from django_huey import DJANGO_HUEY, get_queue
 from common.huey import h_q_reset_tasks
 from common.logger import log
 from .models import Source, Media, MediaServer, Metadata
-from .forms import (ValidateSourceForm, ConfirmDeleteSourceForm, RedownloadMediaForm,
-                    SkipMediaForm, EnableMediaForm, ResetTasksForm, ScheduleTaskForm,
-                    ConfirmDeleteMediaServerForm, SourceForm)
+from .forms import (
+    ValidateSourceForm,
+    ConfirmDeleteSourceForm,
+    RedownloadMediaForm,
+    SkipMediaForm,
+    EnableMediaForm,
+    ResetTasksForm,
+    ScheduleTaskForm,
+    ConfirmDeleteMediaServerForm,
+    SourceForm,
+)
 from .utils import delete_file, validate_url
 from .tasks import (
-    map_task_to_instance, get_error_message,
-    get_running_tasks, get_media_download_task, get_source_completed_tasks,
-    check_source_directory_exists, index_source, download_media_image, download_media_file,
+    map_task_to_instance,
+    get_error_message,
+    get_running_tasks,
+    get_media_download_task,
+    get_source_completed_tasks,
+    check_source_directory_exists,
+    index_source,
+    download_media_image,
+    download_media_file,
     refresh_formats,
 )
-from .choices import (Val, MediaServerType, SourceResolution, IndexSchedule,
-                        YouTube_SourceType, youtube_long_source_types,
-                        youtube_validation_urls)
-from . import signals # noqa
+from .choices import (
+    Val,
+    MediaServerType,
+    SourceResolution,
+    IndexSchedule,
+    YouTube_SourceType,
+    youtube_long_source_types,
+    youtube_validation_urls,
+)
+from . import signals  # noqa
 from . import youtube
 
 
 def get_waiting_tasks():
-    huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+    huey_queue_names = (DJANGO_HUEY or {}).get("queues", {})
     huey_queues = list(map(get_queue, huey_queue_names))
 
     # Fast Guard: Check counts across all Huey queues
@@ -55,7 +85,7 @@ def get_waiting_tasks():
         # Stream pending tasks
         for task in queue.pending():
             yield str(task.id)
-            
+
         # Stream scheduled tasks
         for task in queue.scheduled():
             yield str(task.id)
@@ -68,89 +98,98 @@ def get_waiting_tasks():
                     seen.add(tid)
                     yield tid
         seen.clear()
-            
+
     huey_task_ids = deduplicating_id_generator()
     return TaskHistory.objects.from_huey_ids(huey_task_ids)
 
 
 class DashboardView(TemplateView):
-    '''
-        The dashboard shows non-interactive totals and summaries.
-    '''
+    """
+    The dashboard shows non-interactive totals and summaries.
+    """
 
-    template_name = 'sync/dashboard.html'
+    template_name = "sync/dashboard.html"
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        data['now'] = timezone.now()
+        data["now"] = timezone.now()
         # Sources
-        data['num_sources'] = Source.objects.all().count()
-        data['num_video_sources'] = Source.objects.filter(
+        data["num_sources"] = Source.objects.all().count()
+        data["num_video_sources"] = Source.objects.filter(
             ~Q(source_resolution=Val(SourceResolution.AUDIO))
         ).count()
-        data['num_audio_sources'] = data['num_sources'] - data['num_video_sources']
-        data['num_failed_sources'] = Source.objects.filter(has_failed=True).count()
+        data["num_audio_sources"] = data["num_sources"] - data["num_video_sources"]
+        data["num_failed_sources"] = Source.objects.filter(has_failed=True).count()
         # Media
-        data['num_media'] = Media.objects.all().count()
-        data['num_downloaded_media'] = Media.objects.filter(downloaded=True).count()
+        data["num_media"] = Media.objects.all().count()
+        data["num_downloaded_media"] = Media.objects.filter(downloaded=True).count()
         # Tasks
         completed_qs = TaskHistory.objects.filter(
             start_at__isnull=False,
-            end_at__gt=F('start_at'),
+            end_at__gt=F("start_at"),
         )
         waiting_qs = get_waiting_tasks()
-        data['num_tasks'] = waiting_qs.count()
-        data['num_completed_tasks'] = completed_qs.count()
+        data["num_tasks"] = waiting_qs.count()
+        data["num_completed_tasks"] = completed_qs.count()
         # Disk usage
-        disk_usage = Media.objects.filter(
-            downloaded=True, downloaded_filesize__isnull=False
-        ).defer('metadata').aggregate(Sum('downloaded_filesize'))
-        data['disk_usage_bytes'] = disk_usage['downloaded_filesize__sum']
-        if not data['disk_usage_bytes']:
-            data['disk_usage_bytes'] = 0
-        if data['disk_usage_bytes'] and data['num_downloaded_media']:
-            data['average_bytes_per_media'] = round(data['disk_usage_bytes'] /
-                                                    data['num_downloaded_media'])
+        disk_usage = (
+            Media.objects.filter(downloaded=True, downloaded_filesize__isnull=False)
+            .defer("metadata")
+            .aggregate(Sum("downloaded_filesize"))
+        )
+        data["disk_usage_bytes"] = disk_usage["downloaded_filesize__sum"]
+        if not data["disk_usage_bytes"]:
+            data["disk_usage_bytes"] = 0
+        if data["disk_usage_bytes"] and data["num_downloaded_media"]:
+            data["average_bytes_per_media"] = round(
+                data["disk_usage_bytes"] / data["num_downloaded_media"]
+            )
         else:
-            data['average_bytes_per_media'] = 0
+            data["average_bytes_per_media"] = 0
         # Latest downloads
-        data['latest_downloads'] = Media.objects.filter(
-            downloaded=True,
-            download_date__isnull=False,
-            downloaded_filesize__isnull=False,
-        ).defer('metadata').order_by('-download_date')[:10]
+        data["latest_downloads"] = (
+            Media.objects.filter(
+                downloaded=True,
+                download_date__isnull=False,
+                downloaded_filesize__isnull=False,
+            )
+            .defer("metadata")
+            .order_by("-download_date")[:10]
+        )
         # Largest downloads
-        data['largest_downloads'] = Media.objects.filter(
-            downloaded=True, downloaded_filesize__isnull=False
-        ).defer('metadata').order_by('-downloaded_filesize')[:10]
+        data["largest_downloads"] = (
+            Media.objects.filter(downloaded=True, downloaded_filesize__isnull=False)
+            .defer("metadata")
+            .order_by("-downloaded_filesize")[:10]
+        )
         # UID and GID
-        data['uid'] = os.getuid()
-        data['gid'] = os.getgid()
+        data["uid"] = os.getuid()
+        data["gid"] = os.getgid()
         # Config and download locations
-        data['config_dir'] = str(settings.CONFIG_BASE_DIR)
-        data['downloads_dir'] = str(settings.DOWNLOAD_ROOT)
-        data['database_connection'] = settings.DATABASE_CONNECTION_STR
+        data["config_dir"] = str(settings.CONFIG_BASE_DIR)
+        data["downloads_dir"] = str(settings.DOWNLOAD_ROOT)
+        data["database_connection"] = settings.DATABASE_CONNECTION_STR
         # Add the database filesize when using db.sqlite3
-        data['database_filesize'] = None
-        if 'sqlite' == connection.vendor:
-            db_name = str(connection.get_connection_params().get('database', ''))
-            db_path = pathlib.Path(db_name) if '/' == db_name[0] else None
+        data["database_filesize"] = None
+        if "sqlite" == connection.vendor:
+            db_name = str(connection.get_connection_params().get("database", ""))
+            db_path = pathlib.Path(db_name) if "/" == db_name[0] else None
             if db_path:
-                data['database_filesize'] = db_path.stat().st_size
+                data["database_filesize"] = db_path.stat().st_size
         return data
 
 
 class SourcesView(ListView):
-    '''
-        A bare list of the sources which have been created with their states.
-    '''
+    """
+    A bare list of the sources which have been created with their states.
+    """
 
-    template_name = 'sync/sources.html'
-    context_object_name = 'sources'
+    template_name = "sync/sources.html"
+    context_object_name = "sources"
     paginate_by = settings.SOURCES_PER_PAGE
     messages = {
-        'source-deleted': _('Your selected source has been deleted.'),
-        'source-refreshed': _('The source has been scheduled to be synced now.')
+        "source-deleted": _("Your selected source has been deleted."),
+        "source-refreshed": _("The source has been scheduled to be synced now."),
     }
 
     def get(self, *args, **kwargs):
@@ -166,8 +205,8 @@ class SourcesView(ListView):
                 vn_fmt=_('Index media from source "{}" once'),
                 vn_args=(source.name,),
             )
-            url = reverse_lazy('sync:sources')
-            url = append_uri_params(url, {'message': 'source-refreshed'})
+            url = reverse_lazy("sync:sources")
+            url = append_uri_params(url, {"message": "source-refreshed"})
             return HttpResponseRedirect(url)
         else:
             return super().get(self, *args, **kwargs)
@@ -177,54 +216,54 @@ class SourcesView(ListView):
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
-        message_key = request.GET.get('message', '')
-        self.message = self.messages.get(message_key, '')
+        message_key = request.GET.get("message", "")
+        self.message = self.messages.get(message_key, "")
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        all_sources = Source.objects.all().order_by('name')
+        all_sources = Source.objects.all().order_by("name")
         return all_sources.annotate(
-            media_count=Count('media_source'),
-            downloaded_count=Count(Case(When(media_source__downloaded=True, then=1)))
+            media_count=Count("media_source"),
+            downloaded_count=Count(Case(When(media_source__downloaded=True, then=1))),
         )
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        data['message'] = self.message
+        data["message"] = self.message
         return data
 
 
 class ValidateSourceView(FormView):
-    '''
-        Validate a URL and prepopulate a create source view form with confirmed
-        accurate data. The aim here is to streamline onboarding of new sources
-        which otherwise may not be entirely obvious to add, such as the "key"
-        being just a playlist ID or some other reasonably opaque internals.
-    '''
+    """
+    Validate a URL and prepopulate a create source view form with confirmed
+    accurate data. The aim here is to streamline onboarding of new sources
+    which otherwise may not be entirely obvious to add, such as the "key"
+    being just a playlist ID or some other reasonably opaque internals.
+    """
 
-    template_name = 'sync/source-validate.html'
+    template_name = "sync/source-validate.html"
     form_class = ValidateSourceForm
     errors = {
-        'invalid_url': _('That URL does not match any supported formats.'),
+        "invalid_url": _("That URL does not match any supported formats."),
     }
     source_types = youtube_long_source_types
     validation_urls = youtube_validation_urls
     prepopulate_fields = {
-        Val(YouTube_SourceType.CHANNEL): ('source_type', 'key', 'name', 'directory'),
-        Val(YouTube_SourceType.CHANNEL_ID): ('source_type', 'key'),
-        Val(YouTube_SourceType.PLAYLIST): ('source_type', 'key'),
+        Val(YouTube_SourceType.CHANNEL): ("source_type", "key", "name", "directory"),
+        Val(YouTube_SourceType.CHANNEL_ID): ("source_type", "key"),
+        Val(YouTube_SourceType.PLAYLIST): ("source_type", "key"),
     }
 
     def __init__(self, *args, **kwargs):
-        self.source_type_str = ''
+        self.source_type_str = ""
         self.source_type = None
-        self.key = ''
+        self.key = ""
         super().__init__(*args, **kwargs)
 
     def form_valid(self, form):
         # Perform extra validation on the URL, we need to extract the channel name or
         # playlist ID and check they are valid
-        source_url = form.cleaned_data['source_url']
+        source_url = form.cleaned_data["source_url"]
         for source_type in YouTube_SourceType.values:
             validation_url = self.validation_urls.get(source_type)
             try:
@@ -238,30 +277,27 @@ class ValidateSourceView(FormView):
             except ValidationError:
                 continue
         # Source type wasn't detected - presumably it's not a valid URL
-        form.add_error('source_url', ValidationError(self.errors['invalid_url']))
+        form.add_error("source_url", ValidationError(self.errors["invalid_url"]))
         return super().form_invalid(form)
 
     def get_success_url(self):
-        url = reverse_lazy('sync:add-source')
+        url = reverse_lazy("sync:add-source")
         fields_to_populate = self.prepopulate_fields.get(self.source_type)
         fields = {}
         value = self.key
         use_channel_id = (
-            'youtube-channel' == self.source_type_str and
-            '@' == self.key[0]
+            "youtube-channel" == self.source_type_str and "@" == self.key[0]
         )
         if use_channel_id:
             old_key = self.key
             old_source_type = self.source_type
             old_source_type_str = self.source_type_str
 
-            self.source_type_str = 'youtube-channel-id'
+            self.source_type_str = "youtube-channel-id"
             self.source_type = self.source_types.get(self.source_type_str, None)
-            index_url = Source.create_index_url(self.source_type, self.key, 'videos')
+            index_url = Source.create_index_url(self.source_type, self.key, "videos")
             try:
-                self.key = youtube.get_channel_id(
-                    index_url.replace('/channel/', '/')
-                )
+                self.key = youtube.get_channel_id(index_url.replace("/channel/", "/"))
             except youtube.YouTubeError:
                 # It did not work, revert to previous behavior
                 self.key = old_key
@@ -269,11 +305,11 @@ class ValidateSourceView(FormView):
                 self.source_type_str = old_source_type_str
 
         for field in fields_to_populate:
-            if field == 'source_type':
+            if field == "source_type":
                 fields[field] = self.source_type
-            elif field == 'key':
+            elif field == "key":
                 fields[field] = self.key
-            elif field in ('name', 'directory'):
+            elif field in ("name", "directory"):
                 fields[field] = value
         return append_uri_params(url, fields)
 
@@ -282,11 +318,15 @@ class EditSourceMixin:
     model = Source
     form_class = SourceForm
     errors = {
-        'invalid_media_format': _('Invalid media format, the media format contains '
-                                  'errors or is empty. Check the table at the end of '
-                                  'this page for valid media name variables'),
-        'dir_outside_dlroot': _('You cannot specify a directory outside of the '
-                                'base directory (%BASEDIR%)')
+        "invalid_media_format": _(
+            "Invalid media format, the media format contains "
+            "errors or is empty. Check the table at the end of "
+            "this page for valid media name variables"
+        ),
+        "dir_outside_dlroot": _(
+            "You cannot specify a directory outside of the "
+            "base directory (%BASEDIR%)"
+        ),
     }
 
     def form_valid(self, form: Form):
@@ -294,25 +334,24 @@ class EditSourceMixin:
         obj = form.save(commit=False)
         # temporarily use media_format from the form
         saved_media_format = obj.media_format
-        obj.media_format = form.cleaned_data['media_format']
+        obj.media_format = form.cleaned_data["media_format"]
         example_media_file = obj.get_example_media_format()
         obj.media_format = saved_media_format
 
-        if '' == example_media_file:
+        if "" == example_media_file:
             form.add_error(
-                'media_format',
-                ValidationError(self.errors['invalid_media_format'])
+                "media_format", ValidationError(self.errors["invalid_media_format"])
             )
 
         # Check for suspicious file path(s)
         try:
-            targetCheck = form.cleaned_data['directory'] + '/.virt'
+            targetCheck = form.cleaned_data["directory"] + "/.virt"
             safe_join(settings.DOWNLOAD_ROOT, targetCheck)
         except SuspiciousFileOperation:
             form.add_error(
-                'directory',
+                "directory",
                 ValidationError(
-                    self.errors['dir_outside_dlroot'].replace(
+                    self.errors["dir_outside_dlroot"].replace(
                         "%BASEDIR%", str(settings.DOWNLOAD_ROOT)
                     )
                 ),
@@ -325,12 +364,12 @@ class EditSourceMixin:
 
 
 class AddSourceView(EditSourceMixin, CreateView):
-    '''
-        Adds a new source, optionally takes some initial data querystring values to
-        prepopulate some of the more unclear values.
-    '''
+    """
+    Adds a new source, optionally takes some initial data querystring values to
+    prepopulate some of the more unclear values.
+    """
 
-    template_name = 'sync/source-add.html'
+    template_name = "sync/source-add.html"
 
     def __init__(self, *args, **kwargs):
         self.prepopulated_data = {}
@@ -338,47 +377,50 @@ class AddSourceView(EditSourceMixin, CreateView):
 
     def dispatch(self, request, *args, **kwargs):
         # Inject the adjustable media format default
-        self.prepopulated_data['media_format'] = getattr(
-            settings, 'MEDIA_FORMATSTR', settings.MEDIA_FORMATSTR_DEFAULT
+        self.prepopulated_data["media_format"] = getattr(
+            settings, "MEDIA_FORMATSTR", settings.MEDIA_FORMATSTR_DEFAULT
         )
-        source_type = request.GET.get('source_type', '')
+        source_type = request.GET.get("source_type", "")
         if source_type and source_type in YouTube_SourceType.values:
-            self.prepopulated_data['source_type'] = source_type
-        key = request.GET.get('key', '')
+            self.prepopulated_data["source_type"] = source_type
+        key = request.GET.get("key", "")
         if key:
-            self.prepopulated_data['key'] = key.strip()
-        name = request.GET.get('name', '')
+            self.prepopulated_data["key"] = key.strip()
+        name = request.GET.get("name", "")
         if name:
-            self.prepopulated_data['name'] = slugify(name)
-        directory = request.GET.get('directory', '')
+            self.prepopulated_data["name"] = slugify(name)
+        directory = request.GET.get("directory", "")
         if directory:
-            self.prepopulated_data['directory'] = slugify(directory)
+            self.prepopulated_data["directory"] = slugify(directory)
         return super().dispatch(request, *args, **kwargs)
 
     def get_initial(self):
         initial = super().get_initial()
-        initial['target_schedule'] = timezone.now().replace(
-            second=0, microsecond=0,
+        initial["target_schedule"] = timezone.now().replace(
+            second=0,
+            microsecond=0,
         )
         for k, v in self.prepopulated_data.items():
             initial[k] = v
         return initial
 
     def get_success_url(self):
-        url = reverse_lazy('sync:source', kwargs={'pk': self.object.pk})
-        return append_uri_params(url, {'message': 'source-created'})
+        url = reverse_lazy("sync:source", kwargs={"pk": self.object.pk})
+        return append_uri_params(url, {"message": "source-created"})
 
 
 class SourceView(DetailView):
 
-    template_name = 'sync/source.html'
+    template_name = "sync/source.html"
     model = Source
     messages = {
-        'source-created': _('Your new source has been created. If you have added a '
-                            'very large source such as a channel with hundreds of '
-                            'videos it can take several minutes or up to an hour '
-                            'for media to start to appear.'),
-        'source-updated': _('Your source has been updated.'),
+        "source-created": _(
+            "Your new source has been created. If you have added a "
+            "very large source such as a channel with hundreds of "
+            "videos it can take several minutes or up to an hour "
+            "for media to start to appear."
+        ),
+        "source-updated": _("Your source has been updated."),
     }
 
     def __init__(self, *args, **kwargs):
@@ -386,47 +428,51 @@ class SourceView(DetailView):
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
-        message_key = request.GET.get('message', '')
-        self.message = self.messages.get(message_key, '')
+        message_key = request.GET.get("message", "")
+        self.message = self.messages.get(message_key, "")
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        data['message'] = self.message
-        data['errors'] = []
+        data["message"] = self.message
+        data["errors"] = []
         for error in get_source_completed_tasks(self.object.pk, only_errors=True):
             error_message = get_error_message(error)
-            setattr(error, 'error_message', error_message)
-            data['errors'].append(error)
-        data['media'] = Media.objects.filter(source=self.object).order_by('-published').defer('metadata')
+            setattr(error, "error_message", error_message)
+            data["errors"].append(error)
+        data["media"] = (
+            Media.objects.filter(source=self.object)
+            .order_by("-published")
+            .defer("metadata")
+        )
         return data
 
 
 class UpdateSourceView(EditSourceMixin, UpdateView):
 
-    template_name = 'sync/source-update.html'
+    template_name = "sync/source-update.html"
 
     def get_initial(self):
         initial = super().get_initial()
-        when = getattr(self.object, 'target_schedule') or timezone.now()
-        initial['target_schedule'] = when.replace(second=0, microsecond=0)
+        when = getattr(self.object, "target_schedule") or timezone.now()
+        initial["target_schedule"] = when.replace(second=0, microsecond=0)
         return initial
 
     def get_success_url(self):
-        url = reverse_lazy('sync:source', kwargs={'pk': self.object.pk})
-        return append_uri_params(url, {'message': 'source-updated'})
+        url = reverse_lazy("sync:source", kwargs={"pk": self.object.pk})
+        return append_uri_params(url, {"message": "source-updated"})
 
 
 class DeleteSourceView(DeleteView, FormMixin):
-    '''
-        Confirm the deletion of a source with an option to delete all the media
-        associated with the source from disk when the source is deleted.
-    '''
+    """
+    Confirm the deletion of a source with an option to delete all the media
+    associated with the source from disk when the source is deleted.
+    """
 
-    template_name = 'sync/source-delete.html'
+    template_name = "sync/source-delete.html"
     model = Source
     form_class = ConfirmDeleteSourceForm
-    context_object_name = 'source'
+    context_object_name = "source"
 
     def post(self, request, *args, **kwargs):
         source = self.get_object()
@@ -439,20 +485,22 @@ class DeleteSourceView(DeleteView, FormMixin):
             filter_text=str(source.pk),
             target_schedule=source.target_schedule or timezone.now(),
         )
-        copy_fields = set(map(lambda f: f.name, source._meta.fields)) - set(media_source.keys())
+        copy_fields = set(map(lambda f: f.name, source._meta.fields)) - set(
+            media_source.keys()
+        )
         for k, v in source.__dict__.items():
             if k in copy_fields:
                 media_source[k] = v
         media_source = Source(**media_source)
-        delete_media_val = request.POST.get('delete_media', False)
+        delete_media_val = request.POST.get("delete_media", False)
         delete_media = True if delete_media_val is not False else False
         # overload this boolean for our own use
         media_source.delete_removed_media = delete_media
         # adjust the directory and key on the source to be deleted
-        source.directory = source.directory + '/deleted'
-        source.key = source.key + '/deleted'
-        source.name = f'[Deleting] {source.name}'
-        source.save(update_fields={'directory', 'key', 'name'})
+        source.directory = source.directory + "/deleted"
+        source.key = source.key + "/deleted"
+        source.name = f"[Deleting] {source.name}"
+        source.save(update_fields={"directory", "key", "name"})
         source.refresh_from_db()
         # save the new media source now that it is not a duplicate
         media_source.uuid = None
@@ -463,24 +511,24 @@ class DeleteSourceView(DeleteView, FormMixin):
         if delete_media:
             directory_path = pathlib.Path(media_source.directory_path)
             mkdir_p(directory_path)
-            (directory_path / '.to_be_removed').touch(exist_ok=True)
+            (directory_path / ".to_be_removed").touch(exist_ok=True)
         return super().post(request, *args, **kwargs)
 
     def get_success_url(self):
-        url = reverse_lazy('sync:sources')
-        return append_uri_params(url, {'message': 'source-deleted'})
+        url = reverse_lazy("sync:sources")
+        return append_uri_params(url, {"message": "source-deleted"})
 
 
 class MediaView(ListView):
-    '''
-        A bare list of media added with their states.
-    '''
+    """
+    A bare list of media added with their states.
+    """
 
-    template_name = 'sync/media.html'
-    context_object_name = 'media'
+    template_name = "sync/media.html"
+    context_object_name = "media"
     paginate_by = settings.MEDIA_PER_PAGE
     messages = {
-        'filter': _('Viewing media filtered for source: <strong>{name}</strong>'),
+        "filter": _("Viewing media filtered for source: <strong>{name}</strong>"),
     }
 
     def __init__(self, *args, **kwargs):
@@ -495,28 +543,38 @@ class MediaView(ListView):
     def dispatch(self, request, *args, **kwargs):
         def is_active(arg, /):
             return str(arg).strip().lower() in (
-                'enable', 'enabled', 'on', 'true', 'yes', '1',
+                "enable",
+                "enabled",
+                "on",
+                "true",
+                "yes",
+                "1",
             )
+
         def post_or_get(request, /, key, default=None):
             return request.POST.get(key) or request.GET.get(key) or default
 
-        filter_by = post_or_get(request, 'filter', '')
+        filter_by = post_or_get(request, "filter", "")
         if filter_by:
             try:
                 self.filter_source = Source.objects.get(pk=filter_by)
             except Source.DoesNotExist:
                 self.filter_source = None
-        show_skipped = post_or_get(request, 'show_skipped', '')
+        show_skipped = post_or_get(request, "show_skipped", "")
         if is_active(show_skipped):
             self.show_skipped = True
-        only_skipped = post_or_get(request, 'only_skipped', '')
+        only_skipped = post_or_get(request, "only_skipped", "")
         if is_active(only_skipped):
             self.only_skipped = True
-        self.query = post_or_get(request, 'query')
-        self.search_description = is_active(post_or_get(request, 'search_description'))
-        self.sp = post_or_get(request, 'sp')
-        if self.sp not in ('combined', 'union', 'or',):
-            self.sp = 'or'
+        self.query = post_or_get(request, "query")
+        self.search_description = is_active(post_or_get(request, "search_description"))
+        self.sp = post_or_get(request, "sp")
+        if self.sp not in (
+            "combined",
+            "union",
+            "or",
+        ):
+            self.sp = "or"
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -527,39 +585,46 @@ class MediaView(ListView):
         if self.filter_source:
             q = q.filter(source=self.filter_source)
         m_q = q
-        if needle and 'combined' == self.sp:
+        if needle and "combined" == self.sp:
             if self.search_description:
                 q = q.filter(
-                    Q(new_metadata__value__description__icontains=needle) |
-                    Q(key__contains=needle) |
-                    Q(title__icontains=needle) |
-                    Q(new_metadata__value__fulltitle__icontains=needle)
+                    Q(new_metadata__value__description__icontains=needle)
+                    | Q(key__contains=needle)
+                    | Q(title__icontains=needle)
+                    | Q(new_metadata__value__fulltitle__icontains=needle)
                 )
             else:
                 q = q.filter(
-                    Q(key__contains=needle) |
-                    Q(title__icontains=needle) |
-                    Q(new_metadata__value__fulltitle__icontains=needle)
+                    Q(key__contains=needle)
+                    | Q(title__icontains=needle)
+                    | Q(new_metadata__value__fulltitle__icontains=needle)
                 )
         elif needle:
             md_q = md_qs.filter(
-                Q(media__in=m_q) &
-                (
-                    Q(key__contains=needle) |
-                    Q(media__title__icontains=needle) |
-                    Q(value__fulltitle__icontains=needle)
+                Q(media__in=m_q)
+                & (
+                    Q(key__contains=needle)
+                    | Q(media__title__icontains=needle)
+                    | Q(value__fulltitle__icontains=needle)
                 )
-            ).only('pk')
-            if 'union' == self.sp:
+            ).only("pk")
+            if "union" == self.sp:
                 if self.search_description:
-                    q = q.union(m_q.filter(new_metadata__value__description__icontains=needle).only('pk'))
+                    q = q.union(
+                        m_q.filter(
+                            new_metadata__value__description__icontains=needle
+                        ).only("pk")
+                    )
                     # We need to be able to filter again, even after using union
-                    q = m_q.filter(pk__in=q.only('pk'))
+                    q = m_q.filter(pk__in=q.only("pk"))
                 else:
                     q = m_q.filter(new_metadata__in=md_q)
             else:
                 if self.search_description:
-                    q = m_q.filter(Q(new_metadata__value__description__icontains=needle) | Q(new_metadata__in=md_q))
+                    q = m_q.filter(
+                        Q(new_metadata__value__description__icontains=needle)
+                        | Q(new_metadata__in=md_q)
+                    )
                 else:
                     q = m_q.filter(new_metadata__in=md_q)
         if self.only_skipped:
@@ -567,29 +632,29 @@ class MediaView(ListView):
         elif not self.show_skipped:
             q = q.filter(Q(can_download=True) & Q(skip=False) & Q(manual_skip=False))
 
-        return q.order_by('-published', '-created')
+        return q.order_by("-published", "-created")
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        data['message'] = ''
-        data['source'] = None
+        data["message"] = ""
+        data["source"] = None
         if self.filter_source:
-            message = str(self.messages.get('filter', ''))
-            data['message'] = message.format(name=self.filter_source.name)
-            data['source'] = self.filter_source
-        data['show_skipped'] = self.show_skipped
-        data['only_skipped'] = self.only_skipped
-        data['query'] = self.query or str()
-        data['search_description'] = self.search_description
+            message = str(self.messages.get("filter", ""))
+            data["message"] = message.format(name=self.filter_source.name)
+            data["source"] = self.filter_source
+        data["show_skipped"] = self.show_skipped
+        data["only_skipped"] = self.only_skipped
+        data["query"] = self.query or str()
+        data["search_description"] = self.search_description
         return data
 
 
 class MediaThumbView(DetailView):
-    '''
-        Shows a media thumbnail. Whitenoise doesn't support post-start media image
-        serving and the images here are pretty small so just serve them manually. This
-        isn't fast, but it's not likely to be a serious bottleneck.
-    '''
+    """
+    Shows a media thumbnail. Whitenoise doesn't support post-start media image
+    serving and the images here are pretty small so just serve them manually. This
+    isn't fast, but it's not likely to be a serious bottleneck.
+    """
 
     model = Media
 
@@ -601,31 +666,32 @@ class MediaThumbView(DetailView):
         if media.thumb_file_exists:
             thumb_path = pathlib.Path(media.thumb.path)
             thumb = thumb_path.read_bytes()
-            content_type = 'image/jpeg'
+            content_type = "image/jpeg"
         else:
             # No thumbnail on disk, return a blank 1x1 gif
-            thumb = b64decode('R0lGODlhAQABAIABAP///wAAACH5BAEKAAEALAA'
-                              'AAAABAAEAAAICTAEAOw==')
-            content_type = 'image/gif'
+            thumb = b64decode(
+                "R0lGODlhAQABAIABAP///wAAACH5BAEKAAEALAA" "AAAABAAEAAAICTAEAOw=="
+            )
+            content_type = "image/gif"
             max_age = 600
         response = HttpResponse(thumb, content_type=content_type)
 
-        response['Cache-Control'] = f'public, max-age={max_age}'
+        response["Cache-Control"] = f"public, max-age={max_age}"
         return response
 
 
 class MediaItemView(DetailView):
-    '''
-        A single media item overview page.
-    '''
+    """
+    A single media item overview page.
+    """
 
-    template_name = 'sync/media-item.html'
+    template_name = "sync/media-item.html"
     model = Media
     messages = {
-        'thumbnail': _('Thumbnail has been scheduled to redownload'),
-        'redownloading': _('Media file has been deleted and scheduled to redownload'),
-        'skipped': _('Media file has been deleted and marked to never download'),
-        'enabled': _('Media has been re-enabled and will be downloaded'),
+        "thumbnail": _("Thumbnail has been scheduled to redownload"),
+        "redownloading": _("Media file has been deleted and scheduled to redownload"),
+        "skipped": _("Media file has been deleted and marked to never download"),
+        "enabled": _("Media has been re-enabled and will be downloaded"),
     }
 
     def __init__(self, *args, **kwargs):
@@ -633,38 +699,42 @@ class MediaItemView(DetailView):
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
-        message_key = request.GET.get('message', '')
-        self.message = self.messages.get(message_key, '')
+        message_key = request.GET.get("message", "")
+        self.message = self.messages.get(message_key, "")
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        data['message'] = self.message
+        data["message"] = self.message
         combined_exact, combined_format = self.object.get_best_combined_format()
         audio_exact, audio_format = self.object.get_best_audio_format()
         video_exact, video_format = self.object.get_best_video_format()
-        data['combined_format_dict'] = {'id': str(combined_format)}
-        data['audio_format_dict'] = {'id': str(audio_format)}
-        data['video_format_dict'] = {'id': str(video_format)}
-        context_keys = { k for k in data.keys() if k.endswith('_format_dict') }
+        data["combined_format_dict"] = {"id": str(combined_format)}
+        data["audio_format_dict"] = {"id": str(audio_format)}
+        data["video_format_dict"] = {"id": str(video_format)}
+        context_keys = {k for k in data.keys() if k.endswith("_format_dict")}
         for fmt in self.object.iter_formats():
             for k in context_keys:
                 v = data[k]
-                if v.get('id') == fmt.get('id'):
+                if v.get("id") == fmt.get("id"):
                     data[k] = fmt
         task = get_media_download_task(self.object.pk)
-        data['task'] = task
-        data['download_state'] = self.object.get_download_state(task)
-        data['download_state_icon'] = self.object.get_download_state_icon(task)
-        data['combined_exact'] = combined_exact
-        data['combined_format'] = combined_format
-        data['audio_exact'] = audio_exact
-        data['audio_format'] = audio_format
-        data['video_exact'] = video_exact
-        data['video_format'] = video_format
-        data['youtube_dl_format'] = self.object.get_format_str()
-        data['filename_path'] = pathlib.Path(self.object.filename)
-        data['media_file_path'] = pathlib.Path(self.object.media_file.path) if self.object.media_file else None
+        data["task"] = task
+        data["download_state"] = self.object.get_download_state(task)
+        data["download_state_icon"] = self.object.get_download_state_icon(task)
+        data["combined_exact"] = combined_exact
+        data["combined_format"] = combined_format
+        data["audio_exact"] = audio_exact
+        data["audio_format"] = audio_format
+        data["video_exact"] = video_exact
+        data["video_format"] = video_format
+        data["youtube_dl_format"] = self.object.get_format_str()
+        data["filename_path"] = pathlib.Path(self.object.filename)
+        data["media_file_path"] = (
+            pathlib.Path(self.object.media_file.path)
+            if self.object.media_file
+            else None
+        )
         return data
 
     def get(self, *args, **kwargs):
@@ -677,26 +747,26 @@ class MediaItemView(DetailView):
                 download_media_image,
                 str(media.pk),
                 media.thumbnail,
-                priority=1+download_media_image.settings.get('default_priority', 0),
+                priority=1 + download_media_image.settings.get("default_priority", 0),
                 vn_fmt=_('Redownload thumbnail for "{}": {}'),
                 vn_args=(
                     media.key,
                     media.name,
                 ),
             )
-            url = reverse_lazy('sync:media-item', kwargs={'pk': media.pk})
-            url = append_uri_params(url, {'message': 'thumbnail'})
+            url = reverse_lazy("sync:media-item", kwargs={"pk": media.pk})
+            url = append_uri_params(url, {"message": "thumbnail"})
             return HttpResponseRedirect(url)
         else:
             return super().get(self, *args, **kwargs)
 
 
 class MediaRedownloadView(FormView, SingleObjectMixin):
-    '''
-        Confirm that the media file should be deleted and redownloaded.
-    '''
+    """
+    Confirm that the media file should be deleted and redownloaded.
+    """
 
-    template_name = 'sync/media-redownload.html'
+    template_name = "sync/media-redownload.html"
     form_class = RedownloadMediaForm
     model = Media
 
@@ -712,9 +782,9 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
         # Try to download manually, when can_download was true
         media = self.object
         if media.can_download:
-            attempted_key = '_refresh_formats_attempted'
+            attempted_key = "_refresh_formats_attempted"
             media.save_to_metadata(attempted_key, 1)
-            refreshed_key = 'formats_epoch'
+            refreshed_key = "formats_epoch"
             media.save_to_metadata(refreshed_key, 1)
             TaskHistory.schedule(
                 refresh_formats,
@@ -766,16 +836,16 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
         return super().form_valid(form)
 
     def get_success_url(self):
-        url = reverse_lazy('sync:media-item', kwargs={'pk': self.object.pk})
-        return append_uri_params(url, {'message': 'redownloading'})
+        url = reverse_lazy("sync:media-item", kwargs={"pk": self.object.pk})
+        return append_uri_params(url, {"message": "redownloading"})
 
 
 class MediaSkipView(FormView, SingleObjectMixin):
-    '''
-        Confirm that the media file should be deleted and marked to skip.
-    '''
+    """
+    Confirm that the media file should be deleted and marked to skip.
+    """
 
-    template_name = 'sync/media-skip.html'
+    template_name = "sync/media-skip.html"
     form_class = SkipMediaForm
     model = Media
 
@@ -794,7 +864,7 @@ class MediaSkipView(FormView, SingleObjectMixin):
             filepath = self.object.media_file.path
             barefilepath, fileext = os.path.splitext(filepath)
             # Get all files that start with the bare file path
-            all_related_files = glob.glob(f'{barefilepath}.*')
+            all_related_files = glob.glob(f"{barefilepath}.*")
             for file in all_related_files:
                 delete_file(file)
         # Reset all download data
@@ -813,16 +883,16 @@ class MediaSkipView(FormView, SingleObjectMixin):
         return super().form_valid(form)
 
     def get_success_url(self):
-        url = reverse_lazy('sync:media-item', kwargs={'pk': self.object.pk})
-        return append_uri_params(url, {'message': 'skipped'})
+        url = reverse_lazy("sync:media-item", kwargs={"pk": self.object.pk})
+        return append_uri_params(url, {"message": "skipped"})
 
 
 class MediaEnableView(FormView, SingleObjectMixin):
-    '''
-        Confirm that the media item should be re-enabled (marked as unskipped).
-    '''
+    """
+    Confirm that the media item should be re-enabled (marked as unskipped).
+    """
 
-    template_name = 'sync/media-enable.html'
+    template_name = "sync/media-enable.html"
     form_class = EnableMediaForm
     model = Media
 
@@ -842,14 +912,15 @@ class MediaEnableView(FormView, SingleObjectMixin):
         return super().form_valid(form)
 
     def get_success_url(self):
-        url = reverse_lazy('sync:media-item', kwargs={'pk': self.object.pk})
-        return append_uri_params(url, {'message': 'enabled'})
+        url = reverse_lazy("sync:media-item", kwargs={"pk": self.object.pk})
+        return append_uri_params(url, {"message": "enabled"})
 
 
 class MediaContent(DetailView):
-    '''
-        Redirect to nginx to download the file
-    '''
+    """
+    Redirect to nginx to download the file
+    """
+
     model = Media
 
     def __init__(self, *args, **kwargs):
@@ -859,13 +930,13 @@ class MediaContent(DetailView):
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()
         # development direct file stream - DO NOT USE PRODUCTIVLY
-        if settings.DEBUG and 'runserver' in sys.argv:
+        if settings.DEBUG and "runserver" in sys.argv:
             # get media URL
             pth = self.object.media_file.url
             # remove "/media-data/"
-            pth = pth.split("/media-data/",1)[1]
+            pth = pth.split("/media-data/", 1)[1]
             # remove "/" (incase of absolute path)
-            pth = pth.split(str(settings.DOWNLOAD_ROOT).lstrip("/"),1)
+            pth = pth.split(str(settings.DOWNLOAD_ROOT).lstrip("/"), 1)
 
             # if we do not have a "/" at the beginning, it is not a absolute path...
             if len(pth) > 1:
@@ -873,39 +944,38 @@ class MediaContent(DetailView):
             else:
                 pth = pth[0]
 
-
             # build final path
             filepth = pathlib.Path(str(settings.DOWNLOAD_ROOT) + pth)
 
             if filepth.exists():
                 # return file
-                response = FileResponse(open(filepth,'rb'))
+                response = FileResponse(open(filepth, "rb"))
                 return response
             else:
                 return HttpResponseNotFound()
 
         else:
             headers = {
-                'Content-Type': self.object.content_type,
-                'X-Accel-Redirect': self.object.media_file.url,
+                "Content-Type": self.object.content_type,
+                "X-Accel-Redirect": self.object.media_file.url,
             }
             return HttpResponse(headers=headers)
 
 
 class TasksView(ListView):
-    '''
-        A list of tasks queued to be completed. This is, for example, scraping for new
-        media or downloading media.
-    '''
+    """
+    A list of tasks queued to be completed. This is, for example, scraping for new
+    media or downloading media.
+    """
 
-    template_name = 'sync/tasks.html'
-    context_object_name = 'tasks'
+    template_name = "sync/tasks.html"
+    context_object_name = "tasks"
     paginate_by = settings.TASKS_PER_PAGE
     messages = {
-        'filter': _('Viewing tasks filtered for source: <strong>{name}</strong>'),
-        'reset': _('All tasks have been reset'),
-        'revoked': _('Revoked task: {task_id}'),
-        'scheduled': _('Scheduled task: {name}'),
+        "filter": _("Viewing tasks filtered for source: <strong>{name}</strong>"),
+        "reset": _("All tasks have been reset"),
+        "revoked": _("Revoked task: {task_id}"),
+        "scheduled": _("Scheduled task: {name}"),
     }
 
     def __init__(self, *args, **kwargs):
@@ -914,33 +984,31 @@ class TasksView(ListView):
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
-        message_key = request.GET.get('message', '')
-        self.message = self.messages.get(message_key, '')
-        filter_by = request.GET.get('filter', '')
+        message_key = request.GET.get("message", "")
+        self.message = self.messages.get(message_key, "")
+        filter_by = request.GET.get("filter", "")
         if filter_by:
             try:
                 self.filter_source = Source.objects.get(pk=filter_by)
             except Source.DoesNotExist:
                 self.filter_source = None
             else:
-                if not message_key or 'filter' == message_key:
-                    message = self.messages.get('filter', '')
-                    self.message = message.format(
-                        name=self.filter_source.name
-                    )
+                if not message_key or "filter" == message_key:
+                    message = self.messages.get("filter", "")
+                    self.message = message.format(name=self.filter_source.name)
 
-        if message_key in ('revoked', 'scheduled'):
+        if message_key in ("revoked", "scheduled"):
             fmt_vars = dict(
-                pk=request.GET.get('pk', 'Unknown'),
-                task_id=request.GET.get('task_id', 'Unknown'),
+                pk=request.GET.get("pk", "Unknown"),
+                task_id=request.GET.get("task_id", "Unknown"),
             )
             try:
-                task = TaskHistory.objects.get(pk=fmt_vars['pk'])
+                task = TaskHistory.objects.get(pk=fmt_vars["pk"])
             except TaskHistory.DoesNotExist:
-                fmt_vars['name'] = fmt_vars['pk']
+                fmt_vars["name"] = fmt_vars["pk"]
             else:
-                fmt_vars['name'] = task.verbose_name or task.task_id or task.pk
-                fmt_vars['task_id'] = task.task_id
+                fmt_vars["name"] = task.verbose_name or task.task_id or task.pk
+                fmt_vars["task_id"] = task.task_id
             self.message = self.message.format(**fmt_vars)
 
         return super().dispatch(request, *args, **kwargs)
@@ -948,12 +1016,12 @@ class TasksView(ListView):
     def get_queryset(self):
         qs = get_waiting_tasks()
         if self.filter_source:
-            params_prefix=f'[["{self.filter_source.pk}"'
+            params_prefix = f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
         return qs.order_by(
-            '-priority',
-            'scheduled_at',
-            'end_at',
+            "-priority",
+            "scheduled_at",
+            "end_at",
         )
 
     def get_context_data(self, *args, **kwargs):
@@ -963,71 +1031,69 @@ class TasksView(ListView):
         # Huey removes running tasks,
         # so the waiting tasks will not include them.
         running_qs = get_running_tasks(now_dt)
-        errors_qs = scheduled_qs.filter(
-            attempts__gt=0
-        ).exclude(last_error__exact='')
+        errors_qs = scheduled_qs.filter(attempts__gt=0).exclude(last_error__exact="")
 
         # Add to context data from ListView
-        data['message'] = self.message
-        data['source'] = self.filter_source
-        data['running'] = list()
-        data['errors'] = list()
-        data['total_errors'] = errors_qs.count()
-        data['scheduled'] = list()
-        data['total_scheduled'] = scheduled_qs.count()
-        data['wait_for_database_queue'] = False
+        data["message"] = self.message
+        data["source"] = self.filter_source
+        data["running"] = list()
+        data["errors"] = list()
+        data["total_errors"] = errors_qs.count()
+        data["scheduled"] = list()
+        data["total_scheduled"] = scheduled_qs.count()
+        data["wait_for_database_queue"] = False
 
         def add_to_task(task):
-            setattr(task, 'run_now', task.scheduled_at < now_dt)
+            setattr(task, "run_now", task.scheduled_at < now_dt)
             obj, url = map_task_to_instance(task)
             if obj:
-                setattr(task, 'instance', obj)
-                setattr(task, 'url', url)
+                setattr(task, "instance", obj)
+                setattr(task, "url", url)
             if task.has_error():
                 error_message = get_error_message(task)
-                setattr(task, 'error_message', error_message)
-                return 'error'
+                setattr(task, "error_message", error_message)
+                return "error"
             return True and obj
 
         for task in running_qs:
-            if task in data['running']:
-                    continue
+            if task in data["running"]:
+                continue
             add_to_task(task)
-            data['running'].append(task)
+            data["running"].append(task)
 
         # show all the errors when they fit on one page
-        if (data['total_errors'] + len(data['running'])) < self.paginate_by:
+        if (data["total_errors"] + len(data["running"])) < self.paginate_by:
             for task in errors_qs:
-                if task in data['running']:
+                if task in data["running"]:
                     continue
                 mapped = add_to_task(task)
-                if 'error' == mapped:
-                    data['errors'].append(task)
+                if "error" == mapped:
+                    data["errors"].append(task)
                 elif mapped:
-                    data['scheduled'].append(task)
+                    data["scheduled"].append(task)
 
-        for task in data['tasks']:
+        for task in data["tasks"]:
             already_added = (
-                task in data['running'] or
-                task in data['errors'] or
-                task in data['scheduled']
+                task in data["running"]
+                or task in data["errors"]
+                or task in data["scheduled"]
             )
             if already_added:
                 continue
             mapped = add_to_task(task)
-            if 'error' == mapped:
-                data['errors'].append(task)
+            if "error" == mapped:
+                data["errors"].append(task)
             elif mapped or settings.DEBUG:
-                data['scheduled'].append(task)
+                data["scheduled"].append(task)
 
         sort_keys = (
             # key, reverse
-            ('priority', True),
-            ('scheduled_at', False),
-            ('run_now', True),
+            ("priority", True),
+            ("scheduled_at", False),
+            ("run_now", True),
         )
-        data['errors'] = multi_key_sort(data['errors'], sort_keys, attr=True)
-        data['scheduled'] = multi_key_sort(data['scheduled'], sort_keys, attr=True)
+        data["errors"] = multi_key_sort(data["errors"], sort_keys, attr=True)
+        data["scheduled"] = multi_key_sort(data["scheduled"], sort_keys, attr=True)
 
         return data
 
@@ -1047,51 +1113,54 @@ class TasksView(ListView):
             pass
         else:
             if page_number > paginator.num_pages:
-                self.kwargs[page_kwarg] = 'last'
+                self.kwargs[page_kwarg] = "last"
         return super().paginate_queryset(queryset, page_size)
 
     def get(self, *args, **kwargs):
         path = args[0].path
-        if path.startswith('/task/') and path.endswith('/cancel'):
+        if path.startswith("/task/") and path.endswith("/cancel"):
             try:
                 task = TaskHistory.objects.get(pk=kwargs["pk"])
             except TaskHistory.DoesNotExist:
                 return HttpResponseNotFound()
             else:
-                huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
-                huey_queues = { q.name: q for q in map(get_queue, huey_queue_names) }
+                huey_queue_names = (DJANGO_HUEY or {}).get("queues", {})
+                huey_queues = {q.name: q for q in map(get_queue, huey_queue_names)}
                 q = huey_queues.get(task.queue)
                 if q is None:
-                    msg = f'TasksView: queue not found: {task.pk=} {task.queue=}'
+                    msg = f"TasksView: queue not found: {task.pk=} {task.queue=}"
                     log.warning(msg)
                     return HttpResponseNotFound()
                 # revoke the task we want to cancel
                 q.revoke_by_id(id=task.task_id, revoke_once=True)
                 vn = task.verbose_name or task.task_id or task.pk
-                if not vn.startswith('[revoked] '):
-                    task.verbose_name = f'[revoked] {vn}'
+                if not vn.startswith("[revoked] "):
+                    task.verbose_name = f"[revoked] {vn}"
                     task.save()
-                return HttpResponseRedirect(append_uri_params(
-                    reverse_lazy('sync:tasks'),
-                    dict(
-                        message='revoked',
-                        pk=str(task.pk),
-                        task_id=str(task.task_id),
-                    ),
-                ))
+                return HttpResponseRedirect(
+                    append_uri_params(
+                        reverse_lazy("sync:tasks"),
+                        dict(
+                            message="revoked",
+                            pk=str(task.pk),
+                            task_id=str(task.task_id),
+                        ),
+                    )
+                )
         else:
             return super().get(self, *args, **kwargs)
 
-class CompletedTasksView(ListView):
-    '''
-        List of tasks which have been completed with an optional per-source filter.
-    '''
 
-    template_name = 'sync/tasks-completed.html'
-    context_object_name = 'tasks'
+class CompletedTasksView(ListView):
+    """
+    List of tasks which have been completed with an optional per-source filter.
+    """
+
+    template_name = "sync/tasks-completed.html"
+    context_object_name = "tasks"
     paginate_by = settings.TASKS_PER_PAGE
     messages = {
-        'filter': _('Viewing tasks filtered for source: <strong>{name}</strong>'),
+        "filter": _("Viewing tasks filtered for source: <strong>{name}</strong>"),
     }
 
     def __init__(self, *args, **kwargs):
@@ -1099,7 +1168,7 @@ class CompletedTasksView(ListView):
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
-        filter_by = request.GET.get('filter', '')
+        filter_by = request.GET.get("filter", "")
         if filter_by:
             try:
                 self.filter_source = Source.objects.get(pk=filter_by)
@@ -1110,40 +1179,40 @@ class CompletedTasksView(ListView):
     def get_queryset(self):
         qs = TaskHistory.objects.filter(
             start_at__isnull=False,
-            end_at__gt=F('start_at'),
+            end_at__gt=F("start_at"),
         )
         if self.filter_source:
-            params_prefix=f'[["{self.filter_source.pk}"'
+            params_prefix = f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
-        return qs.order_by('-end_at')
+        return qs.order_by("-end_at")
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        for task in data['tasks']:
+        for task in data["tasks"]:
             if task.has_error():
                 error_message = get_error_message(task)
-                setattr(task, 'error_message', error_message)
-        data['message'] = ''
-        data['source'] = self.filter_source
+                setattr(task, "error_message", error_message)
+        data["message"] = ""
+        data["source"] = self.filter_source
         if self.filter_source:
-            message = str(self.messages.get('filter', ''))
-            data['message'] = message.format(name=self.filter_source.name)
+            message = str(self.messages.get("filter", ""))
+            data["message"] = message.format(name=self.filter_source.name)
         return data
 
 
 class ResetTasks(FormView):
-    '''
-        Confirm that all tasks should be reset. As all tasks are triggered from
-        signals by checking for files existing etc. this can be done by just deleting
-        all tasks and then calling every Source objects .save() method.
-    '''
+    """
+    Confirm that all tasks should be reset. As all tasks are triggered from
+    signals by checking for files existing etc. this can be done by just deleting
+    all tasks and then calling every Source objects .save() method.
+    """
 
-    template_name = 'sync/tasks-reset.html'
+    template_name = "sync/tasks-reset.html"
     form_class = ResetTasksForm
 
     def form_valid(self, form):
         # Delete all tasks
-        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+        huey_queue_names = (DJANGO_HUEY or {}).get("queues", {})
         for queue_name in huey_queue_names:
             h_q_reset_tasks(queue_name)
         # Iter all tasks
@@ -1154,22 +1223,22 @@ class ResetTasks(FormView):
         return super().form_valid(form)
 
     def get_success_url(self):
-        url = reverse_lazy('sync:tasks')
-        return append_uri_params(url, {'message': 'reset'})
+        url = reverse_lazy("sync:tasks")
+        return append_uri_params(url, {"message": "reset"})
 
 
 class TaskScheduleView(FormView, SingleObjectMixin):
-    '''
-        Confirm that the task should be re-scheduled.
-    '''
+    """
+    Confirm that the task should be re-scheduled.
+    """
 
-    template_name = 'sync/task-schedule.html'
+    template_name = "sync/task-schedule.html"
     form_class = ScheduleTaskForm
     model = TaskHistory
-    context_object_name = 'task'
+    context_object_name = "task"
     errors = dict(
-        invalid_when=_('The type ({}) was incorrect.'),
-        when_before_now=_('The date and time must be in the future.'),
+        invalid_when=_("The type ({}) was incorrect."),
+        when_before_now=_("The date and time must be in the future."),
     )
 
     def __init__(self, *args, **kwargs):
@@ -1182,7 +1251,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
     def dispatch(self, request, *args, **kwargs):
         self.now = timezone.now()
         self.object = self.get_object()
-        self.timestamp = kwargs.get('timestamp')
+        self.timestamp = kwargs.get("timestamp")
         try:
             self.when = timestamp_to_datetime(self.timestamp)
         except AssertionError:
@@ -1196,42 +1265,42 @@ class TaskScheduleView(FormView, SingleObjectMixin):
 
     def get_initial(self):
         initial = super().get_initial()
-        initial['now'] = self.now
-        initial['when'] = self.when
+        initial["now"] = self.now
+        initial["when"] = self.when
         return initial
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        data['now'] = self.now
-        data['when'] = self.when
+        data["now"] = self.now
+        data["when"] = self.when
         return data
 
     def get_success_url(self):
         return append_uri_params(
-            reverse_lazy('sync:tasks'),
+            reverse_lazy("sync:tasks"),
             dict(
-                message='scheduled',
+                message="scheduled",
                 pk=str(self.object.pk),
                 task_id=str(self.object.task_id),
             ),
         )
 
     def form_valid(self, form):
-        when = form.cleaned_data.get('when')
+        when = form.cleaned_data.get("when")
 
         if not isinstance(when, self.now.__class__):
             form.add_error(
-                'when',
+                "when",
                 ValidationError(
-                    self.errors['invalid_when'].format(
+                    self.errors["invalid_when"].format(
                         type(when),
                     ),
                 ),
             )
         if when < self.now:
             form.add_error(
-                'when',
-                ValidationError(self.errors['when_before_now']),
+                "when",
+                ValidationError(self.errors["when_before_now"]),
             )
 
         if form.errors:
@@ -1240,35 +1309,35 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         pk = self.object.pk
         queue = self.object.queue
         task_id = self.object.task_id
-        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
-        huey_queues = { q.name: q for q in map(get_queue, huey_queue_names) }
+        huey_queue_names = (DJANGO_HUEY or {}).get("queues", {})
+        huey_queues = {q.name: q for q in map(get_queue, huey_queue_names)}
         q = huey_queues.get(queue)
         if q is None:
-            msg = f'TaskScheduleView: queue not found: {pk=} {queue=}'
+            msg = f"TaskScheduleView: queue not found: {pk=} {queue=}"
             log.warning(msg)
         else:
             eta = max(self.now, when)
             if q.reschedule(task_id, eta):
                 vn = self.object.verbose_name or task_id or pk
-                self.object.verbose_name = f'[revoked] {vn}'
+                self.object.verbose_name = f"[revoked] {vn}"
                 self.object.save()
             else:
-                msg = f'TaskScheduleView: task not found: {pk=} {task_id=}'
+                msg = f"TaskScheduleView: task not found: {pk=} {task_id=}"
                 log.warning(msg)
 
         return super().form_valid(form)
 
 
 class MediaServersView(ListView):
-    '''
-        List of media servers which have been added.
-    '''
+    """
+    List of media servers which have been added.
+    """
 
-    template_name = 'sync/mediaservers.html'
-    context_object_name = 'mediaservers'
+    template_name = "sync/mediaservers.html"
+    context_object_name = "mediaservers"
     types_object = MediaServerType
     messages = {
-        'deleted': _('Your selected media server has been deleted.'),
+        "deleted": _("Your selected media server has been deleted."),
     }
 
     def __init__(self, *args, **kwargs):
@@ -1276,27 +1345,27 @@ class MediaServersView(ListView):
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
-        message_key = request.GET.get('message', '')
-        self.message = self.messages.get(message_key, '')
+        message_key = request.GET.get("message", "")
+        self.message = self.messages.get(message_key, "")
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        return MediaServer.objects.all().order_by('host', 'port')
+        return MediaServer.objects.all().order_by("host", "port")
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        data['message'] = self.message
-        data['media_server_types'] = self.types_object.members_list()
+        data["message"] = self.message
+        data["media_server_types"] = self.types_object.members_list()
         return data
 
 
 class AddMediaServerView(FormView):
-    '''
-        Adds a new media server. The form is switched out to whatever matches the
-        server type.
-    '''
+    """
+    Adds a new media server. The form is switched out to whatever matches the
+    server type.
+    """
 
-    template_name = 'sync/mediaserver-add.html'
+    template_name = "sync/mediaserver-add.html"
     server_types = MediaServerType.long_types()
     server_type_names = dict(MediaServerType.choices)
     forms = MediaServerType.forms_dict()
@@ -1308,7 +1377,7 @@ class AddMediaServerView(FormView):
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
-        server_type_str = kwargs.get('server_type', '')
+        server_type_str = kwargs.get("server_type", "")
         self.server_type = self.server_types.get(server_type_str)
         if not self.server_type:
             raise Http404
@@ -1343,8 +1412,10 @@ class AddMediaServerView(FormView):
         except IntegrityError:
             form.add_error(
                 None,
-                (f'A media server already exists with the host and port '
-                 f'{mediaserver.host}:{mediaserver.port}')
+                (
+                    f"A media server already exists with the host and port "
+                    f"{mediaserver.host}:{mediaserver.port}"
+                ),
             )
         # Check if saving caused any errors
         if form.errors:
@@ -1355,27 +1426,27 @@ class AddMediaServerView(FormView):
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        data['server_type'] = self.server_type
-        data['server_type_long'] = self.server_types.get(self.server_type)
-        data['server_type_name'] = self.server_type_names.get(self.server_type)
-        data['server_help'] = self.model_class.get_help_html()
+        data["server_type"] = self.server_type
+        data["server_type_long"] = self.server_types.get(self.server_type)
+        data["server_type_name"] = self.server_type_names.get(self.server_type)
+        data["server_help"] = self.model_class.get_help_html()
         return data
 
     def get_success_url(self):
-        url = reverse_lazy('sync:mediaserver', kwargs={'pk': self.object.pk})
-        return append_uri_params(url, {'message': 'created'})
+        url = reverse_lazy("sync:mediaserver", kwargs={"pk": self.object.pk})
+        return append_uri_params(url, {"message": "created"})
 
 
 class MediaServerView(DetailView):
-    '''
-        A single media server overview page.
-    '''
+    """
+    A single media server overview page.
+    """
 
-    template_name = 'sync/mediaserver.html'
+    template_name = "sync/mediaserver.html"
     model = MediaServer
-    private_options = ('token',)
+    private_options = ("token",)
     messages = {
-        'created': _('Your media server has been successfully added'),
+        "created": _("Your media server has been successfully added"),
     }
 
     def __init__(self, *args, **kwargs):
@@ -1383,39 +1454,39 @@ class MediaServerView(DetailView):
         super().__init__(*args, **kwargs)
 
     def dispatch(self, request, *args, **kwargs):
-        message_key = request.GET.get('message', '')
-        self.message = self.messages.get(message_key, '')
+        message_key = request.GET.get("message", "")
+        self.message = self.messages.get(message_key, "")
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        data['message'] = self.message
-        data['private_options'] = self.private_options
+        data["message"] = self.message
+        data["private_options"] = self.private_options
         return data
 
 
 class DeleteMediaServerView(DeleteView, FormMixin):
-    '''
-        Confirms deletion and then deletes a media server.
-    '''
+    """
+    Confirms deletion and then deletes a media server.
+    """
 
-    template_name = 'sync/mediaserver-delete.html'
+    template_name = "sync/mediaserver-delete.html"
     model = MediaServer
     form_class = ConfirmDeleteMediaServerForm
-    context_object_name = 'mediaserver'
+    context_object_name = "mediaserver"
 
     def get_success_url(self):
-        url = reverse_lazy('sync:mediaservers')
-        return append_uri_params(url, {'message': 'deleted'})
+        url = reverse_lazy("sync:mediaservers")
+        return append_uri_params(url, {"message": "deleted"})
 
 
 class UpdateMediaServerView(FormView, SingleObjectMixin):
-    '''
-        Adds a new media server. The form is switched out to whatever matches the
-        server type.
-    '''
+    """
+    Adds a new media server. The form is switched out to whatever matches the
+    server type.
+    """
 
-    template_name = 'sync/mediaserver-update.html'
+    template_name = "sync/mediaserver-update.html"
     model = MediaServer
     forms = MediaServerType.forms_dict()
 
@@ -1464,8 +1535,10 @@ class UpdateMediaServerView(FormView, SingleObjectMixin):
         except IntegrityError:
             form.add_error(
                 None,
-                (f'A media server already exists with the host and port '
-                 f'{self.object.host}:{self.object.port}')
+                (
+                    f"A media server already exists with the host and port "
+                    f"{self.object.host}:{self.object.port}"
+                ),
             )
         # Check if saving caused any errors
         if form.errors:
@@ -1475,9 +1548,9 @@ class UpdateMediaServerView(FormView, SingleObjectMixin):
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
-        data['server_help'] = self.object.get_help_html
+        data["server_help"] = self.object.get_help_html
         return data
 
     def get_success_url(self):
-        url = reverse_lazy('sync:mediaserver', kwargs={'pk': self.object.pk})
-        return append_uri_params(url, {'message': 'updated'})
+        url = reverse_lazy("sync:mediaserver", kwargs={"pk": self.object.pk})
+        return append_uri_params(url, {"message": "updated"})

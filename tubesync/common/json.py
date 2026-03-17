@@ -7,8 +7,9 @@ class CustomJSONEncoder(DjangoJSONEncoder):
     """
     Custom JSON encoder for handling datetime and LazyList objects.
     """
-    item_separator: str = ','
-    key_separator: str = ':'
+
+    item_separator: str = ","
+    key_separator: str = ":"
 
     def default(self, obj: object) -> object:
         """
@@ -47,4 +48,4 @@ def json_serial(obj: object) -> str:
         return list(obj)
     else:
         # Raise a TypeError for unsupported types
-        raise TypeError(f'Type {type(obj)} is not json_serial()-able')
+        raise TypeError(f"Type {type(obj)} is not json_serial()-able")

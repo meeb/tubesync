@@ -7,7 +7,7 @@ def get_num_workers():
     cpu_workers = multiprocessing.cpu_count() * 2 + 1
     # But default to 3
     try:
-        num_workers = int(os.getenv('GUNICORN_WORKERS', 3))
+        num_workers = int(os.getenv("GUNICORN_WORKERS", 3))
     except ValueError:
         num_workers = cpu_workers
     if 0 < num_workers < cpu_workers:
@@ -17,22 +17,22 @@ def get_num_workers():
 
 
 def get_bind():
-    host = os.getenv('LISTEN_HOST', '127.0.0.1')
-    port = os.getenv('LISTEN_PORT', '8080')
-    return '{}:{}'.format(host, port)
+    host = os.getenv("LISTEN_HOST", "127.0.0.1")
+    port = os.getenv("LISTEN_PORT", "8080")
+    return "{}:{}".format(host, port)
 
 
 workers = get_num_workers()
 timeout = 90
-chdir = '/app'
+chdir = "/app"
 daemon = False
 control_socket_disable = True
-control_socket = '/run/app/gunicorn.ctl'
-pidfile = '/run/app/gunicorn.pid'
-user = 'app'
-group = 'app'
-loglevel = 'info'
-errorlog = '-'
-accesslog = '/dev/null'  # Access logs are printed to stdout from nginx
-django_settings = 'django.settings'
+control_socket = "/run/app/gunicorn.ctl"
+pidfile = "/run/app/gunicorn.pid"
+user = "app"
+group = "app"
+loglevel = "info"
+errorlog = "-"
+accesslog = "/dev/null"  # Access logs are printed to stdout from nginx
+django_settings = "django.settings"
 bind = get_bind()

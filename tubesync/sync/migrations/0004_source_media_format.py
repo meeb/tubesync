@@ -6,13 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0003_source_copy_thumbnails'),
+        ("sync", "0003_source_copy_thumbnails"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='source',
-            name='media_format',
-            field=models.CharField(default='{yyyymmdd}_{source}_{title}_{key}_{format}.{ext}', help_text='File format to use for saving files', max_length=200, verbose_name='media format'),
+            model_name="source",
+            name="media_format",
+            field=models.CharField(
+                default="{yyyymmdd}_{source}_{title}_{key}_{format}.{ext}",
+                help_text="File format to use for saving files",
+                max_length=200,
+                verbose_name="media format",
+            ),
         ),
     ]

@@ -4,13 +4,12 @@ from common.logger import log
 from common.utils import remove_enclosed
 from sync.utils import filter_response
 
-
 progress_hook = {
-    'status': dict(),
+    "status": dict(),
 }
 
 postprocessor_hook = {
-    'status': dict(),
+    "status": dict(),
 }
 
 
@@ -29,7 +28,7 @@ class BaseStatus:
     def __init__(self, hook_status_dict=None):
         self.media_key = None
         self.media_uuid = None
-        self.task_status = '[Started: 0%]'
+        self.task_status = "[Started: 0%]"
         self.task_verbose_name = None
         self._status_dict = hook_status_dict or self.status_dict
         self._registered_keys = set()
@@ -59,14 +58,8 @@ class BaseStatus:
             media = mqs.get(uuid=self.media_uuid)
             task = get_media_download_task(str(media.pk))
         else:
-            mqs = mqs.exclude(
-                skip=True,
-                manual_skip=True,
-                downloaded=True
-            ).filter(
-                source__download_media=True,
-                can_download=True,
-                key=self.media_key
+            mqs = mqs.exclude(skip=True, manual_skip=True, downloaded=True).filter(
+                source__download_media=True, can_download=True, key=self.media_key
             )
             for m in mqs:
                 t = get_media_download_task(str(m.pk))
@@ -82,18 +75,24 @@ class BaseStatus:
                 # clean up any previously prepended task_status
                 # this happened because of duplicated tasks on my test system
                 self.task_verbose_name = remove_enclosed(
-                    task.verbose_name, '[', ']', ' ',
+                    task.verbose_name,
+                    "[",
+                    "]",
+                    " ",
                 )
-            task.verbose_name = f'{self.task_status} {self.task_verbose_name}'
+            task.verbose_name = f"{self.task_status} {self.task_verbose_name}"
             task.save()
 
+
 class ProgressHookStatus(BaseStatus):
-    status_dict = progress_hook['status']
-    valid = frozenset((
-        'downloading',
-        'finished',
-        'error',
-    ))
+    status_dict = progress_hook["status"]
+    valid = frozenset(
+        (
+            "downloading",
+            "finished",
+            "error",
+        )
+    )
 
     def __init__(self, *args, status=None, info_dict={}, filename=None, **kwargs):
         super().__init__(self.status_dict)
@@ -107,15 +106,26 @@ class ProgressHookStatus(BaseStatus):
             return 0
         return 1 + self.download_progress
 
-class PPHookStatus(BaseStatus):
-    status_dict = postprocessor_hook['status']
-    valid = frozenset((
-        'started',
-        'processing',
-        'finished',
-    ))
 
-    def __init__(self, *args, status=None, postprocessor=None, info_dict={}, filename=None, **kwargs):
+class PPHookStatus(BaseStatus):
+    status_dict = postprocessor_hook["status"]
+    valid = frozenset(
+        (
+            "started",
+            "processing",
+            "finished",
+        )
+    )
+
+    def __init__(
+        self,
+        *args,
+        status=None,
+        postprocessor=None,
+        info_dict={},
+        filename=None,
+        **kwargs,
+    ):
         super().__init__(self.status_dict)
         self.filename = filename
         self.info = info_dict
@@ -123,55 +133,58 @@ class PPHookStatus(BaseStatus):
         self.name = postprocessor
         self.status = status
 
+
 def yt_dlp_progress_hook(event):
-    if not ProgressHookStatus.valid_status(event['status']):
-        log.warn(f'[youtube-dl] unknown progress event: {str(event)}')
+    if not ProgressHookStatus.valid_status(event["status"]):
+        log.warn(f"[youtube-dl] unknown progress event: {str(event)}")
         return None
 
     key = None
-    if 'display_id' in event['info_dict']:
-        key = event['info_dict']['display_id']
-    elif 'id' in event['info_dict']:
-        key = event['info_dict']['id']
+    if "display_id" in event["info_dict"]:
+        key = event["info_dict"]["display_id"]
+    elif "id" in event["info_dict"]:
+        key = event["info_dict"]["id"]
 
-    filename = os.path.basename(event.get('filename', '???'))
-    if 'error' == event['status']:
-        log.error(f'[youtube-dl] error occured downloading: {filename}')
-    elif 'downloading' == event['status']:
+    filename = os.path.basename(event.get("filename", "???"))
+    if "error" == event["status"]:
+        log.error(f"[youtube-dl] error occured downloading: {filename}")
+    elif "downloading" == event["status"]:
         # get or create the status for filename
         status = ProgressHookStatus.get(filename)
         if status is None:
             status = ProgressHookStatus(**event)
             status.register(key, filename, status.filename)
 
-        downloaded_bytes = event.get('downloaded_bytes', 0) or 0
-        total_bytes_estimate = event.get('total_bytes_estimate', 0) or 0
-        total_bytes = event.get('total_bytes', 0) or total_bytes_estimate
-        fragment_index = event.get('fragment_index', 0) or 0
-        fragment_count = event.get('fragment_count', 0) or 0
-        eta = event.get('_eta_str', '?').strip()
-        percent_str = event.get('_percent_str', '?').strip()
-        speed = event.get('_speed_str', '?').strip()
-        total = event.get('_total_bytes_str', '?').strip()
+        downloaded_bytes = event.get("downloaded_bytes", 0) or 0
+        total_bytes_estimate = event.get("total_bytes_estimate", 0) or 0
+        total_bytes = event.get("total_bytes", 0) or total_bytes_estimate
+        fragment_index = event.get("fragment_index", 0) or 0
+        fragment_count = event.get("fragment_count", 0) or 0
+        eta = event.get("_eta_str", "?").strip()
+        percent_str = event.get("_percent_str", "?").strip()
+        speed = event.get("_speed_str", "?").strip()
+        total = event.get("_total_bytes_str", "?").strip()
         percent = None
         try:
-            percent = int(float(percent_str.rstrip('%')))
+            percent = int(float(percent_str.rstrip("%")))
         except:
             pass
         if fragment_index >= 0 and fragment_count > 0:
             percent = round(100 * fragment_index / fragment_count)
-            percent_str = f'{percent}%'
+            percent_str = f"{percent}%"
         elif downloaded_bytes >= 0 and total_bytes > 0:
             percent = round(100 * downloaded_bytes / total_bytes)
         if percent and (status.next_progress() < percent) and (0 == percent % 5):
             status.download_progress = percent
             if key:
                 status.media_key = key
-            status.task_status = f'[downloading: {percent_str}]'
+            status.task_status = f"[downloading: {percent_str}]"
             status.update_task()
-            log.info(f'[youtube-dl] downloading: {filename} - {percent_str} '
-                     f'of {total} at {speed}, {eta} remaining')
-    elif 'finished' == event['status']:
+            log.info(
+                f"[youtube-dl] downloading: {filename} - {percent_str} "
+                f"of {total} at {speed}, {eta} remaining"
+            )
+    elif "finished" == event["status"]:
         # update the status for filename to the finished value
         status = ProgressHookStatus.get(filename)
         if status is None:
@@ -179,80 +192,93 @@ def yt_dlp_progress_hook(event):
             status.register(key, filename, status.filename)
         status.download_progress = 100
 
-        total_size_str = event.get('_total_bytes_str', '?').strip()
-        elapsed_str = event.get('_elapsed_str', '?').strip()
-        log.info(f'[youtube-dl] finished downloading: {filename} - '
-                 f'{total_size_str} in {elapsed_str}')
+        total_size_str = event.get("_total_bytes_str", "?").strip()
+        elapsed_str = event.get("_elapsed_str", "?").strip()
+        log.info(
+            f"[youtube-dl] finished downloading: {filename} - "
+            f"{total_size_str} in {elapsed_str}"
+        )
 
         status.cleanup()
 
+
 def yt_dlp_postprocessor_hook(event):
-    if not PPHookStatus.valid_status(event['status']):
-        log.warn(f'[youtube-dl] unknown postprocessor event: {str(event)}')
+    if not PPHookStatus.valid_status(event["status"]):
+        log.warn(f"[youtube-dl] unknown postprocessor event: {str(event)}")
         return None
 
-    name = key = 'Unknown'
-    filename = os.path.basename(event.get('filename', '???'))
-    if 'display_id' in event['info_dict']:
-        key = event['info_dict']['display_id']
-    elif 'id' in event['info_dict']:
-        key = event['info_dict']['id']
+    name = key = "Unknown"
+    filename = os.path.basename(event.get("filename", "???"))
+    if "display_id" in event["info_dict"]:
+        key = event["info_dict"]["display_id"]
+    elif "id" in event["info_dict"]:
+        key = event["info_dict"]["id"]
 
     status = PPHookStatus(**event)
     status.register(key, filename, status.filename)
 
     title = None
-    if 'fulltitle' in event['info_dict']:
-        title = event['info_dict']['fulltitle']
-    elif 'title' in event['info_dict']:
-        title = event['info_dict']['title']
+    if "fulltitle" in event["info_dict"]:
+        title = event["info_dict"]["fulltitle"]
+    elif "title" in event["info_dict"]:
+        title = event["info_dict"]["title"]
 
     if title:
-        name = f'{key}: {title}'
+        name = f"{key}: {title}"
 
     status.media_name = name
 
-    if 'started' == event['status']:
-        remove_keys = frozenset({
-            'formats',
-            'automatic_captions',
-        })
-        logged_dict = filter_response(event['info_dict'], True)
+    if "started" == event["status"]:
+        remove_keys = frozenset(
+            {
+                "formats",
+                "automatic_captions",
+            }
+        )
+        logged_dict = filter_response(event["info_dict"], True)
         found_keys = set(logged_dict.keys()).intersection(remove_keys)
         for key in found_keys:
             del logged_dict[key]
         log.debug(repr(logged_dict))
 
-    if 'Unknown' != key:
+    if "Unknown" != key:
         status.media_key = key
     status.task_status = f'[{event["postprocessor"]}: {event["status"]}]'
     status.update_task()
 
     log.info(f'[{event["postprocessor"]}] {event["status"]} for: {name}')
-    if 'started' == event['status'] and 'Merger' == event['postprocessor']:
-        files_to_merge = event['info_dict'].get('__files_to_merge') or list()
+    if "started" == event["status"] and "Merger" == event["postprocessor"]:
+        files_to_merge = event["info_dict"].get("__files_to_merge") or list()
         log.info(f'[{event["postprocessor"]}] Files to merge: {files_to_merge}')
         from .models import Media
+
         try:
             media = Media.objects.get(pk=status.media_uuid)
-            media.new_metadata.value['requested_formats'] = event['info_dict'].get('requested_formats')
-            media.new_metadata.value['requested_subtitles'] = event['info_dict'].get('requested_subtitles')
+            media.new_metadata.value["requested_formats"] = event["info_dict"].get(
+                "requested_formats"
+            )
+            media.new_metadata.value["requested_subtitles"] = event["info_dict"].get(
+                "requested_subtitles"
+            )
             media.new_metadata.save()
         except Media.DoesNotExist:
             pass
         except Exception as e:
             log.exception(e)
-    if 'finished' == event['status']:
+    if "finished" == event["status"]:
         status.cleanup()
 
 
-progress_hook.update({
-    'class': ProgressHookStatus(),
-    'function': yt_dlp_progress_hook,
-})
+progress_hook.update(
+    {
+        "class": ProgressHookStatus(),
+        "function": yt_dlp_progress_hook,
+    }
+)
 
-postprocessor_hook.update({
-    'class': PPHookStatus(),
-    'function': yt_dlp_postprocessor_hook,
-})
-
+postprocessor_hook.update(
+    {
+        "class": PPHookStatus(),
+        "function": yt_dlp_postprocessor_hook,
+    }
+)

@@ -1,5 +1,5 @@
 """
-    All the logic for filtering media from channels to work out if we should skip downloading it or not
+All the logic for filtering media from channels to work out if we should skip downloading it or not
 """
 
 from common.logger import log
@@ -41,13 +41,14 @@ def filter_media(instance: Media):
 
     # If we aren't already skipping the file, call our custom function that can be overridden
     if not skip and filter_custom(instance):
-        log.info(f"Media: {instance.source} / {instance} has been skipped by Custom Filter")
+        log.info(
+            f"Media: {instance.source} / {instance} has been skipped by Custom Filter"
+        )
         skip = True
         unskip = False
 
     keep_newly_published_video = (
-        is_published and download_kept and
-        not (instance.downloaded or video_too_old)
+        is_published and download_kept and not (instance.downloaded or video_too_old)
     )
 
     # Check if skipping

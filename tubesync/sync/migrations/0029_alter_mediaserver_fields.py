@@ -6,28 +6,47 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0028_alter_source_source_resolution'),
+        ("sync", "0028_alter_source_source_resolution"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='mediaserver',
-            name='options',
-            field=models.TextField(help_text='JSON encoded options for the media server', null=True, verbose_name='options'),
+            model_name="mediaserver",
+            name="options",
+            field=models.TextField(
+                help_text="JSON encoded options for the media server",
+                null=True,
+                verbose_name="options",
+            ),
         ),
         migrations.AlterField(
-            model_name='mediaserver',
-            name='server_type',
-            field=models.CharField(choices=[('j', 'Jellyfin'), ('p', 'Plex')], db_index=True, default='p', help_text='Server type', max_length=1, verbose_name='server type'),
+            model_name="mediaserver",
+            name="server_type",
+            field=models.CharField(
+                choices=[("j", "Jellyfin"), ("p", "Plex")],
+                db_index=True,
+                default="p",
+                help_text="Server type",
+                max_length=1,
+                verbose_name="server type",
+            ),
         ),
         migrations.AlterField(
-            model_name='mediaserver',
-            name='use_https',
-            field=models.BooleanField(default=False, help_text='Connect to the media server over HTTPS', verbose_name='use https'),
+            model_name="mediaserver",
+            name="use_https",
+            field=models.BooleanField(
+                default=False,
+                help_text="Connect to the media server over HTTPS",
+                verbose_name="use https",
+            ),
         ),
         migrations.AlterField(
-            model_name='mediaserver',
-            name='verify_https',
-            field=models.BooleanField(default=True, help_text='If connecting over HTTPS, verify the SSL certificate is valid', verbose_name='verify https'),
+            model_name="mediaserver",
+            name="verify_https",
+            field=models.BooleanField(
+                default=True,
+                help_text="If connecting over HTTPS, verify the SSL certificate is valid",
+                verbose_name="verify https",
+            ),
         ),
     ]

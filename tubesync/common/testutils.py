@@ -1,5 +1,6 @@
 import logging
 
+
 def prevent_request_warnings(original_function: callable) -> callable:
     """
     Suppresses errors from views that raise legitimate errors, such as testing
@@ -12,9 +13,10 @@ def prevent_request_warnings(original_function: callable) -> callable:
     Returns:
         A new function that suppresses request warnings.
     """
+
     def new_function(*args: tuple, **kwargs: dict) -> None:
         # Get the current logger and store its level
-        logger = logging.getLogger('django.request')
+        logger = logging.getLogger("django.request")
         previous_logging_level = logger.getEffectiveLevel()
 
         # Temporarily set the logger level to CRITICAL to suppress warnings

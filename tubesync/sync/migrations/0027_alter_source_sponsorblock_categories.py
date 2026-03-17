@@ -7,13 +7,31 @@ import sync.fields
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0026_alter_source_sub_langs'),
+        ("sync", "0026_alter_source_sub_langs"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='source',
-            name='sponsorblock_categories',
-            field=sync.fields.CommaSepChoiceField(all_choice='all', all_label='(All Categories)', allow_all=True, default='all', help_text='Select the SponsorBlock categories that you wish to be removed from downloaded videos.', max_length=128, possible_choices=[('sponsor', 'Sponsor'), ('intro', 'Intermission/Intro Animation'), ('outro', 'Endcards/Credits'), ('selfpromo', 'Unpaid/Self Promotion'), ('preview', 'Preview/Recap'), ('filler', 'Filler Tangent'), ('interaction', 'Interaction Reminder'), ('music_offtopic', 'Non-Music Section')], verbose_name=''),
+            model_name="source",
+            name="sponsorblock_categories",
+            field=sync.fields.CommaSepChoiceField(
+                all_choice="all",
+                all_label="(All Categories)",
+                allow_all=True,
+                default="all",
+                help_text="Select the SponsorBlock categories that you wish to be removed from downloaded videos.",
+                max_length=128,
+                possible_choices=[
+                    ("sponsor", "Sponsor"),
+                    ("intro", "Intermission/Intro Animation"),
+                    ("outro", "Endcards/Credits"),
+                    ("selfpromo", "Unpaid/Self Promotion"),
+                    ("preview", "Preview/Recap"),
+                    ("filler", "Filler Tangent"),
+                    ("interaction", "Interaction Reminder"),
+                    ("music_offtopic", "Non-Music Section"),
+                ],
+                verbose_name="",
+            ),
         ),
     ]

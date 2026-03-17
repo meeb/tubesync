@@ -16,11 +16,11 @@ import requests
 TIMEOUT: int = 5
 
 # HTTP authentication credentials from environment variables
-HTTP_USER: str = os.getenv('HTTP_USER')
-HTTP_PASS: str = os.getenv('HTTP_PASS')
+HTTP_USER: str = os.getenv("HTTP_USER")
+HTTP_PASS: str = os.getenv("HTTP_PASS")
 
 # Disable proxy for healthcheck requests
-os.environ['no_proxy'] = '*'
+os.environ["no_proxy"] = "*"
 
 
 def do_healthcheck(url: str) -> bool:
@@ -31,7 +31,7 @@ def do_healthcheck(url: str) -> bool:
     :param url: URL to perform the healthcheck on
     :return: True if the healthcheck was successful, False otherwise
     """
-    headers = {'User-Agent': 'healthcheck'}
+    headers = {"User-Agent": "healthcheck"}
     auth = None
     if HTTP_USER and HTTP_PASS:
         auth = (HTTP_USER, HTTP_PASS)
@@ -44,9 +44,9 @@ def do_healthcheck(url: str) -> bool:
         return False
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # If the service is intentionally down, exit immediately
-    if os.path.exists('/run/service/gunicorn/down'):
+    if os.path.exists("/run/service/gunicorn/down"):
         sys.exit(0)
 
     # Check if a URL was provided as a command-line argument

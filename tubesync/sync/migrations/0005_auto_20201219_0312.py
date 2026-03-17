@@ -6,13 +6,24 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0004_source_media_format'),
+        ("sync", "0004_source_media_format"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='source',
-            name='source_type',
-            field=models.CharField(choices=[('c', 'YouTube channel'), ('i', 'YouTube channel by ID'), ('p', 'YouTube playlist')], db_index=True, default='c', help_text='Source type', max_length=1, verbose_name='source type'),
+            model_name="source",
+            name="source_type",
+            field=models.CharField(
+                choices=[
+                    ("c", "YouTube channel"),
+                    ("i", "YouTube channel by ID"),
+                    ("p", "YouTube playlist"),
+                ],
+                db_index=True,
+                default="c",
+                help_text="Source type",
+                max_length=1,
+                verbose_name="source type",
+            ),
         ),
     ]

@@ -1,187 +1,172 @@
 from django.urls import path
-from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceView,
-                    SourceView, UpdateSourceView, DeleteSourceView, MediaView,
-                    MediaThumbView, MediaItemView, MediaRedownloadView, MediaSkipView,
-                    MediaEnableView, MediaContent, TasksView, CompletedTasksView, ResetTasks,
-                    TaskScheduleView, MediaServersView, AddMediaServerView, MediaServerView,
-                    DeleteMediaServerView, UpdateMediaServerView)
+from .views import (
+    DashboardView,
+    SourcesView,
+    ValidateSourceView,
+    AddSourceView,
+    SourceView,
+    UpdateSourceView,
+    DeleteSourceView,
+    MediaView,
+    MediaThumbView,
+    MediaItemView,
+    MediaRedownloadView,
+    MediaSkipView,
+    MediaEnableView,
+    MediaContent,
+    TasksView,
+    CompletedTasksView,
+    ResetTasks,
+    TaskScheduleView,
+    MediaServersView,
+    AddMediaServerView,
+    MediaServerView,
+    DeleteMediaServerView,
+    UpdateMediaServerView,
+)
 
-
-app_name = 'sync'
+app_name = "sync"
 
 
 urlpatterns = [
-
     # Dashboard URLs
-
     path(
-        '',
+        "",
         DashboardView.as_view(),
-        name='dashboard',
+        name="dashboard",
     ),
-
     # Source URLs
-
     path(
-        'sources',
+        "sources",
         SourcesView.as_view(),
-        name='sources',
+        name="sources",
     ),
-
     path(
-        'source-validate',
+        "source-validate",
         ValidateSourceView.as_view(),
-        name='validate-source',
+        name="validate-source",
     ),
-
     path(
-        'source-sync-now/<uuid:pk>',
+        "source-sync-now/<uuid:pk>",
         SourcesView.as_view(),
-        name='source-sync-now',
+        name="source-sync-now",
     ),
-
     path(
-        'source-add',
+        "source-add",
         AddSourceView.as_view(),
-        name='add-source',
+        name="add-source",
     ),
-
     path(
-        'source/<uuid:pk>',
+        "source/<uuid:pk>",
         SourceView.as_view(),
-        name='source',
+        name="source",
     ),
-
     path(
-        'source-update/<uuid:pk>',
+        "source-update/<uuid:pk>",
         UpdateSourceView.as_view(),
-        name='update-source',
+        name="update-source",
     ),
-
     path(
-        'source-delete/<uuid:pk>',
+        "source-delete/<uuid:pk>",
         DeleteSourceView.as_view(),
-        name='delete-source',
+        name="delete-source",
     ),
-
     # Media URLs
-
     path(
-        'media',
+        "media",
         MediaView.as_view(),
-        name='media',
+        name="media",
     ),
-
     path(
-        'media-thumb/<uuid:pk>',
+        "media-thumb/<uuid:pk>",
         MediaThumbView.as_view(),
-        name='media-thumb',
+        name="media-thumb",
     ),
-
     path(
-        'media/<uuid:pk>',
+        "media/<uuid:pk>",
         MediaItemView.as_view(),
-        name='media-item',
+        name="media-item",
     ),
-
     path(
-        'media-redownload/<uuid:pk>',
+        "media-redownload/<uuid:pk>",
         MediaRedownloadView.as_view(),
-        name='redownload-media',
+        name="redownload-media",
     ),
-
     path(
-        'media-thumb-redownload/<uuid:pk>',
+        "media-thumb-redownload/<uuid:pk>",
         MediaItemView.as_view(),
-        name='redownload-thumb',
+        name="redownload-thumb",
     ),
-
     path(
-        'media-skip/<uuid:pk>',
+        "media-skip/<uuid:pk>",
         MediaSkipView.as_view(),
-        name='skip-media',
+        name="skip-media",
     ),
-
     path(
-        'media-enable/<uuid:pk>',
+        "media-enable/<uuid:pk>",
         MediaEnableView.as_view(),
-        name='enable-media',
+        name="enable-media",
     ),
-
     path(
-        'media-content/<uuid:pk>',
+        "media-content/<uuid:pk>",
         MediaContent.as_view(),
-        name='media-content',
+        name="media-content",
     ),
-
     # Task URLs
-
     path(
-        'tasks',
+        "tasks",
         TasksView.as_view(),
-        name='tasks',
+        name="tasks",
     ),
-
     path(
-        'task/<int:pk>/cancel',
+        "task/<int:pk>/cancel",
         TasksView.as_view(),
-        name='revoke-task',
+        name="revoke-task",
     ),
-
     path(
-        'task/<int:pk>/schedule/now',
+        "task/<int:pk>/schedule/now",
         TaskScheduleView.as_view(),
-        name='run-task',
+        name="run-task",
     ),
-
     path(
-        'task/<int:pk>/schedule/<int:timestamp>',
+        "task/<int:pk>/schedule/<int:timestamp>",
         TaskScheduleView.as_view(),
-        name='schedule-task',
+        name="schedule-task",
     ),
-
     path(
-        'tasks-completed',
+        "tasks-completed",
         CompletedTasksView.as_view(),
-        name='tasks-completed',
+        name="tasks-completed",
     ),
-
     path(
-        'tasks-reset',
+        "tasks-reset",
         ResetTasks.as_view(),
-        name='reset-tasks',
+        name="reset-tasks",
     ),
-
     # Media Server URLs
-
     path(
-        'mediaservers',
+        "mediaservers",
         MediaServersView.as_view(),
-        name='mediaservers',
+        name="mediaservers",
     ),
-
     path(
-        'mediaserver-add/<slug:server_type>',
+        "mediaserver-add/<slug:server_type>",
         AddMediaServerView.as_view(),
-        name='add-mediaserver',
+        name="add-mediaserver",
     ),
-
     path(
-        'mediaserver/<int:pk>',
+        "mediaserver/<int:pk>",
         MediaServerView.as_view(),
-        name='mediaserver',
+        name="mediaserver",
     ),
-
     path(
-        'mediaserver-delete/<int:pk>',
+        "mediaserver-delete/<int:pk>",
         DeleteMediaServerView.as_view(),
-        name='delete-mediaserver',
+        name="delete-mediaserver",
     ),
-
     path(
-        'mediaserver-update/<int:pk>',
+        "mediaserver-update/<int:pk>",
         UpdateMediaServerView.as_view(),
-        name='update-mediaserver',
+        name="update-mediaserver",
     ),
-
 ]

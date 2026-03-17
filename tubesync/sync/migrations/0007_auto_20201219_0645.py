@@ -6,13 +6,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0006_source_write_nfo'),
+        ("sync", "0006_source_write_nfo"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='source',
-            name='write_nfo',
-            field=models.BooleanField(default=False, help_text='Write an NFO file in XML with the media info, these may be detected and used by some media servers', verbose_name='write nfo'),
+            model_name="source",
+            name="write_nfo",
+            field=models.BooleanField(
+                default=False,
+                help_text="Write an NFO file in XML with the media info, these may be detected and used by some media servers",
+                verbose_name="write nfo",
+            ),
         ),
     ]

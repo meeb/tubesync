@@ -7,23 +7,44 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0019_add_delete_removed_media'),
+        ("sync", "0019_add_delete_removed_media"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='source',
-            name='filter_text',
-            field=models.CharField(blank=True, default='', help_text='Regex compatible filter string for video titles', max_length=100, verbose_name='filter string'),
+            model_name="source",
+            name="filter_text",
+            field=models.CharField(
+                blank=True,
+                default="",
+                help_text="Regex compatible filter string for video titles",
+                max_length=100,
+                verbose_name="filter string",
+            ),
         ),
         migrations.AlterField(
-            model_name='source',
-            name='auto_subtitles',
-            field=models.BooleanField(default=False, help_text='Accept auto-generated subtitles', verbose_name='accept auto-generated subs'),
+            model_name="source",
+            name="auto_subtitles",
+            field=models.BooleanField(
+                default=False,
+                help_text="Accept auto-generated subtitles",
+                verbose_name="accept auto-generated subs",
+            ),
         ),
         migrations.AlterField(
-            model_name='source',
-            name='sub_langs',
-            field=models.CharField(default='en', help_text='List of subtitles langs to download, comma-separated. Example: en,fr or all,-fr,-live_chat', max_length=30, validators=[django.core.validators.RegexValidator(message='Subtitle langs must be a comma-separated list of langs. example: en,fr or all,-fr,-live_chat', regex='^(\\-?[\\_\\.a-zA-Z]+,)*(\\-?[\\_\\.a-zA-Z]+){1}$')], verbose_name='subs langs'),
+            model_name="source",
+            name="sub_langs",
+            field=models.CharField(
+                default="en",
+                help_text="List of subtitles langs to download, comma-separated. Example: en,fr or all,-fr,-live_chat",
+                max_length=30,
+                validators=[
+                    django.core.validators.RegexValidator(
+                        message="Subtitle langs must be a comma-separated list of langs. example: en,fr or all,-fr,-live_chat",
+                        regex="^(\\-?[\\_\\.a-zA-Z]+,)*(\\-?[\\_\\.a-zA-Z]+){1}$",
+                    )
+                ],
+                verbose_name="subs langs",
+            ),
         ),
     ]

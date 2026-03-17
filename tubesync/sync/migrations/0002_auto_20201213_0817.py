@@ -8,13 +8,23 @@ import sync.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0001_initial'),
+        ("sync", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='media',
-            name='media_file',
-            field=models.FileField(blank=True, help_text='Media file', max_length=200, null=True, storage=django.core.files.storage.FileSystemStorage(location='/downloads'), upload_to=sync.models.get_media_file_path, verbose_name='media file'),
+            model_name="media",
+            name="media_file",
+            field=models.FileField(
+                blank=True,
+                help_text="Media file",
+                max_length=200,
+                null=True,
+                storage=django.core.files.storage.FileSystemStorage(
+                    location="/downloads"
+                ),
+                upload_to=sync.models.get_media_file_path,
+                verbose_name="media file",
+            ),
         ),
     ]

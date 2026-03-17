@@ -6,14 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('common', '0002_taskhistory_elapsed_taskhistory_scheduled_at_and_more'),
+        ("common", "0002_taskhistory_elapsed_taskhistory_scheduled_at_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='taskhistory',
-            name='remove_duplicates',
+            model_name="taskhistory",
+            name="remove_duplicates",
             field=models.BooleanField(default=bool),
         ),
     ]
-

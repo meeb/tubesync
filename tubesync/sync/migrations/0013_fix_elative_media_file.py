@@ -5,21 +5,19 @@ from django.db import migrations
 
 
 def fix_media_file(apps, schema_editor):
-    Media = apps.get_model('sync', 'Media')
+    Media = apps.get_model("sync", "Media")
     for media in Media.objects.filter(downloaded=True):
         download_dir = str(settings.DOWNLOAD_ROOT)
 
         if media.media_file.name.startswith(download_dir):
-            media.media_file.name = media.media_file.name[len(download_dir) + 1:]
+            media.media_file.name = media.media_file.name[len(download_dir) + 1 :]
             media.save()
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0012_alter_media_downloaded_format'),
+        ("sync", "0012_alter_media_downloaded_format"),
     ]
 
-    operations = [
-        migrations.RunPython(fix_media_file)
-    ]
+    operations = [migrations.RunPython(fix_media_file)]

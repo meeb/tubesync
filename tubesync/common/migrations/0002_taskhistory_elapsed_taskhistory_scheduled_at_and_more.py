@@ -7,29 +7,30 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('common', '0001_initial'),
+        ("common", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='taskhistory',
-            name='elapsed',
+            model_name="taskhistory",
+            name="elapsed",
             field=models.FloatField(default=float),
         ),
         migrations.AddField(
-            model_name='taskhistory',
-            name='scheduled_at',
-            field=models.DateTimeField(db_index=True, default=django.utils.timezone.now),
+            model_name="taskhistory",
+            name="scheduled_at",
+            field=models.DateTimeField(
+                db_index=True, default=django.utils.timezone.now
+            ),
         ),
         migrations.AlterField(
-            model_name='taskhistory',
-            name='attempts',
+            model_name="taskhistory",
+            name="attempts",
             field=models.IntegerField(db_index=True, default=int),
         ),
         migrations.AlterField(
-            model_name='taskhistory',
-            name='repeat',
+            model_name="taskhistory",
+            name="repeat",
             field=models.BigIntegerField(default=int),
         ),
     ]
-

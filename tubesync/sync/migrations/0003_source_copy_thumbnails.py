@@ -6,13 +6,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0002_auto_20201213_0817'),
+        ("sync", "0002_auto_20201213_0817"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='source',
-            name='copy_thumbnails',
-            field=models.BooleanField(default=False, help_text='Copy thumbnails with the media, these may be detected and used by some media servers', verbose_name='copy thumbnails'),
+            model_name="source",
+            name="copy_thumbnails",
+            field=models.BooleanField(
+                default=False,
+                help_text="Copy thumbnails with the media, these may be detected and used by some media servers",
+                verbose_name="copy thumbnails",
+            ),
         ),
     ]

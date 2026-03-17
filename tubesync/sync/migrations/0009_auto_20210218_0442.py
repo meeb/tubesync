@@ -8,23 +8,42 @@ import sync.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0008_source_download_cap'),
+        ("sync", "0008_source_download_cap"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='source',
-            name='download_media',
-            field=models.BooleanField(default=True, help_text='Download media from this source, if not selected the source will only be indexed', verbose_name='download media'),
+            model_name="source",
+            name="download_media",
+            field=models.BooleanField(
+                default=True,
+                help_text="Download media from this source, if not selected the source will only be indexed",
+                verbose_name="download media",
+            ),
         ),
         migrations.AlterField(
-            model_name='media',
-            name='media_file',
-            field=models.FileField(blank=True, help_text='Media file', max_length=200, null=True, storage=django.core.files.storage.FileSystemStorage(location='/home/meeb/Repos/github.com/meeb/tubesync/tubesync/downloads'), upload_to=sync.models.get_media_file_path, verbose_name='media file'),
+            model_name="media",
+            name="media_file",
+            field=models.FileField(
+                blank=True,
+                help_text="Media file",
+                max_length=200,
+                null=True,
+                storage=django.core.files.storage.FileSystemStorage(
+                    location="/home/meeb/Repos/github.com/meeb/tubesync/tubesync/downloads"
+                ),
+                upload_to=sync.models.get_media_file_path,
+                verbose_name="media file",
+            ),
         ),
         migrations.AlterField(
-            model_name='source',
-            name='media_format',
-            field=models.CharField(default='{yyyymmdd}_{source}_{title}_{key}_{format}.{ext}', help_text='File format to use for saving files, detailed options at bottom of page.', max_length=200, verbose_name='media format'),
+            model_name="source",
+            name="media_format",
+            field=models.CharField(
+                default="{yyyymmdd}_{source}_{title}_{key}_{format}.{ext}",
+                help_text="File format to use for saving files, detailed options at bottom of page.",
+                max_length=200,
+                verbose_name="media format",
+            ),
         ),
     ]

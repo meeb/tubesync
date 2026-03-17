@@ -4,25 +4,25 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('sync', '0036_alter_source_sponsorblock_categories'),
+        ("sync", "0036_alter_source_sponsorblock_categories"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='source',
-            name='fallback',
+            model_name="source",
+            name="fallback",
             field=models.CharField(
                 choices=[
-                    ('f', 'Fail, do not download any media'),
-                    ('c', 'Get next best resolution, only the preferred codec'),
-                    ('h', 'Get next best resolution, any codec, but at least HD'),
-                    ('n', 'Get next best resolution, any codec'),
+                    ("f", "Fail, do not download any media"),
+                    ("c", "Get next best resolution, only the preferred codec"),
+                    ("h", "Get next best resolution, any codec, but at least HD"),
+                    ("n", "Get next best resolution, any codec"),
                 ],
                 db_index=True,
-                default='h',
-                help_text='What do do when media in your source resolution and codecs is not available',
+                default="h",
+                help_text="What do do when media in your source resolution and codecs is not available",
                 max_length=1,
-                verbose_name='fallback',
+                verbose_name="fallback",
             ),
         ),
     ]

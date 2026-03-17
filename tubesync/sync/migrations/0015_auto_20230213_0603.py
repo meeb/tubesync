@@ -6,18 +6,28 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0014_alter_media_media_file'),
+        ("sync", "0014_alter_media_media_file"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='media',
-            name='manual_skip',
-            field=models.BooleanField(db_index=True, default=False, help_text='Media marked as "skipped", won\' be downloaded', verbose_name='manual_skip'),
+            model_name="media",
+            name="manual_skip",
+            field=models.BooleanField(
+                db_index=True,
+                default=False,
+                help_text='Media marked as "skipped", won\' be downloaded',
+                verbose_name="manual_skip",
+            ),
         ),
         migrations.AlterField(
-            model_name='media',
-            name='skip',
-            field=models.BooleanField(db_index=True, default=False, help_text='INTERNAL FLAG - Media will be skipped and not downloaded', verbose_name='skip'),
+            model_name="media",
+            name="skip",
+            field=models.BooleanField(
+                db_index=True,
+                default=False,
+                help_text="INTERNAL FLAG - Media will be skipped and not downloaded",
+                verbose_name="skip",
+            ),
         ),
     ]

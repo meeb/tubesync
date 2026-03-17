@@ -7,13 +7,24 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0025_add_video_type_support'),
+        ("sync", "0025_add_video_type_support"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='source',
-            name='sub_langs',
-            field=models.CharField(default='en', help_text='List of subtitles langs to download, comma-separated. Example: en,fr or all,-fr,-live_chat', max_length=30, validators=[django.core.validators.RegexValidator(message='Subtitle langs must be a comma-separated list of langs. example: en,fr or all,-fr,-live_chat', regex='^(\\-?[\\_\\.a-zA-Z-]+(,|$))+')], verbose_name='subs langs'),
+            model_name="source",
+            name="sub_langs",
+            field=models.CharField(
+                default="en",
+                help_text="List of subtitles langs to download, comma-separated. Example: en,fr or all,-fr,-live_chat",
+                max_length=30,
+                validators=[
+                    django.core.validators.RegexValidator(
+                        message="Subtitle langs must be a comma-separated list of langs. example: en,fr or all,-fr,-live_chat",
+                        regex="^(\\-?[\\_\\.a-zA-Z-]+(,|$))+",
+                    )
+                ],
+                verbose_name="subs langs",
+            ),
         ),
     ]

@@ -7,52 +7,51 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('sync', '0034_source_target_schedule_and_more'),
+        ("sync", "0034_source_target_schedule_and_more"),
     ]
 
     operations = [
         migrations.AlterUniqueTogether(
-            name='metadata',
-            unique_together={('media', 'site', 'key')},
+            name="metadata",
+            unique_together={("media", "site", "key")},
         ),
         migrations.AddField(
-            model_name='metadata',
-            name='source',
+            model_name="metadata",
+            name="source",
             field=models.ForeignKey(
                 blank=True,
-                help_text='Source from which the video was retrieved',
+                help_text="Source from which the video was retrieved",
                 null=True,
                 on_delete=django.db.models.deletion.CASCADE,
-                related_name='videos',
-                related_query_name='video',
-                to='sync.source',
+                related_name="videos",
+                related_query_name="video",
+                to="sync.source",
             ),
         ),
         migrations.AlterField(
-            model_name='metadata',
-            name='media',
+            model_name="metadata",
+            name="media",
             field=models.OneToOneField(
                 blank=True,
-                help_text='Media the metadata belongs to',
+                help_text="Media the metadata belongs to",
                 null=True,
                 on_delete=django.db.models.deletion.SET_NULL,
-                related_name='new_metadata',
-                to='sync.media',
+                related_name="new_metadata",
+                to="sync.media",
             ),
         ),
         migrations.AlterField(
-            model_name='metadata',
-            name='retrieved',
+            model_name="metadata",
+            name="retrieved",
             field=models.DateTimeField(
                 db_index=True,
                 default=django.utils.timezone.now,
-                help_text='Date and time the metadata was retrieved',
-                verbose_name='retrieved',
+                help_text="Date and time the metadata was retrieved",
+                verbose_name="retrieved",
             ),
         ),
         migrations.AlterUniqueTogether(
-            name='metadata',
-            unique_together={('media', 'site', 'key'), ('source', 'site', 'key')},
+            name="metadata",
+            unique_together={("media", "site", "key"), ("source", "site", "key")},
         ),
     ]
-

@@ -6,46 +6,49 @@ from common.logger import log
 
 def remove_duplicated_rows(apps, schema_editor):
     def keep_which(task_id, th_qs):
-        tqs = th_qs.order_by('-id').filter(task_id=task_id)
+        tqs = th_qs.order_by("-id").filter(task_id=task_id)
         return tqs[0].id
 
-    TaskHistory = apps.get_model("common", 'TaskHistory')
+    TaskHistory = apps.get_model("common", "TaskHistory")
     th_qs = TaskHistory.objects.all()
     duplicates = set(
         th_qs.values(
-            'task_id',
-        ).alias(
-            count=models.Count('id'),
-        ).filter(
+            "task_id",
+        )
+        .alias(
+            count=models.Count("id"),
+        )
+        .filter(
             count__gt=1,
-        ).values_list(
-            'task_id',
+        )
+        .values_list(
+            "task_id",
             flat=True,
         ),
     )
 
-    log.info(f'TaskHistory rows: {len(duplicates)=}')
+    log.info(f"TaskHistory rows: {len(duplicates)=}")
     for n, task_id in enumerate(duplicates, start=1):
         keeping = None
         try:
             keeping = keep_which(task_id, th_qs)
         except IndexError as e:
-            msg = f'TaskHistory: {n=}: {task_id=}: failed to find the row to keep'
+            msg = f"TaskHistory: {n=}: {task_id=}: failed to find the row to keep"
             log.exception(msg, exc_info=e)
             continue
-        log.debug(f'{n=}: {task_id=}: {keeping=}')
+        log.debug(f"{n=}: {task_id=}: {keeping=}")
         TaskHistory.objects.filter(
             task_id=task_id,
         ).exclude(
             id=keeping,
         ).delete()
-    log.info('TaskHistory rows: finished removing duplicates.')
+    log.info("TaskHistory rows: finished removing duplicates.")
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('common', '0003_taskhistory_remove_duplicates'),
+        ("common", "0003_taskhistory_remove_duplicates"),
     ]
 
     operations = [
@@ -54,9 +57,8 @@ class Migration(migrations.Migration):
             migrations.RunPython.noop,
         ),
         migrations.AlterField(
-            model_name='taskhistory',
-            name='task_id',
+            model_name="taskhistory",
+            name="task_id",
             field=models.CharField(max_length=40, unique=True),
         ),
     ]
-

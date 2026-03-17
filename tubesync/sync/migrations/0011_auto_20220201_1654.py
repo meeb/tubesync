@@ -6,14 +6,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0010_auto_20210924_0554'),
+        ("sync", "0010_auto_20210924_0554"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='source',
-            name='write_json',
+            model_name="source",
+            name="write_json",
             field=models.BooleanField(
-                default=False, help_text='Write a JSON file with the media info, these may be detected and used by some media servers', verbose_name='write json'),
+                default=False,
+                help_text="Write a JSON file with the media info, these may be detected and used by some media servers",
+                verbose_name="write json",
+            ),
         ),
     ]

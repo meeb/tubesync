@@ -9,13 +9,23 @@ import sync.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0013_fix_elative_media_file'),
+        ("sync", "0013_fix_elative_media_file"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='media',
-            name='media_file',
-            field=models.FileField(blank=True, help_text='Media file', max_length=255, null=True, storage=django.core.files.storage.FileSystemStorage(base_url='/media-data/', location=str(settings.DOWNLOAD_ROOT)), upload_to=sync.models.get_media_file_path, verbose_name='media file'),
+            model_name="media",
+            name="media_file",
+            field=models.FileField(
+                blank=True,
+                help_text="Media file",
+                max_length=255,
+                null=True,
+                storage=django.core.files.storage.FileSystemStorage(
+                    base_url="/media-data/", location=str(settings.DOWNLOAD_ROOT)
+                ),
+                upload_to=sync.models.get_media_file_path,
+                verbose_name="media file",
+            ),
         ),
     ]
