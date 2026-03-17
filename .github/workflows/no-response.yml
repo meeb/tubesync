@@ -17,7 +17,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: tcely/no-response@v0.1.3
+      - uses: tcely/no-response@v0.1.4
         with:
           token: ${{ github.token }}
           # auto close issues with no response from author for N days
