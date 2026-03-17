@@ -444,10 +444,10 @@ class Media(models.Model):
                     'hdr': hdr,
                     'format': tuple(fmt),
                 }
-            if self.downloaded_format:
-                resolution = self.downloaded_format.lower()
-            elif self.downloaded_height:
+            if self.downloaded_height and self.downloaded_height > 0:
                 resolution = f'{self.downloaded_height}p'
+            elif self.downloaded_format and self.downloaded_format != Val(SourceResolution.AUDIO):
+                resolution = self.downloaded_format.lower()
             if resolution:
                 fmt.append(resolution)
             if self.downloaded_format != Val(SourceResolution.AUDIO):
@@ -492,10 +492,10 @@ class Media(models.Model):
                 # Combined
                 vformat = cformat
         if vformat:
-            if vformat['format']:
-                resolution = vformat['format'].lower()
-            else:
+            if vformat.get('height', 0) > 0:
                 resolution = f"{vformat['height']}p"
+            elif vformat.get('format'):
+                resolution = str(vformat['format']).lower()
             if resolution:
                 fmt.append(resolution)
             vcodec = vformat['vcodec'].lower()

@@ -6,6 +6,7 @@
 
 
 import logging
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -667,6 +668,79 @@ class FilepathTestCase(TestCase):
         self.assertEqual(test_media.filename,
                          ('no-fancy-stuff-title_test_720p-720x1280-opus'
                           '-vp9-30fps-hdr.mkv'))
+
+    def test_resolution_token_prefers_height_over_format_note(self):
+        self.source.media_format = '{resolution}.{ext}'
+
+        def build_metadata(video_format_note):
+            return json.dumps({
+                'title': 'Test',
+                'fulltitle': 'Test',
+                'upload_date': '20240317',
+                'duration': 1,
+                'uploader': 'u',
+                'epoch': 1,
+                'formats': [
+                    {
+                        'format_id': '399',
+                        'format_note': video_format_note,
+                        'format': f'399 - {video_format_note}',
+                        'height': 1080,
+                        'width': 1920,
+                        'vcodec': 'vp9',
+                        'acodec': 'none',
+                        'fps': 50,
+                        'tbr': 1000,
+                    },
+                    {
+                        'format_id': '251',
+                        'format_note': 'audio',
+                        'format': '251 - audio',
+                        'height': None,
+                        'width': None,
+                        'vcodec': 'none',
+                        'acodec': 'opus',
+                        'abr': 128,
+                        'asr': 48000,
+                    },
+                ],
+            })
+
+        media_50fps = Media.objects.create(
+            key='test50fps',
+            source=self.source,
+            metadata=build_metadata('1080p50'),
+        )
+        self.assertEqual(media_50fps.format_dict['resolution'], '1080p')
+        self.assertEqual(media_50fps.filename, '1080p.mkv')
+
+        media_premium = Media.objects.create(
+            key='testpremium',
+            source=self.source,
+            metadata=build_metadata('premium'),
+        )
+        self.assertEqual(media_premium.format_dict['resolution'], '1080p')
+        self.assertEqual(media_premium.filename, '1080p.mkv')
+
+        downloaded_premium = Media.objects.create(
+            key='downloadedpremium',
+            source=self.source,
+            metadata=build_metadata('premium'),
+            downloaded=True,
+            download_date=timezone.now(),
+            downloaded_format='PREMIUM',
+            downloaded_height=1080,
+            downloaded_width=1920,
+            downloaded_audio_codec='opus',
+            downloaded_video_codec='vp9',
+            downloaded_container='mkv',
+            downloaded_fps=50,
+            downloaded_hdr=False,
+            downloaded_filesize=123,
+        )
+        downloaded_premium.downloaded = True
+        self.assertEqual(downloaded_premium.format_dict['resolution'], '1080p')
+        self.assertEqual(downloaded_premium.filename, '1080p.mkv')
 
     def test_directory_prefix(self):
         # Confirm the setting exists and is valid
