@@ -446,7 +446,7 @@ class Media(models.Model):
                 }
             if self.downloaded_height and self.downloaded_height > 0:
                 resolution = f'{self.downloaded_height}p'
-            elif self.downloaded_format and self.downloaded_format != Val(SourceResolution.AUDIO):
+            elif self.downloaded_format:
                 resolution = self.downloaded_format.lower()
             if resolution:
                 fmt.append(resolution)
