@@ -797,6 +797,31 @@ class MediaTestCase(TestCase):
         self.media.created = datetime(year=2020, month=1, day=1, hour=1,
                                       minute=1, second=1)
 
+    def test_download_finished_clears_stale_video_fields_for_audio(self):
+        filepath = self.media.filepath.parent / 'downloaded-audio.ogg'
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        filepath.write_bytes(b'test-audio')
+
+        # Simulate stale values from a prior video download.
+        self.media.downloaded_format = '1080p'
+        self.media.downloaded_height = 1080
+        self.media.downloaded_width = 1920
+        self.media.downloaded_video_codec = 'vp9'
+        self.media.downloaded_fps = 50
+        self.media.downloaded_hdr = True
+
+        # 249 is an audio-only format in sync/testdata/metadata.json.
+        self.media.download_finished('249', 'ogg', downloaded_filepath=filepath)
+
+        self.assertTrue(self.media.downloaded)
+        self.assertEqual(self.media.downloaded_format, Val(SourceResolution.AUDIO))
+        self.assertEqual(self.media.downloaded_container, 'ogg')
+        self.assertIsNone(self.media.downloaded_height)
+        self.assertIsNone(self.media.downloaded_width)
+        self.assertIsNone(self.media.downloaded_video_codec)
+        self.assertIsNone(self.media.downloaded_fps)
+        self.assertFalse(self.media.downloaded_hdr)
+
     def test_nfo(self):
         expected_nfo = [
             "<?xml version='1.0' encoding='utf8'?>",
