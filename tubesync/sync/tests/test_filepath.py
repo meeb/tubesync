@@ -10,7 +10,7 @@ from sync.choices import (
     YouTube_SourceType,
 )
 
-from .fixtures import metadata
+from .fixtures import metadata, all_test_metadata
 
 class FilepathTestCase(TestCase):
 
@@ -174,4 +174,70 @@ class FilepathTestCase(TestCase):
         test_no_prefix_path = Path(self.source.directory_path)
         self.assertEqual(test_no_prefix_path.parts[-1], 'testdirectory')
 
+    def test_resolution_token_prefers_height_over_format_note(self):
+        self.source.media_format = '{resolution}.{ext}'
 
+        def create_media(key, metadata_key, downloaded_fields=None):
+            downloaded_fields = downloaded_fields or dict()
+            media = Media(key=key, source=self.source, **downloaded_fields)
+            metadata_dict = media.metadata_loads(all_test_metadata[metadata_key])
+            media.metadata = media.metadata_dumps(metadata_dict)
+            media.save()
+            return media
+
+        media_50fps = create_media('test50fps', 'issue499_1080p50')
+        self.assertEqual(media_50fps.format_dict['resolution'], '1080p')
+        self.assertEqual(media_50fps.filename, '1080p.mkv')
+
+        media_premium = create_media('testpremium', 'issue499_premium')
+        self.assertEqual(media_premium.format_dict['resolution'], '1080p')
+        self.assertEqual(media_premium.filename, '1080p.mkv')
+
+        downloaded_premium = create_media(
+            'downloadedpremium',
+            'issue499_premium',
+            downloaded_fields=dict(
+                downloaded=True,
+                download_date=timezone.now(),
+                downloaded_format='PREMIUM',
+                downloaded_height=1080,
+                downloaded_width=1920,
+                downloaded_audio_codec='opus',
+                downloaded_video_codec='vp9',
+                downloaded_container='mkv',
+                downloaded_fps=50,
+                downloaded_hdr=False,
+                downloaded_filesize=123,
+            ),
+        )
+        self.assertEqual(downloaded_premium.format_dict['resolution'], '1080p')
+        self.assertEqual(downloaded_premium.filename, '1080p.mkv')
+
+        self.source.source_resolution = Val(SourceResolution.AUDIO)
+        downloaded_audio = create_media(
+            'downloadedaudio',
+            'issue499_1080p50',
+            downloaded_fields=dict(
+                downloaded=True,
+                download_date=timezone.now(),
+                downloaded_format=Val(SourceResolution.AUDIO),
+                downloaded_width=1920,
+                downloaded_audio_codec='OPUS',
+                downloaded_video_codec='vp9',
+                downloaded_container='ogg',
+                downloaded_fps=50,
+                downloaded_hdr=False,
+                downloaded_filesize=123,
+            ),
+        )
+        self.assertEqual(downloaded_audio.downloaded, True)
+        self.assertEqual(downloaded_audio.downloaded_width, 1920)
+        self.assertEqual(downloaded_audio.format_dict['ext'], 'ogg')
+        self.assertEqual(downloaded_audio.format_dict['resolution'], 'audio')
+        self.assertEqual(downloaded_audio.format_dict['height'], '0')
+        self.assertEqual(downloaded_audio.format_dict['width'], '0')
+        downloaded_audio.downloaded_height = 1080
+        self.assertEqual(downloaded_audio.downloaded_height, 1080)
+        self.assertEqual(downloaded_audio.format_dict['resolution'], 'audio')
+        self.assertEqual(downloaded_audio.format_dict['height'], '0')
+        self.source.source_resolution = Val(SourceResolution.VIDEO_1080P)

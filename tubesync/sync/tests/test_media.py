@@ -256,4 +256,25 @@ class MediaFilterTestCase(TestCase):
         self.assertTrue(changed)
         self.assertFalse(self.media.skip)
 
+    def test_download_finished_clears_stale_video_fields_for_audio(self):
+        filepath = self.media.filepath.parent / 'downloaded-audio.ogg'
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        filepath.write_bytes(b'test-audio')
 
+        self.media.downloaded_format = '1080p'
+        self.media.downloaded_height = 1080
+        self.media.downloaded_width = 1920
+        self.media.downloaded_video_codec = 'vp9'
+        self.media.downloaded_fps = 50
+        self.media.downloaded_hdr = True
+
+        self.media.download_finished('249', 'ogg', downloaded_filepath=filepath)
+
+        self.assertTrue(self.media.downloaded)
+        self.assertEqual(self.media.downloaded_format, Val(SourceResolution.AUDIO))
+        self.assertEqual(self.media.downloaded_container, 'ogg')
+        self.assertIsNone(self.media.downloaded_height)
+        self.assertIsNone(self.media.downloaded_width)
+        self.assertIsNone(self.media.downloaded_video_codec)
+        self.assertIsNone(self.media.downloaded_fps)
+        self.assertFalse(self.media.downloaded_hdr)
