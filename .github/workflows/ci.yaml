@@ -276,7 +276,7 @@ jobs:
       meta-images: ${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ needs.info.outputs.IMAGE_NAME }}
       output: image
       platforms: linux/amd64,linux/arm64
-      push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
+      push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name }}
       setup-qemu: true
       meta-flavor: |
         latest=false
