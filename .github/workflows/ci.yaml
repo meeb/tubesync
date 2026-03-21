@@ -260,7 +260,7 @@ jobs:
 
   build:
     if: ${{ !cancelled() && 'success' == needs.info.result }}
-    needs: ['info', 'test']
+    needs: ['info', 'test', 'containerise']
     uses: docker/github-builder/.github/workflows/build.yml@v1
     permissions:
       contents: read # to fetch the repository content
