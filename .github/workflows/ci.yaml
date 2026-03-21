@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   info:
-    if: ${{ !cancelled() && 'pull_request' != github.event_name }}
+    #if: ${{ !cancelled() && 'pull_request' != github.event_name }}
     runs-on: ubuntu-latest
     outputs:
       IMAGE_NAME: ${{ env.IMAGE_NAME }}
