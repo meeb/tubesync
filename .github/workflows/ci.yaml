@@ -27,6 +27,7 @@ jobs:
     if: ${{ !cancelled() && 'pull_request' != github.event_name }}
     runs-on: ubuntu-latest
     outputs:
+      IMAGE_NAME: ${{ env.IMAGE_NAME }}
       ffmpeg-date: ${{ steps.jq.outputs.FFMPEG_DATE }}
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
       ffmpeg-version: ${{ steps.jq.outputs.FFMPEG_VERSION }}
@@ -184,11 +185,13 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Set up QEMU
+        if: false
         uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v4
       - name: Log into GitHub Container Registry
+        if: false
         env:
           DOCKER_REGISTRY: https://ghcr.io
           DOCKER_USERNAME: ${{ github.repository_owner }}
@@ -234,6 +237,7 @@ jobs:
             --highestUserWastedPercent '0.05' \
             --highestWastedBytes '50M'
       - name: Build and push
+        if: false
         id: build-push
         timeout-minutes: 60
         uses: docker/build-push-action@v7
@@ -254,23 +258,36 @@ jobs:
             FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
 
-#permissions:
-#  contents: read
-#jobs:
-#  build:
-#    if: ${{ !cancelled() && 'success' == needs.info.result }}
-#    needs: ['info', 'test']
-#    uses: docker/github-builder/.github/workflows/build.yml@v1
-#    permissions:
-#      contents: read # to fetch the repository content
-#      id-token: write # for signing attestation(s) with GitHub OIDC Token
-#    with:
-#      cache-mode: max
-#      output: image
-#      push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
-#      meta-images: name/app
-#    secrets:
-#      registry-auths: |
-#        - registry: docker.io
-#          username: ${{ vars.DOCKERHUB_USERNAME }}
-#          password: ${{ secrets.DOCKERHUB_TOKEN }}
+  build:
+    if: ${{ !cancelled() && 'success' == needs.info.result }}
+    needs: ['info', 'test']
+    uses: docker/github-builder/.github/workflows/build.yml@v1
+    permissions:
+      contents: read # to fetch the repository content
+      id-token: write # for signing attestation(s) with GitHub OIDC Token
+    secrets:
+      registry-auths: |
+        - registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+    with:
+      cache: true
+      cache-mode: max
+      meta-images: ${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ needs.info.outputs.IMAGE_NAME }}
+      output: image
+      platforms: linux/amd64,linux/arm64
+      push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
+      setup-qemu: true
+      meta-flavor: |
+        latest=false
+      meta-tags: |
+        type=schedule,pattern=weekly
+        type=raw,enable={{is_default_branch}},value=latest
+        type=raw,enable={{is_not_default_branch}},value=test
+        type=ref,event=tag
+        type=ref,event=pr
+      build-args: |
+        IMAGE_NAME=${{ needs.info.outputs.IMAGE_NAME }}
+        FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
+        FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
+        YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
