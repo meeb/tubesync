@@ -1,4 +1,5 @@
 import logging
+import shutil
 from datetime import datetime
 from xml.etree import ElementTree
 from django.conf import settings
@@ -12,7 +13,9 @@ from sync.choices import (
     YouTube_SourceType,
 )
 
-from .fixtures import metadata
+from .fixtures import all_test_metadata
+metadata = all_test_metadata['boring']
+
 
 class MediaTestCase(TestCase):
 
@@ -47,33 +50,8 @@ class MediaTestCase(TestCase):
                                       minute=1, second=1)
 
     def test_nfo(self):
-        expected_nfo = [
-            "<?xml version='1.0' encoding='utf8'?>",
-            '<episodedetails>',
-            '  <title>no fancy stuff title</title>',
-            '  <showtitle>testname</showtitle>',
-            '  <season>2017</season>',
-            '  <episode></episode>',
-            '  <ratings>',
-            '    <rating default="True" max="5" name="youtube">',
-            '      <value>1.2345</value>',
-            '      <votes>579</votes>',
-            '    </rating>',
-            '  </ratings>',
-            '  <plot>no fancy stuff desc</plot>',
-            '  <thumb />',  # media.thumbfile is empty without media existing
-            '  <mpaa>50</mpaa>',
-            '  <runtime>401</runtime>',
-            '  <id>mediakey</id>',
-            '  <uniqueid default="True" type="youtube">mediakey</uniqueid>',
-            '  <studio>test uploader</studio>',
-            '  <aired>2017-09-11</aired>',
-            '  <dateadded>2020-01-01 01:01:01</dateadded>',
-            '  <genre>test category 1</genre>',
-            '  <genre>test category 2</genre>',
-            '</episodedetails>',
-        ]
-        expected_tree = ElementTree.fromstring('\n'.join(expected_nfo))
+        from .fixtures import all_test_metadata
+        expected_tree = ElementTree.fromstring(all_test_metadata['expected_nfo'])
         nfo_tree = ElementTree.fromstring(self.media.nfoxml)
         # Check each node with attribs in expected_tree is present in test_nfo
         for expected_node in expected_tree:
@@ -259,6 +237,7 @@ class MediaFilterTestCase(TestCase):
     def test_download_finished_clears_stale_video_fields_for_audio(self):
         filepath = self.media.filepath.parent / 'downloaded-audio.ogg'
         filepath.parent.mkdir(parents=True, exist_ok=True)
+        self.addCleanup(lambda: shutil.rmtree(self.media.source.directory_path, ignore_errors=True))
         filepath.write_bytes(b'test-audio')
 
         self.media.downloaded_format = '1080p'

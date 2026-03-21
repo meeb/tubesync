@@ -19,15 +19,15 @@ class TasksTestCase(TestCase):
 
         now = timezone.now()
 
-        m11 = Media.objects.create(source=src1, downloaded=True, key='a11', download_date=now - timedelta(days=5)) # noqa
-        m12 = Media.objects.create(source=src1, downloaded=True, key='a12', download_date=now - timedelta(days=25)) # noqa
-        m13 = Media.objects.create(source=src1, downloaded=False, key='a13') # noqa
+        m11 = Media.objects.create(source=src1, downloaded=True, key='a11', download_date=now - timedelta(days=5)) # noqa: F841
+        m12 = Media.objects.create(source=src1, downloaded=True, key='a12', download_date=now - timedelta(days=25)) # noqa: F841
+        m13 = Media.objects.create(source=src1, downloaded=False, key='a13') # noqa: F841
 
-        m21 = Media.objects.create(source=src2, downloaded=True, key='a21', download_date=now - timedelta(days=5)) # noqa
+        m21 = Media.objects.create(source=src2, downloaded=True, key='a21', download_date=now - timedelta(days=5)) # noqa: F841
         m22 = Media.objects.create(source=src2, downloaded=True, key='a22', download_date=now - timedelta(days=25))
-        m23 = Media.objects.create(source=src2, downloaded=False, key='a23') # noqa
-
+        m23 = Media.objects.create(source=src2, downloaded=False, key='a23') # noqa: F841
         self.assertEqual(src1.media_source.all().count(), 3)
+
         self.assertEqual(src2.media_source.all().count(), 3)
 
         cleanup_old_media.call_local(durable=False)

@@ -346,45 +346,8 @@ class FrontEndTestCase(TestCase):
             fallback=Val(Fallback.FAIL)
         )
         # Add some media
-        test_minimal_metadata = '''
-            {
-                "channel_id":"testkey",
-                "thumbnail":"https://example.com/thumb.jpg",
-                "formats": [{
-                    "format_id":"251",
-                    "player_url":null,
-                    "ext":"webm",
-                    "format_note":"tiny",
-                    "acodec":"opus",
-                    "abr":160,
-                    "asr":48000,
-                    "filesize":6669827,
-                    "fps":null,
-                    "height":null,
-                    "tbr":156.344,
-                    "width":null,
-                    "vcodec":"none",
-                    "format":"251 - audio only (tiny)",
-                    "protocol":"https"
-                },
-                {
-                    "format_id":"248",
-                    "player_url":null,
-                    "ext":"webm",
-                    "height":1080,
-                    "format_note":"1080p",
-                    "vcodec":"vp9",
-                    "asr":null,
-                    "filesize":63659748,
-                    "fps":24,
-                    "tbr":2747.461,
-                    "width":1920,
-                    "acodec":"none",
-                    "format":"248 - 1920x1080 (1080p)",
-                    "protocol":"https"
-                }]
-            }
-        '''
+        from .fixtures import all_test_metadata
+        test_minimal_metadata = all_test_metadata['minimal']
         before_dt = timezone.now()
         past_date = timezone.make_aware(datetime(year=2000, month=1, day=1))
         test_media1 = Media.objects.create(

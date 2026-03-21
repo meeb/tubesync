@@ -10,7 +10,10 @@ from sync.choices import (
     YouTube_SourceType,
 )
 
-from .fixtures import metadata, all_test_metadata
+from .fixtures import all_test_metadata
+
+# temporary for compatibility with old testing code
+metadata = all_test_metadata['boring']
 
 class FilepathTestCase(TestCase):
 
@@ -160,19 +163,19 @@ class FilepathTestCase(TestCase):
         self.assertTrue(hasattr(settings, 'SOURCE_DOWNLOAD_DIRECTORY_PREFIX'))
         self.assertTrue(isinstance(settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX, bool))
         # Test the default behavior for "True", forced "audio" or "video" parent directories for sources
-        settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX = True
-        self.source.source_resolution = Val(SourceResolution.AUDIO)
-        test_audio_prefix_path = Path(self.source.directory_path)
-        self.assertEqual(test_audio_prefix_path.parts[-2], 'audio')
-        self.assertEqual(test_audio_prefix_path.parts[-1], 'testdirectory')
-        self.source.source_resolution = Val(SourceResolution.VIDEO_1080P)
-        test_video_prefix_path = Path(self.source.directory_path)
-        self.assertEqual(test_video_prefix_path.parts[-2], 'video')
-        self.assertEqual(test_video_prefix_path.parts[-1], 'testdirectory')
+        with self.settings(SOURCE_DOWNLOAD_DIRECTORY_PREFIX=True):
+            self.source.source_resolution = Val(SourceResolution.AUDIO)
+            test_audio_prefix_path = Path(self.source.directory_path)
+            self.assertEqual(test_audio_prefix_path.parts[-2], 'audio')
+            self.assertEqual(test_audio_prefix_path.parts[-1], 'testdirectory')
+            self.source.source_resolution = Val(SourceResolution.VIDEO_1080P)
+            test_video_prefix_path = Path(self.source.directory_path)
+            self.assertEqual(test_video_prefix_path.parts[-2], 'video')
+            self.assertEqual(test_video_prefix_path.parts[-1], 'testdirectory')
         # Test the default behavior for "False", no parent directories for sources
-        settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX = False
-        test_no_prefix_path = Path(self.source.directory_path)
-        self.assertEqual(test_no_prefix_path.parts[-1], 'testdirectory')
+        with self.settings(SOURCE_DOWNLOAD_DIRECTORY_PREFIX=False):
+            test_no_prefix_path = Path(self.source.directory_path)
+            self.assertEqual(test_no_prefix_path.parts[-1], 'testdirectory')
 
     def test_resolution_token_prefers_height_over_format_note(self):
         self.source.media_format = '{resolution}.{ext}'

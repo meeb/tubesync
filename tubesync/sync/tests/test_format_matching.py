@@ -303,7 +303,7 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, acodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.source_acodec = acodec
@@ -311,7 +311,7 @@ class FormatMatchingTestCase(TestCase):
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_audio_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
 
     def test_video_exact_format_matching(self):
         self.source.fallback = Val(Fallback.FAIL)
@@ -355,14 +355,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test 60fps metadata
         self.media.metadata = all_test_metadata['60fps']
         self.media.save()
@@ -395,14 +395,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test hdr metadata
         self.media.metadata = all_test_metadata['hdr']
         self.media.save()
@@ -451,14 +451,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test 60fps+hdr metadata
         self.media.metadata = all_test_metadata['60fps+hdr']
         self.media.save()
@@ -514,14 +514,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
 
     def test_video_require_codec_format_matching(self):
         self.media.source.fallback = Val(Fallback.REQUIRE_CODEC)
@@ -566,14 +566,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test 60fps metadata
         self.media.metadata = all_test_metadata['60fps']
         self.media.save()
@@ -607,14 +607,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test hdr metadata
         self.media.metadata = all_test_metadata['hdr']
         self.media.save()
@@ -664,14 +664,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test 60fps+hdr metadata
         self.media.metadata = all_test_metadata['60fps+hdr']
         self.media.save()
@@ -728,14 +728,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # test AV1 codec
         self.media.metadata = all_test_metadata['20230629']
         self.media.save()
@@ -772,14 +772,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
 
     def test_video_next_best_format_matching(self):
         self.source.fallback = Val(Fallback.NEXT_BEST_RESOLUTION)
@@ -823,14 +823,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test 60fps metadata
         self.media.metadata = all_test_metadata['60fps']
         self.media.save()
@@ -863,14 +863,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test hdr metadata
         self.media.metadata = all_test_metadata['hdr']
         self.media.save()
@@ -919,14 +919,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test 60fps+hdr metadata
         self.media.metadata = all_test_metadata['60fps+hdr']
         self.media.save()
@@ -982,14 +982,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
 
     def test_metadata_20230629(self):
         self.source.fallback = Val(Fallback.NEXT_BEST_RESOLUTION)
@@ -1072,14 +1072,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
             # The aim here is to execute the matching code to find error paths, specific testing isn't required
             self.media.get_best_audio_format()
 
