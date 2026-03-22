@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   info:
-    #if: ${{ !cancelled() && 'pull_request' != github.event_name }}
+    if: ${{ !cancelled() && 'pull_request' != github.event_name }}
     runs-on: ubuntu-latest
     outputs:
       IMAGE_NAME: ${{ env.IMAGE_NAME }}
@@ -179,39 +179,14 @@ jobs:
     if: ${{ !cancelled() && 'success' == needs.info.result }}
     needs: ['info', 'test']
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 30
     concurrency:
       group: ${{ github.repository }}-${{ github.workflow }}
       cancel-in-progress: false
     steps:
-      - name: Set up QEMU
-        if: false
-        uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v4
-      - name: Log into GitHub Container Registry
-        if: false
-        env:
-          DOCKER_REGISTRY: https://ghcr.io
-          DOCKER_USERNAME: ${{ github.repository_owner }}
-          DOCKER_TOKEN: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
-        run: echo "${DOCKER_TOKEN}" | docker login --password-stdin --username "${DOCKER_USERNAME}" "${DOCKER_REGISTRY}"
-      - name: Push missing release tags
-        if: ${{ false && 'meeb' == github.actor && github.actor == github.repository_owner && '' != needs.info.outputs.missing-tags }}
-        run: |
-          missing='${{ needs.info.outputs.missing-tags }}'
-          image='${{ needs.info.outputs.missing-tags-image }}'
-          printf -- '%s\n' "${missing}" | tr '|' '\n' | \
-            while read SPEC
-            do
-              printf -- '%s\n' "${SPEC}" | ( IFS='=' ; \
-                read tag source && \
-                docker pull "${source}" && \
-                docker tag "${source}" "${image}:${tag}" && \
-                docker push "${image}:${tag}" ;
-              )
-            done
       - name: Build image for `dive`
         id: build-dive-image
         uses: docker/build-push-action@v7
@@ -221,7 +196,7 @@ jobs:
             FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
             FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
-          cache-from: type=gha
+          cache-from: type=gha,scope=buildkit-linux-amd64
           load: true
           platforms: linux/amd64
           push: false
@@ -236,30 +211,12 @@ jobs:
             --ci \
             --highestUserWastedPercent '0.05' \
             --highestWastedBytes '50M'
-      - name: Build and push
-        if: false
-        id: build-push
-        timeout-minutes: 60
-        uses: docker/build-push-action@v7
-        with:
-          platforms: linux/amd64,linux/arm64
-          push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
-          tags: ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.event.repository.default_branch == github.ref_name && 'latest' || 'test' }}
-          cache-from: |
-            type=registry,ref=ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:latest
-            type=registry,ref=ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:latest
-            type=gha
-          cache-to: |
-            type=gha,mode=max
-            ${{ 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'type=inline' || '' }}
-          build-args: |
-            IMAGE_NAME=${{ env.IMAGE_NAME }}
-            FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
-            FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
-            YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
 
-  build:
+  docker-image:
     if: ${{ !cancelled() && 'success' == needs.info.result && 'success' == needs.containerise.result }}
+    concurrency:
+      group: ${{ github.repository }}-${{ github.workflow }}
+      cancel-in-progress: false
     needs: ['info', 'test', 'containerise']
     uses: docker/github-builder/.github/workflows/build.yml@v1
     permissions:
