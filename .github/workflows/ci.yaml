@@ -2,6 +2,7 @@ name: CI
 
 env:
   IMAGE_NAME: tubesync
+  REGISTRY: ghcr.io
 
 on:
   workflow_dispatch:
@@ -28,6 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       IMAGE_NAME: ${{ env.IMAGE_NAME }}
+      REGISTRY: ${{ env.REGISTRY }}
       ffmpeg-date: ${{ steps.jq.outputs.FFMPEG_DATE }}
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
       ffmpeg-version: ${{ steps.jq.outputs.FFMPEG_VERSION }}
@@ -224,13 +226,13 @@ jobs:
       id-token: write # for signing attestation(s) with GitHub OIDC Token
     secrets:
       registry-auths: |
-        - registry: ghcr.io
+        - registry: ${{ needs.info.outputs.REGISTRY }}
           username: ${{ github.repository_owner }}
           password: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
     with:
       cache: true
       cache-mode: max
-      meta-images: ${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ needs.info.outputs.IMAGE_NAME }}
+      meta-images: ${{ needs.info.outputs.REGISTRY }}/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ needs.info.outputs.IMAGE_NAME }}
       output: image
       platforms: linux/amd64,linux/arm64
       push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name }}
