@@ -1,5 +1,4 @@
 import logging
-import shutil
 from datetime import datetime
 from xml.etree import ElementTree
 from django.conf import settings
@@ -50,7 +49,6 @@ class MediaTestCase(TestCase):
                                       minute=1, second=1)
 
     def test_nfo(self):
-        from .fixtures import all_test_metadata
         expected_tree = ElementTree.fromstring(all_test_metadata['expected_nfo'])
         nfo_tree = ElementTree.fromstring(self.media.nfoxml)
         # Check each node with attribs in expected_tree is present in test_nfo
@@ -237,7 +235,7 @@ class MediaFilterTestCase(TestCase):
     def test_download_finished_clears_stale_video_fields_for_audio(self):
         filepath = self.media.filepath.parent / 'downloaded-audio.ogg'
         filepath.parent.mkdir(parents=True, exist_ok=True)
-        self.addCleanup(lambda: shutil.rmtree(self.media.source.directory_path, ignore_errors=True))
+        self.addCleanup(lambda: filepath.unlink(missing_ok=True))
         filepath.write_bytes(b'test-audio')
 
         self.media.downloaded_format = '1080p'

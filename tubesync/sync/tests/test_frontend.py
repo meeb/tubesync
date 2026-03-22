@@ -7,6 +7,7 @@ from django.utils import timezone
 from django_huey import DJANGO_HUEY, get_queue
 from common.models import TaskHistory
 from sync.models import Source, Media
+from .fixtures import all_test_metadata
 from sync.tasks import (
     check_source_directory_exists,
     get_media_download_task, get_media_thumbnail_task,
@@ -346,7 +347,6 @@ class FrontEndTestCase(TestCase):
             fallback=Val(Fallback.FAIL)
         )
         # Add some media
-        from .fixtures import all_test_metadata
         test_minimal_metadata = all_test_metadata['minimal']
         before_dt = timezone.now()
         past_date = timezone.make_aware(datetime(year=2000, month=1, day=1))
