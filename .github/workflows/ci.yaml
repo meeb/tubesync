@@ -259,7 +259,7 @@ jobs:
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
 
   build:
-    if: ${{ !cancelled() && 'success' == needs.info.result }}
+    if: ${{ !cancelled() && 'success' == needs.info.result && 'success' == needs.containerise.result }}
     needs: ['info', 'test', 'containerise']
     uses: docker/github-builder/.github/workflows/build.yml@v1
     permissions:
