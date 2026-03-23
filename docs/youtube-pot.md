@@ -5,7 +5,7 @@
 ## YouTube Proof-of-Origin Token plugin
 
 To generate tokens TubeSync is using a plugin for `yt-dlp` from:
-* https://github.com/Brainicism/bgutil-ytdlp-pot-provider/tree/1.2.2/plugin/yt_dlp_plugins/extractor/
+* https://github.com/Brainicism/bgutil-ytdlp-pot-provider/tree/1.3.1/plugin/yt_dlp_plugins/extractor/
 
 #### Addition of plugin support
 
@@ -35,14 +35,14 @@ If you are using another web server instead, you should configure similar proxyi
 
 #### Running the web service container the plugin communicates with
 
-Docker image: `brainicism/bgutil-ytdlp-pot-provider:1.2.2`
+Docker image: `brainicism/bgutil-ytdlp-pot-provider:1.3.1`
 
 ```sh
 $ docker run -d \
     --name bgutil-ytdlp-pot-service \
     -p 4416:4416 \
     --restart unless-stopped \
-    brainicism/bgutil-ytdlp-pot-provider:1.2.2
+    brainicism/bgutil-ytdlp-pot-provider:1.3.1
 ```
 
 #### Configure the plugin using environment variables

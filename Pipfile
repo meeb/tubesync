@@ -7,7 +7,7 @@ verify_ssl = true
 autopep8 = "*"
 
 [packages]
-django = "~=5.2.5"
+django = "~=6.0.0"
 django-huey = "*"
 django-sass-processor = {extras = ["management-command"], version = "*"}
 pillow = "*"
@@ -24,6 +24,6 @@ yt-dlp = {extras = ["default", "curl-cffi"], version = "*"}
 emoji = "*"
 brotli = "*"
 html5lib = "*"
-bgutil-ytdlp-pot-provider = "~=1.2.2"
+bgutil-ytdlp-pot-provider = "~=1.3.1"
 yt-dlp-remote-cipher = "*"
 babi = "*"

@@ -1,0 +1,34 @@
+name: No Response
+
+# `issues`.`closed`, `issue_comment`.`created`, and `scheduled` event types are required for this Action
+# to work properly.
+on:
+  workflow_dispatch:
+  issues:
+    types: [closed]
+  issue_comment:
+    types: [created]
+  schedule:
+    - cron: '19,43 * * * *'
+
+jobs:
+  noResponse:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: tcely/no-response@v0.1.4
+        with:
+          token: ${{ github.token }}
+          # auto close issues with no response from author for N days
+          daysUntilClose: 30
+          # label to use to track when a response is required (once a response is made, this label will be auto removed)
+          # if the label doesn't exist, it will be auto-created
+          responseRequiredLabel: "waiting-on-author"
+          # once the responseRequiredLabel is removed, this one will be added for tracking on maintainers' side
+          ##optionalFollowupLabel: "status: waiting for maintainer's response"
+          # this comment will be posted when closing the issue
+          closeComment: >
+            The issue has been closed due to no response from the author.
+            Responses, from the original author of the issue,
+            should automatically re-open the issue.
