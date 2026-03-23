@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="1.2.2"
+ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="1.3.1"
 ARG FFMPEG_VERSION="N"
 ARG YTDLP_EJS_VERSION="0.3.2"
 
@@ -21,7 +21,8 @@ ARG QJS_VERSION="2025-09-13"
 ARG SHA256_QJS="fed9715220d616d1a178e1c2e6bd62e8e850626b4fe337cf417940fd32b35802"
 
 ARG ALPINE_VERSION="latest"
-ARG DEBIAN_VERSION="bookworm-slim"
+ARG DEBIAN_VERSION="13-slim"
+ARG OPENRESTY_DEBIAN_VERSION="bookworm"
 
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
@@ -60,6 +61,17 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
         'Dir::Cache::%spkgcache "";\n' '' src ; \
 	chmod a+r /etc/apt/apt.conf.d/docker-disable-pkgcache ; \
     set -x && \
+    # When a new release is out but the debian image hasn't
+    # updated yet, upgrades cause more wasted space than
+    # we want to accept. This should prevent apt from
+    # upgrading packages that shipped with the image.
+    dpkg -s | \
+      grep -B 3 -e '^Status: install ok installed$' | \
+      grep -e '^Package: ' | \
+      cut -d : -f 2- | \
+      xargs -r -t apt-mark hold && \
+    # We must allow these upgrades
+    apt-mark unhold libc6 libssl3t64 && \
     apt-get update && \
     # Install locales
     LC_ALL='C.UTF-8' LANG='C.UTF-8' LANGUAGE='C.UTF-8' \
@@ -168,8 +180,8 @@ FROM scratch AS deno
 COPY --from=deno-binaries /deno /usr/local/bin/
 
 FROM alpine:${ALPINE_VERSION} AS openresty-debian
+ARG OPENRESTY_DEBIAN_VERSION
 ARG TARGETARCH
-ARG DEBIAN_VERSION
 ADD 'https://openresty.org/package/pubkey.gpg' '/downloaded/pubkey.gpg'
 RUN set -eu ; \
     decide_arch() { \
@@ -187,7 +199,7 @@ RUN set -eu ; \
     mkdir -v -p '/etc/apt/sources.list.d' && \
     printf -- >| '/etc/apt/sources.list.d/openresty.list' \
         'deb http://openresty.org/package/%sdebian %s openresty' \
-        "$(decide_arch)" "${DEBIAN_VERSION%-slim}"
+        "$(decide_arch)" "${OPENRESTY_DEBIAN_VERSION}"
 
 FROM tubesync-asfald AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -446,6 +458,12 @@ COPY --from=openresty-debian \
 COPY --from=openresty-debian \
     /etc/apt/sources.list.d/openresty.list /etc/apt/sources.list.d/openresty.list
 
+RUN mkdir -v -p /etc/crypto-policies/back-ends && \
+    cp -v -p /usr/share/apt/default-sequoia.config \
+        /etc/crypto-policies/back-ends/apt-sequoia.config && \
+    sed -i -e '/^sha1\./s/2026-/2027-/;' \
+        /etc/crypto-policies/back-ends/apt-sequoia.config
+
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
   set -x && \
@@ -507,6 +525,10 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   update-alternatives --install /usr/local/bin/vim vim /usr/bin/vim.tiny 15 && \
   update-alternatives --install /usr/local/bin/vim vim /usr/bin/vis 35 && \
   rm -v /usr/local/bin/babi /bin/nano /usr/bin/vim.tiny && \
+  printf >| /usr/local/bin/sqlite3 -- '%s\n' '#!/usr/bin/env sh' '' \
+    'if [ -x /usr/bin/sqlite3 ]; then exec /usr/bin/sqlite3 "$@" ; fi;' '' \
+    'exec /usr/bin/env python3 -m sqlite3 "$@"' && \
+  chmod -c 00755 /usr/local/bin/sqlite3 && \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
@@ -600,12 +622,6 @@ RUN --mount=type=tmpfs,target=/cache \
     uv --no-config --no-progress --no-managed-python \
     pip install --strict --system --break-system-packages \
     --requirements /cache/requirements.txt && \
-  # remove the getpot_bgutil_script plugin
-  find /usr/local/lib \
-  -name 'getpot_bgutil_script.py' \
-  -path '*/yt_dlp_plugins/extractor/getpot_bgutil_script.py' \
-  -type f -print -delete \
-  && \
   # Clean up
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
@@ -665,8 +681,8 @@ RUN --mount=type=tmpfs,target=/cache \
   mkdir -v -p /cache/.home-directories && \
   cp -at /cache/.home-directories/ "${HOME}" && \
   HOME="/cache/.home-directories/${HOME#/}" && \
-  DENO_COMPAT=1 deno run -A npm:npm ci --no-audit --no-fund && \
-  DENO_COMPAT=1 deno run -A npm:npm audit fix && \
+  DENO_COMPAT=1 deno run --no-config -A npm:npm ci --no-audit --no-fund && \
+  DENO_COMPAT=1 deno run --no-config -A npm:npm audit fix && \
   node npm:typescript/tsc
 
 # Build app
