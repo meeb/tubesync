@@ -25,25 +25,30 @@ ghcr.io/meeb/tubesync:latest
 
 # Screenshots
 
+<details>
+<summary>Click to expand screenshots</summary>
+
 ### Dashboard
 
-![TubeSync Dashboard](https://github.com/meeb/tubesync/blob/main/docs/dashboard-v0.5.png?raw=true)
+![TubeSync Dashboard](docs/dashboard-v0.5.png)
 
 ### Sources overview
 
-![TubeSync sources overview](https://github.com/meeb/tubesync/blob/main/docs/sources-v0.5.png?raw=true)
+![TubeSync sources overview](docs/sources-v0.5.png)
 
 ### Source details
 
-![TubeSync source details](https://github.com/meeb/tubesync/blob/main/docs/source-v0.5.png?raw=true)
+![TubeSync source details](docs/source-v0.5.png)
 
 ### Media overview
 
-![TubeSync media overview](https://github.com/meeb/tubesync/blob/main/docs/media-v0.5.png?raw=true)
+![TubeSync media overview](docs/media-v0.5.png)
 
 ### Media details
 
-![TubeSync media-details](https://github.com/meeb/tubesync/blob/main/docs/media-item-v0.5.png?raw=true)
+![TubeSync media-details](docs/media-item-v0.5.png)
+
+</details>
 
 
 # Requirements
@@ -146,36 +151,9 @@ services:
 
 ## Optional authentication
 
-Available in `v1.0` (or `:latest`) and later. If you want to enable a basic username and
-password to be required to access the TubeSync dashboard you can set them with the
-following environment variables:
-
-```bash
-HTTP_USER
-HTTP_PASS
-```
-
-For example, in the `docker run ...` line add in:
-
-```bash
-...
--e HTTP_USER=some-username \
--e HTTP_PASS=some-secure-password \
-...
-```
-
-Or in your Docker Compose file you would add in:
-
-```yaml
-...
-    environment:
-      - HTTP_USER=some-username
-      - HTTP_PASS=some-secure-password
-...
-```
-
-When BOTH `HTTP_USER` and `HTTP_PASS` are set then basic HTTP authentication will be
-enabled.
+You can enable basic HTTP authentication by setting the `HTTP_USER` and `HTTP_PASS`
+environment variables. See the [environment variables reference](//github.com/meeb/tubesync/wiki/Environment-Variables#authentication)
+for details.
 
 
 # Updating
