@@ -477,9 +477,9 @@ RUN --mount=type=bind,source=assets/fontawesome-free,target=/fontawesome-free \
   ( tailwindcss --help || : ) && \
   test -s /app/common/static/styles/tubesync.css && \
   DEBUG=1 timeout 20m tailwindcss build \
-    --input tubesync.css \
-    --output .output.css \
-    --cwd /app/common/static/styles --optimize && \
+    --input /app/common/static/styles/tubesync.css \
+    --output /app/common/static/styles/.output.css \
+    --cwd /app --optimize && \
   mv -v /app/common/static/styles/.output.css /app/common/static/styles/output.css && \
   # install local_settings.py
   rm -v /app/tubesync/local_settings.py.example && \
