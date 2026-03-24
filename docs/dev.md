@@ -147,11 +147,11 @@ tubesync/
 │   ├── tubesync/          # Django project config (settings, urls, wsgi)
 │   ├── common/            # Shared app (base templates, utils, middleware, task queue)
 │   └── sync/              # Main app (sources, media, downloads, media servers)
-├── assets/                # Vendored third-party assets (Font Awesome)
 ├── docs/                  # Documentation
 │   └── assets/            # Screenshots and images
+├── config/                # Static configuration files
+├── fontawesome-free/      # The source for checked-in symbolic links
 ├── patches/               # Patches applied to yt-dlp
-├── config/                # yt-dlp configuration
 ├── Dockerfile             # Multi-stage container build
 ├── Makefile               # Dev shortcuts (build, test, dev, container)
 ├── Pipfile                # Python dependencies
