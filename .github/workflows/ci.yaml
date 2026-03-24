@@ -15,6 +15,7 @@ on:
   pull_request:
     branches:
       - 'main'
+      - 'test-*'
     types:
       - opened
       - reopened
