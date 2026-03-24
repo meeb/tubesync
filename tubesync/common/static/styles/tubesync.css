@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "./fonts.css";
-@import "./fontawesome/css/all.css";
 
 @theme {
     --font-sans: 'Roboto', Arial, Helvetica, sans-serif;
