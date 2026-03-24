@@ -1,6 +1,7 @@
 import datetime
 import os
 import uuid
+from pathlib import Path
 from functools import wraps
 from huey import (
     CancelExecution, Huey as huey_Huey,
@@ -214,7 +215,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     return maint_result
 
 
-def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
+def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, tasks_dir=None):
     name_fmt = 'huey_{}'
     if prefix:
         name_fmt = f'huey_{prefix}_' + '{}'
@@ -226,7 +227,10 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
         workers = 2
     finally:
         if 0 >= workers:
-            useful_cpus = os.sched_getaffinity(0)
+            try:
+                useful_cpus = os.sched_getaffinity(0)
+            except AttributeError:
+                useful_cpus = range(os.cpu_count() or 2)
             workers = max(2, len(useful_cpus) // 2)
         elif 1 == workers:
             thread = False
@@ -239,7 +243,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
         utc=True,
         compression=True,
         connection=dict(
-            filename=f'/config/tasks/{name}.db',
+            filename=str(Path(tasks_dir or '/config/tasks') / f'{name}.db'),
             fsync=True,
             isolation_level='IMMEDIATE', # _create_connection sets this to None
             strict_fifo=True,

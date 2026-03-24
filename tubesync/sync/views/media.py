@@ -15,7 +15,7 @@ from django.utils.translation import gettext_lazy as _
 from common.models import TaskHistory
 from common.utils import append_uri_params
 from ..models import Source, Media, Metadata
-from ..forms import RedownloadMediaForm, SkipMediaForm, EnableMediaForm
+from django import forms
 from ..utils import delete_file
 from ..tasks import (
     get_media_download_task, download_media_image, download_media_file,
@@ -249,7 +249,7 @@ class MediaRedownloadView(FormView, SingleObjectMixin):
     '''
 
     template_name = 'sync/media-redownload.html'
-    form_class = RedownloadMediaForm
+    form_class = forms.Form
     model = Media
 
     def __init__(self, *args, **kwargs):
@@ -328,7 +328,7 @@ class MediaSkipView(FormView, SingleObjectMixin):
     '''
 
     template_name = 'sync/media-skip.html'
-    form_class = SkipMediaForm
+    form_class = forms.Form
     model = Media
 
     def __init__(self, *args, **kwargs):
@@ -375,7 +375,7 @@ class MediaEnableView(FormView, SingleObjectMixin):
     '''
 
     template_name = 'sync/media-enable.html'
-    form_class = EnableMediaForm
+    form_class = forms.Form
     model = Media
 
     def __init__(self, *args, **kwargs):

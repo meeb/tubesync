@@ -11,7 +11,13 @@ dev:
 	$(python) tubesync/manage.py runserver
 
 
-build:
+css:
+	./tailwindcss --input tubesync/common/static/styles/tubesync.css --output tubesync/common/static/styles/output.css
+
+css-watch:
+	./tailwindcss --input tubesync/common/static/styles/tubesync.css --output tubesync/common/static/styles/output.css --watch
+
+build: css
 	mkdir -p tubesync/media
 	mkdir -p tubesync/static
 	$(python) tubesync/manage.py collectstatic --noinput

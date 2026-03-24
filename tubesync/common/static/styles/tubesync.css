@@ -1,0 +1,137 @@
+@import "tailwindcss";
+@import "./fonts.css";
+
+@theme {
+    --font-sans: 'Roboto', Arial, Helvetica, sans-serif;
+
+    --color-background: #ffffff;
+    --color-foreground: #0f172a;
+    --color-card: #ffffff;
+    --color-border: #e2e8f0;
+    --color-input: #e2e8f0;
+    --color-ring: #e71d36;
+
+    --color-primary: #e71d36;
+    --color-primary-foreground: #fdfffc;
+    --color-accent: #f97316;
+    --color-accent-foreground: #fdfffc;
+    --color-destructive: #b91c1c;
+    --color-destructive-foreground: #fdfffc;
+
+    --color-muted: #f1f5f9;
+    --color-muted-foreground: #64748b;
+
+    --color-nav: #011627;
+    --color-nav-foreground: #fdfffc;
+    --color-header: #e71d36;
+    --color-header-foreground: #fdfffc;
+    --color-footer: #0f172a;
+    --color-footer-foreground: #94a3b8;
+}
+
+/* Base styles — inside @layer base so Tailwind utilities can override */
+@layer base {
+    html {
+        font-size: 1.05rem;
+    }
+
+    body {
+        @apply bg-background text-foreground font-sans antialiased;
+        display: flex;
+        min-height: 100vh;
+        flex-direction: column;
+    }
+
+    a {
+        @apply text-primary hover:text-accent transition-colors;
+        text-decoration: none;
+    }
+
+    h1 {
+        @apply text-2xl font-bold tracking-tight text-foreground;
+        margin: 0;
+        padding: 0 0 0.5rem 0;
+    }
+
+    h2 {
+        @apply text-xl font-semibold tracking-tight text-foreground;
+        margin: 0;
+        padding: 1.5rem 0 1rem 0;
+    }
+
+    h3 {
+        @apply text-lg font-semibold text-foreground;
+    }
+
+    strong {
+        font-weight: 700;
+    }
+
+    /* SVG logo */
+    svg.tubesync-logo .logo-icon,
+    svg.tubesync-logo .logo-left-arrow,
+    svg.tubesync-logo .logo-right-arrow {
+        fill: currentColor !important;
+    }
+
+    /* Code blocks */
+    code {
+        @apply bg-muted px-1.5 py-0.5 rounded text-xs font-mono;
+    }
+
+    /* Form inputs - Django renders raw HTML inputs, style them globally */
+    input[type="text"],
+    input[type="url"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="search"],
+    textarea {
+        @apply w-full px-3 py-2 rounded-md border border-input bg-background text-sm text-foreground;
+        @apply outline-none focus:ring-2 focus:ring-ring focus:border-ring;
+        @apply transition-colors;
+    }
+
+    textarea {
+        min-height: 120px;
+    }
+
+    select {
+        @apply w-full px-3 py-2 rounded-md border border-input bg-background text-sm text-foreground;
+        @apply outline-none focus:ring-2 focus:ring-ring focus:border-ring;
+        appearance: auto;
+    }
+
+    input[type="checkbox"] {
+        @apply rounded border-border text-primary;
+        width: 1rem;
+        height: 1rem;
+    }
+
+    /* Error display for forms */
+    .errors {
+        @apply rounded-lg border border-destructive/20 bg-destructive/5 p-4 mb-4;
+    }
+
+    .errors li,
+    .errorlist li {
+        @apply text-destructive text-sm py-1 px-2;
+    }
+
+    .error-text {
+        @apply text-destructive;
+    }
+}
+
+/* Utility classes (outside layer, but safe — they don't conflict with Tailwind utilities) */
+.truncate {
+    @apply overflow-hidden text-ellipsis whitespace-nowrap;
+}
+
+.nowrap {
+    white-space: nowrap;
+}
+
+.no-text-transform {
+    text-transform: none;
+}

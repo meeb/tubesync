@@ -19,3 +19,5 @@ DATABASE_CONNECTION_STR = f'sqlite at "{DATABASES["default"]["NAME"]}"'
 
 
 DOWNLOAD_ROOT = DOWNLOADS_BASE_DIR / 'downloads'
+
+HUEY_TASKS_DIR = CONFIG_BASE_DIR / 'tasks'
