@@ -474,7 +474,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
 FROM scratch AS quickjs
 COPY --from=quickjs-extracted /assimilated/qjs /usr/local/sbin/
 
-FROM tubesync-base AS tubesync-prepare-app
+FROM tubesync-tailwindcss AS tubesync-prepare-app
 
 COPY tubesync /app
 
@@ -487,6 +487,15 @@ RUN --mount=type=bind,source=assets/fontawesome-free,target=/fontawesome-free \
       tar --null -ch --files-from=- | \
       tar --unlink-first -xvp ; \
   ) && \
+  # compile with tailwindcss
+  mkdir -v -p /app/common/static/styles && \
+  rm -v -f /app/common/static/styles/.output.css /app/common/static/styles/output.css && \
+  test -s /app/common/static/styles/tubesync.css && \
+  tailwindcss build --optimize \
+    --input /app/common/static/styles/tubesync.css \
+    --output /app/common/static/styles/.output.css && \
+  mv -v /app/common/static/styles/.output.css /app/common/static/styles/output.css && \
+  # install local_settings.py
   rm -v /app/tubesync/local_settings.py.example && \
   mv -v /app/tubesync/local_settings.py.container /app/tubesync/local_settings.py
 
