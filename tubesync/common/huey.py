@@ -8,6 +8,7 @@ from huey import (
 )
 from huey.api import TaskLock
 from huey.storage import SqliteStorage as huey_SqliteStorage
+from pathlib import Path
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
 
 
@@ -214,7 +215,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     return maint_result
 
 
-def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
+def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=None):
     name_fmt = 'huey_{}'
     if prefix:
         name_fmt = f'huey_{prefix}_' + '{}'
@@ -239,7 +240,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
         utc=True,
         compression=True,
         connection=dict(
-            filename=f'/config/tasks/{name}.db',
+            filename=str(Path(tasks_dir or '/config/tasks') / f'{name}.db'),
             fsync=True,
             isolation_level='IMMEDIATE', # _create_connection sets this to None
             strict_fifo=True,
