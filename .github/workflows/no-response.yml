@@ -1,11 +1,12 @@
 name: No Response
 
-# `issues`.`closed`, `issue_comment`.`created`, and `scheduled` event types are required for this Action
+# `issues`.`closed`, `issues`.`labeled`, `issue_comment`.`created`,
+# and `scheduled` event types are required for this Action
 # to work properly.
 on:
   workflow_dispatch:
   issues:
-    types: [closed]
+    types: [closed, labeled]
   issue_comment:
     types: [created]
   schedule:
@@ -22,7 +23,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: tcely/no-response@v0.1.4
+      - uses: tcely/no-response@v0.2.0
         with:
           token: ${{ github.token }}
           # auto close issues with no response from author for N days
