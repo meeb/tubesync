@@ -2,6 +2,7 @@ name: CI
 
 env:
   IMAGE_NAME: tubesync
+  REGISTRY: ghcr.io
 
 on:
   workflow_dispatch:
@@ -29,6 +30,8 @@ jobs:
     if: ${{ !cancelled() && 'pull_request' != github.event_name }}
     runs-on: ubuntu-latest
     outputs:
+      IMAGE_NAME: ${{ env.IMAGE_NAME }}
+      REGISTRY: ${{ env.REGISTRY }}
       ffmpeg-date: ${{ steps.jq.outputs.FFMPEG_DATE }}
       ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
       ffmpeg-version: ${{ steps.jq.outputs.FFMPEG_VERSION }}
@@ -178,49 +181,26 @@ jobs:
 
   containerise:
     if: ${{ !cancelled() && 'success' == needs.info.result }}
-    needs: ['info', 'test']
+    needs: ['info']
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 30
     concurrency:
       group: ${{ github.repository }}-${{ github.workflow }}
       cancel-in-progress: false
     steps:
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Log into GitHub Container Registry
-        env:
-          DOCKER_REGISTRY: https://ghcr.io
-          DOCKER_USERNAME: ${{ github.repository_owner }}
-          DOCKER_TOKEN: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
-        run: echo "${DOCKER_TOKEN}" | docker login --password-stdin --username "${DOCKER_USERNAME}" "${DOCKER_REGISTRY}"
-      - name: Push missing release tags
-        if: ${{ false && 'meeb' == github.actor && github.actor == github.repository_owner && '' != needs.info.outputs.missing-tags }}
-        run: |
-          missing='${{ needs.info.outputs.missing-tags }}'
-          image='${{ needs.info.outputs.missing-tags-image }}'
-          printf -- '%s\n' "${missing}" | tr '|' '\n' | \
-            while read SPEC
-            do
-              printf -- '%s\n' "${SPEC}" | ( IFS='=' ; \
-                read tag source && \
-                docker pull "${source}" && \
-                docker tag "${source}" "${image}:${tag}" && \
-                docker push "${image}:${tag}" ;
-              )
-            done
+        uses: docker/setup-buildx-action@v4
       - name: Build image for `dive`
         id: build-dive-image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
             FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
-          cache-from: type=gha
+          cache-from: type=gha,scope=buildkit-linux-amd64
           load: true
           platforms: linux/amd64
           push: false
@@ -235,23 +215,40 @@ jobs:
             --ci \
             --highestUserWastedPercent '0.08' \
             --highestWastedBytes '50M'
-      - name: Build and push
-        id: build-push
-        timeout-minutes: 60
-        uses: docker/build-push-action@v6
-        with:
-          platforms: linux/amd64,linux/arm64
-          push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'true' || 'false' }}
-          tags: ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:${{ github.event.repository.default_branch == github.ref_name && 'latest' || 'test' }}
-          cache-from: |
-            type=registry,ref=ghcr.io/${{ needs.info.outputs.lowercase-github-actor }}/${{ env.IMAGE_NAME }}:latest
-            type=registry,ref=ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:latest
-            type=gha
-          cache-to: |
-            type=gha,mode=max
-            ${{ 'meeb' == github.repository_owner && 'pull_request' != github.event_name && 'type=inline' || '' }}
-          build-args: |
-            IMAGE_NAME=${{ env.IMAGE_NAME }}
-            FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
-            FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
-            YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
+
+  docker-image:
+    if: ${{ !cancelled() && 'success' == needs.info.result && 'success' == needs.containerise.result }}
+    concurrency:
+      group: ${{ github.repository }}-${{ github.workflow }}
+      cancel-in-progress: false
+    needs: ['info', 'test', 'containerise']
+    uses: docker/github-builder/.github/workflows/build.yml@v1
+    permissions:
+      contents: read # to fetch the repository content
+      id-token: write # for signing attestation(s) with GitHub OIDC Token
+    secrets:
+      registry-auths: |
+        - registry: ${{ needs.info.outputs.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ 'meeb' == github.repository_owner && secrets.REGISTRY_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+    with:
+      cache: true
+      cache-mode: max
+      meta-images: ${{ needs.info.outputs.REGISTRY }}/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ needs.info.outputs.IMAGE_NAME }}
+      output: image
+      platforms: linux/amd64,linux/arm64
+      push: ${{ 'success' == needs.test.result && 'meeb' == github.repository_owner && 'pull_request' != github.event_name }}
+      setup-qemu: false
+      meta-flavor: |
+        latest=false
+      meta-tags: |
+        type=schedule,pattern=weekly
+        type=raw,enable={{is_default_branch}},value=latest
+        type=raw,enable={{is_not_default_branch}},value=test
+        type=ref,event=tag
+        type=ref,event=pr
+      build-args: |
+        IMAGE_NAME=${{ needs.info.outputs.IMAGE_NAME }}
+        FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
+        FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
+        YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}

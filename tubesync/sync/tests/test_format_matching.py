@@ -1,1037 +1,13 @@
-'''
-    Tests do not test the scheduled tasks that perform live requests to index media or
-    download content. They only check for compliance of web interface and check
-    the matching code logic is working as expected.
-'''
-
-
 import logging
-from datetime import datetime, timedelta
-from pathlib import Path
-from urllib.parse import urlsplit
-from xml.etree import ElementTree
-from django.conf import settings
-from django.test import TestCase, Client, override_settings
-from django.utils import timezone
-from django_huey import DJANGO_HUEY, get_queue
-from common.models import TaskHistory
-from .models import Source, Media
-from .tasks import (
-    cleanup_old_media, check_source_directory_exists,
-    get_media_download_task, get_media_thumbnail_task,
-)
-from .filtering import filter_media
-from .utils import filter_response
-from .choices import (
-    Val, Fallback, FilterSeconds, IndexSchedule, SourceResolution,
-    TaskQueue, YouTube_AudioCodec, YouTube_VideoCodec,
+from django.test import TestCase
+from sync.models import Source, Media
+from sync.choices import (
+    Val, Fallback, SourceResolution,
+    YouTube_AudioCodec, YouTube_VideoCodec,
     YouTube_SourceType,
 )
 
-
-class FrontEndTestCase(TestCase):
-    maxDiff = None
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        # Use immediate mode to execute tasks in this process
-        for qn in DJANGO_HUEY.get('queues', dict()):
-            q = get_queue(qn)
-            # Set the storage variable before using the property.
-            q.immediate_use_memory = True
-            q.immediate = False
-
-    def setUp(self):
-        # Disable general logging for test case
-        logging.disable(logging.CRITICAL)
-
-    def test_dashboard(self):
-        c = Client()
-        response = c.get('/')
-        self.assertEqual(response.status_code, 200)
-
-    def test_validate_source(self):
-        test_sources = {
-            'youtube-channel': {
-                'valid': (
-                    'https://m.youtube.com/testchannel',
-                    'https://m.youtube.com/c/testchannel',
-                    'https://m.youtube.com/c/testchannel/videos',
-                    'https://www.youtube.com/testchannel',
-                    'https://www.youtube.com/c/testchannel',
-                    'https://www.youtube.com/c/testchannel/videos',
-                ),
-                'invalid_schema': (
-                    'http://www.youtube.com/c/playlist',
-                    'ftp://www.youtube.com/c/playlist',
-                ),
-                'invalid_domain': (
-                    'https://www.test.com/c/testchannel',
-                    'https://www.example.com/c/testchannel',
-                    'https://n.youtube.com/c/testchannel',
-                ),
-                'invalid_path': (
-                    'https://www.youtube.com/test/invalid',
-                    'https://www.youtube.com/c/test/invalid',
-                ),
-                'invalid_reserved_paths': (
-                    'https://www.youtube.com/watch?v=OkMadb8cpIw',
-                    'https://www.youtube.com/watch',
-                    'https://www.youtube.com/shorts',
-                    'https://www.youtube.com/live',
-                    'https://www.youtube.com/feed',
-                    'https://www.youtube.com/trending',
-                ),
-            },
-            'youtube-channel-id': {
-                'valid': (
-                    'https://m.youtube.com/channel/channelid',
-                    'https://m.youtube.com/channel/channelid/videos',
-                    'https://www.youtube.com/channel/channelid',
-                    'https://www.youtube.com/channel/channelid/videos',
-                ),
-                'invalid_schema': (
-                    'http://www.youtube.com/channel/channelid',
-                    'ftp://www.youtube.com/channel/channelid',
-                ),
-                'invalid_domain': (
-                    'https://www.test.com/channel/channelid',
-                    'https://www.example.com/channel/channelid',
-                    'https://n.youtube.com/channel/channelid',
-                ),
-                'invalid_path': (
-                    'https://www.youtube.com/test/invalid',
-                    'https://www.youtube.com/channel/test/invalid',
-                ),
-            },
-            'youtube-playlist': {
-                'valid': (
-                    'https://m.youtube.com/playlist?list=testplaylist',
-                    'https://m.youtube.com/watch?v=testvideo&list=testplaylist',
-                    'https://www.youtube.com/playlist?list=testplaylist',
-                    'https://www.youtube.com/watch?v=testvideo&list=testplaylist',
-                ),
-                'invalid_schema': (
-                    'http://www.youtube.com/playlist?list=testplaylist',
-                    'ftp://www.youtube.com/playlist?list=testplaylist',
-                ),
-                'invalid_domain': (
-                    'https://www.test.com/playlist?list=testplaylist',
-                    'https://www.example.com/playlist?list=testplaylist',
-                    'https://n.youtube.com/playlist?list=testplaylist',
-                ),
-                'invalid_path': (
-                    'https://www.youtube.com/test/invalid',
-                ),
-            }
-        }
-        c = Client()
-        response = c.get('/source-validate')
-        self.assertEqual(response.status_code, 200)
-        for (source_type, tests) in test_sources.items():
-            for test, urls in tests.items():
-                for url in urls:
-                    data = {'source_url': url}
-                    response = c.post('/source-validate', data)
-                    if test == 'valid':
-                        # Valid source tests should bounce to /source-add
-                        self.assertEqual(response.status_code, 302)
-                        url_parts = urlsplit(response.url)
-                        self.assertEqual(url_parts.path, '/source-add')
-                    else:
-                        # Invalid source tests should reload the page with an error
-                        self.assertEqual(response.status_code, 200)
-                        self.assertIn('<ul class="errorlist"',
-                                      response.content.decode())
-
-    def test_add_source_prepopulation(self):
-        c = Client()
-        response = c.get('/source-add?key=testkey&name=testname&directory=testdir')
-        self.assertEqual(response.status_code, 200)
-        html = response.content.decode()
-        checked_key, checked_name, checked_directory = False, False, False
-        for line in html.split('\n'):
-            if 'id="id_key"' in line:
-                self.assertIn('value="testkey', line)
-                checked_key = True
-            if 'id="id_name"' in line:
-                self.assertIn('value="testname', line)
-                checked_name = True
-            if 'id="id_directory"' in line:
-                self.assertIn('value="testdir', line)
-                checked_directory = True
-        self.assertTrue(checked_key)
-        self.assertTrue(checked_name)
-        self.assertTrue(checked_directory)
-
-    def test_source(self):
-        #logging.disable(logging.NOTSET)
-        # Sources overview page
-        c = Client()
-        response = c.get('/sources')
-        self.assertEqual(response.status_code, 200)
-        # Add as source form
-        response = c.get('/source-add')
-        self.assertEqual(response.status_code, 200)
-        # Create a new source
-        data_categories = ('sponsor', 'preview', 'preview', 'sponsor',)
-        expected_categories = ['sponsor', 'preview']
-        data = {
-            'source_type': 'c',
-            'key': 'testkey',
-            'name': 'testname',
-            'directory': 'testdirectory',
-            'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
-            'download_cap': 0,
-            'filter_text': '.*',
-            'filter_seconds_min': bool(FilterSeconds.MIN),
-            'index_schedule': 3600,
-            'download_media': False,
-            'index_videos': True,
-            'delete_old_media': False,
-            'days_to_keep': 14,
-            'source_resolution': '1080p',
-            'source_vcodec': 'VP9',
-            'source_acodec': 'OPUS',
-            'prefer_60fps': False,
-            'prefer_hdr': False,
-            'fallback': 'f',
-            'sponsorblock_categories': data_categories,
-            'sub_langs': 'en',
-        }
-        response = c.post('/source-add', data)
-        self.assertEqual(response.status_code, 302)
-        url_parts = urlsplit(response.url)
-        url_path = str(url_parts.path).strip()
-        if url_path.startswith('/'):
-            url_path = url_path[1:]
-        path_parts = url_path.split('/')
-        self.assertEqual(path_parts[0], 'source')
-        source_uuid = path_parts[1]
-        source = Source.objects.get(pk=source_uuid)
-        self.assertEqual(str(source.pk), source_uuid)
-        # Check that the SponsorBlock categories were saved
-        self.assertEqual(source.sponsorblock_categories.selected_choices,
-                         expected_categories)
-        # Run the check_source_directory_exists task
-        check_source_directory_exists.call_local(source_uuid)
-        # Check the source is now on the source overview page
-        response = c.get('/sources')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(source_uuid, response.content.decode())
-        # Check the source detail page loads
-        response = c.get(f'/source/{source_uuid}')
-        self.assertEqual(response.status_code, 200)
-        # Check a task was created to index the media for the new source
-        index_task_qs = TaskHistory.objects.filter(
-            name='sync.tasks.index_source',
-            task_params__0__0=source_uuid,
-        ).order_by('end_at')
-        self.assertTrue(index_task_qs)
-        task = index_task_qs.last()
-        self.assertEqual(task.queue, get_queue(Val(TaskQueue.LIMIT)).name)
-        # save and refresh the Source
-        source.refresh_from_db()
-        source.sponsorblock_categories.selected_choices.append('sponsor')
-        source.save()
-        source.refresh_from_db()
-        # Check that the SponsorBlock categories remain saved
-        self.assertEqual(source.sponsorblock_categories.selected_choices,
-                         expected_categories)
-        # Update the source key
-        data = {
-            'source_type': Val(YouTube_SourceType.CHANNEL),
-            'key': 'updatedkey',  # changed
-            'name': 'testname',
-            'directory': 'testdirectory',
-            'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
-            'download_cap': 0,
-            'filter_text': '.*',
-            'filter_seconds_min': bool(FilterSeconds.MIN),
-            'index_schedule': Val(IndexSchedule.EVERY_HOUR),
-            'delete_old_media': False,
-            'days_to_keep': 14,
-            'source_resolution': Val(SourceResolution.VIDEO_1080P),
-            'source_vcodec': Val(YouTube_VideoCodec.VP9),
-            'source_acodec': Val(YouTube_AudioCodec.OPUS),
-            'prefer_60fps': False,
-            'prefer_hdr': False,
-            'fallback': Val(Fallback.FAIL),
-            'sponsorblock_categories': data_categories,
-            'sub_langs': 'en',
-        }
-        response = c.post(f'/source-update/{source_uuid}', data)
-        self.assertEqual(response.status_code, 302)
-        url_parts = urlsplit(response.url)
-        url_path = str(url_parts.path).strip()
-        if url_path.startswith('/'):
-            url_path = url_path[1:]
-        path_parts = url_path.split('/')
-        self.assertEqual(path_parts[0], 'source')
-        source_uuid = path_parts[1]
-        source = Source.objects.get(pk=source_uuid)
-        self.assertEqual(source.key, 'updatedkey')
-        # Check that the SponsorBlock categories remain saved
-        source.refresh_from_db()
-        self.assertEqual(source.sponsorblock_categories.selected_choices,
-                         expected_categories)
-        # Update the source index schedule which should recreate the scheduled task
-        data = {
-            'source_type': Val(YouTube_SourceType.CHANNEL),
-            'key': 'updatedkey',
-            'name': 'testname',
-            'directory': 'testdirectory',
-            'media_format': settings.MEDIA_FORMATSTR_DEFAULT,
-            'download_cap': 0,
-            'filter_text': '.*',
-            'filter_seconds_min': bool(FilterSeconds.MIN),
-            'index_schedule': Val(IndexSchedule.EVERY_2_HOURS),  # changed
-            'delete_old_media': False,
-            'days_to_keep': 14,
-            'source_resolution': Val(SourceResolution.VIDEO_1080P),
-            'source_vcodec': Val(YouTube_VideoCodec.VP9),
-            'source_acodec': Val(YouTube_AudioCodec.OPUS),
-            'prefer_60fps': False,
-            'prefer_hdr': False,
-            'fallback': Val(Fallback.FAIL),
-            'sponsorblock_categories': data_categories,
-            'sub_langs': 'en',
-        }
-        response = c.post(f'/source-update/{source_uuid}', data)
-        self.assertEqual(response.status_code, 302)
-        url_parts = urlsplit(response.url)
-        url_path = str(url_parts.path).strip()
-        if url_path.startswith('/'):
-            url_path = url_path[1:]
-        path_parts = url_path.split('/')
-        self.assertEqual(path_parts[0], 'source')
-        source_uuid = path_parts[1]
-        source = Source.objects.get(pk=source_uuid)
-        # Check that the SponsorBlock categories remain saved
-        self.assertEqual(source.sponsorblock_categories.selected_choices,
-                         expected_categories)
-        # Check a new task has been created by seeing if the pk has changed
-        new_task = index_task_qs.last()
-        self.assertNotEqual(task.pk, new_task.pk)
-        # Delete source confirmation page
-        response = c.get(f'/source-delete/{source_uuid}')
-        self.assertEqual(response.status_code, 200)
-        # Delete source
-        response = c.post(f'/source-delete/{source_uuid}')
-        self.assertEqual(response.status_code, 302)
-        url_parts = urlsplit(response.url)
-        self.assertEqual(url_parts.path, '/sources')
-        try:
-            Source.objects.get(pk=source_uuid)
-            object_gone = False
-        except Source.DoesNotExist:
-            object_gone = True
-        self.assertTrue(object_gone)
-        # Check the source is now gone from the source overview page
-        response = c.get('/sources')
-        self.assertEqual(response.status_code, 200)
-        self.assertNotIn(source_uuid, response.content.decode())
-        # Check the source details page now 404s
-        response = c.get(f'/source/{source_uuid}')
-        self.assertEqual(response.status_code, 404)
-
-    def test_media(self):
-        # Media overview page
-        c = Client()
-        response = c.get('/media')
-        self.assertEqual(response.status_code, 200)
-        # Add a test source
-        test_source = Source.objects.create(
-            source_type=Val(YouTube_SourceType.CHANNEL),
-            key='testkey',
-            name='testname',
-            directory='testdirectory',
-            index_schedule=Val(IndexSchedule.EVERY_HOUR),
-            delete_old_media=False,
-            days_to_keep=14,
-            source_resolution=Val(SourceResolution.VIDEO_1080P),
-            source_vcodec=Val(YouTube_VideoCodec.VP9),
-            source_acodec=Val(YouTube_AudioCodec.OPUS),
-            prefer_60fps=False,
-            prefer_hdr=False,
-            fallback=Val(Fallback.FAIL)
-        )
-        # Add some media
-        test_minimal_metadata = '''
-            {
-                "channel_id":"testkey",
-                "thumbnail":"https://example.com/thumb.jpg",
-                "formats": [{
-                    "format_id":"251",
-                    "player_url":null,
-                    "ext":"webm",
-                    "format_note":"tiny",
-                    "acodec":"opus",
-                    "abr":160,
-                    "asr":48000,
-                    "filesize":6669827,
-                    "fps":null,
-                    "height":null,
-                    "tbr":156.344,
-                    "width":null,
-                    "vcodec":"none",
-                    "format":"251 - audio only (tiny)",
-                    "protocol":"https"
-                },
-                {
-                    "format_id":"248",
-                    "player_url":null,
-                    "ext":"webm",
-                    "height":1080,
-                    "format_note":"1080p",
-                    "vcodec":"vp9",
-                    "asr":null,
-                    "filesize":63659748,
-                    "fps":24,
-                    "tbr":2747.461,
-                    "width":1920,
-                    "acodec":"none",
-                    "format":"248 - 1920x1080 (1080p)",
-                    "protocol":"https"
-                }]
-            }
-        '''
-        before_dt = timezone.now()
-        past_date = timezone.make_aware(datetime(year=2000, month=1, day=1))
-        test_media1 = Media.objects.create(
-            key='mediakey1',
-            source=test_source,
-            published=past_date,
-            metadata=test_minimal_metadata
-        )
-        test_media1_pk = str(test_media1.pk)
-        test_media2 = Media.objects.create(
-            key='mediakey2',
-            source=test_source,
-            published=past_date,
-            metadata=test_minimal_metadata
-        )
-        test_media2_pk = str(test_media2.pk)
-        test_media3 = Media.objects.create(
-            key='mediakey3',
-            source=test_source,
-            published=past_date,
-            metadata=test_minimal_metadata
-        )
-        test_media3_pk = str(test_media3.pk)
-        # simulate the tasks consumer signals having already run
-        now_dt = timezone.now()
-        TaskHistory.objects.filter(
-            name__startswith='sync.tasks.download_media_',
-        ).update(
-            scheduled_at=before_dt,
-            start_at=now_dt,
-            end_at=now_dt,
-        )
-        # Check the tasks to fetch the media thumbnails have been scheduled
-        found_download_task1 = get_media_download_task(test_media1_pk)
-        found_download_task2 = get_media_download_task(test_media2_pk)
-        found_download_task3 = get_media_download_task(test_media3_pk)
-        found_thumbnail_task1 = get_media_thumbnail_task(test_media1_pk)
-        found_thumbnail_task2 = get_media_thumbnail_task(test_media2_pk)
-        found_thumbnail_task3 = get_media_thumbnail_task(test_media3_pk)
-        self.assertTrue(found_download_task1)
-        self.assertTrue(found_download_task2)
-        self.assertTrue(found_download_task3)
-        self.assertTrue(found_thumbnail_task1)
-        self.assertTrue(found_thumbnail_task2)
-        self.assertTrue(found_thumbnail_task3)
-        # Check the media is listed on the media overview page
-        response = c.get('/media')
-        self.assertEqual(response.status_code, 200)
-        html = response.content.decode()
-        self.assertIn(test_media1_pk, html)
-        self.assertIn(test_media2_pk, html)
-        self.assertIn(test_media3_pk, html)
-        # Check the media detail pages load
-        response = c.get(f'/media/{test_media1_pk}')
-        self.assertEqual(response.status_code, 200)
-        response = c.get(f'/media/{test_media2_pk}')
-        self.assertEqual(response.status_code, 200)
-        response = c.get(f'/media/{test_media3_pk}')
-        self.assertEqual(response.status_code, 200)
-        # Delete the media
-        test_media1.delete()
-        test_media2.delete()
-        test_media3.delete()
-        # Check the media detail pages now 404
-        response = c.get(f'/media/{test_media1_pk}')
-        self.assertEqual(response.status_code, 404)
-        response = c.get(f'/media/{test_media2_pk}')
-        self.assertEqual(response.status_code, 404)
-        response = c.get(f'/media/{test_media3_pk}')
-        self.assertEqual(response.status_code, 404)
-        # simulate the tasks consumer signals having already run
-        TaskHistory.objects.filter(
-            name__startswith='sync.tasks.download_media_',
-        ).update(end_at=timezone.now())
-        # Confirm any tasks have been deleted
-        found_download_task1 = get_media_download_task(test_media1_pk)
-        found_download_task2 = get_media_download_task(test_media2_pk)
-        found_download_task3 = get_media_download_task(test_media3_pk)
-        found_thumbnail_task1 = get_media_thumbnail_task(test_media1_pk)
-        found_thumbnail_task2 = get_media_thumbnail_task(test_media2_pk)
-        found_thumbnail_task3 = get_media_thumbnail_task(test_media3_pk)
-        self.assertFalse(found_download_task1)
-        self.assertFalse(found_download_task2)
-        self.assertFalse(found_download_task3)
-        self.assertFalse(found_thumbnail_task1)
-        self.assertFalse(found_thumbnail_task2)
-        self.assertFalse(found_thumbnail_task3)
-
-    def test_tasks(self):
-        # Tasks overview page
-        c = Client()
-        response = c.get('/tasks')
-        self.assertEqual(response.status_code, 200)
-        # Completed tasks overview page
-        response = c.get('/tasks-completed')
-        self.assertEqual(response.status_code, 200)
-
-    def test_mediaservers(self):
-        # Media servers overview page
-        c = Client()
-        response = c.get('/mediaservers')
-        self.assertEqual(response.status_code, 200)
-
-
-metadata_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata.json'
-with open(metadata_filepath, 'rt') as file:
-    metadata = file.read()
-metadata_hdr_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_hdr.json'
-with open(metadata_hdr_filepath, 'rt') as file:
-    metadata_hdr = file.read()
-metadata_60fps_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_60fps.json'
-with open(metadata_60fps_filepath, 'rt') as file:
-    metadata_60fps = file.read()
-metadata_60fps_hdr_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_60fps_hdr.json'
-with open(metadata_60fps_hdr_filepath, 'rt') as file:
-    metadata_60fps_hdr = file.read()
-metadata_20230629_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_2023-06-29.json'
-with open(metadata_20230629_filepath, 'rt') as file:
-    metadata_20230629 = file.read()
-metadata_issue_499_1080p50_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_issue_499_1080p50.json'
-with open(metadata_issue_499_1080p50_filepath, 'rt') as file:
-    metadata_issue_499_1080p50 = file.read()
-metadata_issue_499_premium_filepath = settings.BASE_DIR / 'sync' / 'testdata' / 'metadata_issue_499_premium.json'
-with open(metadata_issue_499_premium_filepath, 'rt') as file:
-    metadata_issue_499_premium = file.read()
-all_test_metadata = {
-    'boring': metadata,
-    'hdr': metadata_hdr,
-    '60fps': metadata_60fps,
-    '60fps+hdr': metadata_60fps_hdr,
-    '20230629': metadata_20230629,
-    'issue499_1080p50': metadata_issue_499_1080p50,
-    'issue499_premium': metadata_issue_499_premium,
-}
-
-
-class FilepathTestCase(TestCase):
-
-    def setUp(self):
-        # Disable general logging for test case
-        logging.disable(logging.CRITICAL)
-        # Add a test source
-        self.source = Source.objects.create(
-            source_type=Val(YouTube_SourceType.CHANNEL),
-            key='testkey',
-            name='testname',
-            directory='testdirectory',
-            media_format=settings.MEDIA_FORMATSTR_DEFAULT,
-            index_schedule=3600,
-            delete_old_media=False,
-            days_to_keep=14,
-            source_resolution=Val(SourceResolution.VIDEO_1080P),
-            source_vcodec=Val(YouTube_VideoCodec.VP9),
-            source_acodec=Val(YouTube_AudioCodec.OPUS),
-            prefer_60fps=False,
-            prefer_hdr=False,
-            fallback=Val(Fallback.FAIL)
-        )
-        # Add some test media
-        self.media = Media.objects.create(
-            key='mediakey',
-            source=self.source,
-            metadata=metadata,
-        )
-
-    def test_source_media_format(self):
-        # Check media format validation is working
-        # Empty
-        self.source.media_format = ''
-        self.assertEqual(self.source.get_example_media_format(), '')
-        # Invalid, bad key
-        self.source.media_format = '{test}'
-        self.assertEqual(self.source.get_example_media_format(), '')
-        # Invalid, extra brackets
-        self.source.media_format = '{key}}'
-        self.assertEqual(self.source.get_example_media_format(), '')
-        # Invalid, not a string
-        self.source.media_format = 1
-        self.assertEqual(self.source.get_example_media_format(), '')
-        # Check all expected keys validate
-        self.source.media_format = 'test-{yyyymmdd}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-' + timezone.now().strftime('%Y%m%d'))
-        self.source.media_format = 'test-{yyyy_mm_dd}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-' + timezone.now().strftime('%Y-%m-%d'))
-        self.source.media_format = 'test-{yyyy_0mm_dd}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-' + timezone.now().strftime('%Y-0%m-%d'))
-        self.source.media_format = 'test-{yyyy}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-' + timezone.now().strftime('%Y'))
-        self.source.media_format = 'test-{mm}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-' + timezone.now().strftime('%m'))
-        self.source.media_format = 'test-{dd}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-' + timezone.now().strftime('%d'))
-        self.source.media_format = 'test-{source}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-' + self.source.slugname)
-        self.source.media_format = 'test-{source_full}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-' + self.source.name)
-        self.source.media_format = 'test-{title}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-some-media-title-name')
-        self.source.media_format = 'test-{title_full}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-Some Media Title Name')
-        self.source.media_format = 'test-{key}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-SoMeUnIqUiD')
-        self.source.media_format = 'test-{format}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-1080p-vp9-opus')
-        self.source.media_format = 'test-{playlist_title}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-Some Playlist Title')
-        self.source.media_format = 'test-{ext}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-' + self.source.extension)
-        self.source.media_format = 'test-{resolution}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-' + self.source.source_resolution)
-        self.source.media_format = 'test-{height}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-720')
-        self.source.media_format = 'test-{width}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-1280')
-        self.source.media_format = 'test-{vcodec}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-' + self.source.source_vcodec.lower())
-        self.source.media_format = 'test-{acodec}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-' + self.source.source_acodec.lower())
-        self.source.media_format = 'test-{fps}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-24')
-        self.source.media_format = 'test-{hdr}'
-        self.assertEqual(self.source.get_example_media_format(),
-                         'test-hdr')
-
-    def test_media_filename(self):
-        # Check child directories work
-        self.source.media_format = '{yyyy}/{key}.{ext}'
-        self.assertEqual(self.media.directory_path,
-                         self.source.directory_path / '2017')
-        self.assertEqual(self.media.filename, '2017/mediakey.mkv')
-        self.source.media_format = '{yyyy}/{yyyy_mm_dd}/{key}.{ext}'
-        self.assertEqual(self.media.directory_path,
-                         self.source.directory_path / '2017/2017-09-11')
-        self.assertEqual(self.media.filename, '2017/2017-09-11/mediakey.mkv')
-        # Check media specific media format keys work
-        test_media = Media.objects.create(
-            key='test',
-            source=self.source,
-            metadata=metadata,
-            downloaded=True,
-            download_date=timezone.now(),
-            downloaded_format='720p',
-            downloaded_height=720,
-            downloaded_width=1280,
-            downloaded_audio_codec='opus',
-            downloaded_video_codec='vp9',
-            downloaded_container='mkv',
-            downloaded_fps=30,
-            downloaded_hdr=True,
-            downloaded_filesize=12345
-        )
-        # Bypass media-file-exists on-save signal
-        test_media.downloaded = True
-        self.source.media_format = ('{title}_{key}_{resolution}-{height}x{width}-'
-                                    '{acodec}-{vcodec}-{fps}fps-{hdr}.{ext}')
-        self.assertEqual(test_media.filename,
-                         ('no-fancy-stuff-title_test_720p-720x1280-opus'
-                          '-vp9-30fps-hdr.mkv'))
-
-    def test_resolution_token_prefers_height_over_format_note(self):
-        self.source.media_format = '{resolution}.{ext}'
-
-        def create_media(key, metadata_key, downloaded_fields=None):
-            downloaded_fields = downloaded_fields or dict()
-            media = Media(key=key, source=self.source, **downloaded_fields)
-            metadata_dict = media.metadata_loads(all_test_metadata[metadata_key])
-            media.metadata = media.metadata_dumps(metadata_dict)
-            media.save()
-            return media
-
-        media_50fps = create_media('test50fps', 'issue499_1080p50')
-        self.assertEqual(media_50fps.format_dict['resolution'], '1080p')
-        self.assertEqual(media_50fps.filename, '1080p.mkv')
-
-        media_premium = create_media('testpremium', 'issue499_premium')
-        self.assertEqual(media_premium.format_dict['resolution'], '1080p')
-        self.assertEqual(media_premium.filename, '1080p.mkv')
-
-        downloaded_premium = create_media(
-            'downloadedpremium',
-            'issue499_premium',
-            downloaded_fields=dict(
-                downloaded=True,
-                download_date=timezone.now(),
-                downloaded_format='PREMIUM',
-                downloaded_height=1080,
-                downloaded_width=1920,
-                downloaded_audio_codec='opus',
-                downloaded_video_codec='vp9',
-                downloaded_container='mkv',
-                downloaded_fps=50,
-                downloaded_hdr=False,
-                downloaded_filesize=123,
-            ),
-        )
-        self.assertEqual(downloaded_premium.format_dict['resolution'], '1080p')
-        self.assertEqual(downloaded_premium.filename, '1080p.mkv')
-
-        # verify audio-only downloads still work as expected
-        self.source.source_resolution=Val(SourceResolution.AUDIO)
-        downloaded_audio = create_media(
-            'downloadedaudio',
-            'issue499_1080p50',
-            downloaded_fields=dict(
-                downloaded=True,
-                download_date=timezone.now(),
-                downloaded_format=Val(SourceResolution.AUDIO),
-                downloaded_width=1920,
-                downloaded_audio_codec='OPUS',
-                downloaded_video_codec='vp9',
-                downloaded_container='ogg',
-                downloaded_fps=50,
-                downloaded_hdr=False,
-                downloaded_filesize=123,
-            ),
-        )
-        self.assertEqual(downloaded_audio.downloaded, True)
-        self.assertEqual(downloaded_audio.downloaded_width, 1920)
-        self.assertEqual(downloaded_audio.format_dict['ext'], 'ogg')
-        self.assertEqual(downloaded_audio.format_dict['resolution'], 'audio')
-        self.assertEqual(downloaded_audio.format_dict['height'], '0')
-        self.assertEqual(downloaded_audio.format_dict['width'], '0')
-        downloaded_audio.downloaded_height = 1080
-        self.assertEqual(downloaded_audio.downloaded_height, 1080)
-        self.assertEqual(downloaded_audio.format_dict['resolution'], 'audio')
-        self.assertEqual(downloaded_audio.format_dict['height'], '0')
-        self.source.source_resolution=Val(SourceResolution.VIDEO_1080P)
-
-    def test_directory_prefix(self):
-        # Confirm the setting exists and is valid
-        self.assertTrue(hasattr(settings, 'SOURCE_DOWNLOAD_DIRECTORY_PREFIX'))
-        self.assertTrue(isinstance(settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX, bool))
-        # Test the default behavior for "True", forced "audio" or "video" parent directories for sources
-        settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX = True
-        self.source.source_resolution = Val(SourceResolution.AUDIO)
-        test_audio_prefix_path = Path(self.source.directory_path)
-        self.assertEqual(test_audio_prefix_path.parts[-2], 'audio')
-        self.assertEqual(test_audio_prefix_path.parts[-1], 'testdirectory')
-        self.source.source_resolution = Val(SourceResolution.VIDEO_1080P)
-        test_video_prefix_path = Path(self.source.directory_path)
-        self.assertEqual(test_video_prefix_path.parts[-2], 'video')
-        self.assertEqual(test_video_prefix_path.parts[-1], 'testdirectory')
-        # Test the default behavior for "False", no parent directories for sources
-        settings.SOURCE_DOWNLOAD_DIRECTORY_PREFIX = False
-        test_no_prefix_path = Path(self.source.directory_path)
-        self.assertEqual(test_no_prefix_path.parts[-1], 'testdirectory')
-
-
-class MediaTestCase(TestCase):
-
-    def setUp(self):
-        # Disable general logging for test case
-        logging.disable(logging.CRITICAL)
-        # Add a test source
-        self.source = Source.objects.create(
-            source_type=Val(YouTube_SourceType.CHANNEL),
-            key='testkey',
-            name='testname',
-            directory='testdirectory',
-            media_format=settings.MEDIA_FORMATSTR_DEFAULT,
-            index_schedule=3600,
-            delete_old_media=False,
-            days_to_keep=14,
-            source_resolution=Val(SourceResolution.VIDEO_1080P),
-            source_vcodec=Val(YouTube_VideoCodec.VP9),
-            source_acodec=Val(YouTube_AudioCodec.OPUS),
-            prefer_60fps=False,
-            prefer_hdr=False,
-            fallback=Val(Fallback.FAIL)
-        )
-        # Add some test media
-        self.media = Media.objects.create(
-            key='mediakey',
-            source=self.source,
-            metadata=metadata,
-        )
-        # Fix a created datetime for predictable testing
-        self.media.created = datetime(year=2020, month=1, day=1, hour=1,
-                                      minute=1, second=1)
-
-    def test_download_finished_clears_stale_video_fields_for_audio(self):
-        filepath = self.media.filepath.parent / 'downloaded-audio.ogg'
-        filepath.parent.mkdir(parents=True, exist_ok=True)
-        filepath.write_bytes(b'test-audio')
-
-        # Simulate stale values from a prior video download.
-        self.media.downloaded_format = '1080p'
-        self.media.downloaded_height = 1080
-        self.media.downloaded_width = 1920
-        self.media.downloaded_video_codec = 'vp9'
-        self.media.downloaded_fps = 50
-        self.media.downloaded_hdr = True
-
-        # 249 is an audio-only format in sync/testdata/metadata.json.
-        self.media.download_finished('249', 'ogg', downloaded_filepath=filepath)
-
-        self.assertTrue(self.media.downloaded)
-        self.assertEqual(self.media.downloaded_format, Val(SourceResolution.AUDIO))
-        self.assertEqual(self.media.downloaded_container, 'ogg')
-        self.assertIsNone(self.media.downloaded_height)
-        self.assertIsNone(self.media.downloaded_width)
-        self.assertIsNone(self.media.downloaded_video_codec)
-        self.assertIsNone(self.media.downloaded_fps)
-        self.assertFalse(self.media.downloaded_hdr)
-
-    def test_nfo(self):
-        expected_nfo = [
-            "<?xml version='1.0' encoding='utf8'?>",
-            '<episodedetails>',
-            '  <title>no fancy stuff title</title>',
-            '  <showtitle>testname</showtitle>',
-            '  <season>2017</season>',
-            '  <episode></episode>',
-            '  <ratings>',
-            '    <rating default="True" max="5" name="youtube">',
-            '      <value>1.2345</value>',
-            '      <votes>579</votes>',
-            '    </rating>',
-            '  </ratings>',
-            '  <plot>no fancy stuff desc</plot>',
-            '  <thumb />',  # media.thumbfile is empty without media existing
-            '  <mpaa>50</mpaa>',
-            '  <runtime>401</runtime>',
-            '  <id>mediakey</id>',
-            '  <uniqueid default="True" type="youtube">mediakey</uniqueid>',
-            '  <studio>test uploader</studio>',
-            '  <aired>2017-09-11</aired>',
-            '  <dateadded>2020-01-01 01:01:01</dateadded>',
-            '  <genre>test category 1</genre>',
-            '  <genre>test category 2</genre>',
-            '</episodedetails>',
-        ]
-        expected_tree = ElementTree.fromstring('\n'.join(expected_nfo))
-        nfo_tree = ElementTree.fromstring(self.media.nfoxml)
-        # Check each node with attribs in expected_tree is present in test_nfo
-        for expected_node in expected_tree:
-            # Ignore checking <genre>, only tag we may have multiple of
-            if expected_node.tag == 'genre':
-                continue
-            # Find the same node in the NFO XML tree
-            nfo_node = nfo_tree.find(expected_node.tag)
-            self.assertEqual(expected_node.attrib, nfo_node.attrib)
-            self.assertEqual(expected_node.tag, nfo_node.tag)
-            self.assertEqual(expected_node.text, nfo_node.text)
-
-
-class MediaFilterTestCase(TestCase):
-
-    def setUp(self):
-        # Disable general logging for test case
-        # logging.disable(logging.CRITICAL)
-        # Add a test source
-        self.source = Source.objects.create(
-            source_type=Val(YouTube_SourceType.CHANNEL),
-            key="testkey",
-            name="testname",
-            directory="testdirectory",
-            media_format=settings.MEDIA_FORMATSTR_DEFAULT,
-            index_schedule=3600,
-            delete_old_media=False,
-            days_to_keep=14,
-            source_resolution=Val(SourceResolution.VIDEO_1080P),
-            source_vcodec=Val(YouTube_VideoCodec.VP9),
-            source_acodec=Val(YouTube_AudioCodec.OPUS),
-            prefer_60fps=False,
-            prefer_hdr=False,
-            fallback=Val(Fallback.FAIL),
-        )
-        # Add some test media
-        self.media = Media.objects.create(
-            key="mediakey",
-            source=self.source,
-            metadata=metadata,
-            skip=False,
-            published=timezone.make_aware(
-                datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
-            ),
-        )
-        # Fix a created datetime for predictable testing
-        self.media.created = datetime(
-            year=2020, month=1, day=1, hour=1, minute=1, second=1
-        )
-
-    def test_filter_unpublished_skip(self):
-        # Check if unpublished that we skip download it
-        self.media.skip = False
-        self.media.published = False
-        changed = filter_media(self.media)
-        self.assertTrue(changed)
-        self.assertTrue(self.media.skip)
-
-    def test_filter_published_unskip(self):
-        # Check if we had previously skipped it, but now it's published, we won't skip it
-        self.media.skip = True
-        self.media.published = timezone.make_aware(
-            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
-        )
-        changed = filter_media(self.media)
-        self.assertTrue(changed)
-        self.assertFalse(self.media.skip)
-
-    def test_filter_filter_text_nomatch(self):
-        # Check that if we don't match the filter text, we skip
-        self.media.source.filter_text = "No fancy stuff"
-        self.media.skip = False
-        self.media.published = timezone.make_aware(
-            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
-        )
-        changed = filter_media(self.media)
-        self.assertTrue(changed)
-        self.assertTrue(self.media.skip)
-
-    def test_filter_filter_text_match(self):
-        # Check that if we match the filter text, we don't skip
-        self.media.source.filter_text = "(?i)No fancy stuff"
-        self.media.skip = True
-        self.media.published = timezone.make_aware(
-            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
-        )
-        changed = filter_media(self.media)
-        self.assertTrue(changed)
-        self.assertFalse(self.media.skip)
-
-    def test_filter_filter_text_invert_nomatch(self):
-        # Check that if we don't match the filter text, we don't skip
-        self.media.source.filter_text = "No fancy stuff"
-        self.media.source.filter_text_invert = True
-        self.media.skip = True
-        self.media.published = timezone.make_aware(
-            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
-        )
-        changed = filter_media(self.media)
-        self.assertTrue(changed)
-        self.assertFalse(self.media.skip)
-
-    def test_filter_filter_text_invert_match(self):
-        # Check that if we match the filter text and do skip
-        self.media.source.filter_text = "(?i)No fancy stuff"
-        self.media.source.filter_text_invert = True
-        self.media.skip = False
-        self.media.published = timezone.make_aware(
-            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
-        )
-        changed = filter_media(self.media)
-        self.assertTrue(changed)
-        self.assertTrue(self.media.skip)
-
-    def test_filter_max_cap_skip(self):
-        # Check if it's older than the max_cap, we don't download it (1 second so it will always fail)
-        self.media.source.download_cap = 1
-        self.media.skip = False
-        self.media.published = timezone.make_aware(
-            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
-        )
-        changed = filter_media(self.media)
-        self.assertTrue(changed)
-        self.assertTrue(self.media.skip)
-
-    def test_filter_max_cap_unskip(self):
-        # Make sure it's newer than the cap so we download it, ensure that we are published in the last seconds
-        self.media.source.download_cap = 3600
-        self.media.skip = True
-        self.media.published = timezone.now()
-        changed = filter_media(self.media)
-        self.assertTrue(changed)
-        self.assertFalse(self.media.skip)
-
-    def test_filter_below_min(self):
-        # Filter videos shorter than the minimum limit
-        self.media.skip = False
-        self.media.source.filter_seconds_min = True
-        self.media.source.filter_seconds = 500
-        self.media.published = timezone.make_aware(
-            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
-        )
-        changed = filter_media(self.media)
-        self.assertTrue(changed)
-        self.assertTrue(self.media.skip)
-
-    def test_filter_above_min(self):
-        # Video is longer than the minimum, allow it
-        self.media.skip = True
-        self.media.source.filter_seconds_min = True
-        self.media.source.filter_seconds = 300
-        self.media.published = timezone.make_aware(
-            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
-        )
-        changed = filter_media(self.media)
-        self.assertTrue(changed)
-        self.assertFalse(self.media.skip)
-
-    def test_filter_above_max(self):
-        # Filter videos longer than the maximum limit
-        self.media.skip = False
-        self.media.source.filter_seconds_min = False
-        self.media.source.filter_seconds = 300
-        self.media.published = timezone.make_aware(
-            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
-        )
-        changed = filter_media(self.media)
-        self.assertTrue(changed)
-        self.assertTrue(self.media.skip)
-
-    def test_filter_below_max(self):
-        # Video is below the maximum, allow it
-        self.media.skip = True
-        self.media.source.filter_seconds_min = False
-        self.media.source.filter_seconds = 500
-        self.media.published = timezone.make_aware(
-            datetime(year=2020, month=1, day=1, hour=1, minute=1, second=1)
-        )
-        changed = filter_media(self.media)
-        self.assertTrue(changed)
-        self.assertFalse(self.media.skip)
-
+from .fixtures import all_test_metadata
 
 class FormatMatchingTestCase(TestCase):
 
@@ -1327,7 +303,7 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, acodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.source_acodec = acodec
@@ -1335,7 +311,7 @@ class FormatMatchingTestCase(TestCase):
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_audio_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
 
     def test_video_exact_format_matching(self):
         self.source.fallback = Val(Fallback.FAIL)
@@ -1379,14 +355,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test 60fps metadata
         self.media.metadata = all_test_metadata['60fps']
         self.media.save()
@@ -1419,14 +395,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test hdr metadata
         self.media.metadata = all_test_metadata['hdr']
         self.media.save()
@@ -1475,14 +451,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test 60fps+hdr metadata
         self.media.metadata = all_test_metadata['60fps+hdr']
         self.media.save()
@@ -1538,14 +514,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
 
     def test_video_require_codec_format_matching(self):
         self.media.source.fallback = Val(Fallback.REQUIRE_CODEC)
@@ -1590,14 +566,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test 60fps metadata
         self.media.metadata = all_test_metadata['60fps']
         self.media.save()
@@ -1631,14 +607,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test hdr metadata
         self.media.metadata = all_test_metadata['hdr']
         self.media.save()
@@ -1688,14 +664,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test 60fps+hdr metadata
         self.media.metadata = all_test_metadata['60fps+hdr']
         self.media.save()
@@ -1752,14 +728,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # test AV1 codec
         self.media.metadata = all_test_metadata['20230629']
         self.media.save()
@@ -1796,14 +772,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
 
     def test_video_next_best_format_matching(self):
         self.source.fallback = Val(Fallback.NEXT_BEST_RESOLUTION)
@@ -1847,14 +823,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test 60fps metadata
         self.media.metadata = all_test_metadata['60fps']
         self.media.save()
@@ -1887,14 +863,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test hdr metadata
         self.media.metadata = all_test_metadata['hdr']
         self.media.save()
@@ -1943,14 +919,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
         # Test 60fps+hdr metadata
         self.media.metadata = all_test_metadata['60fps+hdr']
         self.media.save()
@@ -2006,14 +982,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
 
     def test_metadata_20230629(self):
         self.source.fallback = Val(Fallback.NEXT_BEST_RESOLUTION)
@@ -2096,14 +1072,14 @@ class FormatMatchingTestCase(TestCase):
         }
         for params, expected in expected_matches.items():
             resolution, vcodec, prefer_60fps, prefer_hdr = params
-            expeceted_match_type, expected_format_code = expected
+            expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
             self.source.source_vcodec = vcodec
             self.source.prefer_60fps = prefer_60fps
             self.source.prefer_hdr = prefer_hdr
             match_type, format_code = self.media.get_best_video_format()
             self.assertEqual(format_code, expected_format_code)
-            self.assertEqual(match_type, expeceted_match_type)
+            self.assertEqual(match_type, expected_match_type)
             # The aim here is to execute the matching code to find error paths, specific testing isn't required
             self.media.get_best_audio_format()
 
@@ -2137,111 +1113,3 @@ class FormatMatchingTestCase(TestCase):
                     f'expected {expected_match_result}')
 
 
-class ResponseFilteringTestCase(TestCase):
-
-    def setUp(self):
-        # Disable general logging for test case
-        logging.disable(logging.CRITICAL)
-        # Add a test source
-        self.source = Source.objects.create(
-            source_type=Val(YouTube_SourceType.CHANNEL),
-            key='testkey',
-            name='testname',
-            directory='testdirectory',
-            index_schedule=3600,
-            delete_old_media=False,
-            days_to_keep=14,
-            source_resolution=Val(SourceResolution.VIDEO_1080P),
-            source_vcodec=Val(YouTube_VideoCodec.VP9),
-            source_acodec=Val(YouTube_AudioCodec.OPUS),
-            prefer_60fps=False,
-            prefer_hdr=False,
-            fallback=Val(Fallback.FAIL)
-        )
-        # Add some media
-        self.media = Media.objects.create(
-            key='mediakey',
-            source=self.source,
-            metadata='{}'
-        )
-
-    @override_settings(SHRINK_OLD_MEDIA_METADATA=False, SHRINK_NEW_MEDIA_METADATA=False)
-    def test_metadata_20230629(self):
-        self.media.metadata = all_test_metadata['20230629']
-        self.media.save()
-
-        unfiltered = self.media.loaded_metadata
-        filtered = filter_response(self.media.loaded_metadata, True)
-        self.assertIn('formats', unfiltered.keys())
-        self.assertIn('formats', filtered.keys())
-        # filtered 'downloader_options'
-        self.assertIn('downloader_options', unfiltered['formats'][10].keys())
-        self.assertNotIn('downloader_options', filtered['formats'][10].keys())
-        # filtered 'http_headers'
-        self.assertIn('http_headers', unfiltered['formats'][0].keys())
-        self.assertNotIn('http_headers', filtered['formats'][0].keys())
-        # did not lose any formats
-        self.assertEqual(48, len(unfiltered['formats']))
-        self.assertEqual(48, len(filtered['formats']))
-        self.assertEqual(len(unfiltered['formats']), len(filtered['formats']))
-        # did not remove everything with url
-        self.assertIn('original_url', unfiltered.keys())
-        self.assertIn('original_url', filtered.keys())
-        self.assertEqual(unfiltered['original_url'], filtered['original_url'])
-        # did reduce the size of the metadata
-        self.assertTrue(len(str(filtered)) < len(str(unfiltered)))
-
-        url_keys = []
-        for format in unfiltered['formats']:
-            for key in format.keys():
-                if 'url' in key:
-                    url_keys.append((format['format_id'], key, format[key],))
-        unfiltered_url_keys = url_keys
-        self.assertEqual(63, len(unfiltered_url_keys), msg=str(unfiltered_url_keys))
-
-        url_keys = []
-        for format in filtered['formats']:
-            for key in format.keys():
-                if 'url' in key:
-                    url_keys.append((format['format_id'], key, format[key],))
-        filtered_url_keys = url_keys
-        self.assertEqual(3, len(filtered_url_keys), msg=str(filtered_url_keys))
-
-        url_keys = []
-        for lang_code, captions in filtered['automatic_captions'].items():
-            for caption in captions:
-                for key in caption.keys():
-                    if 'url' in key:
-                        url_keys.append((lang_code, caption['ext'], caption[key],))
-        self.assertEqual(0, len(url_keys), msg=str(url_keys))
-
-
-class TasksTestCase(TestCase):
-
-    def setUp(self):
-        # Disable general logging for test case
-        logging.disable(logging.CRITICAL)
-
-    def test_delete_old_media(self):
-        src1 = Source.objects.create(key='aaa', name='aaa', directory='/tmp/a', delete_old_media=False, days_to_keep=14)
-        src2 = Source.objects.create(key='bbb', name='bbb', directory='/tmp/b', delete_old_media=True, days_to_keep=14)
-
-        now = timezone.now()
-
-        m11 = Media.objects.create(source=src1, downloaded=True, key='a11', download_date=now - timedelta(days=5)) # noqa
-        m12 = Media.objects.create(source=src1, downloaded=True, key='a12', download_date=now - timedelta(days=25)) # noqa
-        m13 = Media.objects.create(source=src1, downloaded=False, key='a13') # noqa
-
-        m21 = Media.objects.create(source=src2, downloaded=True, key='a21', download_date=now - timedelta(days=5)) # noqa
-        m22 = Media.objects.create(source=src2, downloaded=True, key='a22', download_date=now - timedelta(days=25))
-        m23 = Media.objects.create(source=src2, downloaded=False, key='a23') # noqa
-
-        self.assertEqual(src1.media_source.all().count(), 3)
-        self.assertEqual(src2.media_source.all().count(), 3)
-
-        cleanup_old_media.call_local(durable=False)
-
-        self.assertEqual(src1.media_source.all().count(), 3)
-        self.assertEqual(src2.media_source.all().count(), 3)
-        self.assertEqual(Media.objects.filter(pk=m22.pk).exists(), False)
-        self.assertEqual(Media.objects.filter(source=src2, key=m22.key, skip=True).exists(), True)
