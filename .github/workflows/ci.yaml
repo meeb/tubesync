@@ -32,25 +32,14 @@ jobs:
     outputs:
       IMAGE_NAME: ${{ env.IMAGE_NAME }}
       REGISTRY: ${{ env.REGISTRY }}
-      ffmpeg-date: ${{ steps.jq.outputs.FFMPEG_DATE }}
-      ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
-      ffmpeg-version: ${{ steps.jq.outputs.FFMPEG_VERSION }}
+      ffmpeg-date: ${{ steps.ffmpeg.outputs.date }}
+      # ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
+      ffmpeg-version: ${{ steps.ffmpeg.outputs.version }}
       lowercase-github-actor: ${{ steps.github-actor.outputs.lowercase }}
       lowercase-github-repository_owner: ${{ steps.github-repository_owner.outputs.lowercase }}
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
-      ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
-      missing-tags: ${{ steps.tagged.outputs.missing }}
-      missing-tags-image: ${{ steps.tagged.outputs.image }}
+      # ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
     steps:
-      - name: Pull tagged releases
-        id: tagged
-        run: |
-          image='ghcr.io/meeb/${{ env.IMAGE_NAME }}'
-          missing=''
-          set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
-          set -eux
-          set_sl_var image "${image}" >> "${GITHUB_OUTPUT}"
-          set_sl_var missing "${missing}" >> "${GITHUB_OUTPUT}"
       - uses: actions/checkout@v6
       - name: Lowercase github username
         id: github-actor
@@ -68,35 +57,6 @@ jobs:
       - name: Retrieve yt-dlp/yt-dlp releases with GitHub CLI
         id: yt-dlp
         uses: ./.github/actions/yt-dlp
-      - name: Set outputs with jq
-        id: jq
-        run: |
-          cat >| .ffmpeg.releases.json <<'EOF'
-          ${{ steps.ffmpeg.outputs.releases }}
-          EOF
-          mk_delim() { local f='%s_EOF_%d_' ; printf -- "${f}" "$1" "${RANDOM}" ; } ;
-          open_ml_var() { local f=''\%'s<<'\%'s\n' ; printf -- "${f}" "$2" "$1" ; } ;
-          close_ml_var() { local f='%s\n' ; printf -- "${f}" "$1" ; } ;
-          {
-            var='FFMPEG_DATE' ;
-            delim="$(mk_delim "${var}")" ;
-            open_ml_var "${delim}" "${var}" ;
-            jq_arg='[foreach .[] as $release ([{}, []]; [ .[0] + {($release.commit): ([ $release.date ] + (.[0][($release.commit)] // []) ) }, [ .[1][0] // $release.commit ] ] ; .[0][(.[1][0])] ) ][-1][0]' ;
-            jq -r "${jq_arg}" -- .ffmpeg.releases.json ;
-            close_ml_var "${delim}" "${var}" ;
-
-            ffmpeg_date="$( jq -r "${jq_arg}" -- .ffmpeg.releases.json )"
-            
-            var='FFMPEG_VERSION' ;
-            delim="$(mk_delim "${var}")" ;
-            open_ml_var "${delim}" "${var}" ;
-            jq_arg='.[]|select(.date == $date)|.versions[]|select(startswith("N-"))' ;
-            jq -r --arg date "${ffmpeg_date}" "${jq_arg}" -- .ffmpeg.releases.json ;
-            close_ml_var "${delim}" "${var}" ;
-            unset -v delim jq_arg var ;
-          } >> "${GITHUB_OUTPUT}"
-          cat -v "${GITHUB_OUTPUT}"
-          rm -v -f .ffmpeg.releases.json
 
   test:
     if: ${{ !cancelled() && ( 'pull_request' != github.event_name || (! github.event.pull_request.draft) ) }}
