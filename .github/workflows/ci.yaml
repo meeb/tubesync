@@ -98,7 +98,7 @@ jobs:
       - name: Check with ruff
         continue-on-error: false
         run: |
-          target_version='py310'
+          target_version='py312'
           ignore_csv_list='E701,E722,E731'
           cd tubesync
           # output formats:
