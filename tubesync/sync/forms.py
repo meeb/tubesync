@@ -54,26 +54,6 @@ class ConfirmDeleteSourceForm(forms.Form):
     )
 
 
-class RedownloadMediaForm(forms.Form):
-
-    pass
-
-
-class SkipMediaForm(forms.Form):
-
-    pass
-
-
-class EnableMediaForm(forms.Form):
-
-    pass
-
-
-class ResetTasksForm(forms.Form):
-
-    pass
-
-
 class ScheduleTaskForm(forms.Form):
 
     now = forms.DateTimeField(
@@ -94,11 +74,6 @@ class ScheduleTaskForm(forms.Form):
             attrs={'type': 'datetime-local'},
         ),
     )
-
-
-class ConfirmDeleteMediaServerForm(forms.Form):
-
-    pass
 
 
 _media_server_type_label = 'Jellyfin'
