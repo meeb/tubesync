@@ -23,7 +23,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: tcely/no-response@tcely-issues
+      - uses: tcely/no-response@v0.2
         with:
           token: ${{ github.token }}
           # auto close issues with no response from author for N days
