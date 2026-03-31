@@ -69,7 +69,7 @@ if [ ! -x "$REPO_ROOT/tailwindcss" ]; then
             local gtar=; case "$(tar --version 2>/dev/null)" in (*'(GNU tar)'*) gtar=t;; esac; tar --strip-components=1 ${gtar:+--wildcards} -xvvpf "${1}" 'asfald-*/asfald';
         }
         curl -sSLO -- "https://github.com/${asfald_uri}/${fn}"
-        curl -sSL -- "https://gh.checksums.asfaload.com/github.com/${asfald_uri}/checksums.txt" | sha256sum --ignore-missing -cw &&
+        curl -sSL -- "https://gh.checksums.asfaload.com/github.com/${asfald_uri}/checksums.txt" | "${PYTHON}" "${REPO_ROOT}/tubesync/shasum.py" -a sha256 - &&
             extract_asfald "${fn}" &&
             TMPDIR="$(mktemp -d "${REPO_ROOT}/.tmp.XXXXXXXX")" ./asfald -o "${REPO_ROOT}/tailwindcss" -p '${path}/sha256sums.txt' "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/${TW_BIN}"
         rm -v -f "${fn}" ./asfald
