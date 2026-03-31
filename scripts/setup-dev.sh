@@ -7,6 +7,9 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PYTHON="${PYTHON:-python3}"
 
+# Fail fast if Python is too old (Django 5 requires 3.10+)
+"${PYTHON}" -c 'import sys; v=sys.version_info; (v.major==3 and v.minor>=10) or (print(f"Error: Python 3.10+ required for Django 5. Found {v.major}.{v.minor}", file=sys.stderr), sys.exit(1))' || exit 1
+
 echo "==> Setting up TubeSync dev environment"
 echo "    Python: $($PYTHON --version)"
 echo "    Repo:   $REPO_ROOT"
@@ -44,16 +47,16 @@ else
     echo "==> local_settings.py already exists, skipping"
 fi
 
-# 5. Download Tailwind CSS CLI if not present
+# 5. Download Tailwind CSS CLI if not present (verified via asfald)
 if [ ! -x "$REPO_ROOT/tailwindcss" ]; then
-    echo "==> Downloading Tailwind CSS CLI"
+    echo "==> Downloading Tailwind CSS CLI (with asfald checksum verification)"
     ARCH="$(uname -m)"
     OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
     case "$OS-$ARCH" in
-        linux-x86_64)  TW_BIN="tailwindcss-linux-x64" ;;
-        linux-aarch64) TW_BIN="tailwindcss-linux-arm64" ;;
-        darwin-arm64)  TW_BIN="tailwindcss-macos-arm64" ;;
-        darwin-x86_64) TW_BIN="tailwindcss-macos-x64" ;;
+        linux-x86_64)  TW_BIN="tailwindcss-linux-x64"; ARCH="x86_64" ;;
+        linux-aarch64) TW_BIN="tailwindcss-linux-arm64"; ARCH="aarch64" ;;
+        darwin-arm64)  TW_BIN="tailwindcss-macos-arm64"; ARCH="arm64" ;;
+        darwin-x86_64) TW_BIN="tailwindcss-macos-x64"; ARCH="x86_64" ;;
         *)             echo "    Unsupported platform: $OS-$ARCH"; TW_BIN="" ;;
     esac
     if [ -n "$TW_BIN" ]; then
@@ -65,16 +68,15 @@ if [ ! -x "$REPO_ROOT/tailwindcss" ]; then
         extract_asfald() {
             local gtar=; case "$(tar --version 2>/dev/null)" in (*'(GNU tar)'*) gtar=t;; esac; tar --strip-components=1 ${gtar:+--wildcards} -xvvpf "${1}" 'asfald-*/asfald';
         }
-        "${PYTHON}" -c 'import sys; v=sys.version_info; (v.major==3 and v.minor>=10) or (print(f"Error: Python 3.10+ required for Django 5. Found {v.major}.{v.minor}", file=sys.stderr), sys.exit(1))' || exit 1
         curl -sSLO -- "https://github.com/${asfald_uri}/${fn}"
-        curl -sSL -- "https://gh.checksums.asfaload.com/github.com/${asfald_uri}/checksums.txt" | "${PYTHON}" "${REPO_ROOT}/tubesync/shasum.py" -a sha256 - &&
+        curl -sSL -- "https://gh.checksums.asfaload.com/github.com/${asfald_uri}/checksums.txt" | sha256sum --ignore-missing -cw &&
             extract_asfald "${fn}" &&
             TMPDIR="$(mktemp -d "${REPO_ROOT}/.tmp.XXXXXXXX")" ./asfald -o "${REPO_ROOT}/tailwindcss" -p '${path}/sha256sums.txt' "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/${TW_BIN}"
         rm -v -f "${fn}" ./asfald
         unset -v asfald_uri fn
-        rmdir -v "${REPO_ROOT}"/.tmp.*
-        chmod +x "$REPO_ROOT/tailwindcss"
-        echo "    Downloaded $TW_BIN"
+        rmdir -v "${REPO_ROOT}"/.tmp.* 2>/dev/null || true
+        chmod -v a+rx "${REPO_ROOT}/tailwindcss"
+        echo "    Downloaded and verified $TW_BIN"
     fi
 else
     echo "==> Tailwind CSS CLI already present"
@@ -82,7 +84,7 @@ fi
 
 # 6. Compile Tailwind CSS
 echo "==> Compiling Tailwind CSS"
-"$REPO_ROOT/tailwindcss" --input "$REPO_ROOT/tubesync/common/static/styles/tubesync.css" --output "$REPO_ROOT/tubesync/common/static/styles/output.css"
+"$REPO_ROOT/tailwindcss" --input "$REPO_ROOT/tubesync/common/static/styles/tubesync.css" --output "$REPO_ROOT/tubesync/common/static/styles/output.css" --cwd "$REPO_ROOT"
 
 # 7. Run migrations
 echo "==> Running database migrations"

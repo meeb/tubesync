@@ -1,6 +1,5 @@
 import datetime
 import uuid
-from pathlib import Path
 from functools import wraps
 from huey import (
     CancelExecution, Huey as huey_Huey,
