@@ -56,7 +56,7 @@ if [ ! -x "$REPO_ROOT/tailwindcss" ]; then
         linux-x86_64)  TW_BIN="tailwindcss-linux-x64"; ARCH="x86_64" ;;
         linux-aarch64) TW_BIN="tailwindcss-linux-arm64"; ARCH="arm64" ;;
         darwin-arm64)  TW_BIN="tailwindcss-macos-arm64"; ARCH="arm64" ;;
-        darwin-x86_64) TW_BIN="tailwindcss-macos-x64"; ARCH="x86_64" ;;
+        darwin-x86_64) TW_BIN="tailwindcss-macos-x64"; ARCH="x64" OS="macos" ;;
         *)             echo "    Unsupported platform: $OS-$ARCH"; TW_BIN="" ;;
     esac
     if [ -n "$TW_BIN" ]; then
