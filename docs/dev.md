@@ -163,7 +163,7 @@ tubesync/
 | File | Purpose |
 |------|---------|
 | `sync/models/` | Source, Media, Metadata, MediaServer models |
-| `sync/views.py` | All web interface views |
+| `sync/views/` | Web interface views (dashboard, sources, media, tasks, mediaservers, utils) |
 | `sync/tasks.py` | Huey background tasks (indexing, downloading) |
 | `sync/signals.py` | Django signals for task triggers |
 | `sync/youtube.py` | yt-dlp integration layer |

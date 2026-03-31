@@ -229,7 +229,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, tasks_dir=None)
         if 0 >= workers:
             try:
                 useful_cpus = os.sched_getaffinity(0)
-            except AttributeError:
+            except AttributeError:  # sched_getaffinity() is Linux-only (unavailable on macOS/Windows)
                 useful_cpus = range(os.cpu_count() or 2)
             workers = max(2, len(useful_cpus) // 2)
         elif 1 == workers:
