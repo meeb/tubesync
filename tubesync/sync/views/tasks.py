@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
-from common.utils import append_uri_params, multi_key_sort
+from common.utils import append_uri_params, multi_key_sort, remove_enclosed
 from common.huey import h_q_reset_tasks
 from common.logger import log
 from django_huey import DJANGO_HUEY, get_queue
@@ -204,10 +204,9 @@ class RevokeTaskView(View):
             return HttpResponseNotFound()
         # revoke the task we want to cancel
         q.revoke_by_id(id=task.task_id, revoke_once=True)
-        vn = task.verbose_name or task.task_id or task.pk
-        if not vn.startswith('[revoked] '):
-            task.verbose_name = f'[revoked] {vn}'
-            task.save()
+        vn = remove_enclosed(task.verbose_name or str(task.task_id or task.pk), '[', ']', ' ')
+        task.verbose_name = f'[revoked] {vn}'
+        task.save()
         return HttpResponseRedirect(append_uri_params(
             reverse_lazy('sync:tasks'),
             dict(
@@ -385,7 +384,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         else:
             eta = max(self.now, when)
             if q.reschedule(task_id, eta):
-                vn = self.object.verbose_name or task_id or pk
+                vn = remove_enclosed(self.object.verbose_name or str(task_id or pk), '[', ']', ' ')
                 self.object.verbose_name = f'[revoked] {vn}'
                 self.object.save()
             else:
