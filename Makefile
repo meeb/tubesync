@@ -7,6 +7,11 @@ image=$(name):latest
 all: clean build
 
 
+requirements:
+	uv --no-config --no-managed-python --no-progress tool run pipenv requirements --no-lock >| requirements.txt
+	uv --no-config --no-managed-python --no-progress tool run pipenv requirements --dev-only --no-lock >| requirements-dev.txt
+
+
 dev:
 	$(python) tubesync/manage.py runserver
 
