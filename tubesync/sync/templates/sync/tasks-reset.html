@@ -3,29 +3,22 @@
 {% block headtitle %}Reset tasks{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Reset tasks</h1>
-    <p>
-      If your TubeSync installation has gotten itself into any form of synchronisation
-      state issues (such you moved then restored files on disk) and the state in
-      TubeSync isn't up to date you can use this button to force a state reset.
-    </p>
-    <p>
-      This will delete all current tasks then all souces will be checked for their
-      states and new tasks to be created where required.
-    </p>
+<h1>Reset tasks</h1>
+<p class="text-muted-foreground mb-4">
+  If your TubeSync installation has gotten itself into any form of synchronisation
+  state issues (such you moved then restored files on disk) and the state in
+  TubeSync isn't up to date you can use this button to force a state reset.
+</p>
+<p class="text-muted-foreground mb-6">
+  This will delete all current tasks then all souces will be checked for their
+  states and new tasks to be created where required.
+</p>
+
+<form method="post" action="{% url 'sync:reset-tasks' %}" class="max-w-2xl">
+  {% csrf_token %}
+  {% include 'simpleform.html' with form=form %}
+  <div class="pt-4">
+    <button class="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-destructive text-destructive-foreground font-medium text-sm hover:bg-destructive/80 transition-colors" type="submit" name="action">Really reset tasks <i class="fas fa-history"></i></button>
   </div>
-</div>
-<div class="row">
-  <form method="post" action="{% url 'sync:reset-tasks' %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Really reset tasks <i class="fas fa-history"></i></button>
-      </div>
-    </div>
-  </form>
-</div>
+</form>
 {% endblock %}

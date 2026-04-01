@@ -3,29 +3,22 @@
 {% block headtitle %}Add a YouTube Source{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Add Source</h1>
-    <p>
-      Enter any YouTube channel or playlist URL below.
-    </p>
-    <p><strong>Supported formats:</strong></p>
-    <ul>
-      <li><strong>YouTube Channel:</strong> <code>https://www.youtube.com/@rossmanngroup</code></li>
-      <li><strong>YouTube Channel by ID:</strong> <code>https://www.youtube.com/channel/UCl2mFZoRqjw_ELax4Yisf6w</code></li>
-      <li><strong>YouTube Playlist:</strong> <code>https://www.youtube.com/playlist?list=PLkVbIsAWN2lsmovRO20_gtfUfgWi-XnnT</code></li>
-    </ul>
+<h1>Add Source</h1>
+<p class="text-muted-foreground mb-4">Enter any YouTube channel or playlist URL below.</p>
+<div class="mb-6">
+  <p class="font-medium mb-2">Supported formats:</p>
+  <ul class="list-disc list-inside text-sm text-muted-foreground space-y-1">
+    <li><strong>YouTube Channel:</strong> <code class="bg-muted px-1.5 py-0.5 rounded text-xs">https://www.youtube.com/@rossmanngroup</code></li>
+    <li><strong>YouTube Channel by ID:</strong> <code class="bg-muted px-1.5 py-0.5 rounded text-xs">https://www.youtube.com/channel/UCl2mFZoRqjw_ELax4Yisf6w</code></li>
+    <li><strong>YouTube Playlist:</strong> <code class="bg-muted px-1.5 py-0.5 rounded text-xs">https://www.youtube.com/playlist?list=PLkVbIsAWN2lsmovRO20_gtfUfgWi-XnnT</code></li>
+  </ul>
+</div>
+
+<form method="post" action="{% url 'sync:validate-source' %}" class="max-w-2xl">
+  {% csrf_token %}
+  {% include 'simpleform.html' with form=form %}
+  <div class="pt-4">
+    <button class="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-primary text-primary-foreground font-medium text-sm hover:bg-accent hover:text-accent-foreground transition-colors" type="submit" name="action">Add Source <i class="fas fa-check"></i></button>
   </div>
-</div>
-<div class="row">
-  <form method="post" action="{% url 'sync:validate-source' %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Add Source <i class="fas fa-check"></i></button>
-      </div>
-    </div>
-  </form>
-</div>
+</form>
 {% endblock %}
