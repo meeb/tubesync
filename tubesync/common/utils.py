@@ -3,6 +3,7 @@ import difflib
 import emoji
 import gc
 import io
+import math
 import os
 import pstats
 import string
@@ -14,6 +15,51 @@ from operator import attrgetter, itemgetter
 from pathlib import Path
 from urllib.parse import urlunsplit, urlencode, urlparse
 from .errors import DatabaseConnectionError, QuerySetEmptyError
+
+
+def get_usable_cpu_count() -> int:
+    """
+    Find a reasonable value for available CPUs.
+    Checks: cgroups, scheduler, then physical count.
+    """
+    # Check Cgroup v2 (Modern Docker/K8s)
+    cgroup_dir = Path('/sys/fs/cgroup')
+    try:
+        cpu_max_path = cgroup_dir / 'cpu.max'
+        if cpu_max_path.exists():
+            data = cpu_max_path.read_text().split()
+            # Format: "$MAX $PERIOD" (e.g., "50000 100000")
+            if 'max' != data[0]:
+                quota = int(data[0])
+                period = int(data[1])
+                return max(1, math.ceil(quota / period))
+    except (OSError, ValueError, IndexError):
+        pass
+
+    # Check Cgroup v1 (Legacy Docker/K8s)
+    cgroup_cpu_dir = cgroup_dir / 'cpu'
+    try:
+        quota_path = cgroup_cpu_dir / 'cpu.cfs_quota_us'
+        period_path = cgroup_cpu_dir / 'cpu.cfs_period_us'
+        if quota_path.exists() and period_path.exists():
+            quota = int(quota_path.read_text())
+            period = int(period_path.read_text())
+            if 0 < quota:
+                return max(1, math.ceil(quota / period))
+    except (OSError, ValueError):
+        pass
+
+    # Linux specific: Respects 'taskset' or CPU pinning
+    try:
+        affinity_count = len(os.sched_getaffinity(0))
+        if 0 < affinity_count:
+            return affinity_count
+    except (AttributeError, NotImplementedError):
+        pass
+
+    # Returns total logical CPUs; defaults to 1
+    return max(1, os.cpu_count() or 0)
+
 
 def directory_and_stem(arg_path, /, all_suffixes=False):
     filepath = Path(arg_path)
