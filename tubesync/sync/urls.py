@@ -3,10 +3,10 @@ from .views import (DashboardView, SourcesView, SourceSyncNowView,
                     ValidateSourceView, AddSourceView,
                     SourceView, UpdateSourceView, DeleteSourceView, MediaView,
                     MediaThumbView, MediaItemView, MediaRedownloadView, MediaSkipView,
-                    MediaEnableView, MediaContent, TasksView, RevokeTaskView,
-                    CompletedTasksView, ResetTasks,
-                    TaskScheduleView, MediaServersView, AddMediaServerView, MediaServerView,
-                    DeleteMediaServerView, UpdateMediaServerView)
+                    MediaEnableView, MediaContent, TasksView, CompletedTasksView,
+                    ResetTasks, TaskScheduleView, MediaServersView, AddMediaServerView,
+                    MediaServerView, DeleteMediaServerView, UpdateMediaServerView,
+                    RevokeTaskView, SourceSyncNowView, )
 
 
 app_name = 'sync'

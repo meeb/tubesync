@@ -1,15 +1,21 @@
 name: No Response
 
-# `issues`.`closed`, `issue_comment`.`created`, and `scheduled` event types are required for this Action
+# `issues`.`closed`, `issues`.`labeled`, `issue_comment`.`created`,
+# and `scheduled` event types are required for this Action
 # to work properly.
 on:
   workflow_dispatch:
   issues:
-    types: [closed]
+    types: [closed, labeled]
   issue_comment:
     types: [created]
   schedule:
-    - cron: '19,43 * * * *'
+    # A recurring 40, 30, 70, 50, 40, 70 minute gap pattern
+    - cron: '7 1,6,11,16,21 * * *'
+    - cron: '17 4,9,14,19 * * *'
+    - cron: '27 0,5,10,15,20,23 * * *'
+    - cron: '37 1,3,6,8,11,13,16,18,21 * * *'
+    - cron: '47 2,7,12,17,22 * * *'
 
 jobs:
   noResponse:
@@ -17,7 +23,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: tcely/no-response@v0.1.4
+      - uses: tcely/no-response@v0.2
         with:
           token: ${{ github.token }}
           # auto close issues with no response from author for N days

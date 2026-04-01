@@ -205,11 +205,9 @@ class RevokeTaskView(View):
         # revoke the task we want to cancel
         q.revoke_by_id(id=task.task_id, revoke_once=True)
         vn = task.verbose_name or task.task_id or task.pk
-        # Strip any existing [revoked] prefix(es) before adding one
-        while isinstance(vn, str) and vn.startswith('[revoked] '):
-            vn = vn[len('[revoked] '):]
-        task.verbose_name = f'[revoked] {vn}'
-        task.save()
+        if not vn.startswith('[revoked] '):
+            task.verbose_name = f'[revoked] {vn}'
+            task.save()
         return HttpResponseRedirect(append_uri_params(
             reverse_lazy('sync:tasks'),
             dict(

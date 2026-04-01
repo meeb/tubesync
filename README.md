@@ -152,7 +152,7 @@ services:
 ## Optional authentication
 
 You can enable basic HTTP authentication by setting the `HTTP_USER` and `HTTP_PASS`
-environment variables. See the [environment variables reference](docs/environment-variables.md#authentication)
+environment variables. See the [environment variables reference](//github.com/meeb/tubesync/wiki/Environment-Variables#authentication)
 for details.
 
 

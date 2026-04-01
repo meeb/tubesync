@@ -8,6 +8,7 @@ from huey import (
 )
 from huey.api import TaskLock
 from huey.storage import SqliteStorage as huey_SqliteStorage
+from pathlib import Path
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
 from .utils import get_usable_cpu_count
 
@@ -215,7 +216,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     return maint_result
 
 
-def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, tasks_dir=None):
+def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=None):
     name_fmt = 'huey_{}'
     if prefix:
         name_fmt = f'huey_{prefix}_' + '{}'

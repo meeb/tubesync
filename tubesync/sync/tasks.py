@@ -681,6 +681,7 @@ def download_source_images(source_id):
             file_path = source.directory_path / file_name
             with open(file_path, 'wb') as f:
                 f.write(image_file.read())
+        i = image_file = None
 
     log.info(f'Thumbnail downloaded for source with ID: {source_id} / {source}')
 
