@@ -52,18 +52,28 @@ if [ ! -x "$REPO_ROOT/tailwindcss" ]; then
     echo "==> Downloading Tailwind CSS CLI (with asfald checksum verification)"
     ARCH="$(uname -m)"
     OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-    case "$OS-$ARCH" in
-        linux-x86_64)  TW_BIN="tailwindcss-linux-x64"; ARCH="x86_64" ;;
-        linux-aarch64) TW_BIN="tailwindcss-linux-arm64"; ARCH="arm64" ;;
-        darwin-arm64)  TW_BIN="tailwindcss-macos-arm64"; ARCH="arm64" ;;
-        darwin-x86_64) TW_BIN="tailwindcss-macos-x64"; ARCH="x64" OS="macos" ;;
+    case "$(uname -s)" in
+        Darwin) OS='macos' ;;
+        Linux) OS='linux' ;;
+    esac
+    case "$(uname -m)" in
+        aarch64|arm64) ARCH='arm64' ;;
+        x86_64) ARCH='x64' ;;
+    esac
+    case "${OS}-${ARCH}" in
+        linux-x64)  TW_BIN="tailwindcss-${OS}-${ARCH}" ;;
+        linux-arm64) TW_BIN="tailwindcss-${OS}-${ARCH}" ;;
+        macos-arm64)  TW_BIN="tailwindcss-${OS}-${ARCH}" ;;
+        macos-x64) TW_BIN="tailwindcss-${OS}-${ARCH}" ;;
         *)             echo "    Unsupported platform: $OS-$ARCH"; TW_BIN="" ;;
     esac
     if [ -n "$TW_BIN" ]; then
         asfald_uri='asfaload/asfald/releases/download/v0.6.0'
-        case "${OS}" in
-            (linux) fn="asfald-${ARCH}-unknown-${OS}-musl.tar.gz" ;;
-            (darwin) fn="asfald-${ARCH}-apple-${OS}.tar.gz" ;;
+        case "${OS}-${ARCH}" in
+            (linux-arm64) fn='asfald-aarch64-unknown-linux-musl.tar.gz' ;;
+            (linux-x64) fn='asfald-x86_64-unknown-linux-musl.tar.gz' ;;
+            (macos-arm64) fn='asfald-aarch64-apple-darwin.tar.gz' ;;
+            (macos-x64) fn='asfald-x86_64-apple-darwin.tar.gz' ;;
         esac
         extract_asfald() {
             local gtar=; case "$(tar --version 2>/dev/null)" in (*'(GNU tar)'*) gtar=t;; esac; tar --strip-components=1 ${gtar:+--wildcards} -xvvpf "${1}" 'asfald-*/asfald';
