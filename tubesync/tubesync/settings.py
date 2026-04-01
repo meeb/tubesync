@@ -229,19 +229,22 @@ except ImportError as e:
     sys.exit(1)
 
 
-DJANGO_HUEY = {
-    'default': TaskQueue.LIMIT.value,
-    'queues': dict(),
-    'verbose': None if DEBUG else False,
-}
-for queue_name in TaskQueue.values:
-    queues = DJANGO_HUEY['queues']
-    if TaskQueue.LIMIT.value == queue_name:
-        queues[queue_name] = sqlite_tasks(queue_name, prefix='net', tasks_dir=HUEY_TASKS_DIR)
-    elif TaskQueue.NET.value == queue_name:
-        queues[queue_name] = sqlite_tasks(queue_name, thread=True, workers=0, tasks_dir=HUEY_TASKS_DIR)
-    else:
-        queues[queue_name] = sqlite_tasks(queue_name, thread=True, tasks_dir=HUEY_TASKS_DIR)
+# Allow local_settings.py to fully override DJANGO_HUEY (e.g. to use Redis instead of SQLite).
+# If not overridden, fall back to the default sqlite_tasks-based configuration.
+if not globals().get('DJANGO_HUEY'):
+    DJANGO_HUEY = {
+        'default': TaskQueue.LIMIT.value,
+        'queues': dict(),
+        'verbose': None if DEBUG else False,
+    }
+    for queue_name in TaskQueue.values:
+        queues = DJANGO_HUEY['queues']
+        if TaskQueue.LIMIT.value == queue_name:
+            queues[queue_name] = sqlite_tasks(queue_name, prefix='net', tasks_dir=HUEY_TASKS_DIR)
+        elif TaskQueue.NET.value == queue_name:
+            queues[queue_name] = sqlite_tasks(queue_name, thread=True, workers=0, tasks_dir=HUEY_TASKS_DIR)
+        else:
+            queues[queue_name] = sqlite_tasks(queue_name, thread=True, tasks_dir=HUEY_TASKS_DIR)
 for django_huey_queue in DJANGO_HUEY['queues'].values():
     connection = django_huey_queue.get('connection')
     if connection:

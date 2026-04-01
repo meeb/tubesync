@@ -7,8 +7,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PYTHON="${PYTHON:-python3}"
 
-# Fail fast if Python is too old (Django 5 requires 3.10+)
-"${PYTHON}" -c 'import sys; v=sys.version_info; (v.major==3 and v.minor>=10) or (print(f"Error: Python 3.10+ required for Django 5. Found {v.major}.{v.minor}", file=sys.stderr), sys.exit(1))' || exit 1
+# Fail fast if Python is too old (Django 6 requires 3.12+)
+"${PYTHON}" -c 'import sys; v=sys.version_info; (v.major==3 and v.minor>=12) or (print(f"Error: Python 3.12+ required for Django 6. Found {v.major}.{v.minor}", file=sys.stderr), sys.exit(1))' || exit 1
 
 echo "==> Setting up TubeSync dev environment"
 echo "    Python: $($PYTHON --version)"
