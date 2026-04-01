@@ -12,10 +12,10 @@ dev:
 
 
 css:
-	./tailwindcss --input tubesync/common/static/styles/tubesync.css --output tubesync/common/static/styles/output.css
+	./tailwindcss --input tubesync/common/static/styles/tailwind/tubesync.css --output tubesync/common/static/styles/tailwind/tubesync-compiled.css
 
 css-watch:
-	./tailwindcss --input tubesync/common/static/styles/tubesync.css --output tubesync/common/static/styles/output.css --watch
+	./tailwindcss --input tubesync/common/static/styles/tailwind/tubesync.css --output tubesync/common/static/styles/tailwind/tubesync-compiled.css --watch
 
 build: css
 	mkdir -p tubesync/media

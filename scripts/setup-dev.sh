@@ -91,7 +91,7 @@ fi
 
 # 6. Compile Tailwind CSS
 echo "==> Compiling Tailwind CSS"
-"$REPO_ROOT/tailwindcss" --input "$REPO_ROOT/tubesync/common/static/styles/tubesync.css" --output "$REPO_ROOT/tubesync/common/static/styles/output.css" --cwd "$REPO_ROOT"
+"$REPO_ROOT/tailwindcss" --input "$REPO_ROOT/tubesync/common/static/styles/tailwind/tubesync.css" --output "$REPO_ROOT/tubesync/common/static/styles/tailwind/tubesync-compiled.css" --cwd "$REPO_ROOT"
 
 # 7. Run migrations
 echo "==> Running database migrations"
