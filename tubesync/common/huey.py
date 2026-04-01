@@ -10,6 +10,7 @@ from huey import (
 from huey.api import TaskLock
 from huey.storage import SqliteStorage as huey_SqliteStorage
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
+from .utils import get_usable_cpu_count
 
 
 def _set_acquired(self, value=True):
@@ -227,11 +228,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, tasks_dir=None)
         workers = 2
     finally:
         if 0 >= workers:
-            try:
-                useful_cpus = os.sched_getaffinity(0)
-            except AttributeError:  # sched_getaffinity() is Linux-only (unavailable on macOS/Windows)
-                useful_cpus = range(os.cpu_count() or 2)
-            workers = max(2, len(useful_cpus) // 2)
+            workers = max(2, get_usable_cpu_count() // 2)
         elif 1 == workers:
             thread = False
     return dict(
