@@ -1,5 +1,4 @@
 import datetime
-import os
 import uuid
 from functools import wraps
 from huey import (
@@ -8,7 +7,9 @@ from huey import (
 )
 from huey.api import TaskLock
 from huey.storage import SqliteStorage as huey_SqliteStorage
+from pathlib import Path
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
+from .utils import get_usable_cpu_count
 
 
 def _set_acquired(self, value=True):
@@ -214,7 +215,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     return maint_result
 
 
-def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
+def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=None):
     name_fmt = 'huey_{}'
     if prefix:
         name_fmt = f'huey_{prefix}_' + '{}'
@@ -226,8 +227,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
         workers = 2
     finally:
         if 0 >= workers:
-            useful_cpus = os.sched_getaffinity(0)
-            workers = max(2, len(useful_cpus) // 2)
+            workers = max(2, get_usable_cpu_count() // 2)
         elif 1 == workers:
             thread = False
     return dict(
@@ -239,7 +239,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
         utc=True,
         compression=True,
         connection=dict(
-            filename=f'/config/tasks/{name}.db',
+            filename=str(Path(tasks_dir or '/config/tasks') / f'{name}.db'),
             fsync=True,
             isolation_level='IMMEDIATE', # _create_connection sets this to None
             strict_fifo=True,

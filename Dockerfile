@@ -185,6 +185,53 @@ RUN set -eu ; \
         "https://github.com/asfaload/asfald/releases/latest/download/asfald-${arch}-unknown-linux-musl" && \
     chmod -c 00755 "${dest}" && chown -c root:root "${dest}"
 
+FROM tubesync-asfald AS tailwindcss-download
+
+ARG DESTDIR="/downloaded"
+ARG TAILWINDCSS_URL="https://github.com/tailwindlabs/tailwindcss/releases/latest/download"
+
+ARG TARGETARCH
+RUN set -eu ; \
+\
+    decide_arch() { \
+        case "${TARGETARCH}" in \
+            (amd64) printf -- 'x64' ;; \
+            (arm64) printf -- 'arm64' ;; \
+        esac ; \
+    } ; \
+\
+    arch="$(decide_arch)" ; \
+    apt-get update && \
+    apt-get -y --no-install-recommends install busybox-static && \
+    mkdir -p "${DESTDIR}" && \
+    cd "${DESTDIR}" && \
+    try_url="$(busybox wget -S -O - "${TAILWINDCSS_URL}/sha256sums.txt" 2>&1 | grep -ie '^  Location: ' | head -n 1 | cut -d ' ' -f 4-)" && \
+    for url in 'sha256sums.txt' "tailwindcss-linux-${arch}" "tailwindcss-linux-${arch}-musl" ; \
+    do \
+        case "${try_url}" in \
+            (*githubusercontent.com/*) url="${TAILWINDCSS_URL}/${url}" ;; \
+            (*github.com/*) url="${try_url%/sha256sums.txt}/${url}" ;; \
+        esac ; \
+        TMPDIR="${DESTDIR}" asfald-latest -v -- "${url}" ; \
+    done ; \
+    unset -v arch try_url url ; \
+    cksum -a sha256 --check --warn --strict --ignore-missing sha256sums.txt && \
+    mkdir -v -p "/verified/${TARGETARCH}" && \
+    for binary in tailwindcss-linux-* ; \
+    do \
+        chmod -c 00755 "${binary}" && chown -c root:root "${binary}" && \
+        test -x "/verified/${TARGETARCH}/tailwindcss" || ln -v "${binary}" "/verified/${TARGETARCH}/tailwindcss" ; \
+    done ; \
+    unset -v binary ; \
+    rm -rf "${DESTDIR}" ;
+
+FROM scratch AS tailwindcss
+ARG TARGETARCH
+COPY --from=tailwindcss-download "/verified/${TARGETARCH}/tailwindcss" /usr/local/bin/
+
+FROM tubesync-base AS tubesync-tailwindcss
+COPY --from=tailwindcss /usr/local/bin/ /usr/local/bin/
+
 FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
 
 FROM scratch AS uv
