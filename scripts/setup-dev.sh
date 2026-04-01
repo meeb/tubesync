@@ -33,9 +33,7 @@ fi
 
 # 3. Install dependencies from Pipfile (via uv)
 echo "==> Installing dependencies from Pipfile"
-uv --no-config --no-managed-python --no-progress tool run pipenv requirements --no-lock \
-    | uv pip install -q -r -
-uv --no-config --no-managed-python --no-progress tool run pipenv requirements --dev-only --no-lock \
+uv --no-config --no-managed-python --no-progress tool run pipenv requirements --no-lock --dev \
     | uv pip install -q -r -
 echo "    Done"
 
