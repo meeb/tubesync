@@ -72,7 +72,7 @@ class TasksView(ListView):
             except TaskHistory.DoesNotExist:
                 fmt_vars['name'] = fmt_vars['pk']
             else:
-                fmt_vars['name'] = task.verbose_name or task.task_id or task.pk
+                fmt_vars['name'] = remove_enclosed(task.verbose_name or str(task.task_id or task.pk), '[', ']', ' ')
                 fmt_vars['task_id'] = task.task_id
             self.message = self.message.format(**fmt_vars)
 
