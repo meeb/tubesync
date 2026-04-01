@@ -1,25 +1,31 @@
 from .dashboard import DashboardView
-from .sources import (SourcesView, SourceSyncNowView, ValidateSourceView,
-                      AddSourceView, SourceView, UpdateSourceView,
-                      DeleteSourceView)
-from .media import (MediaView, MediaThumbView, MediaItemView,
-                    MediaRedownloadView, MediaSkipView, MediaEnableView,
-                    MediaContent)
-from .tasks import (TasksView, RevokeTaskView, CompletedTasksView,
-                    ResetTasks, TaskScheduleView)
-from .mediaservers import (MediaServersView, AddMediaServerView,
-                           MediaServerView, DeleteMediaServerView,
-                           UpdateMediaServerView)
+from .sources import (
+    SourcesView, ValidateSourceView, AddSourceView, SourceView,
+    UpdateSourceView, DeleteSourceView, SourceSyncNowView
+)
+from .media import (
+    MediaView, MediaThumbView, MediaItemView, MediaRedownloadView,
+    MediaSkipView, MediaEnableView, MediaContent
+)
+from .tasks import (
+    TasksView, CompletedTasksView, ResetTasks, TaskScheduleView,
+    RevokeTaskView
+)
+from .mediaservers import (
+    MediaServersView, AddMediaServerView, MediaServerView,
+    DeleteMediaServerView, UpdateMediaServerView
+)
 
 __all__ = [
     'DashboardView',
-    'SourcesView', 'SourceSyncNowView', 'ValidateSourceView', 'AddSourceView',
+    'SourcesView', 'ValidateSourceView', 'AddSourceView',
     'SourceView', 'UpdateSourceView', 'DeleteSourceView',
+    'SourceSyncNowView',
     'MediaView', 'MediaThumbView', 'MediaItemView',
     'MediaRedownloadView', 'MediaSkipView', 'MediaEnableView',
     'MediaContent',
-    'TasksView', 'RevokeTaskView', 'CompletedTasksView', 'ResetTasks',
-    'TaskScheduleView',
+    'TasksView', 'CompletedTasksView', 'ResetTasks',
+    'TaskScheduleView', 'RevokeTaskView',
     'MediaServersView', 'AddMediaServerView', 'MediaServerView',
     'DeleteMediaServerView', 'UpdateMediaServerView',
 ]
