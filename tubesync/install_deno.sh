@@ -5,17 +5,16 @@
 # - unzip
 
 HERE="$(dirname "$(realpath -e "$0")")"
+source "${HERE}/download_gh_release.func.inc.sh"
 
 download_deno() {
     local fn
     fn="${1}"
 
-    local url
-    url='https://github.com/denoland/deno/releases/latest/download'
-
     test -n "${fn}"
     rm -v -f "./${fn}"* # this should never do anything
-    curl -sSJLR --remote-name-all "${url}/${fn}{,.sha256sum}"
+    download_gh_release denoland deno "${fn}.sha256sum"
+    download_gh_release denoland deno "${fn}"
     "${HERE}/shasum.py" -a sha256 "./${fn}.sha256sum"
 }
 
