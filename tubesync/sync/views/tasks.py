@@ -83,6 +83,14 @@ class TasksView(ListView):
         if self.filter_source:
             params_prefix=f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
+        if not settings.DEBUG:
+            task_ids = set()
+            for task in qs.iterator(chunk_size=500):
+                obj, _ = map_task_to_instance(task)
+                if obj:
+                    task_ids.add(task.task_id)
+            qs = TaskHistory.objects.from_huey_ids(iter(task_ids))
+            task_ids.clear()
         return qs.order_by(
             '-priority',
             'scheduled_at',
