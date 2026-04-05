@@ -44,21 +44,25 @@ db_vendor = db.connection.vendor
 register_huey_signals()
 
 
+def get_task_map():
+    TASK_MAP = {
+        'index_source': Source,
+        'download_media_image': Media,
+        'download_media_file': Media,
+        'download_media_metadata': Media,
+        'save_all_media_for_source': Source,
+        'rename_all_media_for_source': Source,
+        'refresh_formats': Media,
+    }
+    return { f"sync.tasks.{k}": v for k,v in TASK_MAP.items() }
+
 def map_task_to_instance(task):
     '''
         Reverse-maps a scheduled backgrond task to an instance. Requires the task name
         to be a known task function and the first argument to be a UUID. This is used
         because UUID's are incompatible with background_task's "creator" feature.
     '''
-    TASK_MAP = {
-        'sync.tasks.index_source': Source,
-        'sync.tasks.download_media_image': Media,
-        'sync.tasks.download_media_file': Media,
-        'sync.tasks.download_media_metadata': Media,
-        'sync.tasks.save_all_media_for_source': Source,
-        'sync.tasks.rename_all_media_for_source': Source,
-        'sync.tasks.refresh_formats': Media,
-    }
+    TASK_MAP = get_task_map()
     MODEL_URL_MAP = {
         Source: 'sync:source',
         Media: 'sync:media-item',
