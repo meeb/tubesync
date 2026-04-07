@@ -20,7 +20,7 @@ from ..models import Source
 from django import forms
 from ..forms import ScheduleTaskForm
 from ..tasks import (
-    map_task_to_instance, get_error_message,
+    get_task_map, map_task_to_instance, get_error_message,
     get_running_tasks, check_source_directory_exists,
 )
 
@@ -83,6 +83,8 @@ class TasksView(ListView):
         if self.filter_source:
             params_prefix=f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
+        if not settings.DEBUG:
+            qs = qs.filter(name__in=set(get_task_map().keys()))
         return qs.order_by(
             '-priority',
             'scheduled_at',
