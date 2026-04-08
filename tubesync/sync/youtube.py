@@ -267,6 +267,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
                     raise YouTubeError(f'Failed (again) to extract_info for "{url}": {ee}') from ee
                 # validate the response is what we expected
                 if not _subscriber_only(response=response):
+                    log.debug(f'get_media_info: response: {response}')
                     response = {}
 
     if not response:
