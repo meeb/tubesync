@@ -2,22 +2,41 @@ from random import random
 from django.conf import settings
 from django.shortcuts import render
 from django.views.generic import View
-from django.http import HttpResponse, HttpResponseServerError
+from django.http import HttpResponse, HttpResponseServerError, HttpResponseRedirect
 from django.core.exceptions import PermissionDenied
 from django.db import connection
 from .utils import get_client_ip
+from .context_processors import THEME_COOKIE_NAME
+
+
+def toggle_theme(request):
+    '''
+    Toggle between light and dark theme by setting a cookie.
+    Redirects back to the referring page or dashboard.
+    '''
+    current_theme = request.COOKIES.get(THEME_COOKIE_NAME, 'light')
+    new_theme = 'dark' if current_theme == 'light' else 'light'
+    redirect_url = request.META.get('HTTP_REFERER', '/')
+    response = HttpResponseRedirect(redirect_url)
+    response.set_cookie(
+        THEME_COOKIE_NAME,
+        new_theme,
+        max_age=365 * 24 * 60 * 60,  # 1 year
+        samesite='Lax',
+    )
+    return response
 
 
 def error403(request, *args, **kwargs):
-    return render(request, 'error403.html', status=403) 
+    return render(request, 'error403.html', status=403)
 
 
 def error404(request, *args, **kwargs):
-    return render(request, 'error404.html', status=404) 
+    return render(request, 'error404.html', status=404)
 
 
 def error500(request, *args, **kwargs):
-    return render(request, 'error500.html', status=500) 
+    return render(request, 'error500.html', status=500)
 
 
 class HealthCheckView(View):
