@@ -774,7 +774,7 @@ RUN set -x && \
   printf -- "qjs_version = '%s'\n" "${qjs_version}" >> /app/common/third_party_versions.py
 
 # Create a healthcheck
-HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
+HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py"]
 
 # ENVS and ports
 ENV DENO_DIR="/config/cache/deno" \
