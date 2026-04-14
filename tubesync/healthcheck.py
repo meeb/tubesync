@@ -60,7 +60,7 @@ def bg_v(s, lock):
             now = time.time()
             atomic_write(s, v)
             atomic_write(s + '.t', now)
-            atomic_write(s + '.i', random.randint(1200, 21600))
+            atomic_write(s + '.i', random.randint(1200, 43200))
     except:
         pass
 
@@ -201,7 +201,7 @@ if '__main__' == __name__:
     df = get_down_file(service_name)
     if is_old(vf, lock, df) and not os.path.exists(lf):
         atomic_write(lf, 1)
-        if os.path.exists(lf) and False:
+        if os.path.exists(lf):
             subprocess.Popen(
                 ['/command/s6-rc', '-e', 'stop', service_name],
                 stdout=-1, stderr=-1, start_new_session=True,
@@ -224,9 +224,6 @@ if '__main__' == __name__:
         url = f'http://{host_port}/healthcheck'
     if do_heatlhcheck(url):
         lock.acquire(timeout=TIMEOUT)
-        if os.path.exists(lf):
-            sys.stdout.write('Check for a newer image.\n')
-            sys.exit(2)
         sys.exit(0)
     else:
         sys.exit(1)
