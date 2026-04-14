@@ -264,21 +264,6 @@ class AssetType(models.TextChoices):
     SUBTITLE = 'subtitle', _('Subtitle')
 
 
-class AssetCodec(models.TextChoices):
-    JPEG = 'jpg', _('JPEG')
-    WEBP = 'webp', _('WEBP')
-    PNG = 'png', _('PNG')
-    OPUS = 'OPUS', _('Opus')
-    MP4A = 'M4A', _('MP4A')
-    AV1 = 'AV1', _('AV1')
-    VP9 = 'VP9', _('VP9')
-    AVC1 = 'AVC1', _('AVC1 (H.264)')
-    VTT = 'vtt', _('WebVTT')
-    TTML = 'ttml', _('TTML')
-    SRT = 'srt', _('SubRip')
-    ASS = 'ass', _('Advanced SubStation Alpha')
-
-
 SourceResolutionInteger = SourceResolution._integer_mapping()
 youtube_long_source_types = YouTube_SourceType._long_type_mapping()
 youtube_validation_urls = YouTube_SourceType._validation_urls()

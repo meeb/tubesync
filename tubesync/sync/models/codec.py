@@ -1,7 +1,7 @@
 import uuid
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from ..choices import AssetType, AssetCodec
+from ..choices import AssetType
 
 
 class Codec(models.Model):
@@ -27,7 +27,6 @@ class Codec(models.Model):
         _('codec'),
         max_length=16,
         db_index=True,
-        choices=AssetCodec.choices,
         help_text=_('The codec name'),
     )
 
