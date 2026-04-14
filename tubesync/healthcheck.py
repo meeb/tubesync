@@ -31,15 +31,21 @@ def do_heatlhcheck(url):
     return response.status_code == 200
 
 
-if __name__ == '__main__':
+if '__main__' == __name__:
     # if it is marked as intentionally down, nothing else matters
     if os.path.exists('/run/service/gunicorn/down'):
         sys.exit(0)
     try:
         url = sys.argv[1]
     except IndexError:
-        sys.stderr.write('URL must be supplied\n')
-        sys.exit(1)
+        try:
+            from tubesync.gunicorn import get_bind
+            host_port = get_bind()
+        except:
+            host = os.getenv('LISTEN_HOST', '127.0.0.1')
+            port = os.getenv('LISTEN_PORT', '8080')
+            host_port = f'{host}:{port}'
+        url = f'http://{host_port}/healthcheck'
     if do_heatlhcheck(url):
         sys.exit(0)
     else:
