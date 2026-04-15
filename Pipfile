@@ -8,6 +8,7 @@ autopep8 = "*"
 
 [packages]
 django = "~=6.0.0"
+huey = "~=2.6"
 django-huey = "*"
 django-sass-processor = {extras = ["management-command"], version = "*"}
 pillow = "*"
