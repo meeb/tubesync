@@ -5,6 +5,7 @@ verify_ssl = true
 
 [dev-packages]
 autopep8 = "*"
+pycodestyle = "*"
 
 [packages]
 django = "~=6.0.0"
