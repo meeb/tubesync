@@ -250,6 +250,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=No
             workers=workers if thread else 1,
             worker_type='thread' if thread else 'process',
             max_delay=20.0,
+            max_tasks=10_000,
             flush_locks=True,
             scheduler_interval=10,
             simple_log=False,
