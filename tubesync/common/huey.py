@@ -1,4 +1,5 @@
 import datetime
+import time
 import uuid
 from functools import wraps
 from huey import (
@@ -348,7 +349,7 @@ def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 storage_key_prefix = 'task_history:'
 
 def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
-    signal_time = utils.time_clock()
+    signal_time = time.monotonic()
     signal_dt = datetime.datetime.now(datetime.timezone.utc)
     assert huey is not None
     assert hasattr(huey, 'get') and callable(huey.get)
@@ -464,7 +465,7 @@ def register_huey_signals():
 
         # clean up old history and results from storage
         q = get_queue(qn)
-        now_time = utils.time_clock()
+        now_time = time.monotonic()
         now_dt = datetime.datetime.now(datetime.timezone.utc)
         for key in q.all_results().keys():
             if not key.startswith(storage_key_prefix):
