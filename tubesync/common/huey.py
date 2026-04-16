@@ -359,6 +359,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 
     from common.models import TaskHistory
     add_to_elapsed_signals = frozenset((
+        signals.SIGNAL_TIMEOUT,
         signals.SIGNAL_INTERRUPTED,
         signals.SIGNAL_ERROR,
         signals.SIGNAL_CANCELED,
@@ -370,6 +371,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         signals.SIGNAL_LOCKED,
         signals.SIGNAL_EXECUTING,
         signals.SIGNAL_RETRYING,
+        signals.SIGNAL_RATE_LIMITED,
     )) | add_to_elapsed_signals
     storage_key = f'{storage_key_prefix}{task_obj.id}'
     task_obj_attr = '_signals_history'
