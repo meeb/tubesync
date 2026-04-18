@@ -27,7 +27,12 @@ class Codec(models.Model):
         _('codec'),
         max_length=16,
         db_index=True,
-        help_text=_('The codec name'),
+        help_text=_('The codec extension'),
+    )
+    description = models.CharField(
+        _('description'),
+        max_length=128,
+        help_text=_('A text description / label for this codec'),
     )
 
     def __str__(self):
