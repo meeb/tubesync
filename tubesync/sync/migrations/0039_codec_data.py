@@ -50,6 +50,21 @@ subtitle_codecs = [
     }
 ]
 
+thumbnail_codecs = [
+    {
+        'uuid': UUID('8f0e3044-2d12-4b1c-9a05-39d29d8a493c'),
+        'codec': 'jpg', 'description': 'Joint Photographic Experts Group (ISO/IEC 10918)',
+    },
+    {
+        'uuid': UUID('6c428761-aa82-4916-b571-6eb00dcdb5a6'),
+        'codec': 'png', 'description': 'Portable Network Graphics',
+    },
+    {
+        'uuid': UUID('2f6771e9-9eb2-458e-9be6-f75b98b28758'),
+        'codec': 'webp', 'description': 'WebP',
+    },
+]
+
 def create_codecs(query_set, arg_dict):
     return query_set.bulk_create(
         [ query_set.model(**d) for d in arg_dict ],
@@ -64,21 +79,35 @@ def add_subtitle_codecs(manager, db_alias):
         d['asset_type'] = 'subtitle'
     create_codecs(qs, subtitle_codecs)
 
+def add_thumbnail_codecs(manager, db_alias):
+    qs = manager.using(db_alias)
+    for d in thumbnail_codecs:
+        d['asset_type'] = 'thumbnail'
+    create_codecs(qs, thumbnail_codecs)
+
 def forwards_func(apps, schema_editor):
     # We get the model from the versioned app registry;
     # if we directly import it, it'll be the wrong version.
     Codec = apps.get_model("sync", "Codec")
     db_alias = schema_editor.connection.alias
-    add_subtitle_codecs(Codec.objects, db_alias)
+    manager = Codec.objects
+    add_subtitle_codecs(manager, db_alias)
+    add_thumbnail_codecs(manager, db_alias)
 
 def reverse_func(apps, schema_editor):
     # Delete the rows added by `forwards_func`.
     Codec = apps.get_model("sync", "Codec")
     db_alias = schema_editor.connection.alias
+    qs = Codec.objects.using(db_alias)
     # Delete the subtitle codecs.
-    Codec.objects.using(db_alias).filter(
+    qs.filter(
         asset_type='subtitle',
         codec__in=[ d['codec'] for d in subtitle_codecs ],
+    ).delete()
+    # Delete the thumbnail codecs.
+    qs.filter(
+        asset_type='thumbnail',
+        codec__in=[ d['codec'] for d in thumbnail_codecs ],
     ).delete()
 
 class Migration(migrations.Migration):
