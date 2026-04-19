@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    Codec, # noqa: F401
+    Codec,
     Source,
     Media,
     Metadata,
@@ -45,6 +45,16 @@ class MetadataFormatAdmin(admin.ModelAdmin):
     list_display = ('uuid', 'key', 'site', 'number', 'metadata')
     readonly_fields = ('uuid', 'metadata', 'site', 'key', 'number')
     search_fields = ('uuid', 'metadata__uuid', 'metadata__media__uuid', 'key')
+
+
+@admin.register(Codec)
+class CodecAdmin(admin.ModelAdmin):
+
+    ordering = ('asset_type', 'codec')
+    list_display = ('uuid', 'asset_type', 'codec', 'description')
+    list_filter = ('asset_type',)
+    readonly_fields = ('uuid',)
+    search_fields = ('codec', 'description')
 
 
 @admin.register(MediaServer)
