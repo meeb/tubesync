@@ -1,10 +1,12 @@
 from django.contrib import admin
 from .models import (
+    Codec,
     Source,
     Media,
     Metadata,
     MetadataFormat,
-    MediaServer
+    MediaServer,
+    Subtitle,
 )
 
 
@@ -51,3 +53,13 @@ class MediaServerAdmin(admin.ModelAdmin):
     ordering = ('host', 'port')
     list_display = ('pk', 'server_type', 'host', 'port', 'use_https', 'verify_https')
     search_fields = ('host',)
+
+
+@admin.register(Subtitle)
+class SubtitleAdmin(admin.ModelAdmin):
+
+    ordering = ('language', 'extension')
+    list_display = ('id', 'language', 'extension', 'original_language', 'machine_generated', 'codec')
+    list_filter = ('machine_generated',)
+    search_fields = ('language', 'extension', 'original_language')
+

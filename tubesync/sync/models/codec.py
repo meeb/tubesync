@@ -44,3 +44,4 @@ class Codec(models.Model):
         unique_together = (
             ('asset_type', 'codec'),
         )
+
