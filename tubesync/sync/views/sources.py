@@ -7,6 +7,7 @@ from django.views.generic.edit import FormView, FormMixin, CreateView, UpdateVie
 from django.core.exceptions import SuspiciousFileOperation
 from django.urls import reverse_lazy
 from django.db.models import Count, When, Case
+from django.db.models.functions import Lower
 from django.forms import Form, ValidationError
 from django.utils.text import slugify
 from django.utils._os import safe_join
@@ -47,11 +48,13 @@ class SourcesView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        all_sources = Source.objects.all().order_by('name')
-        return all_sources.annotate(
+        all_sources = Source.objects.all()
+        qs = all_sources.annotate(
+            lower_name=Lower('name'),
             media_count=Count('media_source'),
             downloaded_count=Count(Case(When(media_source__downloaded=True, then=1)))
         )
+        return qs.order_by('lower_name')
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
