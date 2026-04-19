@@ -51,5 +51,5 @@ class Subtitle(models.Model):
         )
 
     def __str__(self):
-        return f'{self.language} ({self.extension})'
+        return f'{self.extension} / {self.language}'
 

@@ -49,9 +49,9 @@ class SubtitleModelTestCase(TestCase):
             Subtitle.objects.create(language='en-US', extension='vtt')
 
     def test_str_representation(self):
-        # Req 8.4 / 3.1: __str__ returns '{language} ({extension})'
+        # Req 8.4 / 3.1: __str__ returns '{extension} / {language}'
         subtitle = Subtitle(language='en-US', extension='vtt')
-        self.assertEqual(str(subtitle), 'en-US (vtt)')
+        self.assertEqual(str(subtitle), 'vtt / en-US')
 
     def test_machine_generated_defaults_to_false(self):
         # Req 1.4: machine_generated defaults to False
@@ -81,7 +81,7 @@ class SubtitleStrPropertyTest(HypothesisTestCase):
     @settings(max_examples=100)
     def test_str_format_property(self, language, extension):
         # Property 1: for any non-empty language and extension,
-        # str(Subtitle) == f'{language} ({extension})'
+        # str(Subtitle) == f'{extension} / {language}'
         subtitle = Subtitle(language=language, extension=extension)
-        self.assertEqual(str(subtitle), f'{language} ({extension})')
+        self.assertEqual(str(subtitle), f'{extension} / {language}')
 

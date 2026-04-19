@@ -68,8 +68,8 @@ class MediaServerAdmin(admin.ModelAdmin):
 @admin.register(Subtitle)
 class SubtitleAdmin(admin.ModelAdmin):
 
-    ordering = ('language', 'extension')
-    list_display = ('id', 'language', 'extension', 'original_language', 'machine_generated', 'codec')
+    ordering = ('extension', 'language')
+    list_display = ('id', 'extension', 'original_language', 'language', 'machine_generated', 'codec')
     list_filter = ('machine_generated',)
-    search_fields = ('language', 'extension', 'original_language')
+    search_fields = ('extension', 'language', 'original_language')
 
