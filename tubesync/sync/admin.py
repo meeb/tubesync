@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    Codec,
+    Codec, # noqa: F401
     Source,
     Media,
     Metadata,
