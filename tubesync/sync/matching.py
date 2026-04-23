@@ -73,12 +73,19 @@ def get_best_combined_format(media):
         matches.add(fmt['id'])
         by_fmt_id[fmt['id']] = fmt
         by_language[fmt['language_code']] = fmt['id']
-        if 'format_note' in fmt and '(default)' in fmt['format_note']:
-            by_fmt_id['default'] = fmt
+        if 'format_note' in fmt:
+            if '(original)' in fmt['format_note']:
+                by_fmt_id['original'] = fmt
+            if '(default)' in fmt['format_note']:
+                by_fmt_id['default'] = fmt
 
     # nothing matched, return early
     if not matches:
         return False, False
+
+    # prefer original
+    if 'original' in by_fmt_id and 'id' in by_fmt_id['original']:
+        return True, by_fmt_id['original']['id']
 
     # use any available matching format
     return get_fallback_id(by_fmt_id, by_language, exact=True, fallback_id=matches.pop())

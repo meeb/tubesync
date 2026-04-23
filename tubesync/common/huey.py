@@ -1,4 +1,5 @@
 import datetime
+import time
 import uuid
 from functools import wraps
 from huey import (
@@ -249,6 +250,8 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=No
             workers=workers if thread else 1,
             worker_type='thread' if thread else 'process',
             max_delay=20.0,
+            max_tasks=10_000,
+            check_worker_health=True,
             flush_locks=True,
             scheduler_interval=10,
             simple_log=False,
@@ -348,7 +351,7 @@ def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 storage_key_prefix = 'task_history:'
 
 def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
-    signal_time = utils.time_clock()
+    signal_time = time.monotonic()
     signal_dt = datetime.datetime.now(datetime.timezone.utc)
     assert huey is not None
     assert hasattr(huey, 'get') and callable(huey.get)
@@ -356,6 +359,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 
     from common.models import TaskHistory
     add_to_elapsed_signals = frozenset((
+        signals.SIGNAL_TIMEOUT,
         signals.SIGNAL_INTERRUPTED,
         signals.SIGNAL_ERROR,
         signals.SIGNAL_CANCELED,
@@ -367,6 +371,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         signals.SIGNAL_LOCKED,
         signals.SIGNAL_EXECUTING,
         signals.SIGNAL_RETRYING,
+        signals.SIGNAL_RATE_LIMITED,
     )) | add_to_elapsed_signals
     storage_key = f'{storage_key_prefix}{task_obj.id}'
     task_obj_attr = '_signals_history'
@@ -464,7 +469,7 @@ def register_huey_signals():
 
         # clean up old history and results from storage
         q = get_queue(qn)
-        now_time = utils.time_clock()
+        now_time = time.monotonic()
         now_dt = datetime.datetime.now(datetime.timezone.utc)
         for key in q.all_results().keys():
             if not key.startswith(storage_key_prefix):
