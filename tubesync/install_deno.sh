@@ -46,7 +46,10 @@ record_deno_version() {
 set -eu
 deno_archive="deno-$(uname -m)-unknown-linux-gnu.zip"
 work_dir="$(mktemp -d)"
-trap "rm -rf -- '${work_dir}'" EXIT
+_cleanup() {
+    rm -rf -- "${work_dir}"
+}
+trap '_cleanup' EXIT
 cd "${work_dir}"
 
 if [ '--only-record-version' != "${1-unset}" ]; then
