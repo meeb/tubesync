@@ -2,8 +2,10 @@
 
 # requires:
 # - curl
-# - sha256sum
+# - python3
 # - unzip
+
+HERE="$(dirname "$(realpath "$0")")"
 
 download_deno() {
     local fn
@@ -15,7 +17,7 @@ download_deno() {
     test -n "${fn}"
     rm -v -f "./${fn}"* # this should never do anything
     curl -sSJLR --remote-name-all "${url}/${fn}{,.sha256sum}"
-    sha256sum -wc "./${fn}.sha256sum"
+    "${HERE}/shasum.py" -a sha256 "./${fn}.sha256sum"
 }
 
 extract_deno() {
