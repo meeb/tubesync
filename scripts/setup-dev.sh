@@ -55,47 +55,14 @@ fi
 # 6. Download Tailwind CSS CLI if not present (verified via asfald)
 if [ ! -x "$REPO_ROOT/tailwindcss" ]; then
     echo "==> Downloading Tailwind CSS CLI (with asfald checksum verification)"
-    ARCH="$(uname -m)"
-    OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-    case "$(uname -s)" in
-        Darwin) OS='macos' ;;
-        Linux) OS='linux' ;;
-    esac
-    case "$(uname -m)" in
-        aarch64|arm64) ARCH='arm64' ;;
-        x86_64) ARCH='x64' ;;
-    esac
-    case "${OS}-${ARCH}" in
-        macos-arm64|macos-x64|linux-arm64|linux-x64)  TW_BIN="tailwindcss-${OS}-${ARCH}" ;;
-        *)             echo "    Unsupported platform: $OS-$ARCH"; TW_BIN="" ;;
-    esac
-    if [ -n "$TW_BIN" ]; then
-        asfald_uri='asfaload/asfald/releases/download/v0.6.0'
-        case "${OS}-${ARCH}" in
-            (linux-arm64) fn='asfald-aarch64-unknown-linux-musl.tar.gz' ;;
-            (linux-x64) fn='asfald-x86_64-unknown-linux-musl.tar.gz' ;;
-            (macos-arm64) fn='asfald-aarch64-apple-darwin.tar.gz' ;;
-            (macos-x64) fn='asfald-x86_64-apple-darwin.tar.gz' ;;
-        esac
-        extract_asfald() {
-            local gtar=; case "$(tar --version 2>/dev/null)" in (*'(GNU tar)'*) gtar=t;; esac; tar --strip-components=1 ${gtar:+--wildcards} -xvvpf "${1}" 'asfald-*/asfald';
-        }
-        curl -sSLO -- "https://github.com/${asfald_uri}/${fn}"
-        curl -sSL -- "https://gh.checksums.asfaload.com/github.com/${asfald_uri}/checksums.txt" | "${PYTHON}" "${REPO_ROOT}/tubesync/shasum.py" -a sha256 - &&
-            extract_asfald "${fn}" &&
-            TMPDIR="$(mktemp -d "${REPO_ROOT}/.tmp.XXXXXXXX")" ./asfald -o "${REPO_ROOT}/tailwindcss" -p '${path}/sha256sums.txt' "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/${TW_BIN}"
-        rm -v -f "${fn}" ./asfald
-        unset -v asfald_uri fn
-        rmdir -v "${REPO_ROOT}"/.tmp.* 2>/dev/null || true
-        chmod -v a+rx "${REPO_ROOT}/tailwindcss"
-        echo "    Downloaded and verified $TW_BIN"
-    fi
+    bash "${REPO_ROOT}/tubesync/install_tailwindcss.sh" "${REPO_ROOT}"
 else
     echo "==> Tailwind CSS CLI already present"
 fi
 
 # 7. Compile Tailwind CSS
 echo "==> Compiling Tailwind CSS"
+# Maybe use `make css` here instead?
 "$REPO_ROOT/tailwindcss" --input "$REPO_ROOT/tubesync/common/static/styles/tailwind/tubesync.css" --output "$REPO_ROOT/tubesync/common/static/styles/tailwind/tubesync-compiled.css" --cwd "$REPO_ROOT"
 
 # 8. Run migrations

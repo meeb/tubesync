@@ -7,7 +7,7 @@ image=$(name):latest
 
 
 all: | clean build
-css: tailwindcss | tubesync/common/static/styles/tailwind/tubesync-compiled.css
+css: tubesync/common/static/styles/tailwind/tubesync-compiled.css
 requirements: | requirements.txt requirements-dev.txt
 .PHONY: all css requirements
 
@@ -16,8 +16,12 @@ dev:
 	$(python) tubesync/manage.py runserver
 
 
-css-watch:
+css-watch: | tailwindcss
 	./tailwindcss --input tubesync/common/static/styles/tailwind/tubesync.css --output tubesync/common/static/styles/tailwind/tubesync-compiled.css --watch
+
+
+tailwindcss:
+	bash ./tubesync/install_tailwindcss.sh "$(realpath .)"
 
 
 build: | css
@@ -66,7 +70,7 @@ APP_CSS = $(call rwildcard,tubesync,*.css)
 TAILWIND_SRCS := $(foreach f, $(filter-out %-compiled.css, $(APP_CSS)), \
     $(if $(filter %/tailwind/, $(dir $(f))), $(f)))
 
-$(TAILWIND_SRCS:.css=-compiled.css): %-compiled.css: %.css
+$(TAILWIND_SRCS:.css=-compiled.css): %-compiled.css: %.css | tailwindcss
 	./tailwindcss --input $< --output $@
 
 clean-tailwind:
