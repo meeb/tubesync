@@ -59,6 +59,20 @@ jobs:
         id: yt-dlp
         uses: ./.github/actions/yt-dlp
 
+  scripts:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6
+      - name: Make directories
+        shell: bash
+        run: sudo install -v -d -o "$(id -un)" /app/common
+      - name: Install `deno`
+        shell: bash
+        run: ./tubesync/install_deno.sh
+      - name: Install `tailwindcss`
+        shell: bash
+        run: ./tubesync/install_tailwindcss.sh
+
   test:
     if: ${{ !cancelled() && ( 'pull_request' != github.event_name || (! github.event.pull_request.draft) ) }}
     runs-on: ubuntu-22.04
