@@ -22,16 +22,16 @@ download_gh_release() {
     repo="${1}"; shift
     template="${1}"; shift
 
-    base_url="https://github.com/${owner}/${repo}/releases"
+    _base_url="https://github.com/${owner}/${repo}/releases"
 
     # Optional: do not shift too far
-    target_version="${1:-latest}"
+    _target_version="${1:-latest}"
     [ 0 -ge $# ] || shift
 
     # Determine the version
-    case "${target_version}" in
+    case "${_target_version}" in
         ('latest')
-            resolved_version="$(get_location_header "${base_url}/latest" | cut -d / -f 8)"
+            resolved_version="$(get_location_header "${_base_url}/latest" | cut -d / -f 8)"
             case "${resolved_version:-/}" in
                 ('/')
                     stderr \
@@ -41,17 +41,17 @@ download_gh_release() {
             esac
             ;;
         *)
-            resolved_version="${target_version}"
+            resolved_version="${_target_version}"
             ;;
     esac
-    unset -v target_version
+    unset -v _target_version
 
     # Generate the filename using printf
     filename=$(printf -- "${template}" "${resolved_version}" "${@}")
 
     # Construct the download URL
-    dl_url="${base_url}/download/${resolved_version}/${filename}"
-    unset -v base_url
+    dl_url="${_base_url}/download/${resolved_version}/${filename}"
+    unset -v _base_url
 
     stdout "Fetching from ${owner}/${repo}: ${filename}"
 
