@@ -33,6 +33,23 @@ fi
 
 # 3. Install dependencies from Pipfile (via uv)
 echo "==> Installing dependencies from Pipfile"
+# Install required build packages
+sudo apt-get update && \
+    sudo apt-get -y --no-install-recommends install \
+        libonig-dev
+
+        # default-libmysqlclient-dev \
+        # g++ \
+        # gcc \
+        # libjpeg-dev \
+        # libonig-dev \
+        # libpq-dev \
+        # libwebp-dev \
+        # make \
+        # postgresql-common \
+        # python3-dev \
+        # zlib1g-dev
+
 uv --no-config --no-managed-python --no-progress tool run pipenv requirements --no-lock --dev \
     | uv pip install -q -r -
 echo "    Done"
