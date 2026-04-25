@@ -7,15 +7,29 @@
 
 HERE="$(dirname "$(realpath "$0")")"
 source "${HERE}/download_gh_release.func.inc.sh"
+source "${HERE}/verify_digest.func.inc.sh"
+source "${HERE}/download_asfald.func.inc.sh"
 
 download_deno() {
+    local owner='denoland' repo='deno'
     local fn
     fn="${1}"
 
+    local releases_url="https://github.com/${owner}/${repo}/releases"
+    local url="${releases_url}/latest/download/${fn}"
+
     test -n "${fn}"
     rm -v -f "./${fn}"* # this should never do anything
-    download_gh_release denoland deno "${fn}.sha256sum"
-    download_gh_release denoland deno "${fn}"
+
+    download_gh_release "${owner}" "${repo}" "${fn}" 'latest'
+    local latest_version="${resolved_version}"
+    test -n "${latest_version}"
+
+    url="${releases_url}/download/${latest_version}/${fn}"
+    local latest_digest="$(./asfald-latest --get-hash "${url}")"
+    verify_digest "${latest_digest}" "${fn}" || return 1
+
+    download_gh_release "${owner}" "${repo}" "${fn}.sha256sum" "${latest_version}"
     "${HERE}/shasum.py" -a sha256 "./${fn}.sha256sum"
 }
 
@@ -47,12 +61,15 @@ set -eu
 deno_archive="deno-$(uname -m)-unknown-linux-gnu.zip"
 work_dir="$(mktemp -d)"
 _cleanup() {
-    rm -rf -- "${work_dir}"
+    rm -v -rf -- "${work_dir}"
 }
 trap '_cleanup' EXIT
 cd "${work_dir}"
 
 if [ '--only-record-version' != "${1-unset}" ]; then
+    download_asfald
+    download_asfald latest
+
     download_deno "${deno_archive}"
     extract_deno "${deno_archive}" '/usr/local/bin'
     record_deno_version '/usr/local/bin/deno'
