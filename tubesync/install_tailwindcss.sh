@@ -7,6 +7,7 @@
 set -eu
 HERE="$(dirname "$(realpath "$0")")"
 source "${HERE}/download_gh_release.func.inc.sh"
+source "${HERE}/verify_digest.func.inc.sh"
 
 bin_directory() {
     local dir="${1:-/usr/local/bin}"
@@ -109,15 +110,6 @@ record_tailwindcss_version() {
     local version="$(get_tailwindcss_version "$@")"
 
     printf -- "tailwindcss_version = '%s'\n" "${version}" >> /app/common/third_party_versions.py
-}
-
-verify_digest() {
-    local digest="${1}"
-    local filename="${2}"
-
-    local algo="${digest%%:*}"
-    local checksum="${digest##*:}"
-    printf -- '%s (%s) = %s\n' "${algo^^}" "${filename}" "${checksum,,}" | "${HERE}/shasum.py" -a "${algo,,}" -
 }
 
 dest_dir="$(bin_directory "$@")"
