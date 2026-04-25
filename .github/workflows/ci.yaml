@@ -72,6 +72,14 @@ jobs:
       - name: Install `tailwindcss`
         shell: bash
         run: ./tubesync/install_tailwindcss.sh
+      - name: make css
+        shell: bash
+        run: |
+          cp -v -l -t . /usr/local/bin/tailwindcss
+          make css
+      - name: TubeSync development environment setup script
+        shell: bash
+        run: ./scripts/setup-dev.sh
 
   test:
     if: ${{ !cancelled() && ( 'pull_request' != github.event_name || (! github.event.pull_request.draft) ) }}
