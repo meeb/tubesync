@@ -1,10 +1,10 @@
+import math
 import os
 import re
-import math
+import requests
 from copy import deepcopy
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-import requests
 from PIL import Image
 from common.utils import list_of_dictionaries
 from django.conf import settings

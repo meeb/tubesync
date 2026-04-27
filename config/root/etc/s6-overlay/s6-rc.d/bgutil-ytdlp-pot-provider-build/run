@@ -21,10 +21,10 @@ command -v node > /dev/null || \
 chown -R app:app .
 
 s6-setuidgid app \
-    env HOME="${tmp_app_home}" DENO_COMPAT=1 deno run -A npm:npm ci --no-fund
+    env HOME="${tmp_app_home}" DENO_COMPAT=1 deno run --no-config -A npm:npm ci --no-fund
 
 s6-setuidgid app \
-    env HOME="${tmp_app_home}" DENO_COMPAT=1 deno run -A npm:npm audit fix
+    env HOME="${tmp_app_home}" DENO_COMPAT=1 deno run --no-config -A npm:npm audit fix
 
 s6-setuidgid app \
     env HOME="${tmp_app_home}" ../node npm:typescript/tsc

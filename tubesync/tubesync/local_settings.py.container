@@ -15,10 +15,6 @@ if DJANGO_URL_PREFIX and STATIC_URL:
     STATIC_URL = urljoin(DJANGO_URL_PREFIX, STATIC_URL[1:])
 
 
-# This is not ever meant to be a public web interface so this isn't too critical
-SECRET_KEY = getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret')
-
-
 ALLOWED_HOSTS_STR = getenv('TUBESYNC_HOSTS', '*')
 ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
 FORCE_SCRIPT_NAME = getenv('DJANGO_FORCE_SCRIPT_NAME', DJANGO_URL_PREFIX)
@@ -74,16 +70,6 @@ else:
     # with too little delay, you may see
     # more "database is locked" errors
     SQLITE_DELAY_FLOAT = 5
-
-
-DEFAULT_THREADS = 1
-BACKGROUND_TASK_ASYNC_THREADS = getenv('TUBESYNC_WORKERS', DEFAULT_THREADS, integer=True)
-if BACKGROUND_TASK_ASYNC_THREADS > 1:
-    DATABASES['default']['_msgs'] = database_dict.get('_msgs', list())
-    DATABASES['default']['_msgs'].append((logging.WARNING,
-        'Using more than 1 worker is generally a bad idea.',
-    ))
-    BACKGROUND_TASK_RUN_ASYNC = True
 
 
 MEDIA_ROOT = CONFIG_BASE_DIR / 'media'

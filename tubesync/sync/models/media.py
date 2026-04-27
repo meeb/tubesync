@@ -393,9 +393,13 @@ class Media(models.Model):
                             fmt.get('vcodec') and
                             self.source.can_fallback and
                             (
-                                (self.source.fallback == Val(Fallback.NEXT_BEST)) or
+                                (self.source.fallback == Val(Fallback.NEXT_BEST_RESOLUTION)) or
                                 (
-                                    self.source.fallback == Val(Fallback.NEXT_BEST_HD) and
+                                    self.source.fallback == Val(Fallback.REQUIRE_CODEC) and
+                                    self.source.source_vcodec == fmt.get('vcodec')
+                                ) or
+                                (
+                                    self.source.fallback == Val(Fallback.REQUIRE_HD) and
                                     (fmt.get('height') or 0) >= fallback_hd_cutoff
                                 )
                             )
@@ -440,20 +444,25 @@ class Media(models.Model):
                     'hdr': hdr,
                     'format': tuple(fmt),
                 }
-            if self.downloaded_format:
-                resolution = self.downloaded_format.lower()
-            elif self.downloaded_height:
+            is_audio_download = (
+                (self.downloaded_format or '').lower() == Val(SourceResolution.AUDIO)
+            )
+            if is_audio_download:
+                resolution = Val(SourceResolution.AUDIO)
+            elif self.downloaded_height and self.downloaded_height > 0:
                 resolution = f'{self.downloaded_height}p'
+            elif self.downloaded_format:
+                resolution = self.downloaded_format.lower()
             if resolution:
                 fmt.append(resolution)
-            if self.downloaded_format != Val(SourceResolution.AUDIO):
+            if not is_audio_download:
                 vcodec = self.downloaded_video_codec.lower()
             if vcodec:
                 fmt.append(vcodec)
             acodec = self.downloaded_audio_codec.lower()
             if acodec:
                 fmt.append(acodec)
-            if self.downloaded_format != Val(SourceResolution.AUDIO):
+            if not is_audio_download:
                 fps = str(self.downloaded_fps)
                 if fps:
                     fmt.append(f'{fps}fps')
@@ -488,10 +497,10 @@ class Media(models.Model):
                 # Combined
                 vformat = cformat
         if vformat:
-            if vformat['format']:
-                resolution = vformat['format'].lower()
-            else:
+            if vformat.get('height', 0) > 0:
                 resolution = f"{vformat['height']}p"
+            elif vformat.get('format'):
+                resolution = str(vformat['format']).lower()
             if resolution:
                 fmt.append(resolution)
             vcodec = vformat['vcodec'].lower()
@@ -639,8 +648,18 @@ class Media(models.Model):
     @property
     def reduce_data(self):
         now = timezone.now()
+        using_table = False
         try:
             data = json.loads(self.metadata or "{}")
+            old_mdl = len(self.metadata or "")
+            if data.get('_using_table', False):
+                try:
+                    data.update(self.new_metadata.with_formats)
+                except ObjectDoesNotExist:
+                    pass
+                else:
+                    using_table = True
+                    old_mdl = len(str(data))
             if '_reduce_data_ran_at' in data.keys():
                 total_seconds = data['_reduce_data_ran_at']
                 assert isinstance(total_seconds, int), type(total_seconds)
@@ -660,7 +679,6 @@ class Media(models.Model):
             from common.logger import log
             # log the results of filtering / compacting on metadata size
             new_mdl = len(compact_json)
-            old_mdl = len(self.metadata or "")
             if old_mdl > new_mdl:
                 delta = old_mdl - new_mdl
                 log.info(f'{self.key}: metadata compacted by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
@@ -669,7 +687,10 @@ class Media(models.Model):
                 delta = old_mdl - new_mdl
                 log.info(f'{self.key}: metadata reduced by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
                 if getattr(settings, 'SHRINK_OLD_MEDIA_METADATA', False):
-                    self.metadata = filtered_json
+                    if using_table:
+                        self.ingest_metadata(filtered_data)
+                    else:
+                        self.metadata = filtered_json
                     return filtered_data
             return data
 

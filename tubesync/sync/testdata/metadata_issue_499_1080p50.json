@@ -1,0 +1,32 @@
+{
+  "title": "Test",
+  "fulltitle": "Test",
+  "upload_date": "20240317",
+  "duration": 1,
+  "uploader": "u",
+  "epoch": 1,
+  "formats": [
+    {
+      "format_id": "399",
+      "format_note": "1080p50",
+      "format": "399 - 1080p50",
+      "height": 1080,
+      "width": 1920,
+      "vcodec": "vp9",
+      "acodec": "none",
+      "fps": 50,
+      "tbr": 1000
+    },
+    {
+      "format_id": "251",
+      "format_note": "audio",
+      "format": "251 - audio",
+      "height": null,
+      "width": null,
+      "vcodec": "none",
+      "acodec": "opus",
+      "abr": 128,
+      "asr": 48000
+    }
+  ]
+}

@@ -1,17 +1,65 @@
 import cProfile
+import difflib
 import emoji
 import gc
 import io
+import math
 import os
 import pstats
 import string
 import time
 from django.core.paginator import Paginator
 from functools import partial
+from itertools import chain
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from urllib.parse import urlunsplit, urlencode, urlparse
 from .errors import DatabaseConnectionError, QuerySetEmptyError
+
+
+def get_usable_cpu_count() -> int:
+    """
+    Find a reasonable value for available CPUs.
+    Checks: cgroups, scheduler, then physical count.
+    """
+    # Check Cgroup v2 (Modern Docker/K8s)
+    cgroup_dir = Path('/sys/fs/cgroup')
+    try:
+        cpu_max_path = cgroup_dir / 'cpu.max'
+        if cpu_max_path.exists():
+            data = cpu_max_path.read_text().split()
+            # Format: "$MAX $PERIOD" (e.g., "50000 100000")
+            if 'max' != data[0]:
+                quota = int(data[0])
+                period = int(data[1])
+                return max(1, math.ceil(quota / period))
+    except (OSError, ValueError, IndexError):
+        pass
+
+    # Check Cgroup v1 (Legacy Docker/K8s)
+    cgroup_cpu_dir = cgroup_dir / 'cpu'
+    try:
+        quota_path = cgroup_cpu_dir / 'cpu.cfs_quota_us'
+        period_path = cgroup_cpu_dir / 'cpu.cfs_period_us'
+        if quota_path.exists() and period_path.exists():
+            quota = int(quota_path.read_text())
+            period = int(period_path.read_text())
+            if 0 < quota:
+                return max(1, math.ceil(quota / period))
+    except (OSError, ValueError):
+        pass
+
+    # Linux specific: Respects 'taskset' or CPU pinning
+    try:
+        affinity_count = len(os.sched_getaffinity(0))
+        if 0 < affinity_count:
+            return affinity_count
+    except (AttributeError, NotImplementedError):
+        pass
+
+    # Returns total logical CPUs; defaults to 1
+    return max(1, os.cpu_count() or 0)
+
 
 def directory_and_stem(arg_path, /, all_suffixes=False):
     filepath = Path(arg_path)
@@ -68,6 +116,23 @@ def glob_quote(filestr, /):
         raise TypeError(f'expected a str, got "{type(filestr)}"')
 
     return filestr.translate(str.maketrans(_glob_specials))
+
+
+def is_empty_iterator(iterator):
+    """
+    Checks if an iterator is empty without fully consuming it.
+    Returns: (is_empty_boolean, iterator)
+    """
+    returned_iterator = iterator
+    try:
+        first_item = next(iterator)
+    except StopIteration:
+        return True, iter([])
+    else:
+        # Put the first item back at the start of a new iterator
+        # Chaining the single item with the original remaining stream
+        returned_iterator = chain([first_item], iterator)
+    return False, returned_iterator
 
 
 def list_of_dictionaries(arg_list, /, arg_function=lambda x: x):
@@ -292,6 +357,37 @@ def remove_enclosed(haystack, /, open='[', close=']', sep=' ', *, valid=None, st
         if invalid:
             return haystack
     return haystack[:o] + haystack[len(n)+c:]
+
+
+def resolve_priority_order(user_input, master_list, cutoff=0.6):
+    """
+    Normalizes and validates a user's preferred order against a master set.
+    """
+    resolved = []
+    # Index for case-insensitive and underscore/hyphen normalization
+    norm_map = {m.lower().replace('_', '-'): m for m in master_list}
+
+    for item in user_input:
+        # 1. Exact match (fastest)
+        if item in master_list:
+            if item not in resolved:
+                resolved.append(item)
+            continue
+
+        # 2. Normalized match (handles 'en_US' -> 'en-US' or 'EN-US' -> 'en-US')
+        norm_item = item.lower().replace('_', '-')
+        if norm_item in norm_map:
+            match = norm_map[norm_item]
+            if match not in resolved:
+                resolved.append(match)
+            continue
+
+        # 3. Fuzzy match (handles 'English' -> 'en' or 'USA' -> 'en-US')
+        matches = difflib.get_close_matches(item, master_list, n=1, cutoff=cutoff)
+        if matches and matches[0] not in resolved:
+            resolved.append(matches[0])
+
+    return resolved
 
 
 def django_queryset_generator(query_set, /, *,

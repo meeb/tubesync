@@ -1,5 +1,6 @@
 
 from django import forms, VERSION as DJANGO_VERSION
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 from .models import Source
@@ -37,6 +38,12 @@ SourceForm = forms.modelform_factory(
     },
 )
 
+def source_clean_media_format(self):
+    data = self.cleaned_data.get('media_format', '').strip()
+    return data or getattr(settings, 'MEDIA_FORMATSTR', settings.MEDIA_FORMATSTR_DEFAULT)
+
+SourceForm.clean_media_format = source_clean_media_format
+
 class ValidateSourceForm(forms.Form):
 
     source_url = forms.URLField(
@@ -56,26 +63,6 @@ class ConfirmDeleteSourceForm(forms.Form):
         label=_('Also delete downloaded media'),
         required=False
     )
-
-
-class RedownloadMediaForm(forms.Form):
-
-    pass
-
-
-class SkipMediaForm(forms.Form):
-
-    pass
-
-
-class EnableMediaForm(forms.Form):
-
-    pass
-
-
-class ResetTasksForm(forms.Form):
-
-    pass
 
 
 class ScheduleTaskForm(forms.Form):
@@ -99,11 +86,6 @@ class ScheduleTaskForm(forms.Form):
             attrs={'type': 'datetime-local', 'class': 'input is-medium'},
         ),
     )
-
-
-class ConfirmDeleteMediaServerForm(forms.Form):
-
-    pass
 
 
 _media_server_type_label = 'Jellyfin'

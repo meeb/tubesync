@@ -36,8 +36,9 @@ class CapChoices(models.IntegerChoices):
 
 class Fallback(models.TextChoices):
     FAIL = 'f', _('Fail, do not download any media')
-    NEXT_BEST = 'n', _('Get next best resolution or codec instead')
-    NEXT_BEST_HD = 'h', _('Get next best resolution but at least HD')
+    REQUIRE_CODEC = 'c', _('Get next best resolution, only the preferred codec')
+    REQUIRE_HD = 'h', _('Get next best resolution, any codec, but at least HD')
+    NEXT_BEST_RESOLUTION = 'n', _('Get next best resolution, any codec')
 
 
 class FileExtension(models.TextChoices):

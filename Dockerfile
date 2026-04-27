@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="1.2.2"
+ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="1.3.1"
 ARG FFMPEG_VERSION="N"
 ARG YTDLP_EJS_VERSION="0.3.2"
 
@@ -21,7 +21,8 @@ ARG QJS_VERSION="2025-09-13"
 ARG SHA256_QJS="fed9715220d616d1a178e1c2e6bd62e8e850626b4fe337cf417940fd32b35802"
 
 ARG ALPINE_VERSION="latest"
-ARG DEBIAN_VERSION="bookworm-slim"
+ARG DEBIAN_VERSION="13-slim"
+ARG OPENRESTY_DEBIAN_VERSION="bookworm"
 
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
@@ -31,6 +32,19 @@ ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
 ARG QJS_CHECKSUM_ALGORITHM="sha256"
 
+
+FROM debian:${DEBIAN_VERSION} AS tubesync-prepare-etc
+
+COPY patches/ /var/tmp/patches/
+RUN --mount=type=tmpfs,target=/cache \
+    set -eux && cd /var/tmp/patches/ && \
+    ./fettle.pl --dry-run ./docker/tubesync-base/debconf.diff && \
+    ./fettle.pl ./docker/tubesync-base/debconf.diff && \
+    ./fettle.pl --clean ./docker/tubesync-base/debconf.diff
+
+FROM scratch AS tubesync-etc
+
+COPY --from=tubesync-prepare-etc /etc/ /etc/
 
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
@@ -48,6 +62,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_NO_COMPILE=1 \
     PIP_ROOT_USER_ACTION='ignore'
 
+COPY --from=tubesync-etc /etc/debconf.conf /etc/debconf.conf
+
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
     # to be careful, ensure that these files aren't from a different architecture
@@ -58,8 +74,21 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     # hopefully soon, this will be included in Debian images
     printf -- >| /etc/apt/apt.conf.d/docker-disable-pkgcache \
         'Dir::Cache::%spkgcache "";\n' '' src ; \
-	chmod a+r /etc/apt/apt.conf.d/docker-disable-pkgcache ; \
+    chmod a+r /etc/apt/apt.conf.d/docker-disable-pkgcache ; \
+    # Create the directory for debconf
+    mkdir -v /var/cache/debconf/docker-templates ; \
     set -x && \
+    # When a new release is out but the debian image hasn't
+    # updated yet, upgrades cause more wasted space than
+    # we want to accept. This should prevent apt from
+    # upgrading packages that shipped with the image.
+    dpkg -s | \
+      grep -B 3 -e '^Status: install ok installed$' | \
+      grep -e '^Package: ' | \
+      cut -d : -f 2- | \
+      xargs -r -t apt-mark hold && \
+    # We must allow these upgrades
+    apt-mark unhold libc6 libssl3t64 && \
     apt-get update && \
     # Install locales
     LC_ALL='C.UTF-8' LANG='C.UTF-8' LANGUAGE='C.UTF-8' \
@@ -69,8 +98,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     locale-gen && \
     # Clean up
     apt-get -y autopurge && \
-    apt-get -y autoclean && \
-    rm -f /var/cache/debconf/*.dat-old
+    apt-get -y autoclean
 
 FROM alpine:${ALPINE_VERSION} AS asfald-download
 ARG ASFALD_VERSION
@@ -157,6 +185,53 @@ RUN set -eu ; \
         "https://github.com/asfaload/asfald/releases/latest/download/asfald-${arch}-unknown-linux-musl" && \
     chmod -c 00755 "${dest}" && chown -c root:root "${dest}"
 
+FROM tubesync-asfald AS tailwindcss-download
+
+ARG DESTDIR="/downloaded"
+ARG TAILWINDCSS_URL="https://github.com/tailwindlabs/tailwindcss/releases/latest/download"
+
+ARG TARGETARCH
+RUN set -eu ; \
+\
+    decide_arch() { \
+        case "${TARGETARCH}" in \
+            (amd64) printf -- 'x64' ;; \
+            (arm64) printf -- 'arm64' ;; \
+        esac ; \
+    } ; \
+\
+    arch="$(decide_arch)" ; \
+    apt-get update && \
+    apt-get -y --no-install-recommends install busybox-static && \
+    mkdir -p "${DESTDIR}" && \
+    cd "${DESTDIR}" && \
+    try_url="$(busybox wget -S -O - "${TAILWINDCSS_URL}/sha256sums.txt" 2>&1 | grep -ie '^  Location: ' | head -n 1 | cut -d ' ' -f 4-)" && \
+    for url in 'sha256sums.txt' "tailwindcss-linux-${arch}" "tailwindcss-linux-${arch}-musl" ; \
+    do \
+        case "${try_url}" in \
+            (*githubusercontent.com/*) url="${TAILWINDCSS_URL}/${url}" ;; \
+            (*github.com/*) url="${try_url%/sha256sums.txt}/${url}" ;; \
+        esac ; \
+        TMPDIR="${DESTDIR}" asfald-latest -v -- "${url}" ; \
+    done ; \
+    unset -v arch try_url url ; \
+    cksum -a sha256 --check --warn --strict --ignore-missing sha256sums.txt && \
+    mkdir -v -p "/verified/${TARGETARCH}" && \
+    for binary in tailwindcss-linux-* ; \
+    do \
+        chmod -c 00755 "${binary}" && chown -c root:root "${binary}" && \
+        test -x "/verified/${TARGETARCH}/tailwindcss" || ln -v "${binary}" "/verified/${TARGETARCH}/tailwindcss" ; \
+    done ; \
+    unset -v binary ; \
+    rm -rf "${DESTDIR}" ;
+
+FROM scratch AS tailwindcss
+ARG TARGETARCH
+COPY --from=tailwindcss-download "/verified/${TARGETARCH}/tailwindcss" /usr/local/bin/
+
+FROM tubesync-base AS tubesync-tailwindcss
+COPY --from=tailwindcss /usr/local/bin/ /usr/local/bin/
+
 FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
 
 FROM scratch AS uv
@@ -168,8 +243,8 @@ FROM scratch AS deno
 COPY --from=deno-binaries /deno /usr/local/bin/
 
 FROM alpine:${ALPINE_VERSION} AS openresty-debian
+ARG OPENRESTY_DEBIAN_VERSION
 ARG TARGETARCH
-ARG DEBIAN_VERSION
 ADD 'https://openresty.org/package/pubkey.gpg' '/downloaded/pubkey.gpg'
 RUN set -eu ; \
     decide_arch() { \
@@ -187,7 +262,7 @@ RUN set -eu ; \
     mkdir -v -p '/etc/apt/sources.list.d' && \
     printf -- >| '/etc/apt/sources.list.d/openresty.list' \
         'deb http://openresty.org/package/%sdebian %s openresty' \
-        "$(decide_arch)" "${DEBIAN_VERSION%-slim}"
+        "$(decide_arch)" "${OPENRESTY_DEBIAN_VERSION}"
 
 FROM tubesync-asfald AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -446,6 +521,12 @@ COPY --from=openresty-debian \
 COPY --from=openresty-debian \
     /etc/apt/sources.list.d/openresty.list /etc/apt/sources.list.d/openresty.list
 
+RUN mkdir -v -p /etc/crypto-policies/back-ends && \
+    cp -v -p /usr/share/apt/default-sequoia.config \
+        /etc/crypto-policies/back-ends/apt-sequoia.config && \
+    sed -i -e '/^sha1\./s/2026-/2027-/;' \
+        /etc/crypto-policies/back-ends/apt-sequoia.config
+
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
   set -x && \
@@ -456,8 +537,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   && \
   # Clean up
   apt-get -y autopurge && \
-  apt-get -y autoclean && \
-  rm -v -f /var/cache/debconf/*.dat-old
+  apt-get -y autoclean
 
 FROM tubesync-openresty AS tubesync
 
@@ -507,13 +587,16 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   update-alternatives --install /usr/local/bin/vim vim /usr/bin/vim.tiny 15 && \
   update-alternatives --install /usr/local/bin/vim vim /usr/bin/vis 35 && \
   rm -v /usr/local/bin/babi /bin/nano /usr/bin/vim.tiny && \
+  printf >| /usr/local/bin/sqlite3 -- '%s\n' '#!/usr/bin/env sh' '' \
+    'if [ -x /usr/bin/sqlite3 ]; then exec /usr/bin/sqlite3 "$@" ; fi;' '' \
+    'exec /usr/bin/env python3 -m sqlite3 "$@"' && \
+  chmod -c 00755 /usr/local/bin/sqlite3 && \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Clean up
   apt-get -y autopurge && \
-  apt-get -y autoclean && \
-  rm -v -f /var/cache/debconf/*.dat-old
+  apt-get -y autoclean
 
 # Install third party software
 COPY --from=s6-overlay / /
@@ -538,8 +621,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     apt-get -y autoremove --purge file && \
     # Clean up
     apt-get -y autopurge && \
-    apt-get -y autoclean && \
-    rm -v -f /var/cache/debconf/*.dat-old
+    apt-get -y autoclean
 
 # Switch workdir to the the app
 WORKDIR /app
@@ -600,12 +682,6 @@ RUN --mount=type=tmpfs,target=/cache \
     uv --no-config --no-progress --no-managed-python \
     pip install --strict --system --break-system-packages \
     --requirements /cache/requirements.txt && \
-  # remove the getpot_bgutil_script plugin
-  find /usr/local/lib \
-  -name 'getpot_bgutil_script.py' \
-  -path '*/yt_dlp_plugins/extractor/getpot_bgutil_script.py' \
-  -type f -print -delete \
-  && \
   # Clean up
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
@@ -628,7 +704,6 @@ RUN --mount=type=tmpfs,target=/cache \
       -exec du -h '{}' ';' \
       -exec ldd '{}' ';' \
     >| /cache/python-shared-objects 2>&1 && \
-  rm -v -f /var/cache/debconf/*.dat-old && \
   rm -v -rf /tmp/* ; \
   if grep >/dev/null -Fe ' => not found' /cache/python-shared-objects ; \
   then \
@@ -665,8 +740,8 @@ RUN --mount=type=tmpfs,target=/cache \
   mkdir -v -p /cache/.home-directories && \
   cp -at /cache/.home-directories/ "${HOME}" && \
   HOME="/cache/.home-directories/${HOME#/}" && \
-  DENO_COMPAT=1 deno run -A npm:npm ci --no-audit --no-fund && \
-  DENO_COMPAT=1 deno run -A npm:npm audit fix && \
+  DENO_COMPAT=1 deno run --no-config -A npm:npm ci --no-audit --no-fund && \
+  DENO_COMPAT=1 deno run --no-config -A npm:npm audit fix && \
   node npm:typescript/tsc
 
 # Build app
@@ -699,7 +774,7 @@ RUN set -x && \
   printf -- "qjs_version = '%s'\n" "${qjs_version}" >> /app/common/third_party_versions.py
 
 # Create a healthcheck
-HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
+HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py"]
 
 # ENVS and ports
 ENV DENO_DIR="/config/cache/deno" \

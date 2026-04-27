@@ -250,7 +250,7 @@ class Source(db.models.Model):
         max_length=1,
         db_index=True,
         choices=Fallback.choices,
-        default=Fallback.NEXT_BEST_HD,
+        default=Fallback.REQUIRE_HD,
         help_text=_('What do do when media in your source resolution and codecs is not available'),
     )
     copy_channel_images = db.models.BooleanField(
