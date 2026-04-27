@@ -7,7 +7,6 @@
 set -eu
 HERE="$(dirname "$(realpath "$0")")"
 source "${HERE}/download_gh_release.func.inc.sh"
-source "${HERE}/verify_digest.func.inc.sh"
 source "${HERE}/download_asfald.func.inc.sh"
 
 bin_directory() {

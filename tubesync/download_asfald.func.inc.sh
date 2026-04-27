@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+verify_digest() {
+    local digest="${1}"
+    local filename="${2}"
+
+    local algo="${digest%%:*}"
+    local checksum="${digest##*:}"
+    printf -- '%s (%s) = %s\n' "${algo^^}" "${filename}" "${checksum,,}" | "${HERE}/shasum.py" -a "${algo,,}" -
+}
+
 download_asfald() {
     local owner='asfaload' repo='asfald' tag='v0.6.0'
     local asfald_uri="${owner}/${repo}/releases/download/${tag}/checksums.txt"
