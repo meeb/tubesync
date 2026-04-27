@@ -3,7 +3,7 @@ from django.forms import BaseForm
 from basicauth.middleware import BasicAuthMiddleware as BaseBasicAuthMiddleware
 
 
-class MaterializeDefaultFieldsMiddleware:
+class FormsDefaultFieldsMiddleware:
     '''
         Adds 'browser-default' CSS attribute class to all form fields.
     '''

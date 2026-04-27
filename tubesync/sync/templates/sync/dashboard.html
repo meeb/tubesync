@@ -1,133 +1,119 @@
 {% extends 'base.html' %}{% load humanize %}{% load filters %}
 
+{% block active_dashboard %} is-active{% endblock %}
+
 {% block headtitle %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="row">
-  <div class="col s12">
-    <h1 class="truncate">Dashboard</h1>
-  </div>
-</div>
+<h1 class="title mb-4">Dashboard</h1>
+
 {% if num_sources == 0 %}
-<div class="row">
-  <div class="col s12">
-    <p class="no-para-margin-top">
-      You don't have any media sources added. To get started, head over to the
-      <a href="{% url 'sync:sources' %}">sources</a> page and add some.
-    </p>
-    <a href="{% url 'sync:sources' %}" class="btn">Add a source <i class="fas fa-fw fa-play"></i></a>
+<div class="notification is-info is-light">
+  <p>You don't have any media sources added. To get started, head over to the <a href="{% url 'sync:sources' %}">sources</a> page and add some.</p>
+  <div class="buttons mt-4">
+    <a href="{% url 'sync:sources' %}" class="button is-primary">
+      <span class="icon"><i class="fas fa-play"></i></span>
+      <span>Add a source</span>
+    </a>
   </div>
 </div>
 {% endif %}
-<div class="row">
-  <div class="col s12 m6 xl3">
-    <div class="card dashcard">
-      <a href="{% url 'sync:sources' %}">
-        <div class="card-content">
-          <h3 class="truncate">{{ num_sources|intcomma }}</h3>
-          <div class="desc truncate">source{{ num_sources|pluralize }}</div>
-          <div class="truncate"><strong>{{ num_video_sources|intcomma }}</strong> video, <strong>{{ num_audio_sources|intcomma }}</strong> audio</div>
-        </div>
-      </a>
-    </div>
+
+<div class="columns is-multiline">
+  <div class="column is-half-tablet is-one-quarter-widescreen">
+    <a href="{% url 'sync:sources' %}" class="box has-text-centered">
+      <p class="title is-3">{{ num_sources|intcomma }}</p>
+      <p class="subtitle is-6 mb-3">source{{ num_sources|pluralize }}</p>
+      <hr class="my-3">
+      <strong>{{ num_video_sources|intcomma }}</strong> video, <strong>{{ num_audio_sources|intcomma }}</strong> audio
+    </a>
   </div>
-  <div class="col s12 m6 xl3">
-    <div class="card dashcard">
-      <a href="{% url 'sync:media' %}">
-        <div class="card-content">
-          <h3 class="truncate">{{ num_media|intcomma }}</h3>
-          <div class="desc truncate">media item{{ num_media|pluralize }}</div>
-          <div class="truncate"><strong>{{ num_downloaded_media|intcomma }}</strong> downloaded</div>
-        </div>
-      </a>
-    </div>
+
+  <div class="column is-half-tablet is-one-quarter-widescreen">
+    <a href="{% url 'sync:media' %}" class="box has-text-centered">
+      <p class="title is-3">{{ num_media|intcomma }}</p>
+      <p class="subtitle is-6 mb-3">media item{{ num_media|pluralize }}</p>
+      <hr class="my-3">
+      <strong>{{ num_downloaded_media|intcomma }}</strong> downloaded
+    </a>
   </div>
-  <div class="col s12 m6 xl3">
-    <div class="card dashcard">
-      <a href="{% url 'sync:tasks' %}">
-        <div class="card-content">
-          <h3 class="truncate">{{ num_tasks|intcomma }}</h3>
-          <div class="desc truncate">scheduled task{{ num_tasks|pluralize }}</div>
-          <div class="truncate"><strong>{{ num_completed_tasks|intcomma }}</strong> completed</div>
-        </div>
-      </a>
-    </div>
+
+  <div class="column is-half-tablet is-one-quarter-widescreen">
+    <a href="{% url 'sync:tasks' %}" class="box has-text-centered">
+      <p class="title is-3">{{ num_tasks|intcomma }}</p>
+      <p class="subtitle is-6 mb-3">scheduled task{{ num_tasks|pluralize }}</p>
+      <hr class="my-3">
+      <strong>{{ num_completed_tasks|intcomma }}</strong> completed
+    </a>
   </div>
-  <div class="col s12 m6 xl3">
-    <div class="card dashcard">
-      <a href="{% url 'sync:media' %}">
-        <div class="card-content">
-          <h3 class="truncate">{{ disk_usage_bytes|bytesformat }}</h3>
-          <div class="desc truncate">{{ disk_usage_bytes|intcomma }} bytes</div>
-          <div class="truncate">Avg. <strong>{{ average_bytes_per_media|bytesformat }}</strong> per media</div>
-        </div>
-      </a>
-    </div>
+
+  <div class="column is-half-tablet is-one-quarter-widescreen">
+    <a href="{% url 'sync:media' %}" class="box has-text-centered">
+      <p class="title is-3">{{ disk_usage_bytes|bytesformat }}</p>
+      <p class="subtitle is-6 mb-3">{{ disk_usage_bytes|intcomma }} bytes</p>
+      <hr class="my-3">
+      Avg. <strong>{{ average_bytes_per_media|bytesformat }}</strong> per media
+    </a>
   </div>
-  <div class="col s12 l6">
-    <div class="card dashcard">
-      <div class="card-content">
-        <h4 class="truncate">Latest downloads</h4>
-        <div class="collection">
+
+  <div class="column is-half-desktop">
+    <div class="box">
+      <h4 class="title is-5">Latest downloads</h4>
+      <div class="is-fullwidth">
         {% for media in latest_downloads %}
-          <a href="{% url 'sync:media-item' pk=media.pk %}" class="collection-item">
-            <div class="truncate"><strong>{{ media.name }}</strong></div>
-            <div class="truncate"><strong>{{ media.download_date|timesince:now }}</strong> ago from &quot;{{ media.source.name }}&quot;</div>
-          </a>
+        <a href="{% url 'sync:media-item' pk=media.pk %}" class="download-item is-block is-fullwidth p-3">
+          <div class="is-clipped mb-1"><strong>{{ media.name }}</strong></div>
+          <div class="is-clipped"><strong>{{ media.download_date|timesince:now }} ago</strong> from "{{ media.source.name }}"</div>
+        </a>
         {% empty %}
-          <span class="collection-item">No media has been downloaded.</span>
+        <div class="download-item is-block is-fullwidth p-3">No media has been downloaded.</div>
         {% endfor %}
-        </div>
       </div>
     </div>
   </div>
-  <div class="col s12 l6">
-    <div class="card dashcard">
-      <div class="card-content">
-        <h4 class="truncate">Largest downloads</h4>
-        <div class="collection">
-          {% for media in largest_downloads %}
-            <a href="{% url 'sync:media-item' pk=media.pk %}" class="collection-item">
-              <div class="truncate">{{ media.name }}</div>
-              <div class="truncate"><strong>{{ media.downloaded_filesize|bytesformat }}</strong>{% if media.downloaded_format %} in {{ media.downloaded_format }}{% endif %} from &quot;{{ media.source.name }}&quot;</div>
-            </a>
-          {% empty %}
-            <span class="collection-item">No media has been downloaded.</span>
-          {% endfor %}
-          </div>
+
+  <div class="column is-half-desktop">
+    <div class="box">
+      <h4 class="title is-5">Largest downloads</h4>
+      <div class="is-fullwidth">
+        {% for media in largest_downloads %}
+        <a href="{% url 'sync:media-item' pk=media.pk %}" class="download-item is-block is-fullwidth p-3">
+          <div class="is-clipped mb-1">{{ media.name }}</div>
+          <div class="is-clipped"><strong>{{ media.downloaded_filesize|bytesformat }}</strong>{% if media.downloaded_format %} in {{ media.downloaded_format }}{% endif %} from "{{ media.source.name }}"</div>
+        </a>
+        {% empty %}
+        <div class="download-item is-block is-fullwidth p-3">No media has been downloaded.</div>
+        {% endfor %}
       </div>
     </div>
   </div>
 </div>
-<div class="row">
-  <div class="col s12">
-    <h2 class="truncate">Runtime information</h2>
-  </div>
-</div>
-<div class="row">
-  <div class="col s12">
-    <table class="striped">
-      <tr title="User ID TubeSync is running under">
-        <td class="hide-on-small-only">User ID</td>
-        <td><span class="hide-on-med-and-up">User ID<br></span><strong>{{ uid }}</strong></td>
+
+<h2 class="title is-4 mt-5">Runtime information</h2>
+<div class="box">
+  <table class="table is-fullwidth is-hoverable is-striped">
+    <tbody>
+      <tr>
+        <td>User ID</td>
+        <td><strong>{{ uid }}</strong></td>
       </tr>
-      <tr title="Group ID TubeSync is running under">
-        <td class="hide-on-small-only">Group ID</td>
-        <td><span class="hide-on-med-and-up">Group ID<br></span><strong>{{ gid }}</strong></td>
+      <tr>
+        <td>Group ID</td>
+        <td><strong>{{ gid }}</strong></td>
       </tr>
-      <tr title="Local directory where configuration data is stored">
-        <td class="hide-on-small-only">Config directory</td>
-        <td><span class="hide-on-med-and-up">Config directory<br></span><strong>{{ config_dir }}</strong></td>
+      <tr>
+        <td>Config directory</td>
+        <td><strong>{{ config_dir }}</strong></td>
       </tr>
-      <tr title="Local directory where media will be downloaded to">
-        <td class="hide-on-small-only">Downloads directory</td>
-        <td><span class="hide-on-med-and-up">Downloads directory<br></span><strong>{{ downloads_dir }}</strong></td>
+      <tr>
+        <td>Downloads directory</td>
+        <td><strong>{{ downloads_dir }}</strong></td>
       </tr>
-      <tr title="Database connection used by TubeSync">
-        <td class="hide-on-small-only">Database</td>
-        <td><span class="hide-on-med-and-up">Database<br></span><strong>{{ database_connection }}{% if database_filesize %} ({{ database_filesize|bytesformat }}){% endif %}</strong></td>
+      <tr>
+        <td>Database</td>
+        <td><strong>{{ database_connection }}{% if database_filesize %} ({{ database_filesize|bytesformat }}){% endif %}</strong></td>
       </tr>
+    </tbody>
     </table>
   </div>
-</div>
 {% endblock %}

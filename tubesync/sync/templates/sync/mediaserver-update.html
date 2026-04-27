@@ -3,25 +3,22 @@
 {% block headtitle %}Update media server - {{ mediaserver }}{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Update <strong>{{ mediaserver }}</strong></h1>
-    <p>
-      You can use this form to update your media server details. The details will be
-      validated when you save the form.
-    </p>
-    {% if server_help %}{{ server_help|safe }}{% endif %}
-  </div>
-</div>
-<div class="row">
-  <form method="post" action="{% url 'sync:update-mediaserver' pk=mediaserver.pk %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Update media server <i class="fas fa-pen-square"></i></button>
-      </div>
+<h1 class="title mb-4">Update <strong>{{ mediaserver }}</strong></h1>
+<p class="mb-4">
+  You can use this form to update your media server details. The details will be
+  validated when you save the form.
+</p>
+{% if server_help %}<div class="content mb-4">{{ server_help|safe }}</div>{% endif %}
+<form method="post" action="{% url 'sync:update-mediaserver' pk=mediaserver.pk %}" class="simpleform">
+  {% csrf_token %}
+  {% include 'simpleform.html' with form=form %}
+  <div class="field pt-4 has-text-centered">
+    <div class="control">
+      <button class="button is-primary" type="submit" name="action">
+        <span class="icon"><i class="fas fa-pen-square"></i></span>
+        <span>Update media server</span>
+      </button>
     </div>
-  </form>
-</div>
+  </div>
+</form>
 {% endblock %}
