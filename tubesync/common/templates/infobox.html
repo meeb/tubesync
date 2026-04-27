@@ -1,11 +1,5 @@
 {% if message %}
-<div class="row">
-  <div class="col s12">
-    <div class="card infobox">
-      <div class="card-content">
-        <i class="fas fa-fw fa-info-circle"></i> {{ message|safe }}
-      </div>
-    </div>
-  </div>
+<div class="rounded-lg border border-primary/20 bg-nav text-nav-foreground p-4 mb-6">
+  <i class="fas fa-fw fa-info-circle"></i> {{ message|safe }}
 </div>
 {% endif %}

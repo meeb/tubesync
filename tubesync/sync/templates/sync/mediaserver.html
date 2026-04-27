@@ -3,46 +3,39 @@
 {% block headtitle %}Media server - {{ mediaserver }}{% endblock %}
 
 {% block content %}
-<div class="row">
-  <div class="col s12">
-    <h1 class="truncate"><strong>{{ mediaserver.get_server_type_display }}</strong> server at <strong>{{ mediaserver.url }}</strong></h1>
-  </div>
-</div>
+<h1 class="truncate"><strong>{{ mediaserver.get_server_type_display }}</strong> server at <strong>{{ mediaserver.url }}</strong></h1>
+
 {% include 'infobox.html' with message=message %}
-<div class="row">
-  <div class="col s12">
-    <table class="striped">
-      <tr title="The source type">
-        <td class="hide-on-small-only">Type</td>
-        <td><span class="hide-on-med-and-up">Type<br></span><strong>{{ mediaserver.get_server_type_display }}</strong></td>
-      </tr>
-      <tr title="Name of the souce in TubeSync for your reference">
-        <td class="hide-on-small-only">Location</td>
-        <td><span class="hide-on-med-and-up">Location<br></span><strong>{{ mediaserver.url }}</strong></td>
-      </tr>
-      <tr title="Number of media items downloaded for the source">
-        <td class="hide-on-small-only">Use HTTPS</td>
-        <td><span class="hide-on-med-and-up">Use HTTPS<br></span><strong>{% if mediaserver.use_https %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
-      </tr>
-      <tr title="Number of media items downloaded for the source">
-        <td class="hide-on-small-only">Verify HTTPS</td>
-        <td><span class="hide-on-med-and-up">Verify HTTPS<br></span><strong>{% if mediaserver.verify_https %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
-      </tr>
-      {% for name, value in mediaserver.options.items %}
-      <tr title="Unique key of the source, such as the channel name or playlist ID">
-        <td class="hide-on-small-only">{{ name|title }}</td>
-        <td><span class="hide-on-med-and-up">{{ name|title }}<br></span><strong>{% if name in private_options %}{{ value|truncatechars:6 }} (hidden){% else %}{{ value }}{% endif %}</strong></td>
-      </tr>
-      {% endfor %}
-    </table>
-  </div>
+
+<div class="rounded-lg border border-border overflow-hidden mb-6">
+  <table class="w-full text-sm">
+    <tr title="The server type" class="border-b border-border">
+      <td class="hidden sm:table-cell py-3 px-4 text-muted-foreground font-medium w-1/3">Type</td>
+      <td class="py-3 px-4"><span class="sm:hidden text-muted-foreground">Type<br></span><strong>{{ mediaserver.get_server_type_display }}</strong></td>
+    </tr>
+    <tr title="Server location" class="border-b border-border">
+      <td class="hidden sm:table-cell py-3 px-4 text-muted-foreground font-medium w-1/3">Location</td>
+      <td class="py-3 px-4"><span class="sm:hidden text-muted-foreground">Location<br></span><strong>{{ mediaserver.url }}</strong></td>
+    </tr>
+    <tr title="Use HTTPS" class="border-b border-border">
+      <td class="hidden sm:table-cell py-3 px-4 text-muted-foreground font-medium w-1/3">Use HTTPS</td>
+      <td class="py-3 px-4"><span class="sm:hidden text-muted-foreground">Use HTTPS<br></span><strong>{% if mediaserver.use_https %}<i class="fas fa-check text-green-600"></i>{% else %}<i class="fas fa-times text-destructive"></i>{% endif %}</strong></td>
+    </tr>
+    <tr title="Verify HTTPS" class="border-b border-border">
+      <td class="hidden sm:table-cell py-3 px-4 text-muted-foreground font-medium w-1/3">Verify HTTPS</td>
+      <td class="py-3 px-4"><span class="sm:hidden text-muted-foreground">Verify HTTPS<br></span><strong>{% if mediaserver.verify_https %}<i class="fas fa-check text-green-600"></i>{% else %}<i class="fas fa-times text-destructive"></i>{% endif %}</strong></td>
+    </tr>
+    {% for name, value in mediaserver.options.items %}
+    <tr class="border-b border-border">
+      <td class="hidden sm:table-cell py-3 px-4 text-muted-foreground font-medium w-1/3">{{ name|title }}</td>
+      <td class="py-3 px-4"><span class="sm:hidden text-muted-foreground">{{ name|title }}<br></span><strong>{% if name in private_options %}{{ value|truncatechars:6 }} (hidden){% else %}{{ value }}{% endif %}</strong></td>
+    </tr>
+    {% endfor %}
+  </table>
 </div>
-<div class="row no-margin-bottom padding-top">
-  <div class="col s12 l6 margin-bottom">
-    <a href="{% url 'sync:update-mediaserver' pk=mediaserver.pk %}" class="btn">Edit media server <i class="fas fa-pen-square"></i></a>
-  </div>
-  <div class="col s12 l6 margin-bottom">
-    <a href="{% url 'sync:delete-mediaserver' pk=mediaserver.pk %}" class="btn delete-button">Delete media server <i class="fas fa-trash-alt"></i></a>
-  </div>
+
+<div class="flex flex-col sm:flex-row gap-3">
+  <a href="{% url 'sync:update-mediaserver' pk=mediaserver.pk %}" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-primary text-primary-foreground font-medium text-sm hover:bg-accent hover:text-accent-foreground transition-colors">Edit media server <i class="fas fa-pen-square"></i></a>
+  <a href="{% url 'sync:delete-mediaserver' pk=mediaserver.pk %}" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-destructive text-destructive-foreground font-medium text-sm hover:bg-destructive/80 transition-colors">Delete media server <i class="fas fa-trash-alt"></i></a>
 </div>
 {% endblock %}

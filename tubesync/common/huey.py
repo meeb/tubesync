@@ -1,5 +1,5 @@
 import datetime
-import os
+import time
 import uuid
 from functools import wraps
 from huey import (
@@ -8,7 +8,9 @@ from huey import (
 )
 from huey.api import TaskLock
 from huey.storage import SqliteStorage as huey_SqliteStorage
+from pathlib import Path
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
+from .utils import get_usable_cpu_count
 
 
 def _set_acquired(self, value=True):
@@ -214,7 +216,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     return maint_result
 
 
-def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
+def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=None):
     name_fmt = 'huey_{}'
     if prefix:
         name_fmt = f'huey_{prefix}_' + '{}'
@@ -226,8 +228,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
         workers = 2
     finally:
         if 0 >= workers:
-            useful_cpus = os.sched_getaffinity(0)
-            workers = max(2, len(useful_cpus) // 2)
+            workers = max(2, get_usable_cpu_count() // 2)
         elif 1 == workers:
             thread = False
     return dict(
@@ -239,7 +240,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
         utc=True,
         compression=True,
         connection=dict(
-            filename=f'/config/tasks/{name}.db',
+            filename=str(Path(tasks_dir or '/config/tasks') / f'{name}.db'),
             fsync=True,
             isolation_level='IMMEDIATE', # _create_connection sets this to None
             strict_fifo=True,
@@ -249,6 +250,8 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
             workers=workers if thread else 1,
             worker_type='thread' if thread else 'process',
             max_delay=20.0,
+            max_tasks=10_000,
+            check_worker_health=True,
             flush_locks=True,
             scheduler_interval=10,
             simple_log=False,
@@ -348,7 +351,7 @@ def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 storage_key_prefix = 'task_history:'
 
 def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
-    signal_time = utils.time_clock()
+    signal_time = time.monotonic()
     signal_dt = datetime.datetime.now(datetime.timezone.utc)
     assert huey is not None
     assert hasattr(huey, 'get') and callable(huey.get)
@@ -356,6 +359,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 
     from common.models import TaskHistory
     add_to_elapsed_signals = frozenset((
+        signals.SIGNAL_TIMEOUT,
         signals.SIGNAL_INTERRUPTED,
         signals.SIGNAL_ERROR,
         signals.SIGNAL_CANCELED,
@@ -367,6 +371,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         signals.SIGNAL_LOCKED,
         signals.SIGNAL_EXECUTING,
         signals.SIGNAL_RETRYING,
+        signals.SIGNAL_RATE_LIMITED,
     )) | add_to_elapsed_signals
     storage_key = f'{storage_key_prefix}{task_obj.id}'
     task_obj_attr = '_signals_history'
@@ -464,7 +469,7 @@ def register_huey_signals():
 
         # clean up old history and results from storage
         q = get_queue(qn)
-        now_time = utils.time_clock()
+        now_time = time.monotonic()
         now_dt = datetime.datetime.now(datetime.timezone.utc)
         for key in q.all_results().keys():
             if not key.startswith(storage_key_prefix):
