@@ -1,0 +1,15 @@
+#!/command/with-contenv bash
+
+set -e
+cd /app
+
+DIR="${XDG_STATE_HOME:-/config/state}/hat"
+DATABASE="${DIR}/syslog.db"
+
+mkdir -p "${DIR}"
+chown -R app:app "${DIR}"
+chmod 0700 "${DIR}"
+
+exec s6-setuidgid app \
+    hat-syslog-server --log-level 'DEBUG' \
+        --db-enable-archive --db-path "${DATABASE}"
