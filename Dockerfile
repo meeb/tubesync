@@ -569,6 +569,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   python3-libsass \
   python3-pip-whl \
   python3-socks \
+  busybox-syslogd \
   curl \
   indent \
   less \
