@@ -1,0 +1,23 @@
+#!/command/with-contenv bash
+
+install_pkg() {
+    apt-get update && apt-get install -y busybox busybox-syslogd
+}
+
+set -e
+cd /
+
+install -d -o root -g app -m 0750 /run/app/log
+
+command -v busybox >/dev/null || install_pkg
+
+HOST=127.0.0.1
+PORT=6514
+export HOST PORT
+
+config='/run/app/log/.syslog.conf'
+logfile='/run/app/log/messages'
+
+exec busybox syslogd -n -S -l 8 -f "${config}" \
+    -b 9 -s 2048 -O "${logfile}" \
+    -L -R "${HOST}:${PORT}"
