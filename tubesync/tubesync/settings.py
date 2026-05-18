@@ -1,4 +1,5 @@
 from django import VERSION as DJANGO_VERSION
+from logging.handlers import SysLogHandler
 from pathlib import Path
 from common.huey import sqlite_tasks
 from common.utils import getenv
@@ -71,6 +72,119 @@ for django_huey_queue in DJANGO_HUEY['queues'].values():
     consumer = django_huey_queue.get('consumer')
     if consumer:
         consumer['verbose'] = DJANGO_HUEY.get('verbose', False)
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {},
+        'syslog': {
+            'format': '%(asctime)s %(name)s: %(message)s',
+            'datefmt': '%b %d %H:%M:%S',
+        },
+        'common': {
+            'format':  '%(asctime)s [%(name)s/%(levelname)s] %(message)s',
+            'datefmt': None,
+        },
+        'consumer_simple': {
+            'format': '%(asctime)s %(message)s',
+            'datefmt': '%H:%M:%S',
+        },
+        'worker_process': {
+            'format': '[%(asctime)s] %(levelname)s:%(name)s:%(process)d:%(message)s',
+            'datefmt': None,
+        },
+        'worker_thread': {
+            'format': '[%(asctime)s] %(levelname)s:%(name)s:%(process)d:%(threadName)s:%(message)s',
+            'datefmt': None,
+        },
+    },
+    'handlers': {
+        'hat_syslog': {
+            'class': 'common.huey_syslog.SyslogHandler',
+            'host': '127.0.0.1',
+            'port': 6514,
+            'comm_type': 'TCP',
+            'level': 'DEBUG',
+            'formatter': 'default',
+        },
+        'hat_syslog_worker_process': {
+            'class': 'common.huey_syslog.SyslogHandler',
+            'host': '127.0.0.1',
+            'port': 6514,
+            'comm_type': 'TCP',
+            'level': 'DEBUG',
+            'formatter': 'worker_process',
+        },
+        'hat_syslog_worker_thread': {
+            'class': 'common.huey_syslog.SyslogHandler',
+            'host': '127.0.0.1',
+            'port': 6514,
+            'comm_type': 'TCP',
+            'level': 'DEBUG',
+            'formatter': 'worker_thread',
+        },
+        'stderr': {
+            'class': 'logging.StreamHandler',
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'formatter': 'common',
+        },
+        'stderr_worker_process': {
+            'class': 'logging.StreamHandler',
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'formatter': 'worker_process',
+        },
+        'stderr_worker_thread': {
+            'class': 'logging.StreamHandler',
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'formatter': 'worker_thread',
+        },
+        'syslog': {
+            'class': SysLogHandler,
+            'address': '/dev/log',
+            'facility': SysLogHandler.LOG_LOCAL0,
+            'level': 'DEBUG',
+            'formatter': 'syslog',
+        },
+    },
+    'root': {
+        'handlers': ['hat_syslog', 'stderr'],
+        'level': 'DEBUG',
+    },
+    'loggers': {
+        'common.huey_syslog': {
+            'handlers': ['syslog', 'stderr'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'django_huey.management.commands.djangohuey': {
+            'handlers': ['syslog'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'hat.syslog.handler': {
+            'handlers': ['syslog', 'stderr'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'huey': {
+            'handlers': ['hat_syslog', 'stderr'],
+            'level': 'INFO' if DJANGO_HUEY.get('verbose', False) is None else 'WARNING',
+            'propagate': False,
+        },
+        'huey.consumer.worker.process': {
+            'handlers': ['hat_syslog_worker_process', 'stderr_worker_process'],
+            'level': 'INFO' if DJANGO_HUEY.get('verbose', False) is None else 'WARNING',
+            'propagate': False,
+        },
+        'huey.consumer.worker.thread': {
+            'handlers': ['hat_syslog_worker_thread', 'stderr_worker_thread'],
+            'level': 'INFO' if DJANGO_HUEY.get('verbose', False) is None else 'WARNING',
+            'propagate': False,
+        },
+    },
+}
 
 
 TEMPLATES = [

@@ -11,5 +11,5 @@ chown -R app:app "${DIR}"
 chmod 0700 "${DIR}"
 
 exec s6-setuidgid app \
-    hat-syslog-server --log-level 'DEBUG' \
+    hat-syslog-server --log-level 'INFO' \
         --db-enable-archive --db-path "${DATABASE}"
