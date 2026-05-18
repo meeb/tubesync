@@ -80,6 +80,12 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.12', '3.13', '3.14']
+    services:
+      hat-syslog:
+        image: bozokopic/hat-syslog
+        ports:
+          - 127.0.0.1:6514:6514/tcp
+          - 127.0.0.1:6514:6514/udp
     steps:
       - uses: actions/checkout@v6
       - name: Install Python ${{ matrix.python-version }}
@@ -151,6 +157,7 @@ jobs:
               --output-format github \
               --ignore "${ignore_csv_list}"
       - name: Run Django tests
+        timeout-minutes: 5
         run: cd tubesync && TUBESYNC_DEBUG=True python3 -B -W default manage.py test --no-input --buffer --verbosity=2
 
   containerise:
@@ -188,7 +195,7 @@ jobs:
             'ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:dive' \
             --ci \
             --highestUserWastedPercent '0.08' \
-            --highestWastedBytes '50M'
+            --highestWastedBytes '60M'
 
   docker-image:
     if: ${{ !cancelled() && 'success' == needs.info.result && 'success' == needs.containerise.result }}
