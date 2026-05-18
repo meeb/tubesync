@@ -720,6 +720,10 @@ RUN --mount=type=tmpfs,target=/cache \
 # Copy root
 COPY config/root /
 
+# patch hat-syslog
+COPY patches/hat/ \
+    /usr/local/lib/python3/dist-packages/hat/
+
 # patch yt_dlp
 COPY patches/yt_dlp/ \
     /usr/local/lib/python3/dist-packages/yt_dlp/
