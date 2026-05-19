@@ -1,5 +1,8 @@
+from django import VERSION as DJANGO_VERSION
 from pathlib import Path
+from common.huey import sqlite_tasks
 from common.utils import getenv
+from sync.choices import TaskQueue
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -7,10 +10,11 @@ CONFIG_BASE_DIR = BASE_DIR
 DOWNLOADS_BASE_DIR = BASE_DIR
 
 
-VERSION = '0.14.1'
-SECRET_KEY = ''
-DEBUG = False
+VERSION = '0.17.3'
+DEBUG = 'true' == getenv('TUBESYNC_DEBUG').strip().lower()
 ALLOWED_HOSTS = []
+# This is not ever meant to be a public web interface so this isn't too critical
+SECRET_KEY = getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret')
 
 
 INSTALLED_APPS = [
@@ -22,7 +26,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize',
     'sass_processor',
-    'background_task',
+    'django_huey',
     'common',
     'sync',
 ]
@@ -44,6 +48,29 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'tubesync.urls'
 FORCE_SCRIPT_NAME = None
+
+
+DJANGO_HUEY = {
+    'default': TaskQueue.LIMIT.value,
+    'queues': dict(),
+    'verbose': None if DEBUG else False,
+}
+for queue_name in TaskQueue.values:
+    queues = DJANGO_HUEY['queues']
+    if TaskQueue.LIMIT.value == queue_name:
+        queues[queue_name] = sqlite_tasks(queue_name, prefix='net')
+    elif TaskQueue.NET.value == queue_name:
+        queues[queue_name] = sqlite_tasks(queue_name, thread=True, workers=0)
+    else:
+        queues[queue_name] = sqlite_tasks(queue_name, thread=True)
+for django_huey_queue in DJANGO_HUEY['queues'].values():
+    connection = django_huey_queue.get('connection')
+    if connection:
+        filepath = Path('/.' + connection.get('filename') or '').resolve(strict=False)
+        filepath.parent.mkdir(exist_ok=True, parents=True)
+    consumer = django_huey_queue.get('consumer')
+    if consumer:
+        consumer['verbose'] = DJANGO_HUEY.get('verbose', False)
 
 
 TEMPLATES = [
@@ -99,7 +126,10 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = getenv('TZ', 'UTC')
 USE_I18N = True
-USE_L10N = True
+# Removed in Django 5.0, set to True by default in Django 4.0
+# https://docs.djangoproject.com/en/4.1/releases/4.0/#localization
+if DJANGO_VERSION[0:3] < (4, 0, 0):
+    USE_L10N = True
 USE_TZ = True
 
 
@@ -134,12 +164,7 @@ HEALTHCHECK_FIREWALL = True
 HEALTHCHECK_ALLOWED_IPS = ('127.0.0.1',)
 
 
-MAX_ATTEMPTS = 15                           # Number of times tasks will be retried
-MAX_RUN_TIME = 1*(24*60*60)                 # Maximum amount of time in seconds a task can run
-BACKGROUND_TASK_RUN_ASYNC = False           # Run tasks async in the background
-BACKGROUND_TASK_ASYNC_THREADS = 1           # Number of async tasks to run at once
-MAX_BACKGROUND_TASK_ASYNC_THREADS = 8       # For sanity reasons
-BACKGROUND_TASK_PRIORITY_ORDERING = 'ASC'   # Use 'niceness' task priority ordering
+MAX_RUN_TIME = 12*(60*60)                   # Maximum amount of time in seconds a task can run
 COMPLETED_TASKS_DAYS_TO_KEEP = 7            # Number of days to keep completed tasks
 MAX_ENTRIES_PROCESSING = 0                  # Number of videos to process on source refresh (0 for no limit)
 
@@ -154,6 +179,7 @@ MEDIA_THUMBNAIL_HEIGHT = 240                # Height in pixels to resize thumbna
 
 VIDEO_HEIGHT_CUTOFF = 240                   # Smallest resolution in pixels permitted to download
 VIDEO_HEIGHT_IS_HD = 500                    # Height in pixels to count as 'HD'
+VIDEO_HEIGHT_UPGRADE = True                 # Download again when a format with more pixels is available
 
 
 
@@ -166,22 +192,52 @@ SOURCE_DOWNLOAD_DIRECTORY_PREFIX = True
 
 YOUTUBE_DL_CACHEDIR = None
 YOUTUBE_DL_TEMPDIR = None
+YOUTUBE_DL_SKIP_UNAVAILABLE_FORMAT = False
 YOUTUBE_DEFAULTS = {
     'color': 'never',       # Do not use colours in output
     'age_limit': 99,        # 'Age in years' to spoof
-    'ignoreerrors': True,   # Skip on errors (such as unavailable videos in playlists)
+    'ignoreerrors': False,  # When true, yt-dlp does not raise descriptive exceptions
     'cachedir': False,      # Disable on-disk caching
     'addmetadata': True,    # Embed metadata during postprocessing where available
+    'updatetime': True,     # Set mtime in recent versions
+    'update_self': False,   # Updates are handled by pip
     'geo_verification_proxy': getenv('geo_verification_proxy').strip() or None,
+    'sleep_interval_requests': 3,
+    'sleep_interval_subtitles': (60)*2,
+    'max_sleep_interval': (60)*5,
+    'sleep_interval': 0.25,
+    'extractor_args': {
+        'youtube': {
+            'raise_incomplete_data': ['true'],
+        },
+        'youtubepot-bgutilhttp': {
+            'base_url': ['http://127.0.0.1:4416'],
+        },
+    },
+    'postprocessor_args': {
+        'videoremuxer+ffmpeg': ['-bsf:v', 'setts=pts=DTS'],
+    },
+    'js_runtimes': {
+        'deno': {'path': None,},
+        'quickjs': {'path': None,},
+    },
 }
 COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
+YOUTUBE_INFO_SLEEP_REQUESTS = 1
 
 
-MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'
+RENAME_ALL_SOURCES = True
+RENAME_SOURCES = list()
 
 
-RENAME_ALL_SOURCES = False
-RENAME_SOURCES = None
+# An example for changing the ordering for audio tracks.
+#ENGLISH_LANGUAGE_CODE_ORDER = (
+#    'en-orig',
+#    'en-US', 'en-CA', 'en-PH', 'en-IE',
+#    'en-GB', 'en-AU', 'en-NZ', 'en-ZA', 'en-IN',
+#    'en-SG', 'en-HK', 'en-MY',
+#    'en', 'eng',
+#)
 
 
 # WARNING WARNING WARNING
@@ -192,7 +248,7 @@ RENAME_SOURCES = None
 # You have been warned!
 
 try:
-    from .local_settings import *
+    from .local_settings import * # noqa
 except ImportError as e:
     import sys
     sys.stderr.write(f'Unable to import local_settings: {e}\n')
@@ -210,14 +266,54 @@ except:
 if MAX_RUN_TIME < 600:
     MAX_RUN_TIME = 600
 
-DOWNLOAD_MEDIA_DELAY = 60 + (MAX_RUN_TIME / 50)
-
-if RENAME_SOURCES or RENAME_ALL_SOURCES:
-    BACKGROUND_TASK_ASYNC_THREADS += 1
-
-if BACKGROUND_TASK_ASYNC_THREADS > MAX_BACKGROUND_TASK_ASYNC_THREADS:
-    BACKGROUND_TASK_ASYNC_THREADS = MAX_BACKGROUND_TASK_ASYNC_THREADS
+DOWNLOAD_MEDIA_DELAY = 1 + round(MAX_RUN_TIME / 100)
 
 
-from .dbutils import patch_ensure_connection
+MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'
+
+
+DEFAULT_ENGLISH_LCO = (
+    'en-orig',  # 1. Original Audio (YouTube Priority)
+    'en-US',    # 2. American English (Base)
+    'en-CA',    # 3. Canadian English (North American Family)
+    'en-PH',    # 4. Philippine English (American-aligned)
+    'en-IE',    # 5. Irish English (Rhotic/North Atlantic)
+    'en-GB',    # 6. British English (Primary Commonwealth)
+    'en-AU',    # 7. Australian English (Commonwealth)
+    'en-NZ',    # 8. New Zealand English (Commonwealth)
+    'en-ZA',    # 9. South African English (Commonwealth)
+    'en-IN',    # 10. Indian English (Commonwealth)
+    'en-SG',    # 11. Singapore English (Commonwealth)
+    'en-HK',    # 12. Hong Kong English (Commonwealth)
+    'en-MY',    # 13. Malaysia English (Commonwealth)
+    'en-JM',    # 14. Jamaica
+    'en-BZ',    # 15. Belize
+    'en-TT',    # 16. Trinidad and Tobago
+    'en-MT',    # 17. Malta
+    'en-ZW',    # 18. Zimbabwe
+    'en-KE',    # 19. Kenya
+    'en-NG',    # 20. Nigeria
+    'en-BW',    # 21. Botswana
+    'en-GM',    # 22. Gambia
+    'en-GH',    # 23. Ghana
+    'en',       # 24. Standard 2-letter fallback (ISO 639-1)
+    'en-021',   # 25. Northern America (Direct US/CA alignment)
+    'en-019',   # 26. Americas (Hemispheric North/South alignment)
+    'en-013',   # 27. Central America (Strong US influence)
+    'en-029',   # 28. Caribbean (Mix of US/UK influence)
+    'en-419',   # 29. Latin America & Caribbean
+    'en-150',   # 30. Europe (General European English)
+    'en-053',   # 31. Australia and New Zealand (Commonwealth Pacific)
+    'en-009',   # 32. Oceania
+    'en-035',   # 33. South-eastern Asia (Commonwealth Asia)
+    'en-142',   # 34. Asia
+    'en-030',   # 35. Eastern Asia
+    'en-002',   # 36. Africa
+    'en-011',   # 37. Western Africa
+    'en-001',   # 38. World (International English)
+    'eng',      # 39. Standard 3-letter fallback (ISO 639-2)
+)
+
+
+from .dbutils import patch_ensure_connection # noqa
 patch_ensure_connection()

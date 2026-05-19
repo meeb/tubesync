@@ -5,13 +5,40 @@
 '''
 
 
-from .choices import Val, Fallback
-from .utils import multi_key_sort
 from django.conf import settings
+from common.utils import multi_key_sort, resolve_priority_order
+from .choices import Val, Fallback
 
 
+english_language_codes = resolve_priority_order(
+    getattr(
+        settings,
+        'ENGLISH_LANGUAGE_CODE_ORDER',
+        settings.DEFAULT_ENGLISH_LCO,
+    ),
+    settings.DEFAULT_ENGLISH_LCO,
+)
 min_height = getattr(settings, 'VIDEO_HEIGHT_CUTOFF', 360)
 fallback_hd_cutoff = getattr(settings, 'VIDEO_HEIGHT_IS_HD', 500)
+
+
+def get_fallback_id(by_fmt_id, /, by_language = {}, *, exact = False, fallback_id = False):
+    assert isinstance(by_fmt_id, dict), type(by_fmt_id)
+    assert isinstance(by_language, dict), type(by_language)
+    assert exact in (True, False,), 'invalid value for exact'
+
+    # prefer default
+    if 'default' in by_fmt_id and 'id' in by_fmt_id['default']:
+        return exact, by_fmt_id['default']['id']
+
+    # try for English
+    for lc in english_language_codes:
+        if lc in by_language:
+            return exact, by_language[lc]
+
+    # use the fallback ID or report no results by default
+    if fallback_id or (exact is False and fallback_id is False):
+        return exact, fallback_id
 
 
 def get_best_combined_format(media):
@@ -21,6 +48,9 @@ def get_best_combined_format(media):
         and video formats if possible. Combined formats are the easiest to check
         for as they must exactly match the source profile be be valid.
     '''
+    matches = set()
+    by_fmt_id = dict()
+    by_language = dict()
     for fmt in media.iter_formats():
         # Check height matches
         if media.source.source_resolution_height != fmt['height']:
@@ -40,8 +70,25 @@ def get_best_combined_format(media):
             if not fmt['is_hdr']:
                 continue
         # If we reach here, we have a combined match!
-        return True, fmt['id']
-    return False, False
+        matches.add(fmt['id'])
+        by_fmt_id[fmt['id']] = fmt
+        by_language[fmt['language_code']] = fmt['id']
+        if 'format_note' in fmt:
+            if '(original)' in fmt['format_note']:
+                by_fmt_id['original'] = fmt
+            if '(default)' in fmt['format_note']:
+                by_fmt_id['default'] = fmt
+
+    # nothing matched, return early
+    if not matches:
+        return False, False
+
+    # prefer original
+    if 'original' in by_fmt_id and 'id' in by_fmt_id['original']:
+        return True, by_fmt_id['original']['id']
+
+    # use any available matching format
+    return get_fallback_id(by_fmt_id, by_language, exact=True, fallback_id=matches.pop())
 
 
 def get_best_audio_format(media):
@@ -50,30 +97,36 @@ def get_best_audio_format(media):
         has a 'fallback' of fail this can return no match.
     '''
     # Reverse order all audio-only formats
-    audio_formats = []
+    audio_formats = set()
+    by_fmt_acodec = dict()
+    by_fmt_id = dict()
+    by_language = dict()
     for fmt in media.iter_formats():
         # If the format has a video stream, skip it
         if fmt['vcodec'] is not None:
             continue
         if not fmt['acodec']:
             continue
-        audio_formats.append(fmt)
+        audio_formats.add(fmt['id'])
+        by_fmt_id[fmt['id']] = fmt
+        by_fmt_acodec[fmt['acodec']] = fmt['id']
+        by_language[fmt['language_code']] = fmt['id']
+        if 'format_note' in fmt and '(default)' in fmt['format_note']:
+            by_fmt_id['default'] = fmt
     if not audio_formats:
         # Media has no audio formats at all
         return False, False
-    audio_formats = list(reversed(audio_formats))
     # Find the first audio format with a matching codec
-    for fmt in audio_formats:
-        if media.source.source_acodec == fmt['acodec']:
-            # Matched!
-            return True, fmt['id']
+    if (fmt_id := by_fmt_acodec.get(media.source.source_acodec)) is not None:
+        # Matched!
+        return True, fmt_id
     # No codecs matched
-    if media.source.can_fallback:
-        # Can fallback, find the next non-matching codec
-        return False, audio_formats[0]['id']
-    else:
+    if not media.source.can_fallback:
         # Can't fallback
         return False, False
+
+    # Can fallback, find the next non-matching codec
+    return get_fallback_id(by_fmt_id, by_language, exact=False, fallback_id=audio_formats.pop())
 
 
 def get_best_video_format(media):
@@ -86,6 +139,19 @@ def get_best_video_format(media):
     # Check if the source wants audio only, fast path to return
     if media.source.is_audio:
         return False, False
+    source_resolution = media.source.source_resolution.strip().upper()
+    source_resolution_height = media.source.source_resolution_height
+    source_vcodec = media.source.source_vcodec
+    can_switch_codecs = (
+        media.source.can_fallback and
+        media.source.fallback != Val(Fallback.REQUIRE_CODEC)
+    )
+    def matched_resolution(fmt):
+        if fmt['format'] == source_resolution:
+            return True
+        elif fmt['height'] == source_resolution_height:
+            return True
+        return False
     # Filter video-only formats by resolution that matches the source
     video_formats = []
     sort_keys = [('height', False), ('vcodec', True), ('vbr', False)] # key, reverse
@@ -95,43 +161,51 @@ def get_best_video_format(media):
             continue
         if not fmt['vcodec']:
             continue
+        # Disqualify AI-upscaled "super resolution" formats
+        # ID: 248-sr , 1080p, AI-upscaled, TV (1920x1080), fps:25, video:VP9 @1409.292k
+        # ID: 399-sr , 1080p, AI-upscaled, TV (1920x1080), fps:25, video:AV1 @1155.505k
+        # https://github.com/meeb/tubesync/issues/1357
+        if '-sr' in fmt['id']:
+            continue
         if any(key[0] not in fmt for key in sort_keys):
             continue
-        if media.source.source_resolution.strip().upper() == fmt['format']:
-            video_formats.append(fmt)
-        elif media.source.source_resolution_height == fmt['height']:
+        accept_codec = (
+            matched_resolution(fmt) and
+            (can_switch_codecs or (source_vcodec == fmt['vcodec']))
+        )
+        if accept_codec:
             video_formats.append(fmt)
     # Check we matched some streams
     if not video_formats:
         # No streams match the requested resolution, see if we can fallback
-        if media.source.can_fallback:
-            # Find the next-best format matches by height
-            for fmt in media.iter_formats():
-                # If the format has an audio stream, skip it
-                if fmt['acodec'] is not None:
-                    continue
-                if (fmt['height'] <= media.source.source_resolution_height and 
-                    fmt['height'] >= min_height):
-                    video_formats.append(fmt)
-        else:
+        if not media.source.can_fallback:
             # Can't fallback
             return False, False
+        # Find the next-best format matches by height
+        for fmt in media.iter_formats():
+            # If the format has an audio stream, skip it
+            if fmt['acodec'] is not None:
+                continue
+            # Disqualify AI-upscaled "super resolution" formats
+            # See above for more details.
+            if '-sr' in fmt['id']:
+                continue
+            accept_height = (
+                fmt['height'] >= min_height and
+                fmt['height'] <= source_resolution_height
+            )
+            if accept_height:
+                video_formats.append(fmt)
     if not video_formats:
         # Still no matches
         return False, False
     video_formats = multi_key_sort(video_formats, sort_keys, True)
-    source_resolution = media.source.source_resolution.strip().upper()
-    source_vcodec = media.source.source_vcodec
     exact_match, best_match = None, None
-    for fmt in video_formats:
-        # format_note was blank, match height instead
-        if '' == fmt['format'] and fmt['height'] == media.source.source_resolution_height:
-            fmt['format'] = source_resolution
     # Of our filtered video formats, check for resolution + codec + hdr + fps match
     if media.source.prefer_60fps and media.source.prefer_hdr:
         for fmt in video_formats:
             # Check for an exact match
-            if (source_resolution == fmt['format'] and
+            if (matched_resolution(fmt) and
                 source_vcodec == fmt['vcodec'] and 
                 fmt['is_hdr'] and
                 fmt['is_60fps']):
@@ -139,10 +213,10 @@ def get_best_video_format(media):
                 exact_match, best_match = True, fmt
                 break
         if media.source.can_fallback:
-            if not best_match:
+            if not best_match and can_switch_codecs:
                 for fmt in video_formats:
                     # Check for a resolution, hdr and fps match but drop the codec
-                    if (source_resolution == fmt['format'] and 
+                    if (matched_resolution(fmt) and 
                         fmt['is_hdr'] and fmt['is_60fps']):
                         # Close match
                         exact_match, best_match = False, fmt
@@ -158,29 +232,29 @@ def get_best_video_format(media):
             if not best_match:
                 for fmt in video_formats:
                     # Check for resolution, codec and 60fps match
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         source_vcodec == fmt['vcodec'] and
                         fmt['is_60fps']):
                         exact_match, best_match = False, fmt
                         break
-            if not best_match:
+            if not best_match and can_switch_codecs:
                 for fmt in video_formats:
                     # Check for resolution and hdr match
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         fmt['is_hdr']):
                         exact_match, best_match = False, fmt
                         break
-            if not best_match:
+            if not best_match and can_switch_codecs:
                 for fmt in video_formats:
                     # Check for resolution and 60fps match
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         fmt['is_60fps']):
                         exact_match, best_match = False, fmt
                         break
             if not best_match:
                 for fmt in video_formats:
                     # Check for resolution, codec and hdr match
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         source_vcodec == fmt['vcodec'] and
                         fmt['is_hdr']):
                         exact_match, best_match = False, fmt
@@ -188,24 +262,30 @@ def get_best_video_format(media):
             if not best_match:
                 for fmt in video_formats:
                     # Check for resolution and codec
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         source_vcodec == fmt['vcodec']):
+                        exact_match, best_match = False, fmt
+                        break
+            if not best_match and can_switch_codecs:
+                for fmt in video_formats:
+                    # Check for resolution
+                    if matched_resolution(fmt):
                         exact_match, best_match = False, fmt
                         break
             if not best_match:
                 for fmt in video_formats:
-                    # Check for resolution
-                    if source_resolution == fmt['format']:
+                    # Check for codec
+                    if (source_vcodec == fmt['vcodec']):
                         exact_match, best_match = False, fmt
                         break
-            if not best_match:
+            if not best_match and can_switch_codecs:
                 # Match the highest resolution
                 exact_match, best_match = False, video_formats[0]
     # Check for resolution + codec + fps match
     if media.source.prefer_60fps and not media.source.prefer_hdr:
         for fmt in video_formats:
             # Check for an exact match
-            if (source_resolution == fmt['format'] and
+            if (matched_resolution(fmt) and
                 source_vcodec == fmt['vcodec'] and 
                 fmt['is_60fps'] and
                 not fmt['is_hdr']):
@@ -213,10 +293,10 @@ def get_best_video_format(media):
                 exact_match, best_match = True, fmt
                 break
         if media.source.can_fallback:
-            if not best_match:
+            if not best_match and can_switch_codecs:
                 for fmt in video_formats:
                     # Check for a resolution and fps match but drop the codec
-                    if (source_resolution == fmt['format'] and 
+                    if (matched_resolution(fmt) and 
                         fmt['is_60fps'] and
                         not fmt['is_hdr']):
                         exact_match, best_match = False, fmt
@@ -239,7 +319,7 @@ def get_best_video_format(media):
             if not best_match:
                 for fmt in video_formats:
                     # Check for codec and resolution match but drop 60fps
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         source_vcodec == fmt['vcodec'] and
                         not fmt['is_hdr']):
                         exact_match, best_match = False, fmt
@@ -247,34 +327,40 @@ def get_best_video_format(media):
             if not best_match:
                 for fmt in video_formats:
                     # Check for codec and resolution match only
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         source_vcodec == fmt['vcodec']):
+                        exact_match, best_match = False, fmt
+                        break
+            if not best_match and can_switch_codecs:
+                for fmt in video_formats:
+                    # Check for resolution
+                    if matched_resolution(fmt):
                         exact_match, best_match = False, fmt
                         break
             if not best_match:
                 for fmt in video_formats:
-                    # Check for resolution
-                    if source_resolution == fmt['format']:
+                    # Check for codec
+                    if (source_vcodec == fmt['vcodec']):
                         exact_match, best_match = False, fmt
                         break
-            if not best_match:
+            if not best_match and can_switch_codecs:
                 # Match the highest resolution
                 exact_match, best_match = False, video_formats[0]
     # Check for resolution + codec + hdr
     elif media.source.prefer_hdr and not media.source.prefer_60fps:
         for fmt in video_formats:
             # Check for an exact match
-            if (source_resolution == fmt['format'] and
+            if (matched_resolution(fmt) and
                 source_vcodec == fmt['vcodec'] and 
                 fmt['is_hdr']):
                 # Exact match
                 exact_match, best_match = True, fmt
                 break
         if media.source.can_fallback:
-            if not best_match:
+            if not best_match and can_switch_codecs:
                 for fmt in video_formats:
                     # Check for a resolution and fps match but drop the codec
-                    if (source_resolution == fmt['format'] and 
+                    if (matched_resolution(fmt) and 
                         fmt['is_hdr'] and
                         not fmt['is_60fps']):
                         exact_match, best_match = False, fmt
@@ -297,7 +383,7 @@ def get_best_video_format(media):
             if not best_match:
                 for fmt in video_formats:
                     # Check for codec and resolution match but drop hdr
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         source_vcodec == fmt['vcodec'] and
                         not fmt['is_60fps']):
                         exact_match, best_match = False, fmt
@@ -305,24 +391,30 @@ def get_best_video_format(media):
             if not best_match:
                 for fmt in video_formats:
                     # Check for codec and resolution match only
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         source_vcodec == fmt['vcodec']):
+                        exact_match, best_match = False, fmt
+                        break
+            if not best_match and can_switch_codecs:
+                for fmt in video_formats:
+                    # Check for resolution
+                    if matched_resolution(fmt):
                         exact_match, best_match = False, fmt
                         break
             if not best_match:
                 for fmt in video_formats:
-                    # Check for resolution
-                    if source_resolution == fmt['format']:
+                    # Check for codec
+                    if (source_vcodec == fmt['vcodec']):
                         exact_match, best_match = False, fmt
                         break
-            if not best_match:
+            if not best_match and can_switch_codecs:
                 # Match the highest resolution
                 exact_match, best_match = False, video_formats[0]
     # check for resolution + codec
     elif not media.source.prefer_hdr and not media.source.prefer_60fps:
         for fmt in video_formats:
             # Check for an exact match
-            if (source_resolution == fmt['format'] and
+            if (matched_resolution(fmt) and
                 source_vcodec == fmt['vcodec'] and
                 not fmt['is_60fps'] and
                 not fmt['is_hdr']):
@@ -330,10 +422,10 @@ def get_best_video_format(media):
                 exact_match, best_match = True, fmt
                 break
         if media.source.can_fallback:
-            if not best_match:
+            if not best_match and can_switch_codecs:
                 for fmt in video_formats:
                     # Check for a resolution, hdr and fps match but drop the codec
-                    if (source_resolution == fmt['format'] and 
+                    if (matched_resolution(fmt) and 
                         not fmt['is_hdr'] and not fmt['is_60fps']):
                         # Close match
                         exact_match, best_match = False, fmt
@@ -349,7 +441,7 @@ def get_best_video_format(media):
             if not best_match:
                 for fmt in video_formats:
                     # Check for resolution, codec and hdr match
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         source_vcodec == fmt['vcodec'] and
                         not fmt['is_hdr']):
                         exact_match, best_match = False, fmt
@@ -357,7 +449,7 @@ def get_best_video_format(media):
             if not best_match:
                 for fmt in video_formats:
                     # Check for resolution, codec and 60fps match
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         source_vcodec == fmt['vcodec'] and
                         not fmt['is_60fps']):
                         exact_match, best_match = False, fmt
@@ -365,24 +457,30 @@ def get_best_video_format(media):
             if not best_match:
                 for fmt in video_formats:
                     # Check for resolution and codec
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         source_vcodec == fmt['vcodec']):
                         exact_match, best_match = False, fmt
                         break
-            if not best_match:
+            if not best_match and can_switch_codecs:
                 for fmt in video_formats:
                     # Check for resolution and not hdr
-                    if (source_resolution == fmt['format'] and
+                    if (matched_resolution(fmt) and
                         not fmt['is_hdr']):
                         exact_match, best_match = False, fmt
                         break
-            if not best_match:
+            if not best_match and can_switch_codecs:
                 for fmt in video_formats:
                     # Check for resolution
-                    if source_resolution == fmt['format']:
+                    if matched_resolution(fmt):
                         exact_match, best_match = False, fmt
                         break
             if not best_match:
+                for fmt in video_formats:
+                    # Check for codec
+                    if (source_vcodec == fmt['vcodec']):
+                        exact_match, best_match = False, fmt
+                        break
+            if not best_match and can_switch_codecs:
                 # Match the highest resolution
                 exact_match, best_match = False, video_formats[0]
     # See if we found a match
@@ -392,10 +490,13 @@ def get_best_video_format(media):
             return True, best_match['id']
         elif media.source.can_fallback:
             # Allow the fallback if it meets requirements
-            if (media.source.fallback == Val(Fallback.NEXT_BEST_HD) and
+            if (media.source.fallback == Val(Fallback.REQUIRE_HD) and
                 best_match['height'] >= fallback_hd_cutoff):
                 return False, best_match['id']
-            elif media.source.fallback == Val(Fallback.NEXT_BEST):
+            elif (media.source.fallback == Val(Fallback.REQUIRE_CODEC) and
+                source_vcodec == best_match['vcodec']):
+                return False, best_match['id']
+            elif media.source.fallback == Val(Fallback.NEXT_BEST_RESOLUTION):
                 return False, best_match['id']
     # Nope, failed to find match
     return False, False

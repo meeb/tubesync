@@ -10,14 +10,8 @@
 </div>
 {% include 'infobox.html' with message=message %}
 <div class="row">
-  <div class="col m12 xl4 margin-bottom">
-    <a href="{% url 'sync:validate-source' source_type='youtube-channel' %}" class="btn">Add a YouTube channel <i class="fab fa-youtube"></i></a>
-  </div>
-  <div class="col m12 xl4 margin-bottom">
-    <a href="{% url 'sync:validate-source' source_type='youtube-channel-id' %}" class="btn">Add a YouTube channel by ID <i class="fab fa-youtube"></i></a>
-  </div>
-  <div class="col m12 xl4 margin-bottom">
-    <a href="{% url 'sync:validate-source' source_type='youtube-playlist' %}" class="btn">Add a YouTube playlist <i class="fab fa-youtube"></i></a>
+  <div class="col m12 margin-bottom">
+    <a href="{% url 'sync:validate-source' %}" class="btn">Add Source <i class="fab fa-youtube"></i></a>
   </div>
 </div>
 <div class="row no-margin-bottom">
@@ -31,7 +25,8 @@
           {% if source.has_failed %}
           <span class="error-text"><i class="fas fa-exclamation-triangle"></i> <strong>Source has permanent failures</strong></span>
           {% else %}
-          <strong>{{ source.media_count }}</strong> media items, <strong>{{ source.downloaded_count }}</strong> downloaded{% if source.delete_old_media and source.days_to_keep > 0 %}, keeping {{ source.days_to_keep }} days of media{% endif %}
+          <strong>{{ source.media_count }}</strong> media items, <strong>{{ source.downloaded_count }}</strong> downloaded{% if source.delete_old_media and source.days_to_keep > 0 %}, keeping {{ source.days_to_keep }} days of media{% endif %}<br>
+          Next update target: <strong>{% if source.target_schedule %}{{ source.target_schedule|date:'l, h:00 A' }}{% else %}Not set{% endif %}</strong>
           {% endif %}
         </a>
         <a href="{% url 'sync:source-sync-now' pk=source.pk %}" class="btn">Sync Now</a>

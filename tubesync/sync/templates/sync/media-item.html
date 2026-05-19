@@ -9,7 +9,7 @@
     {% if media.title %}<h2 class="truncate"><strong>{{ media.title }}</strong></h2>{% endif %}
     <p class="truncate"><strong><a href="{{ media.url }}" target="_blank"><i class="fas fa-link"></i> {{ media.url }}</a></strong></p>
     <p class="truncate">Downloading to: <strong>{{ media.source.directory_path }}</strong></p>
-    {% if not media.skip and download_state == 'downloaded' %}
+    {% if download_state == 'downloaded' %}
     {% if media.source.is_audio %}
     <audio controls src="{% url 'sync:media-content' pk=media.pk %}"></audio>
     {% else %}
@@ -19,6 +19,8 @@
     {% endif %}
 
     <p class="truncate"><a href="{% url 'sync:media-content' pk=media.pk %}" download="{{ media.filename }}"><strong><i class="fas fa-download"></i> Download</strong></a></p>
+    {% elif media.can_download %}
+    <p class="truncate"><a href="{% url 'sync:redownload-media' pk=media.pk %}{% querystring manual=True %}"><strong><i class="fas fa-download"></i> Begin Downloading</strong></a> (please be patient)</p>
     {% endif %}
   </div>
 </div>
@@ -39,6 +41,9 @@
       <div class="card-image">
         <img src="{% if media.thumb %}{% url 'sync:media-thumb' pk=media.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}">
       </div>
+      <div>
+        <a href="{% url 'sync:redownload-thumb' pk=media.pk %}"><i class="fas fa-redo"></i></a>
+      </div>
     </div>
   </div>
 </div>
@@ -47,12 +52,12 @@
   <div class="col s12">
     <div class="collection">
       <span class="collection-item">
-        {% if task.locked_by_pid_running %}
+        {% if task.start_at == task.end_at %}
         <i class="fas fa-running"></i> <strong>{{ task }}</strong><br>
-        <i class="far fa-clock"></i> Task started at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
+        <i class="far fa-clock"></i> Task started at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong>
         {% else %}
         <i class="fas fa-stopwatch"></i> <strong>{{ task }}</strong><br>
-        <i class="fas fa-redo"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>{% endif %}
+        <i class="fas fa-redo"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong>{% endif %}
         {% endif %}
       </span>
     </div>
@@ -118,7 +123,8 @@
           {% if media_file_path == media.filepath %}
           <span class="green-text">&nbsp;(matched)</span>
           {% endif %}
-        </td>                                                                   </tr>
+        </td>
+      </tr>
       <tr title="Size of the file on disk">
         <td class="hide-on-small-only">File size</td>
         <td><span class="hide-on-med-and-up">File size<br></span><strong>{{ media.downloaded_filesize|bytesformat }}</strong></td>
@@ -165,8 +171,8 @@
       <tr title="Best available format for source requirements">
         <td class="hide-on-small-only">Matched formats</td>
         <td><span class="hide-on-med-and-up">Matched formats<br></span>
-          Combined: <strong>{% if combined_format %}{{ combined_format }} {% if combined_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}</strong><br>
-          Audio: <strong>{% if audio_format %}{{ audio_format }} {% if audio_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}</strong><br>
+          Combined: <strong>{% if combined_format %}{{ combined_format }}{% if combined_format_dict.language_code %} [{{ combined_format_dict.language_code }}]{% endif %} {% if combined_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}</strong><br>
+          Audio: <strong>{% if audio_format %}{{ audio_format }}{% if audio_format_dict.language_code %} [{{ audio_format_dict.language_code }}]{% endif %} {% if audio_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}</strong><br>
           Video: <strong>{% if video_format %}{{ video_format }} {% if video_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}
         </strong></td>
       </tr>

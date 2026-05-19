@@ -63,7 +63,7 @@ class CommaSepChoiceField(models.CharField):
     def __init__(self, *args, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, **kwargs):
         kwargs.setdefault('max_length', 128)
         self.separator = str(separator)
-        self.possible_choices = possible_choices or choices
+        self.possible_choices = possible_choices or kwargs.get('choices')
         self.selected_choices = list()
         self.allow_all = allow_all
         self.all_label = all_label
@@ -75,6 +75,26 @@ class CommaSepChoiceField(models.CharField):
 
     # Override these functions to prevent unwanted behaviors
     def to_python(self, value):
+        saved_value = None
+        arg_was_none = True if value is None else False
+        if isinstance(value, CommaSepChoice):
+            return value.selected_choices
+        if isinstance(value, list) and len(value) > 0 and value[0].startswith('CommaSepChoice('):
+            saved_value = value
+            value = ''.join(value)
+        if isinstance(value, str) and value.startswith('CommaSepChoice('):
+            r = value.replace('CommaSepChoice(', 'dict(', 1)
+            try:
+                o = eval(r)
+            except Exception:
+                pass
+            else:
+                return o.get('selected_choices')
+        if arg_was_none:
+            value = None
+        elif saved_value is not None:
+            value = saved_value
+        self.log.debug(f'CommaSepChoiceField: to_python: was called with: {value!r}')
         return value
 
     def get_internal_type(self):
@@ -128,8 +148,13 @@ class CommaSepChoiceField(models.CharField):
         '''
         Create a data structure to be used in Python code.
         '''
+        # possibly not useful?
+        if isinstance(value, CommaSepChoice):
+            value = value.selected_choices
+        # normally strings
         if isinstance(value, str) and len(value) > 0:
             value = value.split(self.separator)
+        # empty string and None, or whatever
         if not isinstance(value, list):
             value = list()
         self.selected_choices = value
@@ -154,14 +179,33 @@ class CommaSepChoiceField(models.CharField):
         if set(s_value) != set(value):
             self.log.warn(f'CommaSepChoiceField:get_prep_value: values did not match. '
                           f'CommaSepChoiceField({value}) versus CharField({s_value})')
+        return self.__class__._tuple___str__(data)
+
+    
+    # extra functions not used by any parent classes
+    @staticmethod
+    def _tuple___str__(data):
+        if not isinstance(data, CommaSepChoice):
+            return data
+        value = data.selected_choices
         if not isinstance(value, list):
             return ''
-        if data.all_choice in value:
+        if data.allow_all and data.all_choice in value:
             return data.all_choice
         ordered_unique = list(dict.fromkeys(value))
         return data.separator.join(ordered_unique)
 
-    # extra functions not used by any parent classes
+    @staticmethod
+    def _tuple_expand_choices(data):
+        if data.allow_all and data.all_choice in data.selected_choices:
+            return list(dict(data.possible_choices))
+        else:
+            return data.selected_choices
+
+    @property
+    def expand_choices(self):
+        return self.__class__._tuple_expand_choices(self)
+
     def get_all_choices(self):
         choice_list = list()
         if self.possible_choices is None:
@@ -173,4 +217,8 @@ class CommaSepChoiceField(models.CharField):
             choice_list.append(choice)
 
         return choice_list
+
+
+CommaSepChoice.__str__ = CommaSepChoiceField._tuple___str__
+CommaSepChoice.expand_choices = property(fget=CommaSepChoiceField._tuple_expand_choices)
 

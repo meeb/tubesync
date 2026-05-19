@@ -6,8 +6,9 @@
 
 import os
 
-from collections import namedtuple
+from common.errors import FormatUnavailableError
 from common.logger import log
+from common.utils import mkdir_p
 from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -16,11 +17,10 @@ from urllib.parse import urlsplit, parse_qs
 from django.conf import settings
 from .choices import Val, FileExtension
 from .hooks import postprocessor_hook, progress_hook
-from .utils import mkdir_p
 import yt_dlp
 import yt_dlp.patch.check_thumbnails
-import yt_dlp.patch.fatal_http_errors
-from yt_dlp.utils import remove_end, OUTTMPL_TYPES
+#import yt_dlp.patch.fatal_http_errors
+from yt_dlp.utils import remove_end, shell_quote, OUTTMPL_TYPES
 
 
 _defaults = getattr(settings, 'YOUTUBE_DEFAULTS', {})
@@ -81,7 +81,10 @@ def get_channel_id(url):
             else:
                 return channel_id
 
-def get_channel_image_info(url):
+def get_image_info(url):
+    avatar_url = None
+    banner_url = None
+    thumbnail_url = None
     opts = get_yt_opts()
     opts.update({
         'skip_download': True,
@@ -94,20 +97,53 @@ def get_channel_image_info(url):
     with yt_dlp.YoutubeDL(opts) as y:
         try:
             response = y.extract_info(url, download=False)
-
-            avatar_url = None
-            banner_url = None
+        except yt_dlp.utils.DownloadError as e:
+            raise YouTubeError(f'Failed to extract info for "{url}": {e}') from e
+        else:
+            max_height = 0
             for thumbnail in response['thumbnails']:
+                thumbnail_height = thumbnail.get('height')
+                try:
+                    thumbnail_height = int(thumbnail_height)
+                except (TypeError, ValueError,):
+                    thumbnail_height = int()
                 if thumbnail['id'] == 'avatar_uncropped':
                     avatar_url = thumbnail['url']
-                if thumbnail['id'] == 'banner_uncropped':
+                elif thumbnail['id'] == 'banner_uncropped':
                     banner_url = thumbnail['url']
-                if banner_url != None and avatar_url != None:
-                    break
-
-            return avatar_url, banner_url
-        except yt_dlp.utils.DownloadError as e:
-            raise YouTubeError(f'Failed to extract channel info for "{url}": {e}') from e
+                elif thumbnail_height > max_height:
+                    max_height = thumbnail_height
+                    thumbnail_url = thumbnail['url']
+            try:
+                entry_type = response['entries'][0].get('_type')
+            except IndexError:
+                # an empty entries list
+                pass
+            else:
+                if 'url' == entry_type:
+                    del response['entries']
+                elif 'playlist' == entry_type:
+                    for playlist in response['entries']:
+                        del playlist['entries']
+            from .models import Metadata
+            t = Metadata.objects.defer('value').filter(
+                source__isnull=True,
+                media__isnull=True,
+            ).get_or_create(
+                key=response['id'],
+                site=response['extractor_key'],
+            )
+            md = t[0]
+            field_defaults = {
+                f.attname: f.get_default()
+                for f in md._meta.fields
+                if f.has_default()
+            }
+            if 'retrieved' in field_defaults:
+                md.retrieved = field_defaults['retrieved']
+            md.value = response
+            md.save()
+    return avatar_url, banner_url, thumbnail_url
 
 
 def _subscriber_only(msg='', response=None):
@@ -143,7 +179,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
     if days is not None:
         try:
             days = int(str(days), 10)
-        except Exception as e:
+        except (TypeError, ValueError):
             days = None
         start = (
             f'yesterday-{days!s}days' if days else None
@@ -169,6 +205,11 @@ def get_media_info(url, /, *, days=None, info_json=None):
         paths.update({
             'infojson': user_set('infojson', paths, str(info_json_path))
         })
+    default_ea = user_set('extractor_args', default_opts.__dict__, dict())
+    extractor_args = user_set('extractor_args', opts, default_ea)
+    ea_ytt_dict = extractor_args.get('youtubetab', dict())
+    ea_ytt_dict['approximate_date'] = ['true']
+    extractor_args['youtubetab'] = ea_ytt_dict
     default_postprocessors = user_set('postprocessors', default_opts.__dict__, list())
     postprocessors = user_set('postprocessors', opts, default_postprocessors)
     postprocessors.append(dict(
@@ -180,11 +221,12 @@ def get_media_info(url, /, *, days=None, info_json=None):
     playlist_infojson = 'postprocessor_[%(id)s]_%(n_entries)d_%(playlist_count)d_temp'
     outtmpl = dict(
         default='',
-        infojson='%(extractor)s/%(id)s.%(ext)s' if paths.get('infojson') else '',
+        infojson='%(extractor_key)s/%(id)s.%(ext)s' if paths.get('infojson') else '',
         pl_infojson=f'{cache_directory_path}/infojson/playlist/{playlist_infojson}.%(ext)s',
     )
     for k in OUTTMPL_TYPES.keys():
         outtmpl.setdefault(k, '')
+    sleep_interval_requests = getattr(settings, 'YOUTUBE_INFO_SLEEP_REQUESTS', 1)
     opts.update({
         'ignoreerrors': False, # explicitly set this to catch exceptions
         'ignore_no_formats_error': False, # we must fail first to try again with this enabled
@@ -197,15 +239,13 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'check_thumbnails': False,
         'clean_infojson': False,
         'daterange': yt_dlp.utils.DateRange(start=start),
-        'extractor_args': {
-            'youtubetab': {'approximate_date': ['true']},
-        },
+        'extractor_args': extractor_args,
         'outtmpl': outtmpl,
         'overwrites': True,
         'paths': paths,
         'postprocessors': postprocessors,
         'skip_unavailable_fragments': False,
-        'sleep_interval_requests': 2 * settings.BACKGROUND_TASK_ASYNC_THREADS,
+        'sleep_interval_requests': sleep_interval_requests,
         'verbose': True if settings.DEBUG else False,
         'writeinfojson': True,
     })
@@ -310,11 +350,33 @@ def download_media(
     if extension in audio_exts:
         pp_opts.extractaudio = True
         pp_opts.nopostoverwrites = False
+        # The ExtractAudio post processor can change the extension.
+        # This post processor is to change the final filename back
+        # to what we are expecting it to be.
+        final_path = Path(output_file)
+        try:
+            final_path = final_path.resolve(strict=True)
+        except FileNotFoundError:
+            # This is very likely the common case
+            final_path = Path(output_file).resolve(strict=False)
+        expected_file = shell_quote(str(final_path))
+        cmds = pp_opts.exec_cmd.get('after_move', list())
+        cmds.append(
+            f'test -f {expected_file} || '
+            'mv -T -u -- %(filepath,_filename|)q '
+            f'{expected_file}'
+        )
+        # assignment is the quickest way to cover both 'get' cases
+        pp_opts.exec_cmd['after_move'] = cmds
+    elif '+' not in media_format:
+        pp_opts.remuxvideo = extension
 
     ytopts = {
         'format': media_format,
+        'final_ext': extension,
         'merge_output_format': extension,
         'outtmpl': os.path.basename(output_file),
+        'remuxvideo': pp_opts.remuxvideo,
         'quiet': False if settings.DEBUG else True,
         'verbose': True if settings.DEBUG else False,
         'noprogress': None if settings.DEBUG else True,
@@ -327,8 +389,7 @@ def download_media(
         'overwrites': None,
         'skip_unavailable_fragments': False,
         'sleep_interval': 10,
-        'max_sleep_interval': min(20*60, max(60, settings.DOWNLOAD_MEDIA_DELAY)),
-        'sleep_interval_requests': 1 + (2 * settings.BACKGROUND_TASK_ASYNC_THREADS),
+        'max_sleep_interval': min(15*60, max(60, settings.DOWNLOAD_MEDIA_DELAY)),
         'paths': opts.get('paths', dict()),
         'postprocessor_args': opts.get('postprocessor_args', dict()),
         'postprocessor_hooks': opts.get('postprocessor_hooks', list()),
@@ -368,14 +429,22 @@ def download_media(
         codec_options.extend(['-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '31', '-row-mt', '1', '-tile-columns', '2'])
     if '-opus' in ofn:
         codec_options.extend(['-c:a', 'libopus'])
-    set_ffmpeg_codec = not (
-        ytopts['postprocessor_args'] and
-        ytopts['postprocessor_args']['modifychapters+ffmpeg']
+    set_ffmpeg_codec = (
+        'modifychapters+ffmpeg' not in ytopts['postprocessor_args']
     )
     if set_ffmpeg_codec and codec_options:
         ytopts['postprocessor_args'].update({
             'modifychapters+ffmpeg': codec_options,
         })
+
+    # Provide the user control of 'overwrites' in the post processors.
+    pp_opts.overwrites = opts.get(
+        'overwrites',
+        ytopts.get(
+            'overwrites',
+            default_opts.overwrites,
+        ),
+    )
 
     # Create the post processors list.
     # It already included user configured post processors as well.
@@ -387,5 +456,11 @@ def download_media(
         try:
             return y.download([url])
         except yt_dlp.utils.DownloadError as e:
+            remove_unavailable_format = (
+                settings.YOUTUBE_DL_SKIP_UNAVAILABLE_FORMAT and
+                ': Requested format is not available.' in str(e)
+            )
+            if remove_unavailable_format:
+                raise FormatUnavailableError(url, exc=e.__cause__, format=opts.get('format')) from e
             raise YouTubeError(f'Failed to download for "{url}": {e}') from e
     return False

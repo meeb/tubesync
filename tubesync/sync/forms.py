@@ -1,18 +1,48 @@
 
-from django import forms
+from django import forms, VERSION as DJANGO_VERSION
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
+from .models import Source
+
+
+if DJANGO_VERSION[0:3] < (5, 0, 0):
+    _assume_scheme = dict()
+else:
+    # Silence RemovedInDjango60Warning
+    _assume_scheme = dict(assume_scheme='http')
+
+SourceForm = forms.modelform_factory(
+    Source,
+    # manual ordering
+    fields = (
+        'source_type', 'key', 'name', 'directory', 'filter_text', 'filter_text_invert', 'filter_seconds', 'filter_seconds_min',
+        'media_format', 'target_schedule', 'index_schedule', 'index_videos', 'index_streams', 'download_media',
+        'download_cap', 'delete_old_media', 'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
+        'prefer_60fps', 'prefer_hdr', 'fallback', 'delete_removed_media', 'delete_files_on_disk', 'copy_channel_images',
+        'copy_thumbnails', 'write_nfo', 'write_json', 'embed_metadata', 'embed_thumbnail',
+        'enable_sponsorblock', 'sponsorblock_categories', 'write_subtitles', 'auto_subtitles', 'sub_langs',
+    ),
+    widgets = {
+        'target_schedule': forms.DateTimeInput(
+            attrs={'type': 'datetime-local'},
+        ),
+    },
+)
+
+def source_clean_media_format(self):
+    data = self.cleaned_data.get('media_format', '').strip()
+    return data or getattr(settings, 'MEDIA_FORMATSTR', settings.MEDIA_FORMATSTR_DEFAULT)
+
+SourceForm.clean_media_format = source_clean_media_format
 
 class ValidateSourceForm(forms.Form):
 
-    source_type = forms.CharField(
-        max_length=1,
-        required=True,
-        widget=forms.HiddenInput()
-    )
     source_url = forms.URLField(
         label=_('Source URL'),
-        required=True
+        required=True,
+        widget=forms.URLInput(attrs={'placeholder': 'https://www.youtube.com/@channelname'}),
+        **_assume_scheme,
     )
 
 
@@ -24,29 +54,27 @@ class ConfirmDeleteSourceForm(forms.Form):
     )
 
 
-class RedownloadMediaForm(forms.Form):
+class ScheduleTaskForm(forms.Form):
 
-    pass
+    now = forms.DateTimeField(
+        label=_('The current date and time'),
+        required=False,
+        widget=forms.DateTimeInput(
+            attrs={
+                'type': 'datetime-local',
+                'readonly': 'true',
+            },
+        ),
+    )
 
+    when = forms.DateTimeField(
+        label=_('When the task should run'),
+        required=True,
+        widget=forms.DateTimeInput(
+            attrs={'type': 'datetime-local'},
+        ),
+    )
 
-class SkipMediaForm(forms.Form):
-
-    pass
-
-
-class EnableMediaForm(forms.Form):
-
-    pass
-
-
-class ResetTasksForm(forms.Form):
-
-    pass
-
-
-class ConfirmDeleteMediaServerForm(forms.Form):
-
-    pass
 
 _media_server_type_label = 'Jellyfin'
 class JellyfinMediaServerForm(forms.Form):

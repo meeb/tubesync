@@ -1,3 +1,4 @@
+import logging
 import sys
 from pathlib import Path
 from urllib.parse import urljoin
@@ -14,14 +15,8 @@ if DJANGO_URL_PREFIX and STATIC_URL:
     STATIC_URL = urljoin(DJANGO_URL_PREFIX, STATIC_URL[1:])
 
 
-# This is not ever meant to be a public web interface so this isn't too critical
-SECRET_KEY = getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret')
-
-
 ALLOWED_HOSTS_STR = getenv('TUBESYNC_HOSTS', '*')
 ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
-DEBUG_STR = getenv('TUBESYNC_DEBUG', False)
-DEBUG = True if 'true' == DEBUG_STR.strip().lower() else False
 FORCE_SCRIPT_NAME = getenv('DJANGO_FORCE_SCRIPT_NAME', DJANGO_URL_PREFIX)
 
 
@@ -32,13 +27,15 @@ if database_connection_env:
 
 
 if database_dict:
-    print(f'Using database connection: {database_dict["DRIVER"]}://'
-          f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
-          f'{database_dict["PORT"]}/{database_dict["NAME"]}',
-        file=sys.stdout, flush=True)
     DATABASES = {
         'default': database_dict,
     }
+    DATABASES['default']['_msgs'] = database_dict.get('_msgs', list())
+    DATABASES['default']['_msgs'].append((
+        f'Using database connection: {database_dict["DRIVER"]}://'
+        f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
+        f'{database_dict["PORT"]}/{database_dict["NAME"]}',
+    ))
     DATABASE_CONNECTION_STR = (f'{database_dict["DRIVER"]} at "{database_dict["HOST"]}:'
                                f'{database_dict["PORT"]}" database '
                                f'"{database_dict["NAME"]}"')
@@ -48,8 +45,17 @@ else:
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': CONFIG_BASE_DIR / 'db.sqlite3',
             "OPTIONS": {
+                "timeout": 10,
                 "transaction_mode": "IMMEDIATE",
+                # PRAGMA locking_mode = NORMAL | EXCLUSIVE
+                # PRAGMA journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
+                # DO NOT change locking_mode to EXCLUSIVE!
+                # This is a foot-gun, and invalidates a behavior the code relies on.
+                # journal_mode WAL offers increased concurrency, the default is DELETE.
                 "init_command": """
+                    PRAGMA locking_mode = NORMAL;
+                    PRAGMA journal_mode = TRUNCATE;
+                    PRAGMA journal_size_limit = 67108864;
                     PRAGMA legacy_alter_table = OFF;
                     PRAGMA auto_vacuum = INCREMENTAL;
                     PRAGMA incremental_vacuum(100);
@@ -59,9 +65,11 @@ else:
     }
     DATABASE_CONNECTION_STR = f'sqlite at "{DATABASES["default"]["NAME"]}"'
 
-
-DEFAULT_THREADS = 1
-BACKGROUND_TASK_ASYNC_THREADS = getenv('TUBESYNC_WORKERS', DEFAULT_THREADS, integer=True)
+    # the argument to random.expovariate(),
+    # a larger value means less delay
+    # with too little delay, you may see
+    # more "database is locked" errors
+    SQLITE_DELAY_FLOAT = 5
 
 
 MEDIA_ROOT = CONFIG_BASE_DIR / 'media'
@@ -100,11 +108,11 @@ SHRINK_OLD_MEDIA_METADATA = ( 'true' == SHRINK_OLD_MEDIA_METADATA_STR.strip().lo
 
 
 # TUBESYNC_RENAME_ALL_SOURCES: True or False
-RENAME_ALL_SOURCES_STR = getenv('TUBESYNC_RENAME_ALL_SOURCES', False)
+RENAME_ALL_SOURCES_STR = getenv('TUBESYNC_RENAME_ALL_SOURCES', True)
 RENAME_ALL_SOURCES = ( 'true' == RENAME_ALL_SOURCES_STR.strip().lower() )
 # TUBESYNC_RENAME_SOURCES: A comma-separated list of Source directories
 RENAME_SOURCES_STR = getenv('TUBESYNC_RENAME_SOURCES')
-RENAME_SOURCES = RENAME_SOURCES_STR.split(',') if RENAME_SOURCES_STR else None
+RENAME_SOURCES = RENAME_SOURCES_STR.split(',') if RENAME_SOURCES_STR else list()
 
 
 VIDEO_HEIGHT_CUTOFF = getenv("TUBESYNC_VIDEO_HEIGHT_CUTOFF", 240, integer=True)

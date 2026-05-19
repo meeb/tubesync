@@ -1,22 +1,29 @@
 {% extends 'base.html' %}
 
-{% block headtitle %}Validate a {{ help_item }}{% endblock %}
+{% block headtitle %}Add a YouTube Source{% endblock %}
 
 {% block content %}
 <div class="row no-margin-bottom">
   <div class="col s12">
-    <h1>Validate a {{ help_item }}</h1>
-    <p>{{ help_text|safe }}</p>
-    <p>Example: <strong>{{ help_example }}</strong></p>
+    <h1>Add Source</h1>
+    <p>
+      Enter any YouTube channel or playlist URL below.
+    </p>
+    <p><strong>Supported formats:</strong></p>
+    <ul>
+      <li><strong>YouTube Channel:</strong> <code>https://www.youtube.com/@rossmanngroup</code></li>
+      <li><strong>YouTube Channel by ID:</strong> <code>https://www.youtube.com/channel/UCl2mFZoRqjw_ELax4Yisf6w</code></li>
+      <li><strong>YouTube Playlist:</strong> <code>https://www.youtube.com/playlist?list=PLkVbIsAWN2lsmovRO20_gtfUfgWi-XnnT</code></li>
+    </ul>
   </div>
 </div>
 <div class="row">
-  <form method="post" action="{% url 'sync:validate-source' source_type=source_type %}" class="col s12 simpleform">
+  <form method="post" action="{% url 'sync:validate-source' %}" class="col s12 simpleform">
     {% csrf_token %}
     {% include 'simpleform.html' with form=form %}
     <div class="row no-margin-bottom padding-top">
       <div class="col s12">
-        <button class="btn" type="submit" name="action">Validate {{ help_item }} <i class="fas fa-check"></i></button>
+        <button class="btn" type="submit" name="action">Add Source <i class="fas fa-check"></i></button>
       </div>
     </div>
   </form>

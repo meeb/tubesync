@@ -1,29 +1,58 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
+ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="1.3.1"
 ARG FFMPEG_VERSION="N"
+ARG YTDLP_EJS_VERSION="0.3.2"
 
-ARG S6_VERSION="3.2.0.2"
+ARG ASFALD_VERSION="0.6.0"
 
-ARG SHA256_S6_AMD64="59289456ab1761e277bd456a95e737c06b03ede99158beb24f12b165a904f478"
-ARG SHA256_S6_ARM64="8b22a2eaca4bf0b27a43d36e65c89d2701738f628d1abd0cea5569619f66f785"
-ARG SHA256_S6_NOARCH="6dbcde158a3e78b9bb141d7bcb5ccb421e563523babbe2c64470e76f4fd02dae"
+ARG SHA256_ASFALD_AMD64="017cdc44d767bb4733a3bd3fa5f97719e3f58236d006321dfae1924fdda3de9d"
+ARG SHA256_ASFALD_ARM64="4fc112617a71f97592b8760b98c16339d5243577186c970c784fbcab2ef8abd1"
+
+ARG S6_VERSION="3.2.2.0"
+
+ARG SHA256_S6_AMD64="5a09e2f1878dc5f7f0211dd7bafed3eee1afe4f813e872fff2ab1957f266c7c0"
+ARG SHA256_S6_ARM64="50a5d4919e688fafc95ce9cf0055a46f74847517bcf08174bac811de234ec7d2"
+ARG SHA256_S6_NOARCH="85848f6baab49fb7832a5557644c73c066899ed458dd1601035cf18e7c759f26"
+
+ARG QJS_VERSION="2025-09-13"
+
+ARG SHA256_QJS="fed9715220d616d1a178e1c2e6bd62e8e850626b4fe337cf417940fd32b35802"
 
 ARG ALPINE_VERSION="latest"
-ARG DEBIAN_VERSION="bookworm-slim"
+ARG DEBIAN_VERSION="13-slim"
+ARG OPENRESTY_DEBIAN_VERSION="bookworm"
 
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
 
+ARG ASFALD_CHECKSUM_ALGORITHM="sha256"
 ARG FFMPEG_CHECKSUM_ALGORITHM="sha256"
 ARG S6_CHECKSUM_ALGORITHM="sha256"
+ARG QJS_CHECKSUM_ALGORITHM="sha256"
 
+
+FROM debian:${DEBIAN_VERSION} AS tubesync-prepare-etc
+
+COPY patches/ /var/tmp/patches/
+RUN --mount=type=tmpfs,target=/cache \
+    set -eux && cd /var/tmp/patches/ && \
+    ./fettle.pl --dry-run ./docker/tubesync-base/debconf.diff && \
+    ./fettle.pl ./docker/tubesync-base/debconf.diff && \
+    ./fettle.pl --clean ./docker/tubesync-base/debconf.diff
+
+FROM scratch AS tubesync-etc
+
+COPY --from=tubesync-prepare-etc /etc/ /etc/
 
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
 ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND="noninteractive" \
+    APT_KEEP_ARCHIVES=1 \
+    EDITOR="editor" \
     HOME="/root" \
     LANGUAGE="en_US.UTF-8" \
     LANG="en_US.UTF-8" \
@@ -33,24 +62,209 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_NO_COMPILE=1 \
     PIP_ROOT_USER_ACTION='ignore'
 
+COPY --from=tubesync-etc /etc/debconf.conf /etc/debconf.conf
+
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
     # to be careful, ensure that these files aren't from a different architecture
     rm -f /var/cache/apt/*cache.bin ; \
     # Update from the network and keep cache
     rm -f /etc/apt/apt.conf.d/docker-clean ; \
+    # Do not generate more /var/cache/apt/*cache.bin files
+    # hopefully soon, this will be included in Debian images
+    printf -- >| /etc/apt/apt.conf.d/docker-disable-pkgcache \
+        'Dir::Cache::%spkgcache "";\n' '' src ; \
+    chmod a+r /etc/apt/apt.conf.d/docker-disable-pkgcache ; \
+    # Create the directory for debconf
+    mkdir -v /var/cache/debconf/docker-templates ; \
     set -x && \
+    # When a new release is out but the debian image hasn't
+    # updated yet, upgrades cause more wasted space than
+    # we want to accept. This should prevent apt from
+    # upgrading packages that shipped with the image.
+    dpkg -s | \
+      grep -B 3 -e '^Status: install ok installed$' | \
+      grep -e '^Package: ' | \
+      cut -d : -f 2- | \
+      xargs -r -t apt-mark hold && \
+    # We must allow these upgrades
+    apt-mark unhold libc6 libssl3t64 && \
     apt-get update && \
     # Install locales
+    LC_ALL='C.UTF-8' LANG='C.UTF-8' LANGUAGE='C.UTF-8' \
     apt-get -y --no-install-recommends install locales && \
+    # localedef -v -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8 && \
     printf -- "en_US.UTF-8 UTF-8\n" > /etc/locale.gen && \
-    locale-gen en_US.UTF-8 && \
+    locale-gen && \
     # Clean up
     apt-get -y autopurge && \
-    apt-get -y autoclean && \
-    rm -f /var/cache/debconf/*.dat-old
+    apt-get -y autoclean
 
-FROM alpine:${ALPINE_VERSION} AS ffmpeg-download
+FROM alpine:${ALPINE_VERSION} AS asfald-download
+ARG ASFALD_VERSION
+ARG SHA256_ASFALD_AMD64
+ARG SHA256_ASFALD_ARM64
+
+ARG DESTDIR="/downloaded"
+ARG ASFALD_CHECKSUM_ALGORITHM
+ARG CHECKSUM_ALGORITHM="${ASFALD_CHECKSUM_ALGORITHM}"
+
+ARG ASFALD_CHECKSUM_AMD64="${CHECKSUM_ALGORITHM}:${SHA256_ASFALD_AMD64}"
+ARG ASFALD_CHECKSUM_ARM64="${CHECKSUM_ALGORITHM}:${SHA256_ASFALD_ARM64}"
+
+ARG ASFALD_DOWNLOAD_URI="asfaload/asfald/releases/download/v${ASFALD_VERSION}"
+ARG ASFALD_URL="https://github.com/${ASFALD_DOWNLOAD_URI}"
+ARG ASFALD_SUMS_URL="https://gh.checksums.asfaload.com/github.com/${ASFALD_DOWNLOAD_URI}/checksums.txt"
+ARG ASFALD_PREFIX_FILE="asfald-"
+ARG ASFALD_SUFFIX_FILE="-unknown-linux-musl"
+
+ARG ASFALD_FILE_AMD64="${ASFALD_PREFIX_FILE}x86_64${ASFALD_SUFFIX_FILE}"
+ARG ASFALD_FILE_ARM64="${ASFALD_PREFIX_FILE}aarch64${ASFALD_SUFFIX_FILE}"
+
+ADD "${ASFALD_SUMS_URL}" "${DESTDIR}/"
+ADD "${ASFALD_URL}/${ASFALD_FILE_AMD64}" "${DESTDIR}/"
+ADD "${ASFALD_URL}/${ASFALD_FILE_ARM64}" "${DESTDIR}/"
+
+##ADD --checksum="${ASFALD_CHECKSUM_AMD64}" "${ASFALD_URL}/${ASFALD_FILE_AMD64}" "${DESTDIR}/"
+##ADD --checksum="${ASFALD_CHECKSUM_ARM64}" "${ASFALD_URL}/${ASFALD_FILE_ARM64}" "${DESTDIR}/"
+
+# --checksum wasn't recognized, so use busybox to check the sums instead
+ARG TARGETARCH
+RUN set -eu ; \
+    apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" ; \
+\
+    decide_expected() { \
+        case "${TARGETARCH}" in \
+            (amd64) printf -- '%s' "${ASFALD_CHECKSUM_AMD64}" ;; \
+            (arm64) printf -- '%s' "${ASFALD_CHECKSUM_ARM64}" ;; \
+        (*) exit 1 ;; \
+        esac ; \
+    } ; \
+\
+    decide_fn() { \
+      case "${TARGETARCH}" in \
+        (amd64) printf -- '%s\n' "${ASFALD_FILE_AMD64}" ;; \
+        (arm64) printf -- '%s\n' "${ASFALD_FILE_ARM64}" ;; \
+        (*) exit 1 ;; \
+      esac ; \
+    } ; \
+\
+    checksum="$(decide_expected)" ; \
+    file="$(decide_fn)" ; \
+    mkdir -v -p "/verified/${TARGETARCH}" ; \
+    cd "${DESTDIR}/" && \
+    "${CHECKSUM_ALGORITHM}sum" --check --warn --strict --ignore-missing checksums.txt && \
+    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw && \
+    mv -v "${file}" "/verified/${TARGETARCH}/asfald" && \
+    chmod -v 00755 "/verified/${TARGETARCH}/asfald" && \
+    chown -v root:root "/verified/${TARGETARCH}/asfald"
+
+FROM scratch AS asfald
+ARG TARGETARCH
+COPY --from=asfald-download "/verified/${TARGETARCH}/asfald" /usr/local/sbin/
+
+FROM tubesync-base AS tubesync-asfald
+COPY --from=asfald /usr/local/sbin/ /usr/local/sbin/
+
+ARG TARGETARCH
+RUN set -eu ; \
+\
+    decide_arch() { \
+      case "${TARGETARCH}" in \
+        (amd64) printf -- 'x86_64' ;; \
+        (arm64) printf -- 'aarch64' ;; \
+        (*) exit 1 ;; \
+      esac ; \
+    } ; \
+\
+    set -x ; arch="$(decide_arch)" ; \
+    dest='/usr/local/sbin/asfald-latest' ; \
+    TMPDIR="$(dirname "${dest}")" \
+    asfald --overwrite --output "${dest}" \
+        --pattern '${path}/checksums.txt' -- \
+        "https://github.com/asfaload/asfald/releases/latest/download/asfald-${arch}-unknown-linux-musl" && \
+    chmod -c 00755 "${dest}" && chown -c root:root "${dest}"
+
+FROM tubesync-asfald AS tailwindcss-download
+
+ARG DESTDIR="/downloaded"
+ARG TAILWINDCSS_URL="https://github.com/tailwindlabs/tailwindcss/releases/latest/download"
+
+ARG TARGETARCH
+RUN set -eu ; \
+\
+    decide_arch() { \
+        case "${TARGETARCH}" in \
+            (amd64) printf -- 'x64' ;; \
+            (arm64) printf -- 'arm64' ;; \
+        esac ; \
+    } ; \
+\
+    arch="$(decide_arch)" ; \
+    apt-get update && \
+    apt-get -y --no-install-recommends install busybox-static && \
+    mkdir -p "${DESTDIR}" && \
+    cd "${DESTDIR}" && \
+    try_url="$(busybox wget -S -O - "${TAILWINDCSS_URL}/sha256sums.txt" 2>&1 | grep -ie '^  Location: ' | head -n 1 | cut -d ' ' -f 4-)" && \
+    for url in 'sha256sums.txt' "tailwindcss-linux-${arch}" "tailwindcss-linux-${arch}-musl" ; \
+    do \
+        case "${try_url}" in \
+            (*githubusercontent.com/*) url="${TAILWINDCSS_URL}/${url}" ;; \
+            (*github.com/*) url="${try_url%/sha256sums.txt}/${url}" ;; \
+        esac ; \
+        TMPDIR="${DESTDIR}" asfald-latest -v -- "${url}" ; \
+    done ; \
+    unset -v arch try_url url ; \
+    cksum -a sha256 --check --warn --strict --ignore-missing sha256sums.txt && \
+    mkdir -v -p "/verified/${TARGETARCH}" && \
+    for binary in tailwindcss-linux-* ; \
+    do \
+        chmod -c 00755 "${binary}" && chown -c root:root "${binary}" && \
+        test -x "/verified/${TARGETARCH}/tailwindcss" || ln -v "${binary}" "/verified/${TARGETARCH}/tailwindcss" ; \
+    done ; \
+    unset -v binary ; \
+    rm -rf "${DESTDIR}" ;
+
+FROM scratch AS tailwindcss
+ARG TARGETARCH
+COPY --from=tailwindcss-download "/verified/${TARGETARCH}/tailwindcss" /usr/local/bin/
+
+FROM tubesync-base AS tubesync-tailwindcss
+COPY --from=tailwindcss /usr/local/bin/ /usr/local/bin/
+
+FROM ghcr.io/astral-sh/uv:latest AS uv-binaries
+
+FROM scratch AS uv
+COPY --from=uv-binaries /uv /uvx /usr/local/bin/
+
+FROM denoland/deno:bin AS deno-binaries
+
+FROM scratch AS deno
+COPY --from=deno-binaries /deno /usr/local/bin/
+
+FROM alpine:${ALPINE_VERSION} AS openresty-debian
+ARG OPENRESTY_DEBIAN_VERSION
+ARG TARGETARCH
+ADD 'https://openresty.org/package/pubkey.gpg' '/downloaded/pubkey.gpg'
+RUN set -eu ; \
+    decide_arch() { \
+        case "${TARGETARCH}" in \
+            (amd64) printf -- '' ;; \
+            (arm64) printf -- 'arm64/' ;; \
+        esac ; \
+    } ; \
+    set -x ; \
+    mkdir -v -p '/etc/apt/trusted.gpg.d' && \
+    apk --no-cache --no-progress add cmd:gpg2 && \
+    gpg2 --dearmor \
+        -o '/etc/apt/trusted.gpg.d/openresty.gpg' \
+        < '/downloaded/pubkey.gpg' && \
+    mkdir -v -p '/etc/apt/sources.list.d' && \
+    printf -- >| '/etc/apt/sources.list.d/openresty.list' \
+        'deb http://openresty.org/package/%sdebian %s openresty' \
+        "$(decide_arch)" "${OPENRESTY_DEBIAN_VERSION}"
+
+FROM tubesync-asfald AS ffmpeg-download
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
 ARG FFMPEG_PREFIX_FILE
@@ -69,22 +283,6 @@ ARG DESTDIR="/downloaded"
 ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
 RUN set -eu ; \
-    apk --no-cache --no-progress add cmd:aria2c cmd:awk "cmd:${CHECKSUM_ALGORITHM}sum" ; \
-\
-    aria2c_options() { \
-        algorithm="${CHECKSUM_ALGORITHM%[0-9]??}" ; \
-        bytes="${CHECKSUM_ALGORITHM#${algorithm}}" ; \
-        hash="$( awk -v fn="${1##*/}" '$0 ~ fn"$" { print $1; exit; }' "${DESTDIR}/${FFMPEG_FILE_SUMS}" )" ; \
-\
-        printf -- '\t%s\n' \
-          'allow-overwrite=true' \
-          'always-resume=false' \
-          'check-integrity=true' \
-          "checksum=${algorithm}-${bytes}=${hash}" \
-          'max-connection-per-server=2' \
-; \
-        printf -- '\n' ; \
-    } ; \
 \
     decide_arch() { \
         case "${TARGETARCH}" in \
@@ -95,23 +293,15 @@ RUN set -eu ; \
 \
     FFMPEG_ARCH="$(decide_arch)" ; \
     FFMPEG_PREFIX_FILE="$( printf -- '%s' "${FFMPEG_PREFIX_FILE}" | cut -d '-' -f 1,2 )" ; \
+    cd "${DESTDIR}" && \
     for url in $(awk ' \
       $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; } \
       ' "${DESTDIR}/${FFMPEG_FILE_SUMS}") ; \
     do \
         url="${FFMPEG_URL}/${url# }" ; \
-        printf -- '%s\n' "${url}" ; \
-        aria2c_options "${url}" ; \
-        printf -- '\n' ; \
-    done > /tmp/downloads ; \
+        TMPDIR="${DESTDIR}" asfald-latest -qv -- "${url}" ; \
+    done ; \
     unset -v url ; \
-\
-    aria2c --no-conf=true \
-      --dir /downloaded \
-      --lowest-speed-limit='16K' \
-      --show-console-readout=false \
-      --summary-interval=0 \
-      --input-file /tmp/downloads ; \
 \
     decide_expected() { \
         case "${TARGETARCH}" in \
@@ -122,7 +312,6 @@ RUN set -eu ; \
 \
     FFMPEG_HASH="$(decide_expected)" ; \
 \
-    cd "${DESTDIR}" ; \
     if [ -n "${FFMPEG_HASH}" ] ; \
     then \
         printf -- '%s *%s\n' "${FFMPEG_HASH}" "${FFMPEG_PREFIX_FILE}"*-"${FFMPEG_ARCH}"-*"${FFMPEG_SUFFIX_FILE}" >> /tmp/SUMS ; \
@@ -155,7 +344,7 @@ RUN set -eux ; \
 FROM scratch AS ffmpeg
 COPY --from=ffmpeg-extracted /extracted /usr/local/bin/
 
-FROM alpine:${ALPINE_VERSION} AS s6-overlay-download
+FROM tubesync-asfald AS s6-overlay-download
 ARG S6_VERSION
 ARG SHA256_S6_AMD64
 ARG SHA256_S6_ARM64
@@ -185,18 +374,11 @@ ADD "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}.${CHECKSUM_ALGORITHM}" "${DESTDIR}/"
 ##ADD --checksum="${S6_CHECKSUM_ARM64}" "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
 ##ADD --checksum="${S6_CHECKSUM_NOARCH}" "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
 
-# --checksum wasn't recognized, so use busybox to check the sums instead
-ADD "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" "${DESTDIR}/"
-RUN set -eu ; checksum="${S6_CHECKSUM_AMD64}" ; file="${S6_FILE_AMD64}" ; cd "${DESTDIR}/" && \
-    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
-
-ADD "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" "${DESTDIR}/"
-RUN set -eu ; checksum="${S6_CHECKSUM_ARM64}" ; file="${S6_FILE_ARM64}" ; cd "${DESTDIR}/" && \
-    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
-
-ADD "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}" "${DESTDIR}/"
-RUN set -eu ; checksum="${S6_CHECKSUM_NOARCH}" ; file="${S6_FILE_NOARCH}" ; cd "${DESTDIR}/" && \
-    printf -- '%s *%s\n' "$(printf -- '%s' "${checksum}" | cut -d : -f 2-)" "${file}" | "${CHECKSUM_ALGORITHM}sum" -cw
+# --checksum wasn't recognized, so use asfald to check the sums instead
+RUN set -eux ; TMPDIR="${DESTDIR}" ; export TMPDIR ; cd "${DESTDIR}/" && \
+    asfald --hash="${SHA256_S6_AMD64}" -- "${S6_OVERLAY_URL}/${S6_FILE_AMD64}" && \
+    asfald --hash="${SHA256_S6_ARM64}" -- "${S6_OVERLAY_URL}/${S6_FILE_ARM64}" && \
+    asfald --hash="${SHA256_S6_NOARCH}" -- "${S6_OVERLAY_URL}/${S6_FILE_NOARCH}"
 
 FROM alpine:${ALPINE_VERSION} AS s6-overlay-extracted
 COPY --from=s6-overlay-download /downloaded /downloaded
@@ -215,21 +397,22 @@ RUN set -eu ; \
       case "${arg1}" in \
         (amd64) printf -- 'x86_64' ;; \
         (arm64) printf -- 'aarch64' ;; \
-        (armv7l) printf -- 'arm' ;; \
+        (arm|armv7l) printf -- 'armhf' ;; \
         (*) printf -- '%s' "${arg1}" ;; \
       esac ; \
       unset -v arg1 ; \
     } ; \
 \
+    file_ext="${CHECKSUM_ALGORITHM}" ; \
     apk --no-cache --no-progress add "cmd:${CHECKSUM_ALGORITHM}sum" ; \
     mkdir -v /verified ; \
     cd /downloaded ; \
-    for f in *.sha256 ; \
+    for f in *."${file_ext}" ; \
     do \
       "${CHECKSUM_ALGORITHM}sum" --check --warn --strict "${f}" || exit ; \
-      ln -v "${f%.sha256}" /verified/ || exit ; \
+      ln -v "${f%.${file_ext}}" /verified/ || exit ; \
     done ; \
-    unset -v f ; \
+    unset -v f file_ext ; \
 \
     S6_ARCH="$(decide_arch "${TARGETARCH}")" ; \
     set -x ; \
@@ -245,10 +428,118 @@ RUN set -eu ; \
     set +x ; \
     unset -v f ;
 
-FROM scratch AS s6-overlay
-COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
+## FROM scratch AS s6-overlay
+## COPY --from=s6-overlay-extracted /s6-overlay-rootfs /
+FROM ghcr.io/meeb/s6-overlay:v${S6_VERSION} AS s6-overlay
 
-FROM tubesync-base AS tubesync
+FROM tubesync-asfald AS quickjs-extracted
+ARG QJS_VERSION
+ARG SHA256_QJS
+
+ARG DESTDIR="/downloaded"
+ARG QJS_CHECKSUM_ALGORITHM
+ARG CHECKSUM_ALGORITHM="${QJS_CHECKSUM_ALGORITHM}"
+
+ARG QJS_CHECKSUM="${CHECKSUM_ALGORITHM}:${SHA256_QJS}"
+
+ARG QJS_URL="https://bellard.org/quickjs/binary_releases"
+ARG QJS_PREFIX_FILE="quickjs-cosmo-"
+ARG QJS_SUFFIX_FILE=".zip"
+
+ARG QJS_FILE="${QJS_PREFIX_FILE}${QJS_VERSION}${QJS_SUFFIX_FILE}"
+
+##ADD --checksum="${QJS_CHECKSUM}" "${QJS_URL}/${QJS_FILE}" "${DESTDIR}/"
+
+# --checksum wasn't recognized, so use asfald to check the sums instead
+RUN set -eux ; TMPDIR="${DESTDIR}" ; export TMPDIR ; \
+    mkdir -v -p "${DESTDIR}" && cd "${DESTDIR}/" && \
+    asfald --hash="${SHA256_QJS}" -- "${QJS_URL}/${QJS_FILE}"
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    set -eux ; \
+    apt-get update ; \
+    apt-get -y --no-install-recommends install unzip ; \
+    mkdir -v /extracted ; \
+    cd /extracted ; \
+    for f in /downloaded/*.zip ; \
+    do \
+      unzip "${f}" || exit ; \
+    done ; \
+    unset -v f ; \
+    mkdir -v /assimilated ; \
+    install -v -p -t /assimilated /extracted/qjs ; \
+    /assimilated/qjs --assimilate
+
+FROM scratch AS quickjs
+COPY --from=quickjs-extracted /assimilated/qjs /usr/local/sbin/
+
+FROM tubesync-base AS tubesync-prepare-app
+
+COPY tubesync /app
+
+RUN --mount=type=bind,source=fontawesome-free,target=/fontawesome-free \
+  set -x && \
+  # turn any symbolic links into files
+  ( \
+    cd /app && \
+      find . -type l -print0 | \
+      tar --null -ch --files-from=- | \
+      tar --unlink-first -xvp ; \
+  ) && \
+  rm -v /app/tubesync/local_settings.py.example && \
+  mv -v /app/tubesync/local_settings.py.container /app/tubesync/local_settings.py
+
+ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION
+ADD "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/archive/refs/tags/${BGUTIL_YTDLP_POT_PROVIDER_VERSION}.tar.gz" /tmp/
+RUN mkdir -v /tmp/extracted && \
+    tar -C /tmp/extracted/ -xvvpf "/tmp/${BGUTIL_YTDLP_POT_PROVIDER_VERSION}.tar.gz" && \
+    mv -v /tmp/extracted/*/server /app/bgutil-ytdlp-pot-provider/ && \
+    ls -alR /app/bgutil-ytdlp-pot-provider && \
+    rm -rf /tmp/extracted
+
+ARG YTDLP_EJS_VERSION
+ADD "https://github.com/yt-dlp/ejs/archive/refs/tags/${YTDLP_EJS_VERSION}.tar.gz" /tmp/ejs.tar.gz
+ADD 'https://github.com/kikkia/yt-cipher/archive/refs/heads/master.tar.gz' /tmp/yt-cipher-master.tar.gz
+RUN mkdir -v /tmp/extracted && \
+    tar -C /tmp/extracted/ -xvvpf '/tmp/yt-cipher-master.tar.gz' && \
+    tar -C /tmp/extracted/ -xvvpf '/tmp/ejs.tar.gz' && \
+    mkdir -v -p /app/yt-cipher/ejs && \
+    ( cd /tmp/extracted/ejs-*/ && mv -v * /app/yt-cipher/ejs/ ; ) && \
+    ( cd /tmp/extracted/yt-cipher-*/ && : >> deno.jsonc && mv -v src deno.* *.ts /app/yt-cipher/ ; ) && \
+    ( test -s /app/yt-cipher/deno.jsonc || rm -f /app/yt-cipher/deno.jsonc ; ) && \
+    ls -alR /app/yt-cipher && \
+    rm -rf /tmp/extracted
+
+FROM scratch AS tubesync-app
+COPY --from=tubesync-prepare-app /app /app
+
+FROM tubesync-base AS tubesync-openresty
+
+COPY --from=openresty-debian \
+    /etc/apt/trusted.gpg.d/openresty.gpg /etc/apt/trusted.gpg.d/openresty.gpg
+COPY --from=openresty-debian \
+    /etc/apt/sources.list.d/openresty.list /etc/apt/sources.list.d/openresty.list
+
+RUN mkdir -v -p /etc/crypto-policies/back-ends && \
+    cp -v -p /usr/share/apt/default-sequoia.config \
+        /etc/crypto-policies/back-ends/apt-sequoia.config && \
+    sed -i -e '/^sha1\./s/2026-/2027-/;' \
+        /etc/crypto-policies/back-ends/apt-sequoia.config
+
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+  set -x && \
+  apt-get update && \
+  apt-get -y --no-install-recommends install \
+    nginx-common \
+    openresty \
+  && \
+  # Clean up
+  apt-get -y autopurge && \
+  apt-get -y autoclean
+
+FROM tubesync-openresty AS tubesync
 
 ARG S6_VERSION
 
@@ -259,7 +550,9 @@ ARG TARGETARCH
 
 ENV S6_VERSION="${S6_VERSION}" \
     FFMPEG_DATE="${FFMPEG_DATE}" \
-    FFMPEG_VERSION="${FFMPEG_VERSION}"
+    FFMPEG_VERSION="${FFMPEG_VERSION}" \
+    DENO_NO_PROMPT=1 \
+    DENO_NO_UPDATE_CHECK=1
 
 # Reminder: the SHELL handles all variables
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
@@ -269,33 +562,46 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   # Install dependencies we keep
   # Install required distro packages
   apt-get -y --no-install-recommends install \
-  libjpeg62-turbo \
   libmariadb3 \
-  libpq5 \
-  libwebp7 \
-  nginx-light \
-  pipenv \
+  libonig5 \
   pkgconf \
   python3 \
   python3-libsass \
+  python3-pip-whl \
   python3-socks \
-  python3-wheel \
   curl \
+  indent \
   less \
+  lua-lpeg \
+  tre-agrep \
+  vis \
+  xxd \
   && \
   # Link to the current python3 version
   ln -v -s -f -T "$(find /usr/local/lib -name 'python3.[0-9]*' -type d -printf '%P\n' | sort -r -V | head -n 1)" /usr/local/lib/python3 && \
+  # Configure the editor alternatives
+  touch /usr/local/bin/babi /bin/nano /usr/bin/vim.tiny && \
+  update-alternatives --install /usr/bin/editor editor /usr/local/bin/babi 50 && \
+  update-alternatives --install /usr/local/bin/nano nano /bin/nano 10 && \
+  update-alternatives --install /usr/local/bin/nano nano /usr/local/bin/babi 20 && \
+  update-alternatives --install /usr/local/bin/vim vim /usr/bin/vim.tiny 15 && \
+  update-alternatives --install /usr/local/bin/vim vim /usr/bin/vis 35 && \
+  rm -v /usr/local/bin/babi /bin/nano /usr/bin/vim.tiny && \
+  printf >| /usr/local/bin/sqlite3 -- '%s\n' '#!/usr/bin/env sh' '' \
+    'if [ -x /usr/bin/sqlite3 ]; then exec /usr/bin/sqlite3 "$@" ; fi;' '' \
+    'exec /usr/bin/env python3 -m sqlite3 "$@"' && \
+  chmod -c 00755 /usr/local/bin/sqlite3 && \
   # Create a 'app' user which the application will run as
   groupadd app && \
   useradd -M -d /app -s /bin/false -g app app && \
   # Clean up
   apt-get -y autopurge && \
-  apt-get -y autoclean && \
-  rm -v -f /var/cache/debconf/*.dat-old
+  apt-get -y autoclean
 
 # Install third party software
 COPY --from=s6-overlay / /
 COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
+COPY --from=quickjs /usr/local/sbin/ /usr/local/sbin/
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
@@ -308,12 +614,14 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     # Installed ffmpeg (using COPY earlier)
     /usr/local/bin/ffmpeg -version && \
     file /usr/local/bin/ff* && \
+    # Installed quickjs (using COPY earlier)
+    /usr/local/sbin/qjs --help | grep -Fe 'QuickJS version' && \
+    file /usr/local/sbin/qjs && \
     # Clean up file
     apt-get -y autoremove --purge file && \
     # Clean up
     apt-get -y autopurge && \
-    apt-get -y autoclean && \
-    rm -v -f /var/cache/debconf/*.dat-old
+    apt-get -y autoclean
 
 # Switch workdir to the the app
 WORKDIR /app
@@ -322,11 +630,19 @@ ARG YTDLP_DATE
 
 # Set up the app
 RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=cache,id=deno-cache,sharing=locked,target=/cache/deno \
+    --mount=type=cache,id=uv-cache,sharing=locked,target=/cache/uv \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    --mount=type=bind,source=/usr/local/bin/deno,target=/usr/local/bin/deno,from=deno \
+    --mount=type=bind,source=/usr/local/bin/uv,target=/usr/local/bin/uv,from=uv \
+    --mount=type=bind,source=/usr/local/bin/uvx,target=/usr/local/bin/uvx,from=uv \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
   set -x && \
+  DENO_DIR=/cache/deno && export DENO_DIR && \
+  deno --version && \
+  uv --version && \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -334,83 +650,140 @@ RUN --mount=type=tmpfs,target=/cache \
   g++ \
   gcc \
   libjpeg-dev \
+  libonig-dev \
   libpq-dev \
   libwebp-dev \
   make \
   postgresql-common \
   python3-dev \
-  python3-pip \
   zlib1g-dev \
   && \
   # Install non-distro packages
-  cp -at /tmp/ "${HOME}" && \
-  HOME="/tmp/${HOME#/}" \
+  mkdir -v -p /cache/.home-directories && \
+  cp -at /cache/.home-directories/ "${HOME}" && \
+  HOME="/cache/.home-directories/${HOME#/}" \
   XDG_CACHE_HOME='/cache' \
   PIPENV_VERBOSITY=64 \
   PYTHONPYCACHEPREFIX=/cache/pycache \
-    pipenv install --system --skip-lock && \
+  uv tool run --no-config --no-progress --no-managed-python -- \
+    pipenv lock && \
+  HOME="/cache/.home-directories/${HOME#/}" \
+  XDG_CACHE_HOME='/cache' \
+  PIPENV_VERBOSITY=1 \
+  PYTHONPYCACHEPREFIX=/cache/pycache \
+  uv tool run --no-config --no-progress --no-managed-python -- \
+    pipenv requirements --from-pipfile --hash >| /cache/requirements.txt && \
+  rm -v Pipfile.lock && \
+  cat -v /cache/requirements.txt && \
+  HOME="/cache/.home-directories/${HOME#/}" \
+  UV_LINK_MODE='copy' \
+  XDG_CACHE_HOME='/cache' \
+  PYTHONPYCACHEPREFIX=/cache/pycache \
+    uv --no-config --no-progress --no-managed-python \
+    pip install --strict --system --break-system-packages \
+    --requirements /cache/requirements.txt && \
   # Clean up
   apt-get -y autoremove --purge \
   default-libmysqlclient-dev \
   g++ \
   gcc \
   libjpeg-dev \
+  libonig-dev \
   libpq-dev \
   libwebp-dev \
   make \
   postgresql-common \
   python3-dev \
-  python3-pip \
   zlib1g-dev \
   && \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
-  rm -v -f /var/cache/debconf/*.dat-old && \
-  rm -v -rf /tmp/*
+  LD_LIBRARY_PATH=/usr/local/lib/python3/dist-packages/pillow.libs:/usr/local/lib/python3/dist-packages/psycopg_binary.libs \
+    find /usr/local/lib/python3/dist-packages/ \
+      -name '*.so*' -print \
+      -exec du -h '{}' ';' \
+      -exec ldd '{}' ';' \
+    >| /cache/python-shared-objects 2>&1 && \
+  rm -v -rf /tmp/* ; \
+  if grep >/dev/null -Fe ' => not found' /cache/python-shared-objects ; \
+  then \
+      cat -v /cache/python-shared-objects ; \
+      printf -- 1>&2 '%s\n' \
+        ERROR: '    An unresolved shared object was found.' ; \
+      exit 1 ; \
+  fi
+
+# Bundle deno with the image
+##COPY --from=deno /usr/local/bin/ /usr/local/bin/
 
 # Copy root
 COPY config/root /
-
-# patch background_task
-COPY patches/background_task/ \
-    /usr/local/lib/python3/dist-packages/background_task/
 
 # patch yt_dlp
 COPY patches/yt_dlp/ \
     /usr/local/lib/python3/dist-packages/yt_dlp/
 
 # Copy app
-COPY tubesync /app
-COPY tubesync/tubesync/local_settings.py.container /app/tubesync/local_settings.py
+COPY --from=tubesync-app /app /app
+
+# Build the bgutil-ytdlp-pot-provider server when deno is bundled
+RUN --mount=type=tmpfs,target=/cache \
+    --mount=type=cache,id=deno-cache,sharing=locked,target=/cache/deno \
+  command -v deno || exit 0 ; \
+  # python might be used, so keep the .pyc files in /cache
+  PYTHONPYCACHEPREFIX='/cache/pycache' && export PYTHONPYCACHEPREFIX && \
+  set -x && \
+  XDG_CACHE_HOME='/cache' && export XDG_CACHE_HOME && \
+  DENO_DIR='/cache/deno' && export DENO_DIR && \
+  cd /app/bgutil-ytdlp-pot-provider/server && \
+  install -v -t /usr/local/bin ../node && \
+  mkdir -v -p /cache/.home-directories && \
+  cp -at /cache/.home-directories/ "${HOME}" && \
+  HOME="/cache/.home-directories/${HOME#/}" && \
+  DENO_COMPAT=1 deno run --no-config -A npm:npm ci --no-audit --no-fund && \
+  DENO_COMPAT=1 deno run --no-config -A npm:npm audit fix && \
+  node npm:typescript/tsc
 
 # Build app
 RUN set -x && \
+  # Record the bundled deno version when it was included
+  ( deno_binary="$(command -v deno)" ; \
+    test '!' -n "${deno_binary}" || \
+    /app/install_deno.sh --only-record-version ; \
+  ) && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
-  rm -rf /app/db.sqlite3 && \
+  test '!' -e /app/db.sqlite3 && \
   # Run any required app commands
   /usr/bin/python3 -B /app/manage.py compilescss && \
   /usr/bin/python3 -B /app/manage.py collectstatic --no-input --link && \
+  rm -rf /config /downloads /run/app && \
   # Create config, downloads and run dirs
   mkdir -v -p /run/app && \
-  mkdir -v -p /config/media && \
+  mkdir -v -p /config/media /config/tasks && \
   mkdir -v -p /config/cache/pycache && \
   mkdir -v -p /downloads/audio && \
   mkdir -v -p /downloads/video && \
   # Check nginx configuration copied from config/root/etc
-  nginx -t && \
+  openresty -c /etc/nginx/nginx.conf -e stderr -t && \
   # Append software versions
   ffmpeg_version=$(/usr/local/bin/ffmpeg -version | awk -v 'ev=31' '1 == NR && "ffmpeg" == $1 { print $3; ev=0; } END { exit ev; }') && \
   test -n "${ffmpeg_version}" && \
-  printf -- "ffmpeg_version = '%s'\n" "${ffmpeg_version}" >> /app/common/third_party_versions.py
+  printf -- "ffmpeg_version = '%s'\n" "${ffmpeg_version}" >> /app/common/third_party_versions.py && \
+  qjs_version=$(/usr/local/sbin/qjs --help | awk -v 'ev=31' '1 == NR && "version" == $2 { print $3; ev=0; } END { exit ev; }') && \
+  test -n "${qjs_version}" && \
+  printf -- "qjs_version = '%s'\n" "${qjs_version}" >> /app/common/third_party_versions.py
 
 # Create a healthcheck
-HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py", "http://127.0.0.1:8080/healthcheck"]
+HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck.py"]
 
 # ENVS and ports
-ENV PYTHONPATH="/app" \
+ENV DENO_DIR="/config/cache/deno" \
+    PYTHONPATH="/app" \
     PYTHONPYCACHEPREFIX="/config/cache/pycache" \
     S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0" \
-    XDG_CACHE_HOME="/config/cache"
+    XDG_CACHE_HOME="/config/cache" \
+    XDG_CONFIG_HOME="/config/tubesync" \
+    XDG_STATE_HOME="/config/state"
 EXPOSE 4848
 
 # Volumes

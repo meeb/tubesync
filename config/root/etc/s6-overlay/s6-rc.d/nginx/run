@@ -2,4 +2,4 @@
 
 cd /
 
-exec /usr/sbin/nginx
+exec /usr/bin/openresty -c /etc/nginx/nginx.conf -e stderr

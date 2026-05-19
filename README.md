@@ -1,7 +1,5 @@
 # TubeSync
 
-**This is a preview release of TubeSync, it may contain bugs but should be usable**
-
 TubeSync is a PVR (personal video recorder) for YouTube. Or, like Sonarr but for
 YouTube (with a built-in download client). It is designed to synchronize channels and
 playlists from YouTube to local directories and update your media server once media is
@@ -27,25 +25,30 @@ ghcr.io/meeb/tubesync:latest
 
 # Screenshots
 
+<details>
+<summary>Click to expand screenshots</summary>
+
 ### Dashboard
 
-![TubeSync Dashboard](https://github.com/meeb/tubesync/blob/main/docs/dashboard-v0.5.png?raw=true)
+![TubeSync Dashboard](docs/dashboard-v0.5.png)
 
 ### Sources overview
 
-![TubeSync sources overview](https://github.com/meeb/tubesync/blob/main/docs/sources-v0.5.png?raw=true)
+![TubeSync sources overview](docs/sources-v0.5.png)
 
 ### Source details
 
-![TubeSync source details](https://github.com/meeb/tubesync/blob/main/docs/source-v0.5.png?raw=true)
+![TubeSync source details](docs/source-v0.5.png)
 
 ### Media overview
 
-![TubeSync media overview](https://github.com/meeb/tubesync/blob/main/docs/media-v0.5.png?raw=true)
+![TubeSync media overview](docs/media-v0.5.png)
 
 ### Media details
 
-![TubeSync media-details](https://github.com/meeb/tubesync/blob/main/docs/media-item-v0.5.png?raw=true)
+![TubeSync media-details](docs/media-item-v0.5.png)
+
+</details>
 
 
 # Requirements
@@ -63,7 +66,7 @@ directory will be a `video` and `audio` subdirectories. All media which only has
 audio stream (such as music) will download to the `audio` directory. All media with a
 video stream will be downloaded to the `video` directory. All administration of
 TubeSync is performed via a web interface. You can optionally add a media server,
-currently just Plex, to complete the PVR experience.
+currently only Jellyfin or Plex, to complete the PVR experience.
 
 
 # Installation
@@ -111,6 +114,7 @@ $ docker run \
   -v /some/directory/tubesync-config:/config \
   -v /some/directory/tubesync-downloads:/downloads \
   -p 4848:4848 \
+  --stop-timeout 1800 \
   ghcr.io/meeb/tubesync:latest
 ```
 
@@ -127,6 +131,7 @@ services:
     image: ghcr.io/meeb/tubesync:latest
     container_name: tubesync
     restart: on-failure:3
+    stop_grace_period: 30m
     ports:
       - 4848:4848
     volumes:
@@ -146,36 +151,9 @@ services:
 
 ## Optional authentication
 
-Available in `v1.0` (or `:latest`)and later. If you want to enable a basic username and
-password to be required to access the TubeSync dashboard you can set them with the
-following environment variables:
-
-```bash
-HTTP_USER
-HTTP_PASS
-```
-
-For example, in the `docker run ...` line add in:
-
-```bash
-...
--e HTTP_USER=some-username \
--e HTTP_PASS=some-secure-password \
-...
-```
-
-Or in your Docker Compose file you would add in:
-
-```yaml
-...
-    environment:
-      - HTTP_USER=some-username
-      - HTTP_PASS=some-secure-password
-...
-```
-
-When BOTH `HTTP_USER` and `HTTP_PASS` are set then basic HTTP authentication will be
-enabled.
+You can enable basic HTTP authentication by setting the `HTTP_USER` and `HTTP_PASS`
+environment variables. See the [environment variables reference](//github.com/meeb/tubesync/wiki/Environment-Variables#authentication)
+for details.
 
 
 # Updating
@@ -187,6 +165,14 @@ $ docker pull ghcr.io/meeb/tubesync:v[number]
 ```
 
 Back-end updates such as database migrations should be automatic.
+
+> [!IMPORTANT]
+> `MariaDB` was not automatically upgraded for `UUID` column types.
+> To see what changes are needed, you can run:
+> ```bash
+> docker exec -it tubesync python3 /app/manage.py fix-mariadb --dry-run --uuid-columns
+> ```
+> Removing the `--dry-run` will attempt to execute those statements using the configured database connection.
 
 
 # Moving, backing up, etc.
@@ -221,11 +207,14 @@ As media is indexed and downloaded it will appear in the "media" tab.
 
 ### 3. Media Server updating
 
-Currently TubeSync supports Plex as a media server. You can add your local Plex server
+Currently TubeSync supports Plex and Jellyfin as media servers. You can add your local Jellyfin or Plex server
 under the "media servers" tab.
 
 
 # Logging and debugging
+
+> [!TIP]
+> Even more detailed logs are produced when the environment variable `TUBESYNC_DEBUG` is set to `True`.
 
 TubeSync outputs useful logs, errors and debugging information to the console. You can
 view these with:
@@ -234,16 +223,25 @@ view these with:
 $ docker logs --follow tubesync
 ```
 
+To include logs with an issue report, please extract a file and attach it to the issue.
+The command below creates the `TubeSync.logs.txt` file with the logs from the `tubesync` container:
+
+```bash
+docker logs -t tubesync > TubeSync.logs.txt 2>&1
+```
+
 
 # Advanced usage guides
 
 Once you're happy using TubeSync there are some advanced usage guides for more complex
 and less common features:
 
+ * [Using Plex](https://github.com/meeb/tubesync/blob/main/docs/plex-notes.md)
  * [Import existing media into TubeSync](https://github.com/meeb/tubesync/blob/main/docs/import-existing-media.md)
  * [Sync or create missing metadata files](https://github.com/meeb/tubesync/blob/main/docs/create-missing-metadata.md)
  * [Reset tasks from the command line](https://github.com/meeb/tubesync/blob/main/docs/reset-tasks.md)
  * [Using PostgreSQL, MySQL or MariaDB as database backends](https://github.com/meeb/tubesync/blob/main/docs/other-database-backends.md)
+ * [YouTube Proof-of-Origin Tokens](https://github.com/meeb/tubesync/blob/main/docs/youtube-pot.md)
  * [Using cookies](https://github.com/meeb/tubesync/blob/main/docs/using-cookies.md)
  * [Reset metadata](https://github.com/meeb/tubesync/blob/main/docs/reset-metadata.md)
 
@@ -260,19 +258,14 @@ long as possible, up to 24 hours.
 
 ### 2. Indexing massive channels
 
-If you add a massive (several thousand videos) channel to TubeSync and choose "index
-every hour" or similar short interval it's entirely possible your TubeSync install may
-spend its entire time just indexing the massive channel over and over again without
+If you add a massive channel (one with several thousand videos) to TubeSync and choose "index
+every hour" or a similarly short interval; it's entirely possible that your TubeSync install may
+spend its entire time indexing the channel, over and over again, without
 downloading any media. Check your tasks for the status of your TubeSync install.
 
-If you add a significant amount of "work" due to adding many large channels you may
-need to increase the number of background workers by setting the `TUBESYNC_WORKERS`
-environment variable. Try around ~4 at most, although the absolute maximum allowed is 8.
-
-**Be nice.** it's likely entirely possible your IP address could get throttled by the
-source if you try and crawl extremely large amounts very quickly. **Try and be polite
+**Be nice.** It's entirely possible that your IP address could get throttled and/or banned, by the
+source, if you try to crawl extremely large amounts quickly. **Try to be polite
 with the smallest amount of indexing and concurrent downloads possible for your needs.**
-
 
 # FAQ
 
@@ -321,9 +314,11 @@ Notable libraries and software used:
  * [Django](https://www.djangoproject.com/)
  * [yt-dlp](https://github.com/yt-dlp/yt-dlp)
  * [ffmpeg](https://ffmpeg.org/)
- * [Django Background Tasks](https://github.com/arteria/django-background-tasks/)
+ * [QuickJS](https://bellard.org/quickjs/)
+ * [Django Huey](https://github.com/gaiacoop/django-huey)
+ * [Huey](https://github.com/coleifer/huey)
  * [django-sass](https://github.com/coderedcorp/django-sass/)
- * The container bundles with `s6-init` and `nginx`
+ * The container bundles with `s6-init` and `openresty`
 
 See the [Pipfile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full list.
 
@@ -334,7 +329,7 @@ and you can probably break things by playing in the admin. If you still want to 
 it you can run:
 
 ```bash
-$ docker exec -ti tubesync python3 /app/manage.py createsuperuser
+$ docker exec -it tubesync python3 /app/manage.py createsuperuser
 ```
 
 And follow the instructions to create an initial Django superuser, once created, you
@@ -371,22 +366,25 @@ There are a number of other environment variables you can set. These are, mostly
 **NOT** required to be set in the default container installation, they are really only
 useful if you are manually installing TubeSync in some other environment. These are:
 
-| Name                         | What                                                          | Example                              |
-| ---------------------------- | ------------------------------------------------------------- |--------------------------------------|
-| DJANGO_SECRET_KEY            | Django's SECRET_KEY                                           | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l     |
-| DJANGO_URL_PREFIX            | Run TubeSync in a sub-URL on the web server                   | /somepath/                           |
-| TUBESYNC_DEBUG               | Enable debugging                                              | True                                 |
-| TUBESYNC_WORKERS             | Number of background workers, default is 2, max allowed is 8  | 2                                    |
-| TUBESYNC_HOSTS               | Django's ALLOWED_HOSTS, defaults to `*`                       | tubesync.example.com,otherhost.com   |
-| TUBESYNC_RESET_DOWNLOAD_DIR  | Toggle resetting `/downloads` permissions, defaults to True   | True                                 |
-| TUBESYNC_VIDEO_HEIGHT_CUTOFF | Smallest video height in pixels permitted to download         | 240                                  |
-| TUBESYNC_DIRECTORY_PREFIX    | Enable `video` and `audio` directory prefixes in `/downloads` | True                                 |
-| GUNICORN_WORKERS             | Number of gunicorn workers to spawn                           | 3                                    |
-| LISTEN_HOST                  | IP address for gunicorn to listen on                          | 127.0.0.1                            |
-| LISTEN_PORT                  | Port number for gunicorn to listen on                         | 8080                                 |
-| HTTP_USER                    | Sets the username for HTTP basic authentication               | some-username                        |
-| HTTP_PASS                    | Sets the password for HTTP basic authentication               | some-secure-password                 |
-| DATABASE_CONNECTION          | Optional external database connection details                 | mysql://user:pass@host:port/database |
+| Name                         | What                                                          | Example                                                                       |
+| ---------------------------- | ------------------------------------------------------------- |-------------------------------------------------------------------------------|
+| DJANGO_SECRET_KEY            | Django's SECRET_KEY                                           | YJySXnQLB7UVZw2dXKDWxI5lEZaImK6l                   |
+| DJANGO_URL_PREFIX            | Run TubeSync in a sub-URL on the web server                   | /somepath/                                                                    |
+| TUBESYNC_DEBUG               | Enable debugging                                              | True                                                                          |
+| TUBESYNC_HOSTS               | Django's ALLOWED_HOSTS, defaults to `*`                       | tubesync.example.com,otherhost.com                 |
+| TUBESYNC_RESET_DOWNLOAD_DIR  | Toggle resetting `/downloads` permissions, defaults to True   | True                                                                          |
+| TUBESYNC_VIDEO_HEIGHT_CUTOFF | Smallest video height in pixels permitted to download         | 240                                                                           |
+| TUBESYNC_RENAME_SOURCES      | Rename media files from selected sources                      | Source1_directory,Source2_directory                |
+| TUBESYNC_RENAME_ALL_SOURCES  | Rename media files from all sources                           | True                                                                          |
+| TUBESYNC_DIRECTORY_PREFIX    | Enable `video` and `audio` directory prefixes in `/downloads` | True                                                                          |
+| TUBESYNC_SHRINK_NEW          | Filter unneeded information from newly retrieved metadata     | True                                                                          |
+| TUBESYNC_SHRINK_OLD          | Filter unneeded information from metadata loaded from the database | True                                                                     |
+| GUNICORN_WORKERS             | Number of `gunicorn` (web request) workers to spawn           | 3                                                                             |
+| LISTEN_HOST                  | IP address for `gunicorn` to listen on                        | 127.0.0.1                                                                     |
+| LISTEN_PORT                  | Port number for `gunicorn` to listen on                       | 8080                                                                          |
+| HTTP_USER                    | Sets the username for HTTP basic authentication               | some-username                                                                 |
+| HTTP_PASS                    | Sets the password for HTTP basic authentication               | some-secure-password                                                          |
+| DATABASE_CONNECTION          | Optional external database connection details                 | postgresql://user:pass@host:port/database          |
 
 
 # Manual, non-containerised, installation
@@ -396,7 +394,7 @@ following this rough guide, you are on your own and should be knowledgeable abou
 installing and running WSGI-based Python web applications before attempting this.
 
 1. Clone or download this repo
-2. Make sure you're running a modern version of Python (>=3.6) and have Pipenv
+2. Make sure you're running a modern version of Python (>=3.10) and have Pipenv
    installed
 3. Set up the environment with `pipenv install`
 4. Copy `tubesync/tubesync/local_settings.py.example` to

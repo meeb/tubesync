@@ -5,15 +5,16 @@ verify_ssl = true
 
 [dev-packages]
 autopep8 = "*"
+pycodestyle = "*"
 
 [packages]
-django = "<5.2"
+django = "~=6.0.0"
+django-huey = "*"
 django-sass-processor = {extras = ["management-command"], version = "*"}
 pillow = "*"
 whitenoise = "*"
 gunicorn = "*"
 httptools = "*"
-django-background-tasks = ">=1.2.8"
 django-basicauth = "*"
 psycopg = {extras = ["binary", "pool"], version = "*"}
 mysqlclient = "*"
@@ -24,3 +25,6 @@ yt-dlp = {extras = ["default", "curl-cffi"], version = "*"}
 emoji = "*"
 brotli = "*"
 html5lib = "*"
+bgutil-ytdlp-pot-provider = "~=1.3.1"
+yt-dlp-remote-cipher = "*"
+babi = "*"

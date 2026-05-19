@@ -23,12 +23,18 @@
     </p>
     <div class="collection">
       {% for task in running %}
-        <a href="{% url task.url pk=task.instance.pk %}" class="collection-item">
+        <a href="{%if task.instance.pk %}{% url task.url pk=task.instance.pk %}{% else %}#{{ task.task_id }}{% endif %}" class="collection-item">
           <i class="fas fa-running"></i> <strong>{{ task }}</strong><br>
-          <i class="far fa-clock"></i> Task started at <strong>{{ task.locked_at|date:'Y-m-d H:i:s' }}</strong>
+          <i class="far fa-clock"></i> Task started at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong>
         </a>
       {% empty %}
         <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no running tasks.</span>
+        {% if wait_for_database_queue %}
+        <span class="collection-item">
+          No tasks are running because another task has requested a pause of the queue.<br>
+          While the database tasks are still running, additional tasks will remain scheduled.
+        </span>
+        {% endif %}
       {% endfor %}
     </div>
   </div>
@@ -43,11 +49,16 @@
     </p>
     <div class="collection">
       {% for task in errors %}
-        <a href="{% url task.url pk=task.instance.pk %}" class="collection-item error-text">
-          <i class="fas fa-exclamation-triangle"></i> <strong>{{ task }}</strong>, attempted {{ task.attempts }} time{{ task.attempts|pluralize }}<br>
-          Error: &quot;{{ task.error_message }}&quot;<br>
-          <i class="fas fa-history"></i> Task will be retried at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>
-        </a>
+        <div class="collection-item error-text">
+          <a href="{%if task.instance.pk %}{% url task.url pk=task.instance.pk %}{% else %}#{{ task.task_id }}{% endif %}" class="error-text">
+            <i class="fas fa-exclamation-triangle"></i> <strong>{{ task }}</strong>, attempted {{ task.attempts }} time{{ task.attempts|pluralize }}<br>
+            Error: &quot;{{ task.error_message }}&quot;<br>
+          </a>
+          <i class="fas fa-history"></i> Task will be retried at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong>
+          <a href="{% url 'sync:run-task' pk=task.pk %}" class="error-text">
+            <i class="fas fa-undo"></i>
+          </a>
+        </div>
       {% empty %}
         <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no tasks with errors on this page.</span>
       {% endfor %}
@@ -62,22 +73,34 @@
     <p>
       Tasks which are scheduled to run in the future or are waiting in a queue to be
       processed. They can be waiting for an available worker to run immediately, or
-      run in the future at the specified &quot;run at&quot; time.
+      run in the future at the specified &quot;scheduled at&quot; time.
     </p>
     <div class="collection">
       {% for task in scheduled %}
-        <a href="{% url task.url pk=task.instance.pk %}" class="collection-item">
-          <i class="fas fa-stopwatch"></i> <strong>{{ task }}</strong><br>
-          {% if task.instance.index_schedule and task.repeat > 0 %}Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>{% endif %}
-          <i class="fas fa-redo"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.run_at|date:'Y-m-d H:i:s' }}</strong>{% endif %}
-        </a>
+        <div class="collection-item">
+          <a href="{%if task.instance.pk %}{% url task.url pk=task.instance.pk %}{% else %}#{{ task.task_id }}{% endif %}">
+            <i class="fas fa-hourglass-start"></i> <strong>{{ task }}</strong><br>
+            {% if task.instance.is_active and 'once' not in task.verbose_name %}Scheduled to run {{ task.instance.get_index_schedule_display|lower }}.<br>{% endif %}
+            <span class="fa-flip-horizontal" style="display: inline-block;">
+              <i class="fas fa-chart-bar fa-rotate-270"></i>
+            </span> Priority:&nbsp;{{ task.priority }}&nbsp;Queue:&nbsp;{{ task.queue }}<br>
+            <i class="far fa-clock"></i> Task will run {% if task.run_now %}<strong>immediately</strong>{% else %}at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong>
+          </a>
+          <a href="{% url 'sync:revoke-task' pk=task.pk %}">
+            <i class="far fa-stop-circle"></i>
+          </a>
+          <a href="{% url 'sync:run-task' pk=task.pk %}">
+            <i class="far fa-play-circle"></i>
+          {% endif %}
+          </a>
+        </div>
       {% empty %}
         <span class="collection-item no-items"><i class="fas fa-info-circle"></i> There are no scheduled tasks on this page.</span>
       {% endfor %}
     </div>
   </div>
 </div>
-{% include 'pagination.html' with pagination=sources.paginator filter=source.pk %}
+{% include 'pagination.html' with filter=source.pk %}
 <div class="row">
   <div class="col s12">
     <h2>Completed</h2>

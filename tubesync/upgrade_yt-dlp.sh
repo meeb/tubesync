@@ -34,5 +34,5 @@ if [[ "${pip_version}" < "23.0.1" ]]; then
     break_system_packages=''
 fi
 
-pip3 install --upgrade ${break_system_packages} yt-dlp
+pip3 install --upgrade ${break_system_packages} 'yt-dlp[default,curl-cffi]'
 
