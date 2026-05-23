@@ -1,22 +1,22 @@
 import logging
 from django.conf import settings
+##from .logging import default_handler, syslog_handler
 from .utils import getenv
 
 
-logging_level = logging.DEBUG if settings.DEBUG else logging.INFO
-default_formatter = logging.Formatter(
-    '%(asctime)s [%(name)s/%(levelname)s] %(message)s'
-)
-default_sh = logging.StreamHandler()
-default_sh.setFormatter(default_formatter)
-default_sh.setLevel(logging_level)
+##if settings.DEBUG:
+##    default_handler.setLevel(logging.DEBUG)
 
 
 app_name = getenv('DJANGO_SETTINGS_MODULE')
 first_part = app_name.split('.', 1)[0]
 log = app_logger = logging.getLogger(first_part)
-app_logger.addHandler(default_sh)
-app_logger.setLevel(logging_level)
+##app_logger.propagate = False
+##app_logger.addHandler(default_handler)
+##app_logger.addHandler(syslog_handler)
+app_logger.setLevel(logging.INFO)
+if settings.DEBUG:
+    app_logger.setLevel(logging.DEBUG)
 
 if (
     hasattr(settings, 'DATABASES') and

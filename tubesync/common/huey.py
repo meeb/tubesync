@@ -85,6 +85,12 @@ class Huey(huey_Huey):
         kwargs['huey'] = self
         super()._emit(signal, task, *args, **kwargs)
 
+    def create_consumer(self, **options):
+        consumer = super().create_consumer(**options)
+        suffix = f'worker.{consumer.worker_type}'
+        consumer._logger = consumer._logger.getChild(suffix)
+        return consumer
+
     def reschedule(self, task_id, eta):
         pc = self.pending_count()
         found = [
