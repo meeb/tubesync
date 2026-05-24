@@ -154,7 +154,7 @@ LOGGING = {
     },
     'loggers': {
         'common.huey_syslog': {
-            'handlers': ['syslog', 'stderr'],
+            'handlers': ['syslog'],
             'level': 'DEBUG',
             'propagate': False,
         },
@@ -164,23 +164,23 @@ LOGGING = {
             'propagate': False,
         },
         'hat.syslog.handler': {
-            'handlers': ['syslog', 'stderr'],
+            'handlers': ['syslog'],
             'level': 'DEBUG',
             'propagate': False,
         },
         'huey': {
-            'handlers': ['hat_syslog', 'stderr'],
-            'level': 'INFO' if DJANGO_HUEY.get('verbose', False) is None else 'WARNING',
+            'handlers': ['hat_syslog_worker_thread', 'stderr_worker_thread'],
+            'level': 'DEBUG',
             'propagate': False,
         },
         'huey.consumer.worker.process': {
             'handlers': ['hat_syslog_worker_process', 'stderr_worker_process'],
-            'level': 'INFO' if DJANGO_HUEY.get('verbose', False) is None else 'WARNING',
+            'level': 'DEBUG',
             'propagate': False,
         },
         'huey.consumer.worker.thread': {
             'handlers': ['hat_syslog_worker_thread', 'stderr_worker_thread'],
-            'level': 'INFO' if DJANGO_HUEY.get('verbose', False) is None else 'WARNING',
+            'level': 'DEBUG',
             'propagate': False,
         },
     },
