@@ -62,7 +62,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_NO_COMPILE=1 \
     PIP_ROOT_USER_ACTION='ignore'
 
-#COPY --from=tubesync-etc /etc/debconf.conf /etc/debconf.conf
+COPY --from=tubesync-etc /etc/debconf.conf /etc/debconf.conf
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
