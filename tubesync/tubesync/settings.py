@@ -54,7 +54,7 @@ FORCE_SCRIPT_NAME = None
 DJANGO_HUEY = {
     'default': TaskQueue.LIMIT.value,
     'queues': dict(),
-    'verbose': None if DEBUG else False,
+    'verbose': True if DEBUG else None,
 }
 for queue_name in TaskQueue.values:
     queues = DJANGO_HUEY['queues']
@@ -71,7 +71,7 @@ for django_huey_queue in DJANGO_HUEY['queues'].values():
         filepath.parent.mkdir(exist_ok=True, parents=True)
     consumer = django_huey_queue.get('consumer')
     if consumer:
-        consumer['verbose'] = DJANGO_HUEY.get('verbose', False)
+        consumer['verbose'] = DJANGO_HUEY.get('verbose', None)
 
 
 LOGGING = {
@@ -132,12 +132,12 @@ LOGGING = {
         },
         'stderr_worker_process': {
             'class': 'logging.StreamHandler',
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': 'INFO' if DEBUG else 'WARNING',
             'formatter': 'worker_process',
         },
         'stderr_worker_thread': {
             'class': 'logging.StreamHandler',
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': 'INFO' if DEBUG else 'WARNING',
             'formatter': 'worker_thread',
         },
         'syslog': {
