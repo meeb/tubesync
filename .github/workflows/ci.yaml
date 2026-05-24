@@ -194,8 +194,8 @@ jobs:
             'ghcr.io/wagoodman/dive' \
             'ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:dive' \
             --ci \
-            --highestUserWastedPercent '0.08' \
-            --highestWastedBytes '60M'
+            --highestUserWastedPercent '0.05' \
+            --highestWastedBytes '25M'
 
   docker-image:
     if: ${{ !cancelled() && 'success' == needs.info.result && 'success' == needs.containerise.result }}
