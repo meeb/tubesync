@@ -77,6 +77,15 @@ for django_huey_queue in DJANGO_HUEY['queues'].values():
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'drop_huey_scheduler_sleep': {
+            '()': 'common.logging.RemoveSpecificLogFilter',
+            'msg_starts_with': 'Sleeping for ',
+            'logger_name': 'huey.consumer.Scheduler',
+            'func_name': 'sleep_for_interval',
+            'level': 'DEBUG',
+        },
+    },
     'formatters': {
         'default': {},
         'syslog': {
@@ -172,6 +181,7 @@ LOGGING = {
             'handlers': ['hat_syslog_worker_thread', 'stderr_worker_thread'],
             'level': 'DEBUG',
             'propagate': False,
+            'filters': ['drop_huey_scheduler_sleep'],
         },
         'huey.consumer.worker.process': {
             'handlers': ['hat_syslog_worker_process', 'stderr_worker_process'],
