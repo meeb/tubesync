@@ -80,9 +80,21 @@ LOGGING = {
     'filters': {
         'drop_huey_scheduler_sleep': {
             '()': 'common.logging.RemoveSpecificLogFilter',
-            'msg_starts_with': 'Sleeping for ',
             'func_name': 'sleep_for_interval',
             'level': 'DEBUG',
+            'msg_starts_with': 'Sleeping for ',
+        },
+        'drop_huey_scheduler_scheduler_is_up': {
+            '()': 'common.logging.RemoveSpecificLogFilter',
+            'func_name': 'check_worker_health',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Scheduler is up and running.',
+        },
+        'drop_huey_scheduler_workers_are_up': {
+            '()': 'common.logging.RemoveSpecificLogFilter',
+            'func_name': 'check_worker_health',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Workers are up and running.',
         },
     },
     'formatters': {
@@ -186,11 +198,19 @@ LOGGING = {
             'propagate': True,
         },
         'huey.consumer.worker.process': {
+            'filters': [
+                'drop_huey_scheduler_scheduler_is_up',
+                'drop_huey_scheduler_workers_are_up',
+            ],
             'handlers': ['hat_syslog_worker_process', 'stderr_worker_process'],
             'level': 'DEBUG',
             'propagate': False,
         },
         'huey.consumer.worker.thread': {
+            'filters': [
+                'drop_huey_scheduler_scheduler_is_up',
+                'drop_huey_scheduler_workers_are_up',
+            ],
             'handlers': ['hat_syslog_worker_thread', 'stderr_worker_thread'],
             'level': 'DEBUG',
             'propagate': False,
