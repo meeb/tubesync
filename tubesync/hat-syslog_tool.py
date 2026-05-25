@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import io
 import json
+import logging
 import lzma
 import os
 import random
@@ -36,7 +37,7 @@ class _Settings:
     HASH_CHUNK_SIZE: int = (1024) * 32 # KiB
     INITIAL_BACKOFF: float = 0.2
     MAX_BACKOFF: float = 15.0
-    USER_AGENT: str = 'hat-syslog_tool/1.0'
+    USER_AGENT: str = 'hat-syslog_tool/1.1'
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,10 @@ class _SqlTemplates:
     clear_staging: str = 'DELETE FROM staging_rows'
     count_log: str = 'SELECT COUNT(*) FROM log'
     count_verified: str = 'SELECT COUNT(*) FROM file_tracker WHERE committed = 1 AND log_rowid > 0'
+    select_export_logs: str = '''
+        SELECT facility, severity, app_name, procid, msg
+        FROM log
+        ORDER BY rowid ASC;'''
 
 
 # Module-level instances
@@ -116,11 +121,8 @@ class OutputManager:
         self._base_print(lines, self._ORIGINAL_STDERR)
 
 
-def get_fac_sev_mappers() -> tuple[Callable[[str], int], Callable[[str], int]]:
-    """Returns mapping functions for facility and severity strings."""
-    if Facility is not None and Severity is not None:
-        return lambda label: Facility[label].value, lambda label: Severity[label].value
-
+def get_text_labels() -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Returns text tuple labels for matching numerical tokens back to strings."""
     f_labels = (
         'KERN', 'USER', 'MAIL', 'DAEMON', 'AUTH', 'SYSLOG', 'LPR', 'NEWS',
         'UUCP', 'CRON', 'AUTHPRIV', 'FTP', 'NTP', 'AUDIT', 'ALERT', 'CLOCK',
@@ -130,9 +132,38 @@ def get_fac_sev_mappers() -> tuple[Callable[[str], int], Callable[[str], int]]:
         'EMERGENCY', 'ALERT', 'CRITICAL', 'ERROR',
         'WARNING', 'NOTICE', 'INFORMATIONAL', 'DEBUG'
     )
+    return f_labels, s_labels
+
+
+def get_fac_sev_mappers() -> tuple[Callable[[str], int], Callable[[str], int]]:
+    """Returns mapping functions for facility and severity strings."""
+    if Facility is not None and Severity is not None:
+        return lambda label: Facility[label].value, lambda label: Severity[label].value
+
+    f_labels, s_labels = get_text_labels()
     f_map = {k: i for i, k in enumerate(f_labels)}
     s_map = {k: i for i, k in enumerate(s_labels)}
     return lambda label: f_map.get(label, 1), lambda label: s_map.get(label, 6)
+
+
+def extract_numeric_pid(procid: Optional[Union[int, str]]) -> Optional[int]:
+    """Validates the input token and outputs a clean integer PID or None if non-numeric."""
+    if procid is None or isinstance(procid, int):
+        return procid
+
+    procid_str = str(procid).strip()
+    if procid_str.isdigit():
+        return int(procid_str)
+    else:
+        return None
+
+
+def format_syslog_prefix(facility: int, severity: int, msg_str: str) -> str:
+    """Prepends human-readable facility and severity text labels to the message body."""
+    f_labels, s_labels = get_text_labels()
+    f_txt = f_labels[facility] if len(f_labels) > facility else str(facility)
+    s_txt = s_labels[severity] if len(s_labels) > severity else str(severity)
+    return f'[{f_txt}.{s_txt}] {msg_str}'
 
 
 def fetch_scalar(cur: sqlite3.Cursor, query: str, params: Iterable[Any] = ()) -> Any:
@@ -178,10 +209,99 @@ def commit_batch(cur: sqlite3.Cursor) -> None:
     cur.connection.commit()
 
 
+def setup_logger(name: str, filename: str, log_dir: str, log_level: int = logging.DEBUG) -> logging.Logger:
+    '''Creates a clean logger writing raw lines at or above the specified log level.'''
+    filepath = os.path.join(log_dir, filename)
+    handler = logging.FileHandler(filepath, mode='a', encoding='utf-8')
+
+    logger = logging.getLogger(name)
+    logger.setLevel(log_level)
+    logger.addHandler(handler)
+    return logger
+
+
+def process_and_route_log(facility: int, severity: int, app_name: str, procid: Optional[Union[int, str]], msg: Any,
+                          n_acc: logging.Logger, n_err: logging.Logger,
+                          g_acc: logging.Logger, g_err: logging.Logger,
+                          msg_log: logging.Logger) -> None:
+    '''Classifies and routes logs using strict numerical facility boundaries (17=local1, 18=local2).'''
+    if not msg:
+        return
+
+    app_lower = app_name.lower() if app_name else ''
+    msg_str = str(msg).strip()
+    validated_pid = extract_numeric_pid(procid)
+    procid_msg = f'(PID: {validated_pid}) {msg_str}' if validated_pid is not None else msg_str
+
+    # --- ROUTE NGINX (LOCAL1 = 17) ---
+    if 17 == facility:
+        if 'nginx' in app_lower:
+            if 4 >= severity:
+                n_err.info(msg_str)
+            else:
+                n_acc.info(msg_str)
+        else:
+            msg_log.info(format_syslog_prefix(facility, severity, procid_msg))
+
+    # --- ROUTE GUNICORN (LOCAL2 = 18) ---
+    elif 18 == facility:
+        if 'gunicorn' in app_lower:
+            if 'access' in app_lower:
+                g_acc.info(msg_str)
+            else:
+                g_err.info(msg_str)
+        else:
+            msg_log.info(format_syslog_prefix(facility, severity, procid_msg))
+
+    # --- ROUTE UNMATCHED FACILITIES ---
+    else:
+        msg_log.info(format_syslog_prefix(facility, severity, procid_msg))
+
+
+def export_mode(db_path: str, log_dir: str) -> None:
+    '''Queries an existing hat-syslog SQLite file and populates reconstructed flat text log files.'''
+    out = OutputManager()
+    if not os.path.exists(db_path):
+        out.stderr_print(f'[-] Error: Target database file not found at "{db_path}".')
+        sys.exit(1)
+
+    if os.path.exists(log_dir):
+        out.stderr_print(f'[-] Safety Error: Target export directory "{log_dir}" already exists. Specify a brand new directory.')
+        sys.exit(1)
+
+    os.makedirs(log_dir)
+
+    nginx_access = setup_logger('nginx_access', 'nginx_access.log', log_dir)
+    nginx_error = setup_logger('nginx_error', 'nginx_error.log', log_dir)
+    gunicorn_access = setup_logger('gunicorn_access', 'gunicorn_access.log', log_dir)
+    gunicorn_error = setup_logger('gunicorn_error', 'gunicorn_error.log', log_dir)
+    messages_log = setup_logger('messages', 'messages.log', log_dir)
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(_SQL.select_export_logs)
+        records = cursor.fetchall()
+        for facility, severity, app_name, procid, msg in records:
+            process_and_route_log(facility, severity, app_name, procid, msg,
+                                  nginx_access, nginx_error, gunicorn_access, gunicorn_error,
+                                  messages_log)
+        out.stdout_print(f'[+] Export complete. {len(records)} records distributed inside: "{log_dir}"')
+    except sqlite3.Error as e:
+        out.stderr_print(f'[-] Error during database query execution: "{e}"')
+        sys.exit(1)
+    finally:
+        conn.close()
+
+
 def convert_mode(stream: BinaryIO, db_path: str, retries: int, clean: bool, show_stats: bool) -> None:
     start_time = time.time()
     out = OutputManager()
+    f_labels, s_labels = get_text_labels()
     get_fac, get_sev = get_fac_sev_mappers()
+    get_fac_txt = lambda facility: f_labels[facility] if len(f_labels) > facility else str(facility)
+    get_sev_txt = lambda severity: s_labels[severity] if len(s_labels) > severity else str(severity)
 
     class ByteTracker(io.BufferedIOBase):
         def __init__(self, raw: BinaryIO):
@@ -221,8 +341,33 @@ def convert_mode(stream: BinaryIO, db_path: str, retries: int, clean: bool, show
                                 cur.execute(_SQL.insert_tracker_skip, (ext_id, row_id))
                             stats['skipped'] += 1
                             continue
+
+                    failback_facility = 1
+                    facility_val = m_obj.get('facility', failback_facility)
+                    try:
+                        if isinstance(facility_val, str):
+                            facility_num = get_fac(facility_val.strip().upper())
+                        elif isinstance(facility_val, int):
+                            facility_num = get_fac(get_fac_txt(facility_val))
+                        else:
+                            facility_num = failback_facility
+                    except Exception:
+                        facility_num = failback_facility
+
+                    failback_severity = 6
+                    severity_val = m_obj.get('severity', failback_severity)
+                    try:
+                        if isinstance(severity_val, str):
+                            severity_num = get_sev(severity_val.strip().upper())
+                        elif isinstance(severity_val, int):
+                            severity_num = get_sev(get_sev_txt(severity_val))
+                        else:
+                            severity_num = failback_severity
+                    except Exception:
+                        severity_num = failback_severity
+
                     cur.execute(_SQL.insert_staging, (
-                        ts, get_fac(m_obj.get('facility')), get_sev(m_obj.get('severity')),
+                        ts, facility_num, severity_num,
                         m_obj.get('version'), m_obj.get('timestamp'), m_obj.get('hostname'),
                         m_obj.get('app_name'), m_obj.get('procid'), m_obj.get('msgid'),
                         json.dumps(m_obj.get('data')), msg_text, ext_id
@@ -255,7 +400,7 @@ def convert_mode(stream: BinaryIO, db_path: str, retries: int, clean: bool, show
             f"    Skipped:           {stats['skipped']}", f"    Errors:            {stats['errors']}",
             f"    Database Total:    {total_rows}", f"    Tracker Verified:  {stats['committed_tracker']}",
             f"    Duration:          {duration:.2f}s ({tput:.1f} rows/s)",
-            f"    Data Processed:  {stats['uncompressed_bytes'] / 1024 / 1024:.2f} MiB",
+            f"    Data Processed:    {stats['uncompressed_bytes'] / 1024 / 1024:.2f} MiB",
             f"    Source Processed:  {raw_total / 1024 / 1024:.2f} MiB",
         ])
         if is_xz: out.stdout_print(f"    Expansion Ratio:   {ratio:.2f}x")
@@ -347,14 +492,15 @@ async def backup_mode(url: str, output_dir: Optional[str]) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(description='hat-syslog Backup/Restoration Tool')
-    p.add_argument('input', help="URL for backup, file path, or '-'")
-    p.add_argument('--out', '-o', help='Database (.db) path for convert OR directory for backup')
+    p.add_argument('input', help='URL for backup, path to logs backup/DB file, or "-"')
+    p.add_argument('--out', '-o', help='Database (.db) path for convert OR directory for backup/export')
     p.add_argument('--backup', action='store_true', default=True)
-    p.add_argument('--convert', '--import', action='store_true')
+    p.add_argument('--convert', '--import', action='store_true', help='Import logs from a backup file into a database file')
+    p.add_argument('--export', '--split', action='store_true', help='Export logs into individual files from an existing database file')
     p.add_argument('--verify', action='store_true')
     p.add_argument('--clean', action='store_true', help='Error out if target database exists')
     p.add_argument('--retries', type=int, default=_CFG.DEFAULT_RETRIES)
-    p.add_argument('--stats', action='store_true')
+    p.add_argument('--stats', action='store_true', help='Report statistics about the conversion from a logs backup file to a database')
     args = p.parse_args()
     out = OutputManager()
 
@@ -362,13 +508,27 @@ def main() -> None:
         args.backup = False
 
     match args:
+        case _ if args.export:
+            if not args.input:
+                out.stderr_print('[-] Error: input database file path is required for export mode.')
+                sys.exit(1)
+            if not args.out:
+                out.stderr_print('[-] Error: --out directory parameter is required for export mode.')
+                sys.exit(1)
+            export_mode(args.input, args.out)
         case _ if args.verify and not args.convert:
+            if not args.input:
+                out.stderr_print('[-] Error: Input path reference or "-" is required to verify.')
+                sys.exit(1)
             raw_buf = sys.stdin.buffer if '-' == args.input else open(args.input, 'rb')
             success, _ = verify_mode(raw_buf, args.input)
             sys.exit(0 if success else 1)
         case _ if args.convert:
+            if not args.input:
+                out.stderr_print('[-] Error: Input path reference or "-" is required for conversion.')
+                sys.exit(1)
             if not args.out:
-                out.stderr_print("[-] Error: --out is required for conversion.")
+                out.stderr_print('[-] Error: --out is required for conversion.')
                 sys.exit(1)
             try:
                 raw_buf = sys.stdin.buffer if '-' == args.input else open(args.input, 'rb')
@@ -378,9 +538,12 @@ def main() -> None:
             except Exception as e:
                 out.stderr_print(f'[-] Error: {e}')
         case _ if args.backup:
+            if not args.input:
+                out.stderr_print('[-] Error: URL path configuration is required for backup streaming.')
+                sys.exit(1)
             asyncio.run(backup_mode(args.input, args.out))
         case _:
-            out.stderr_print("[-] Error: Specify URL for backup or --convert for local files.")
+            out.stderr_print('[-] Error: Specify URL for backup, --convert for local backup files, or --export to process a database.')
             sys.exit(1)
 
 
