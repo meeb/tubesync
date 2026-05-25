@@ -1,7 +1,7 @@
 from django import VERSION as DJANGO_VERSION
-from logging.handlers import SysLogHandler
 from pathlib import Path
 from common.huey import sqlite_tasks
+from common.logging import syslog
 from common.utils import getenv
 from sync.choices import TaskQueue
 
@@ -134,7 +134,7 @@ LOGGING = {
     },
     'handlers': {
         'hat_syslog': {
-            'class': 'common.huey_syslog.SyslogHandler',
+            'class': syslog.hat.handler,
             'host': '127.0.0.1',
             'port': 6514,
             'comm_type': 'TCP',
@@ -142,7 +142,7 @@ LOGGING = {
             'formatter': 'default',
         },
         'hat_syslog_worker_process': {
-            'class': 'common.huey_syslog.SyslogHandler',
+            'class': syslog.hat.handler,
             'host': '127.0.0.1',
             'port': 6514,
             'comm_type': 'TCP',
@@ -150,7 +150,7 @@ LOGGING = {
             'formatter': 'worker_process',
         },
         'hat_syslog_worker_thread': {
-            'class': 'common.huey_syslog.SyslogHandler',
+            'class': syslog.hat.handler,
             'host': '127.0.0.1',
             'port': 6514,
             'comm_type': 'TCP',
@@ -173,9 +173,9 @@ LOGGING = {
             'formatter': 'worker_thread',
         },
         'syslog': {
-            'class': SysLogHandler,
-            'address': '/dev/log',
-            'facility': SysLogHandler.LOG_LOCAL0,
+            'class': syslog.std.handler,
+            'address': syslog.std.default_handler.address,
+            'facility': syslog.std.default_handler.facility,
             'level': 'DEBUG',
             'formatter': 'syslog',
         },
@@ -185,7 +185,7 @@ LOGGING = {
         'level': 'DEBUG',
     },
     'loggers': {
-        'common.huey_syslog': {
+        'common.logging.syslog.hat': {
             'handlers': ['syslog'],
             'level': 'DEBUG',
             'propagate': False,
