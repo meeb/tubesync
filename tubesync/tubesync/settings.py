@@ -81,7 +81,6 @@ LOGGING = {
         'drop_huey_scheduler_sleep': {
             '()': 'common.logging.RemoveSpecificLogFilter',
             'msg_starts_with': 'Sleeping for ',
-            'logger_name': 'huey.consumer.Scheduler',
             'func_name': 'sleep_for_interval',
             'level': 'DEBUG',
         },
@@ -181,7 +180,10 @@ LOGGING = {
             'handlers': ['hat_syslog_worker_thread', 'stderr_worker_thread'],
             'level': 'DEBUG',
             'propagate': False,
+        },
+        'huey.consumer.Scheduler': {
             'filters': ['drop_huey_scheduler_sleep'],
+            'propagate': True,
         },
         'huey.consumer.worker.process': {
             'handlers': ['hat_syslog_worker_process', 'stderr_worker_process'],
