@@ -78,11 +78,23 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'filters': {
+        'drop_huey_scheduler_checking_periodic_tasks': {
+            '()': 'common.logging.RemoveSpecificLogFilter',
+            'func_name': 'enqueue_periodic_tasks',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Checking periodic tasks',
+        },
         'drop_huey_scheduler_sleep': {
             '()': 'common.logging.RemoveSpecificLogFilter',
             'func_name': 'sleep_for_interval',
             'level': 'DEBUG',
             'msg_starts_with': 'Sleeping for ',
+        },
+        'drop_huey_scheduler_checking_worker_health': {
+            '()': 'common.logging.RemoveSpecificLogFilter',
+            'func_name': 'check_worker_health',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Checking worker health.',
         },
         'drop_huey_scheduler_scheduler_is_up': {
             '()': 'common.logging.RemoveSpecificLogFilter',
@@ -194,11 +206,15 @@ LOGGING = {
             'propagate': False,
         },
         'huey.consumer.Scheduler': {
-            'filters': ['drop_huey_scheduler_sleep'],
+            'filters': [
+                'drop_huey_scheduler_checking_periodic_tasks',
+                'drop_huey_scheduler_sleep',
+            ],
             'propagate': True,
         },
         'huey.consumer.worker.process': {
             'filters': [
+                'drop_huey_scheduler_checking_worker_health',
                 'drop_huey_scheduler_scheduler_is_up',
                 'drop_huey_scheduler_workers_are_up',
             ],
@@ -208,6 +224,7 @@ LOGGING = {
         },
         'huey.consumer.worker.thread': {
             'filters': [
+                'drop_huey_scheduler_checking_worker_health',
                 'drop_huey_scheduler_scheduler_is_up',
                 'drop_huey_scheduler_workers_are_up',
             ],
