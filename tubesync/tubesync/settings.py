@@ -54,7 +54,7 @@ FORCE_SCRIPT_NAME = None
 DJANGO_HUEY = {
     'default': TaskQueue.LIMIT.value,
     'queues': dict(),
-    'verbose': None if DEBUG else False,
+    'verbose': True if DEBUG else None,
 }
 for queue_name in TaskQueue.values:
     queues = DJANGO_HUEY['queues']
@@ -71,12 +71,44 @@ for django_huey_queue in DJANGO_HUEY['queues'].values():
         filepath.parent.mkdir(exist_ok=True, parents=True)
     consumer = django_huey_queue.get('consumer')
     if consumer:
-        consumer['verbose'] = DJANGO_HUEY.get('verbose', False)
+        consumer['verbose'] = DJANGO_HUEY.get('verbose', None)
 
 
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'drop_huey_scheduler_checking_periodic_tasks': {
+            '()': 'common.logging.RemoveSpecificLogFilter',
+            'func_name': 'enqueue_periodic_tasks',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Checking periodic tasks',
+        },
+        'drop_huey_scheduler_sleep': {
+            '()': 'common.logging.RemoveSpecificLogFilter',
+            'func_name': 'sleep_for_interval',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Sleeping for ',
+        },
+        'drop_huey_scheduler_checking_worker_health': {
+            '()': 'common.logging.RemoveSpecificLogFilter',
+            'func_name': 'check_worker_health',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Checking worker health.',
+        },
+        'drop_huey_scheduler_scheduler_is_up': {
+            '()': 'common.logging.RemoveSpecificLogFilter',
+            'func_name': 'check_worker_health',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Scheduler is up and running.',
+        },
+        'drop_huey_scheduler_workers_are_up': {
+            '()': 'common.logging.RemoveSpecificLogFilter',
+            'func_name': 'check_worker_health',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Workers are up and running.',
+        },
+    },
     'formatters': {
         'default': {},
         'syslog': {
@@ -132,12 +164,12 @@ LOGGING = {
         },
         'stderr_worker_process': {
             'class': 'logging.StreamHandler',
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': 'INFO' if DEBUG else 'WARNING',
             'formatter': 'worker_process',
         },
         'stderr_worker_thread': {
             'class': 'logging.StreamHandler',
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': 'INFO' if DEBUG else 'WARNING',
             'formatter': 'worker_thread',
         },
         'syslog': {
@@ -154,7 +186,7 @@ LOGGING = {
     },
     'loggers': {
         'common.huey_syslog': {
-            'handlers': ['syslog', 'stderr'],
+            'handlers': ['syslog'],
             'level': 'DEBUG',
             'propagate': False,
         },
@@ -164,23 +196,40 @@ LOGGING = {
             'propagate': False,
         },
         'hat.syslog.handler': {
-            'handlers': ['syslog', 'stderr'],
+            'handlers': ['syslog'],
             'level': 'DEBUG',
             'propagate': False,
         },
         'huey': {
-            'handlers': ['hat_syslog', 'stderr'],
-            'level': 'INFO' if DJANGO_HUEY.get('verbose', False) is None else 'WARNING',
+            'handlers': ['hat_syslog_worker_thread', 'stderr_worker_thread'],
+            'level': 'DEBUG',
             'propagate': False,
         },
+        'huey.consumer.Scheduler': {
+            'filters': [
+                'drop_huey_scheduler_checking_periodic_tasks',
+                'drop_huey_scheduler_sleep',
+            ],
+            'propagate': True,
+        },
         'huey.consumer.worker.process': {
+            'filters': [
+                'drop_huey_scheduler_checking_worker_health',
+                'drop_huey_scheduler_scheduler_is_up',
+                'drop_huey_scheduler_workers_are_up',
+            ],
             'handlers': ['hat_syslog_worker_process', 'stderr_worker_process'],
-            'level': 'INFO' if DJANGO_HUEY.get('verbose', False) is None else 'WARNING',
+            'level': 'DEBUG',
             'propagate': False,
         },
         'huey.consumer.worker.thread': {
+            'filters': [
+                'drop_huey_scheduler_checking_worker_health',
+                'drop_huey_scheduler_scheduler_is_up',
+                'drop_huey_scheduler_workers_are_up',
+            ],
             'handlers': ['hat_syslog_worker_thread', 'stderr_worker_thread'],
-            'level': 'INFO' if DJANGO_HUEY.get('verbose', False) is None else 'WARNING',
+            'level': 'DEBUG',
             'propagate': False,
         },
     },
