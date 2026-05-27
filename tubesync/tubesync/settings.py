@@ -1,7 +1,7 @@
 from django import VERSION as DJANGO_VERSION
 from pathlib import Path
 from common.huey import sqlite_tasks
-from common.logging import syslog
+from common.logs import syslog
 from common.utils import getenv
 from sync.choices import TaskQueue
 
@@ -79,31 +79,31 @@ LOGGING = {
     'disable_existing_loggers': False,
     'filters': {
         'drop_huey_scheduler_checking_periodic_tasks': {
-            '()': 'common.logging.RemoveSpecificLogFilter',
+            '()': 'common.logs.RemoveSpecificLogFilter',
             'func_name': 'enqueue_periodic_tasks',
             'level': 'DEBUG',
             'msg_starts_with': 'Checking periodic tasks',
         },
         'drop_huey_scheduler_sleep': {
-            '()': 'common.logging.RemoveSpecificLogFilter',
+            '()': 'common.logs.RemoveSpecificLogFilter',
             'func_name': 'sleep_for_interval',
             'level': 'DEBUG',
             'msg_starts_with': 'Sleeping for ',
         },
         'drop_huey_scheduler_checking_worker_health': {
-            '()': 'common.logging.RemoveSpecificLogFilter',
+            '()': 'common.logs.RemoveSpecificLogFilter',
             'func_name': 'check_worker_health',
             'level': 'DEBUG',
             'msg_starts_with': 'Checking worker health.',
         },
         'drop_huey_scheduler_scheduler_is_up': {
-            '()': 'common.logging.RemoveSpecificLogFilter',
+            '()': 'common.logs.RemoveSpecificLogFilter',
             'func_name': 'check_worker_health',
             'level': 'DEBUG',
             'msg_starts_with': 'Scheduler is up and running.',
         },
         'drop_huey_scheduler_workers_are_up': {
-            '()': 'common.logging.RemoveSpecificLogFilter',
+            '()': 'common.logs.RemoveSpecificLogFilter',
             'func_name': 'check_worker_health',
             'level': 'DEBUG',
             'msg_starts_with': 'Workers are up and running.',
@@ -185,7 +185,7 @@ LOGGING = {
         'level': 'DEBUG',
     },
     'loggers': {
-        'common.logging.syslog.hat': {
+        'common.logs.syslog.hat': {
             'handlers': ['syslog'],
             'level': 'DEBUG',
             'propagate': False,
