@@ -1,20 +1,18 @@
 import logging
 from django.conf import settings
-from .logs import app_logger
-##from .logs import app_logger, default_handler
-##from .logs.syslog.std import default_handler as syslog_handler
+from .logs import app_logger, default_handler
+from .logs.syslog.std import default_handler as syslog_default_handler
 
 
 log = app_logger
-##if settings.DEBUG:
-##    default_handler.setLevel(logging.DEBUG)
 
-##app_logger.propagate = False
-##app_logger.addHandler(default_handler)
-##app_logger.addHandler(syslog_handler)
-app_logger.setLevel(logging.INFO)
+default_handler.setLevel(logging.INFO)
 if settings.DEBUG:
-    app_logger.setLevel(logging.DEBUG)
+    default_handler.setLevel(logging.DEBUG)
+
+app_logger.propagate = False
+app_logger.addHandler(default_handler)
+app_logger.addHandler(syslog_default_handler)
 
 if (
     hasattr(settings, 'DATABASES') and
