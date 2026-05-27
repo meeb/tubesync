@@ -20,8 +20,8 @@ hat_syslog_tcp_handler = hat_syslog_handler(
     comm_type='TCP',
 )
 hat_syslog_tcp_handler.setLevel(logging.DEBUG)
-if not settings.DEBUG:
-    hat_syslog_tcp_handler.setLevel(logging.INFO)
+##if not settings.DEBUG:
+##    hat_syslog_tcp_handler.setLevel(logging.INFO)
 
 app_logger.propagate = False
 app_logger.addHandler(default_handler)
