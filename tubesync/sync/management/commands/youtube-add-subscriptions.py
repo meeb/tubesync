@@ -1,7 +1,7 @@
 import json
 import urllib
 from django.core.management.base import BaseCommand, CommandError # noqa
-from common.json import JSONEncoder
+from common.json_encoder import JSONEncoder
 from sync.choices import Val, YouTube_SourceType # noqa
 from sync.models import Source
 
