@@ -1,7 +1,7 @@
 import logging
 from django.conf import settings
 from .logs import app_logger, default_handler
-from .logs.syslog.std import default_handler as syslog_default_handler
+##from .logs.syslog.std import default_handler as syslog_default_handler
 from .logs.syslog.hat import (
     default_handler as hat_syslog_default_handler,
     handler as hat_syslog_handler,
@@ -25,7 +25,7 @@ if not settings.DEBUG:
 
 app_logger.propagate = False
 app_logger.addHandler(default_handler)
-app_logger.addHandler(syslog_default_handler)
+##app_logger.addHandler(syslog_default_handler)
 app_logger.addHandler(hat_syslog_tcp_handler)
 
 if (
