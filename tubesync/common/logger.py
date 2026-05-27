@@ -1,7 +1,7 @@
 import logging
 from django.conf import settings
-##from .logging import default_handler
-##from .logging.syslog.std import default_handler as syslog_handler
+##from .logs import default_handler
+##from .logs.syslog.std import default_handler as syslog_handler
 from .utils import getenv
 
 
