@@ -37,13 +37,18 @@ if not handler:
     from ..std import default_handler as std_default_handler, handler
     class MockSyslogHandler(handler):
         def __init__(self, host, port, comm_type, queue_size, reconnect_delay, *args, **kwargs):
+            self.host = host
+            self.port = port
+            self.comm_type = comm_type
+            self.queue_size = queue_size
+            self.reconnect_delay = reconnect_delay
             args = ()
             kwargs = {}
             kwargs['address'] = std_default_handler.address
             kwargs['facility'] = std_default_handler.facility
             super().__init__(*args, **kwargs)
     handler = MockSyslogHandler
-    default_handler = handler('127.0.0.1', 6514, 'UDP', 1024, 1)
+    default_handler = handler('127.0.0.1', 6514, 'UDP', 1024, 5)
 else:
     _SOCKET_FACTORIES = {
         common.CommType.TCP: lambda state, ctx: _create_tcp_socket(state),
@@ -265,6 +270,13 @@ else:
             self.__thread = None
             self._initial_pid = os.getpid()
             self._closing = threading.Event()
+
+            # Save the original arguments
+            self.host = host
+            self.port = port
+            self.comm_type = comm_type
+            self.queue_size = queue_size
+            self.reconnect_delay = reconnect_delay
 
         def _alive_thread(self):
             """Thread-safe validator confirming background worker availability."""
