@@ -1,17 +1,14 @@
 import logging
 from django.conf import settings
-##from .logs import default_handler
+from .logs import app_logger
+##from .logs import app_logger, default_handler
 ##from .logs.syslog.std import default_handler as syslog_handler
-from .utils import getenv
 
 
+log = app_logger
 ##if settings.DEBUG:
 ##    default_handler.setLevel(logging.DEBUG)
 
-
-app_name = getenv('DJANGO_SETTINGS_MODULE')
-first_part = app_name.split('.', 1)[0]
-log = app_logger = logging.getLogger(first_part)
 ##app_logger.propagate = False
 ##app_logger.addHandler(default_handler)
 ##app_logger.addHandler(syslog_handler)
