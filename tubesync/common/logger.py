@@ -1,22 +1,32 @@
 import logging
 from django.conf import settings
-##from .logging import default_handler, syslog_handler
-from .utils import getenv
+from .logs import app_logger, default_handler
+##from .logs.syslog.std import default_handler as syslog_default_handler
+from .logs.syslog.hat import (
+    default_handler as hat_syslog_default_handler,
+    handler as hat_syslog_handler,
+)
 
 
-##if settings.DEBUG:
-##    default_handler.setLevel(logging.DEBUG)
+log = app_logger
 
-
-app_name = getenv('DJANGO_SETTINGS_MODULE')
-first_part = app_name.split('.', 1)[0]
-log = app_logger = logging.getLogger(first_part)
-##app_logger.propagate = False
-##app_logger.addHandler(default_handler)
-##app_logger.addHandler(syslog_handler)
-app_logger.setLevel(logging.INFO)
+default_handler.setLevel(logging.INFO)
 if settings.DEBUG:
-    app_logger.setLevel(logging.DEBUG)
+    default_handler.setLevel(logging.DEBUG)
+
+hat_syslog_tcp_handler = hat_syslog_handler(
+    host=hat_syslog_default_handler.host,
+    port=hat_syslog_default_handler.port,
+    comm_type='TCP',
+)
+hat_syslog_tcp_handler.setLevel(logging.DEBUG)
+##if not settings.DEBUG:
+##    hat_syslog_tcp_handler.setLevel(logging.INFO)
+
+app_logger.propagate = False
+app_logger.addHandler(default_handler)
+##app_logger.addHandler(syslog_default_handler)
+app_logger.addHandler(hat_syslog_tcp_handler)
 
 if (
     hasattr(settings, 'DATABASES') and
