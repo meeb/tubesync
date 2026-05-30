@@ -10,7 +10,7 @@ from sync.models import Source, Media
 
 class Command(BaseCommand):
 
-    help = ('Scans download media directories for media not yet downloaded and ',
+    help = ('Scans download media directories for media not yet downloaded and '
             'marks them as downloaded')
     extra_extensions = ['mp3', 'mp4', 'avi']
 
