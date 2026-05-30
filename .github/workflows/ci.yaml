@@ -60,6 +60,20 @@ jobs:
         id: yt-dlp
         uses: ./.github/actions/yt-dlp
 
+  scripts:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6
+      - name: Make directories
+        shell: bash
+        run: sudo install -v -d -o "$(id -un)" /app/common
+      - name: Install `deno`
+        shell: bash
+        run: ./tubesync/install_deno.sh
+      - name: Install `tailwindcss`
+        shell: bash
+        run: ./tubesync/install_tailwindcss.sh
+
   test:
     if: ${{ !cancelled() && ( 'pull_request' != github.event_name || (! github.event.pull_request.draft) ) }}
     runs-on: ubuntu-22.04
@@ -67,6 +81,12 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.12', '3.13', '3.14']
+    services:
+      hat-syslog:
+        image: bozokopic/hat-syslog
+        ports:
+          - 127.0.0.1:6514:6514/tcp
+          - 127.0.0.1:6514:6514/udp
     steps:
       - uses: actions/checkout@v6
       - name: Install Python ${{ matrix.python-version }}
@@ -138,6 +158,7 @@ jobs:
               --output-format github \
               --ignore "${ignore_csv_list}"
       - name: Run Django tests
+        timeout-minutes: 5
         run: cd tubesync && TUBESYNC_DEBUG=True python3 -B -W default manage.py test --no-input --buffer --verbosity=2
 
   containerise:
@@ -174,8 +195,8 @@ jobs:
             'ghcr.io/wagoodman/dive' \
             'ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:dive' \
             --ci \
-            --highestUserWastedPercent '0.08' \
-            --highestWastedBytes '50M'
+            --highestUserWastedPercent '0.05' \
+            --highestWastedBytes '25M'
 
   docker-image:
     if: ${{ !cancelled() && 'success' == needs.info.result && 'success' == needs.containerise.result }}

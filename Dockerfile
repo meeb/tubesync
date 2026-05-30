@@ -569,6 +569,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   python3-libsass \
   python3-pip-whl \
   python3-socks \
+  busybox-syslogd \
   curl \
   indent \
   less \
@@ -718,6 +719,10 @@ RUN --mount=type=tmpfs,target=/cache \
 
 # Copy root
 COPY config/root /
+
+# patch hat-syslog
+COPY patches/hat/ \
+    /usr/local/lib/python3/dist-packages/hat/
 
 # patch yt_dlp
 COPY patches/yt_dlp/ \

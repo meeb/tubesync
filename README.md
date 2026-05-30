@@ -152,7 +152,7 @@ services:
 ## Optional authentication
 
 You can enable basic HTTP authentication by setting the `HTTP_USER` and `HTTP_PASS`
-environment variables. See the [environment variables reference](//github.com/meeb/tubesync/wiki/Environment-Variables#authentication)
+environment variables. See the [environment variables reference](https://github.com/meeb/tubesync/wiki/Environment-Variables#authentication)
 for details.
 
 
@@ -213,23 +213,30 @@ under the "media servers" tab.
 
 # Logging and debugging
 
-> [!TIP]
-> Even more detailed logs are produced when the environment variable `TUBESYNC_DEBUG` is set to `True`.
+TubeSync outputs useful logs, errors and debugging information to the console. Access to the historical and live logs is available from a web browser at: `http://HOSTNAME_OR_IP:4848/web-logs/index.html`
 
-TubeSync outputs useful logs, errors and debugging information to the console. You can
-view these with:
+> [!TIP]
+> Even more detailed logs are displayed on the console when the environment variable `TUBESYNC_DEBUG` is set to `True`.
+> 
+> Whichever value this environment variable was set to, the more detailed logs will remain available from the `/web-logs/index.html` page.
+
+You can view the console logs with:
 
 ```bash
 $ docker logs --follow tubesync
 ```
 
 To include logs with an issue report, please extract a file and attach it to the issue.
-The command below creates the `TubeSync.logs.txt` file with the logs from the `tubesync` container:
+The command below creates the `TubeSync.logs.txt` file with the logs from the console of the `tubesync` container instance:
 
 ```bash
 docker logs -t tubesync > TubeSync.logs.txt 2>&1
 ```
 
+It is also possible to copy the logs database (stored at `/config/state/hat/syslog.db` inside the container) or the web logs from a container instance (stored at `/run/app/log/messages` inside the container) using the [`docker container cp`](https://docs.docker.com/reference/cli/docker/container/cp/) command.
+
+> [!TIP]
+> Log files are highly compressible. You can place any combination of these file into a `.zip` archive to save space and make them easier to attach to an issue.
 
 # Advanced usage guides
 
@@ -269,96 +276,7 @@ with the smallest amount of indexing and concurrent downloads possible for your 
 
 # FAQ
 
-### Can I use TubeSync to download single videos?
-
-No, TubeSync is designed to repeatedly scan and download new media from channels or
-playlists. If you want to download single videos the best suggestion would be to create
-your own playlist, add the playlist to TubeSync and then add single videos to your
-playlist as you browse about YouTube. Your "favourites" playlist of videos will download
-automatically.
-
-### Does TubeSync support any other video platforms?
-
-At the moment, no. This is a pre-release. The library TubeSync uses that does most
-of the downloading work, `yt-dlp`, supports many hundreds of video sources so it's
-likely more will be added to TubeSync if there is demand for it.
-
-### Is there a progress bar?
-
-No, in fact, there is no JavaScript at all in the web interface at the moment. TubeSync
-is designed to be more set-and-forget than something you watch download. You can see
-what active tasks are being run in the "tasks" tab and if you want to see exactly what
-your install is doing check the container logs.
-
-### Are there alerts when a download is complete?
-
-No, this feature is best served by existing services such as the excellent 
-[Tautulli](https://tautulli.com/) which can monitor your Plex server and send alerts
-that way.
-
-### There are errors in my "tasks" tab!
-
-You only really need to worry about these if there is a permanent failure. Some errors
-are temporary and will be retried for you automatically, such as a download got
-interrupted and will be tried again later. Sources with permanent errors (such as no
-media available because you got a channel name wrong) will be shown as errors on the
-"sources" tab.
-
-### What is TubeSync written in?
-
-Python3 using Django, embedding yt-dlp. It's pretty much glue between other much
-larger libraries.
-
-Notable libraries and software used:
-
- * [Django](https://www.djangoproject.com/)
- * [yt-dlp](https://github.com/yt-dlp/yt-dlp)
- * [ffmpeg](https://ffmpeg.org/)
- * [QuickJS](https://bellard.org/quickjs/)
- * [Django Huey](https://github.com/gaiacoop/django-huey)
- * [Huey](https://github.com/coleifer/huey)
- * [django-sass](https://github.com/coderedcorp/django-sass/)
- * The container bundles with `s6-init` and `openresty`
-
-See the [Pipfile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full list.
-
-### Can I get access to the full Django admin?
-
-Yes, although pretty much all operations are available through the front-end interface
-and you can probably break things by playing in the admin. If you still want to access
-it you can run:
-
-```bash
-$ docker exec -it tubesync python3 /app/manage.py createsuperuser
-```
-
-And follow the instructions to create an initial Django superuser, once created, you
-can log in at http://localhost:4848/admin
-
-### Are there user accounts or multi-user support?
-
-There is support for basic HTTP authentication by setting the `HTTP_USER` and
-`HTTP_PASS` environment variables. There is not support for multi-user or user
-management.
-
-### Does TubeSync support HTTPS?
-
-No, you should deploy it behind an HTTPS-capable proxy if you want this (nginx, caddy,
-etc.). Configuration of this is beyond the scope of this README.
-
-### What architectures does the container support?
-
-Only two are supported, for the moment:
-- `amd64` (most desktop PCs and servers)
--  `arm64`
-(modern ARM computers, such as the Raspberry Pi 3 or later)
-
-Others may be made available, if there is demand.
-
-### The pipenv install fails with "Locking failed"!
-
-Make sure that you have `mysql_config` or `mariadb_config` available, as required by the python module `mysqlclient`. On Debian-based systems this is usually found in the package `libmysqlclient-dev`
-
+Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Frequently-Asked-Questions#faq).
 
 # Advanced configuration
 

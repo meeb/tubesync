@@ -1,7 +1,7 @@
 import json
 from django.core.management.base import BaseCommand, CommandError # noqa
 from sync.youtube import get_media_info
-from common.json import JSONEncoder
+from common.json_encoder import JSONEncoder
 
 
 class Command(BaseCommand):

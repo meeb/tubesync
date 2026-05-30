@@ -13,7 +13,7 @@ from django.urls import reverse_lazy
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from common.models import TaskHistory
-from common.utils import append_uri_params
+from common.utils import append_uri_params, glob_quote
 from ..models import Source, Media, Metadata
 from django import forms
 from ..utils import delete_file
@@ -345,8 +345,15 @@ class MediaSkipView(FormView, SingleObjectMixin):
             # Delete all files which contains filename
             filepath = self.object.media_file.path
             barefilepath, fileext = os.path.splitext(filepath)
+            # Delete the media file itself
+            delete_file(self.object.media_file.path)
+            self.object.media_file = None
+            # If the media has an associated thumbnail copied, also delete it
+            delete_file(self.object.thumbpath)
+            # If the media has an associated NFO file with it, also delete it
+            delete_file(self.object.nfopath)
             # Get all files that start with the bare file path
-            all_related_files = glob.glob(f'{barefilepath}.*')
+            all_related_files = glob.glob(f'{glob_quote(barefilepath)}.*')
             for file in all_related_files:
                 delete_file(file)
         # Reset all download data

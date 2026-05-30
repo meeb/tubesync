@@ -85,6 +85,12 @@ class Huey(huey_Huey):
         kwargs['huey'] = self
         super()._emit(signal, task, *args, **kwargs)
 
+    def create_consumer(self, **options):
+        consumer = super().create_consumer(**options)
+        suffix = f'worker.{consumer.worker_type}'
+        consumer._logger = consumer._logger.getChild(suffix)
+        return consumer
+
     def reschedule(self, task_id, eta):
         pc = self.pending_count()
         found = [
@@ -252,6 +258,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=No
             max_delay=20.0,
             max_tasks=10_000,
             check_worker_health=True,
+            health_check_interval=30.0,
             flush_locks=True,
             scheduler_interval=10,
             simple_log=False,

@@ -1,6 +1,7 @@
 from django import VERSION as DJANGO_VERSION
 from pathlib import Path
 from common.huey import sqlite_tasks
+from common.logs import syslog
 from common.utils import getenv
 from sync.choices import TaskQueue
 
@@ -10,7 +11,7 @@ CONFIG_BASE_DIR = BASE_DIR
 DOWNLOADS_BASE_DIR = BASE_DIR
 
 
-VERSION = '0.17.2'
+VERSION = '0.18.0'
 DEBUG = 'true' == getenv('TUBESYNC_DEBUG').strip().lower()
 ALLOWED_HOSTS = []
 # This is not ever meant to be a public web interface so this isn't too critical
@@ -53,7 +54,7 @@ FORCE_SCRIPT_NAME = None
 DJANGO_HUEY = {
     'default': TaskQueue.LIMIT.value,
     'queues': dict(),
-    'verbose': None if DEBUG else False,
+    'verbose': True if DEBUG else None,
 }
 for queue_name in TaskQueue.values:
     queues = DJANGO_HUEY['queues']
@@ -70,7 +71,169 @@ for django_huey_queue in DJANGO_HUEY['queues'].values():
         filepath.parent.mkdir(exist_ok=True, parents=True)
     consumer = django_huey_queue.get('consumer')
     if consumer:
-        consumer['verbose'] = DJANGO_HUEY.get('verbose', False)
+        consumer['verbose'] = DJANGO_HUEY.get('verbose', None)
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'drop_huey_scheduler_checking_periodic_tasks': {
+            '()': 'common.logs.RemoveSpecificLogFilter',
+            'func_name': 'enqueue_periodic_tasks',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Checking periodic tasks',
+        },
+        'drop_huey_scheduler_sleep': {
+            '()': 'common.logs.RemoveSpecificLogFilter',
+            'func_name': 'sleep_for_interval',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Sleeping for ',
+        },
+        'drop_huey_scheduler_checking_worker_health': {
+            '()': 'common.logs.RemoveSpecificLogFilter',
+            'func_name': 'check_worker_health',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Checking worker health.',
+        },
+        'drop_huey_scheduler_scheduler_is_up': {
+            '()': 'common.logs.RemoveSpecificLogFilter',
+            'func_name': 'check_worker_health',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Scheduler is up and running.',
+        },
+        'drop_huey_scheduler_workers_are_up': {
+            '()': 'common.logs.RemoveSpecificLogFilter',
+            'func_name': 'check_worker_health',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Workers are up and running.',
+        },
+    },
+    'formatters': {
+        'default': {},
+        'syslog': {
+            'format': '%(asctime)s %(name)s: %(message)s',
+            'datefmt': '%b %d %H:%M:%S',
+        },
+        'common': {
+            'format':  '%(asctime)s [%(name)s/%(levelname)s] %(message)s',
+            'datefmt': None,
+        },
+        'consumer_simple': {
+            'format': '%(asctime)s %(message)s',
+            'datefmt': '%H:%M:%S',
+        },
+        'worker_process': {
+            'format': '[%(asctime)s] %(levelname)s:%(name)s:%(process)d:%(message)s',
+            'datefmt': None,
+        },
+        'worker_thread': {
+            'format': '[%(asctime)s] %(levelname)s:%(name)s:%(process)d:%(threadName)s:%(message)s',
+            'datefmt': None,
+        },
+    },
+    'handlers': {
+        'hat_syslog': {
+            'class': syslog.hat.handler,
+            'host': '127.0.0.1',
+            'port': 6514,
+            'comm_type': 'TCP',
+            'level': 'DEBUG',
+            'formatter': 'default',
+        },
+        'hat_syslog_worker_process': {
+            'class': syslog.hat.handler,
+            'host': '127.0.0.1',
+            'port': 6514,
+            'comm_type': 'TCP',
+            'level': 'DEBUG',
+            'formatter': 'worker_process',
+        },
+        'hat_syslog_worker_thread': {
+            'class': syslog.hat.handler,
+            'host': '127.0.0.1',
+            'port': 6514,
+            'comm_type': 'TCP',
+            'level': 'DEBUG',
+            'formatter': 'worker_thread',
+        },
+        'stderr': {
+            'class': 'logging.StreamHandler',
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'formatter': 'common',
+        },
+        'stderr_worker_process': {
+            'class': 'logging.StreamHandler',
+            'level': 'INFO' if DEBUG else 'WARNING',
+            'formatter': 'worker_process',
+        },
+        'stderr_worker_thread': {
+            'class': 'logging.StreamHandler',
+            'level': 'INFO' if DEBUG else 'WARNING',
+            'formatter': 'worker_thread',
+        },
+        'syslog': {
+            'class': syslog.std.handler,
+            'address': syslog.std.default_handler.address,
+            'facility': syslog.std.default_handler.facility,
+            'level': 'DEBUG',
+            'formatter': 'syslog',
+        },
+    },
+    'root': {
+        'handlers': ['hat_syslog', 'stderr'],
+        'level': 'DEBUG',
+    },
+    'loggers': {
+        'common.logs.syslog.hat': {
+            'handlers': ['syslog'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'django_huey.management.commands.djangohuey': {
+            'handlers': ['syslog'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'hat.syslog.handler': {
+            'handlers': ['syslog'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'huey': {
+            'handlers': ['hat_syslog_worker_thread', 'stderr_worker_thread'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'huey.consumer.Scheduler': {
+            'filters': [
+                'drop_huey_scheduler_checking_periodic_tasks',
+                'drop_huey_scheduler_sleep',
+            ],
+            'propagate': True,
+        },
+        'huey.consumer.worker.process': {
+            'filters': [
+                'drop_huey_scheduler_checking_worker_health',
+                'drop_huey_scheduler_scheduler_is_up',
+                'drop_huey_scheduler_workers_are_up',
+            ],
+            'handlers': ['hat_syslog_worker_process', 'stderr_worker_process'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'huey.consumer.worker.thread': {
+            'filters': [
+                'drop_huey_scheduler_checking_worker_health',
+                'drop_huey_scheduler_scheduler_is_up',
+                'drop_huey_scheduler_workers_are_up',
+            ],
+            'handlers': ['hat_syslog_worker_thread', 'stderr_worker_thread'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
 
 
 TEMPLATES = [
