@@ -2,6 +2,7 @@
 
 import uuid
 from django.db import migrations, models
+from sync.choices import AssetType
 
 class Migration(migrations.Migration):
 
@@ -17,12 +18,7 @@ class Migration(migrations.Migration):
                     default=uuid.uuid4, editable=False, help_text='UUID of the codec', primary_key=True, serialize=False, verbose_name='uuid'),
                 ),
                 ('asset_type', models.CharField(
-                    choices=[
-                        ('thumbnail', 'Thumbnail'),
-                        ('audio', 'Audio'),
-                        ('video', 'Video'),
-                        ('subtitle', 'Subtitle'),
-                    ],
+                    choices=AssetType.choices,
                     db_index=True, help_text='The type of asset this codec is used for', max_length=16, verbose_name='asset type'),
                 ),
                 ('codec', models.CharField(
