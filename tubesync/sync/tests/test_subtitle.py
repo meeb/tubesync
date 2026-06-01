@@ -4,6 +4,7 @@ from django.test import TestCase
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.extra.django import TestCase as HypothesisTestCase
+from sync.choices import AssetType
 from sync.models import Codec, Subtitle
 
 
@@ -12,7 +13,7 @@ class SubtitleModelTestCase(TestCase):
 
     def _make_codec(self):
         codec, _ = Codec.objects.get_or_create(
-            asset_type='subtitle',
+            asset_type=AssetType.SUBTITLE.value,
             codec='vtt',
             defaults={
                 'uuid': uuid.uuid4(),
