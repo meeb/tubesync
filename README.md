@@ -238,19 +238,10 @@ It is also possible to copy the logs database (stored at `/config/state/hat/sysl
 > [!TIP]
 > Log files are highly compressible. You can place any combination of these file into a `.zip` archive to save space and make them easier to attach to an issue.
 
+
 # Advanced usage guides
 
-Once you're happy using TubeSync there are some advanced usage guides for more complex
-and less common features:
-
- * [Using Plex](https://github.com/meeb/tubesync/blob/main/docs/plex-notes.md)
- * [Import existing media into TubeSync](https://github.com/meeb/tubesync/blob/main/docs/import-existing-media.md)
- * [Sync or create missing metadata files](https://github.com/meeb/tubesync/blob/main/docs/create-missing-metadata.md)
- * [Reset tasks from the command line](https://github.com/meeb/tubesync/blob/main/docs/reset-tasks.md)
- * [Using PostgreSQL, MySQL or MariaDB as database backends](https://github.com/meeb/tubesync/blob/main/docs/other-database-backends.md)
- * [YouTube Proof-of-Origin Tokens](https://github.com/meeb/tubesync/blob/main/docs/youtube-pot.md)
- * [Using cookies](https://github.com/meeb/tubesync/blob/main/docs/using-cookies.md)
- * [Reset metadata](https://github.com/meeb/tubesync/blob/main/docs/reset-metadata.md)
+Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Advanced-usage-guides#advanced-usage-guides).
 
 
 # Warnings
@@ -274,9 +265,11 @@ downloading any media. Check your tasks for the status of your TubeSync install.
 source, if you try to crawl extremely large amounts quickly. **Try to be polite
 with the smallest amount of indexing and concurrent downloads possible for your needs.**
 
+
 # FAQ
 
 Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Frequently-Asked-Questions#faq).
+
 
 # Advanced configuration
 
