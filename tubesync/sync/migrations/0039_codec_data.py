@@ -2,6 +2,7 @@
 
 from uuid import UUID
 from django.db import migrations
+from sync.choices import AssetType
 
 subtitle_codecs = [
     {
@@ -76,13 +77,13 @@ def create_codecs(query_set, arg_dict):
 def add_subtitle_codecs(manager, db_alias):
     qs = manager.using(db_alias)
     for d in subtitle_codecs:
-        d['asset_type'] = 'subtitle'
+        d['asset_type'] = AssetType.SUBTITLE.value
     create_codecs(qs, subtitle_codecs)
 
 def add_thumbnail_codecs(manager, db_alias):
     qs = manager.using(db_alias)
     for d in thumbnail_codecs:
-        d['asset_type'] = 'thumbnail'
+        d['asset_type'] = AssetType.THUMBNAIL.value
     create_codecs(qs, thumbnail_codecs)
 
 def forwards_func(apps, schema_editor):
@@ -101,12 +102,12 @@ def reverse_func(apps, schema_editor):
     qs = Codec.objects.using(db_alias)
     # Delete the subtitle codecs.
     qs.filter(
-        asset_type='subtitle',
+        asset_type=AssetType.SUBTITLE.value,
         codec__in=[ d['codec'] for d in subtitle_codecs ],
     ).delete()
     # Delete the thumbnail codecs.
     qs.filter(
-        asset_type='thumbnail',
+        asset_type=AssetType.THUMBNAIL.value,
         codec__in=[ d['codec'] for d in thumbnail_codecs ],
     ).delete()
 
