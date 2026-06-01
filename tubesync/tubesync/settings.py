@@ -113,7 +113,7 @@ LOGGING = {
         'default': {},
         'syslog': {
             'format': '%(asctime)s %(name)s: %(message)s',
-            'datefmt': '%b %d %H:%M:%S',
+            'datefmt': '%b %e %H:%M:%S',
         },
         'common': {
             'format':  '%(asctime)s [%(name)s/%(levelname)s] %(message)s',
