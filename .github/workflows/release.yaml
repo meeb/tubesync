@@ -14,6 +14,7 @@ jobs:
     outputs:
       IMAGE_NAME: ${{ env.IMAGE_NAME }}
       REGISTRY: ${{ env.REGISTRY }}
+      ejs-latest-release: ${{ steps.ejs.outputs.latest-release }}
       ffmpeg-date: ${{ steps.ffmpeg.outputs.date }}
       # ffmpeg-releases: ${{ steps.ffmpeg.outputs.releases }}
       ffmpeg-version: ${{ steps.ffmpeg.outputs.version }}
@@ -43,6 +44,11 @@ jobs:
       - name: Retrieve yt-dlp/yt-dlp releases with GitHub CLI
         id: yt-dlp
         uses: ./.github/actions/yt-dlp
+      - name: Retrieve yt-dlp/ejs releases with GitHub CLI
+        id: ejs
+        uses: ./.github/actions/yt-dlp
+        with:
+          repository_name: ejs
 
   docker-image:
     concurrency:
@@ -76,3 +82,4 @@ jobs:
         FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
         FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
         YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
+        YTDLP_EJS_VERSION=${{ fromJSON(needs.info.outputs.ejs-latest-release).tag.name }}
