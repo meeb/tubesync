@@ -29,7 +29,7 @@ concurrency:
 jobs:
   info:
     if: ${{ !cancelled() && 'pull_request' != github.event_name }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     outputs:
       IMAGE_NAME: ${{ env.IMAGE_NAME }}
       REGISTRY: ${{ env.REGISTRY }}
