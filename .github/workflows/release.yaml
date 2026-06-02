@@ -10,7 +10,7 @@ on:
 
 jobs:
   info:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     outputs:
       IMAGE_NAME: ${{ env.IMAGE_NAME }}
       REGISTRY: ${{ env.REGISTRY }}
