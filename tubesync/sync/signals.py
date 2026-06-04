@@ -352,17 +352,10 @@ def media_post_delete(sender, instance, **kwargs):
         )
     )
     if create_for_indexing_task:
-        skipped_media, created = Media.objects.get_or_create(
-            key=instance.key,
-            source=instance.source,
-        )
-    if created:
         old_metadata = instance.loaded_metadata
         site_field = instance.get_metadata_field('extractor_key')
         thumbnail_url = instance.thumbnail
         thumbnail_field = instance.get_metadata_field('thumbnail')
-        skipped_media.downloaded = False
-        skipped_media.duration = instance.duration
         arg_dict=dict(
             _media_instance_was_deleted=True,
         )
@@ -370,14 +363,20 @@ def media_post_delete(sender, instance, **kwargs):
             site_field: old_metadata.get(site_field),
             thumbnail_field: thumbnail_url,
         })
-        skipped_media.metadata = skipped_media.metadata_dumps(
-            arg_dict=arg_dict,
+        skipped_media, created = Media.objects.get_or_create(
+            key=instance.key,
+            source=instance.source,
+            defaults=dict(
+                skip=True,
+                manual_skip=True,
+                downloaded=False,
+                duration=instance.duration,
+                metadata=instance.metadata_dumps(arg_dict=arg_dict),
+                published=instance.published,
+                title=instance.title,
+            ),
         )
-        skipped_media.published = instance.published
-        skipped_media.title = instance.title
-        skipped_media.skip = True
-        skipped_media.manual_skip = True
-        skipped_media.save()
+    if created:
         # Re-use the old metadata if it exists
         instance_qs = Metadata.objects.filter(
             media__isnull=True,
