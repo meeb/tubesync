@@ -187,7 +187,6 @@ def parse_database_connection_string(database_connection_string):
     }
     backend_options = {
         'postgresql': dict(pool={
-            'open': True,
             'max_size': 10, # default: None (static min_size pool)
             'min_size': 3, # default: 4
             'num_workers': 2, # default: 3
