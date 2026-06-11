@@ -85,6 +85,7 @@ class UtilsTestCase(TestCase):
                     'max_size': 10,
                     'min_size': 3,
                     'num_workers': 2,
+                    'open': True,
                     'timeout': 180,
                 }),
             }
