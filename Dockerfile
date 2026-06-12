@@ -758,10 +758,13 @@ RUN set -x && \
   ) && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   test '!' -e /app/db.sqlite3 && \
+  # Create /dev/log, using an empty configuration file
+  busybox syslogd -l 7 \
+    -O - -f /etc/s6-overlay/s6-rc.d/busybox-syslogd/dependencies.d/base && \
   # Run any required app commands
   /usr/bin/python3 -B /app/manage.py compilescss && \
   /usr/bin/python3 -B /app/manage.py collectstatic --no-input --link && \
-  rm -rf /config /downloads /run/app && \
+  rm -rf /dev/log /config /downloads /run/app && \
   # Create config, downloads and run dirs
   mkdir -v -p /run/app && \
   mkdir -v -p /config/media /config/tasks && \
