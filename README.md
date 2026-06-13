@@ -213,30 +213,7 @@ under the "media servers" tab.
 
 # Logging and debugging
 
-TubeSync outputs useful logs, errors and debugging information to the console. Access to the historical and live logs is available from a web browser at: `http://HOSTNAME_OR_IP:4848/web-logs/index.html`
-
-> [!TIP]
-> Even more detailed logs are displayed on the console when the environment variable `TUBESYNC_DEBUG` is set to `True`.
-> 
-> Whichever value this environment variable was set to, the more detailed logs will remain available from the `/web-logs/index.html` page.
-
-You can view the console logs with:
-
-```bash
-$ docker logs --follow tubesync
-```
-
-To include logs with an issue report, please extract a file and attach it to the issue.
-The command below creates the `TubeSync.logs.txt` file with the logs from the console of the `tubesync` container instance:
-
-```bash
-docker logs -t tubesync > TubeSync.logs.txt 2>&1
-```
-
-It is also possible to copy the logs database (stored at `/config/state/hat/syslog.db` inside the container) or the web logs from a container instance (stored at `/run/app/log/messages` inside the container) using the [`docker container cp`](https://docs.docker.com/reference/cli/docker/container/cp/) command.
-
-> [!TIP]
-> Log files are highly compressible. You can place any combination of these file into a `.zip` archive to save space and make them easier to attach to an issue.
+Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Logging-and-debugging#logging-and-debugging).
 
 
 # Advanced usage guides
