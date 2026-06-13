@@ -216,6 +216,27 @@ def update_model(instance, **kwargs):
 
 
 @db_periodic_task(
+    huey_crontab(minute=29, strict=True,),
+    priority=10,
+    expires=10*60,
+    queue=Val(TaskQueue.DB),
+)
+def delete_deleted_sources():
+    now = timezone.now()
+    end_time = now + timezone.timedelta(minutes=5)
+    qs = Source.objects.filter(
+        key__endswith='/deleted',
+    )
+    for source in qs_gen(qs):
+        if timezone.now() > end_time:
+            log.info('delete_deleted_sources: beyond end_time')
+            return
+        log.info(f'Deleting: {source.pk}')
+        result = source.delete()
+        log.debug(f'Result: {result!r}')
+
+
+@db_periodic_task(
     huey_crontab(minute=40, strict=True,),
     priority=100,
     expires=15*60,
