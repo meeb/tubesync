@@ -5,6 +5,7 @@ from common.logger import log
 from common.utils import glob_quote
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from sync.models import Source
 
 
 class Command(BaseCommand):
@@ -20,6 +21,16 @@ class Command(BaseCommand):
         playlist_id = options['playlist_id']
         total_entries = options['total_entries']
         downloaded_entries = options['fallback_downloaded']
+
+        # We can safely not abort when:
+        # 1) No Source instance is configured to delete missing Media instances; or
+        # 2) We matched a specific Source instance, and it is not configured to delete.
+        # In all other cases, we MUST presume this Source is affected.
+        sources_configured = Source.objects.filter(delete_removed_media=True).exists()
+        source_qs = Source.objects.filter(key__endswith=playlist_id, delete_removed_media=False)
+        this_source_deletes = True
+        if playlist_id and source_qs.exists():
+            this_source_deletes = False
 
         where_dir = Path(getattr(settings, 'YOUTUBE_DL_CACHEDIR', None) or '/dev/shm')
         search_paths = {Path('/dev/shm'), where_dir}
@@ -51,6 +62,8 @@ class Command(BaseCommand):
             'NA' != downloaded_entries
             and 'NA' != total_entries
             and downloaded_entries != total_entries
+            and sources_configured
+            and this_source_deletes
         ):
             log.error('Validation failed: the entire playlist was not available.')
             sys.exit(1)
