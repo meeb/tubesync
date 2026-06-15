@@ -164,15 +164,15 @@ def get_running_tasks_by_name(arg_str, instance_id, /):
 
 def get_media_download_task(media_id):
     tqs = get_running_tasks_by_name('download_media_file', media_id)
-    return tqs[0] if tqs.count() else False
+    return tqs.first() or False
     
 def get_media_thumbnail_task(media_id):
     tqs = get_running_tasks_by_name('download_media_image', media_id)
-    return tqs[0] if tqs.count() else False
+    return tqs.first() or False
 
 def get_source_index_task(source_id):
     tqs = get_running_tasks_by_name('index_source', source_id)
-    return tqs[0] if tqs.count() else False
+    return tqs.first() or False
 
 
 def get_tasks(task_name, id=None, /, instance=None):
@@ -182,7 +182,7 @@ def get_tasks(task_name, id=None, /, instance=None):
 
 def get_first_task(task_name, id=None, /, *, instance=None):
     tqs = get_tasks(task_name, id, instance).order_by('scheduled_at')
-    return tqs[0] if tqs.count() else False
+    return tqs.first() or False
 
 def get_media_metadata_task(media_id):
     return get_first_task('sync.tasks.download_media_metadata', media_id)
