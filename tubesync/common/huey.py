@@ -1,7 +1,7 @@
 import datetime
 import time
 import uuid
-from functools import wraps
+from functools import partial, wraps
 from huey import (
     CancelExecution, Huey as huey_Huey,
     signals, utils,
@@ -468,14 +468,32 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 # Registration of shared signal handlers
 
 def register_huey_signals():
-    from django_huey import DJANGO_HUEY, get_queue, signal
+    from django import db
+    from django_huey import DJANGO_HUEY, get_queue, pre_execute, post_execute, signal
+    def close_db(task, task_value=None, exception=None, /, *, huey=None):
+        assert huey is not None
+        assert hasattr(huey, 'immediate')
+        # Guard against immediate mode and transactions
+        if (
+            any((huey is None, not hasattr(huey, 'immediate'), huey.immediate,)) or
+            any(dbw.in_atomic_block for dbw in db.connections.all())
+        ):
+            return
+        db.close_old_connections()
+
     for qn in DJANGO_HUEY.get('queues', dict()):
+        q = get_queue(qn)
+
+        # hooks to clean up database connections at task boundaries
+        pre_execute(queue=qn, name='close_db')(partial(close_db, huey=q))
+        post_execute(queue=qn, name='close_db')(partial(close_db, huey=q))
+
+        # signals for tracking / maintenance of tasks
         signal(signals.SIGNAL_INTERRUPTED, queue=qn)(on_interrupted)
         signal(queue=qn)(historical_task)
         signal(signals.SIGNAL_EXECUTING, queue=qn)(on_executing_remove_duplicates)
 
         # clean up old history and results from storage
-        q = get_queue(qn)
         now_time = time.monotonic()
         now_dt = datetime.datetime.now(datetime.timezone.utc)
         for key in q.all_results().keys():
