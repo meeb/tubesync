@@ -468,12 +468,11 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 # Registration of shared signal handlers
 
 def register_huey_signals():
-    from django_huey import DJANGO_HUEY, get_close_db_for_queue, get_queue, signal
+    from django_huey import DJANGO_HUEY, get_queue, signal
     for qn in DJANGO_HUEY.get('queues', dict()):
-        close_db = get_close_db_for_queue(queue=qn)
         signal(signals.SIGNAL_INTERRUPTED, queue=qn)(on_interrupted)
-        signal(queue=qn)(close_db(historical_task))
-        signal(signals.SIGNAL_EXECUTING, queue=qn)(close_db(on_executing_remove_duplicates))
+        signal(queue=qn)(historical_task)
+        signal(signals.SIGNAL_EXECUTING, queue=qn)(on_executing_remove_duplicates)
 
         # clean up old history and results from storage
         q = get_queue(qn)
