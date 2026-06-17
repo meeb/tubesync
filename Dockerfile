@@ -764,6 +764,8 @@ RUN set -x && \
   # Run any required app commands
   /usr/bin/python3 -B /app/manage.py compilescss && \
   /usr/bin/python3 -B /app/manage.py collectstatic --no-input --link && \
+  # Check gunicorn configuration copied from tubesync/tubesync/gunicorn.py
+  gunicorn --config /app/tubesync/gunicorn.py --check-config && \
   rm -rf /dev/log /config /downloads /run/app && \
   # Create config, downloads and run dirs
   mkdir -v -p /run/app && \
