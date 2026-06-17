@@ -751,6 +751,7 @@ RUN --mount=type=tmpfs,target=/cache \
 
 # Build app
 RUN set -x && \
+  PYTHONDONTWRITEBYTECODE=1 && export PYTHONDONTWRITEBYTECODE && \
   # Record the bundled deno version when it was included
   ( deno_binary="$(command -v deno)" ; \
     test '!' -n "${deno_binary}" || \
