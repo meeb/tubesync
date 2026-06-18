@@ -357,17 +357,26 @@ def on_executing_remove_duplicates(signal_name, task_obj, exception_obj=None, /,
         if not th.remove_duplicates:
             return
 
-    waiting = [
-        t
-        for t in huey.pending() + huey.scheduled()
-        if task_obj.id != t.id and
-        task_obj.name == t.name and
-        task_obj.data == t.data and
-        task_obj.priority >= t.priority and
-        task_obj.retries <= t.retries
-    ]
-    for t in waiting:
-        huey.revoke_by_id(t.id, revoke_once=True)
+    def task_generator(queue):
+        for t in queue.pending():
+            yield t
+        for t in queue.scheduled():
+            yield t
+
+    def waiting_id_generator(queue, task_obj):
+        for t in task_generator(queue):
+            matches = all((
+                task_obj.id != t.id,
+                task_obj.name == t.name,
+                task_obj.data == t.data,
+                task_obj.priority >= t.priority,
+                task_obj.retries <= t.retries,
+            ))
+            if matches:
+                yield t.id
+
+    for task_id in waiting_id_generator(queue=huey, task_obj=task_obj):
+        huey.revoke_by_id(task_id, revoke_once=True)
 
 def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     if signals.SIGNAL_INTERRUPTED != signal_name:
