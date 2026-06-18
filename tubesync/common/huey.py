@@ -1,4 +1,5 @@
 import datetime
+import subprocess
 import time
 import uuid
 from functools import partial, wraps
@@ -179,6 +180,28 @@ def h_q_tuple(q, /):
         h_q_dict(q),
     )
 
+def start_consumer(queue_name):
+    assert isinstance(queue_name, str), type(queue_name)
+    svc_name = queue_name.replace('_', '-')
+    subprocess.Popen(
+        [ '/command/s6-rc', '-e', 'start', svc_name ],
+        stdout=-1, stderr=-1, start_new_session=True,
+    )
+
+def h_q_reset_maint_func(queue, /, exception=None, status=None):
+        if status is None:
+            return
+        elif 'started' == status:
+            start_consumer(queue.name)
+        elif 'exception' == status and exception is not None:
+            # log, but do not raise an exception
+            from huey.api import logger
+            logger.error(
+                f'{queue.name}: maintenance function exception: {exception}'
+            )
+            return
+        return True
+
 # Configuration convenience helpers
 
 def h_q_reset_tasks(q, /, *, maint_func=None):
@@ -212,7 +235,6 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
             maint_result = maint_func(q, status='started')
         except Exception as exc:
             maint_result = maint_func(q, exception=exc, status='exception')
-            pass
         finally:
             maint_func(q, status='finished')
     # clear everything now that we are done

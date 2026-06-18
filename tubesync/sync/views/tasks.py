@@ -12,7 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params, multi_key_sort
-from common.huey import h_q_reset_tasks
+from common.huey import h_q_reset_maint_func, h_q_reset_tasks
 from common.logger import log
 from django_huey import DJANGO_HUEY, get_queue
 from .utils import get_waiting_tasks
@@ -283,7 +283,7 @@ class ResetTasks(FormView):
         # Delete all tasks
         huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
         for queue_name in huey_queue_names:
-            h_q_reset_tasks(queue_name)
+            h_q_reset_tasks(queue_name, maint_func=h_q_reset_maint_func)
         # Iter all tasks
         for source in Source.objects.all():
             check_source_directory_exists(str(source.pk))
