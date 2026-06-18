@@ -125,7 +125,7 @@ def get_hostname_as_short_id():
     return None
 
 def get_root_start_time(curr=None):
-    if curr is None:
+    if curr is None or 0 >= curr:
         curr = os.getpid()
     start_time = '0'
     # Climb the process tree to find the namespace root (PPID 0)
@@ -202,10 +202,15 @@ if '__main__' == __name__:
     if is_old(vf, lock, df) and not os.path.exists(lf):
         atomic_write(lf, 1)
         if os.path.exists(lf):
-            subprocess.Popen(
-                ['/command/s6-rc', '-e', 'stop', service_name],
-                stdout=-1, stderr=-1, start_new_session=True,
-            )
+            latest_version = exists_read(vf, '').strip()
+            cmd = [
+                '/usr/bin/env', 'python3', '/app/manage.py', 'stop-queue',
+                '--installed', yt_dlp_version,
+                '--latest', latest_version,
+                '--name', 'yt-dlp',
+                service_name,
+            ]
+            subprocess.Popen(cmd, stdout=-1, stderr=-1, start_new_session=True)
     # if gunicorn is marked as intentionally down, nothing else matters
     df = get_down_file('gunicorn')
     if os.path.exists(df):
