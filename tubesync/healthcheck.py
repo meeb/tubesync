@@ -203,7 +203,7 @@ if '__main__' == __name__:
         atomic_write(lf, 1)
         if os.path.exists(lf):
             subprocess.Popen(
-                ['/command/s6-rc', '-e', 'stop', service_name],
+                ['/usr/bin/env', 'python3', '/app/manage.py', 'stop-queue', service_name],
                 stdout=-1, stderr=-1, start_new_session=True,
             )
     # if gunicorn is marked as intentionally down, nothing else matters
