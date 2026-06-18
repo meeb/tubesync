@@ -30,6 +30,21 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            '--installed',
+            type=str,
+            help='The version that is currently installed.',
+        )
+        parser.add_argument(
+            '--latest',
+            type=str,
+            help='The latest version that was released.',
+        )
+        parser.add_argument(
+            '--name',
+            type=str,
+            help='The name of the software that was released.',
+        )
+        parser.add_argument(
             'service_input',
             type=str,
             help='A configuration key name, a backend queue name, or a service name suffix.',
@@ -38,6 +53,19 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         service_input = options['service_input'].strip()
         s6_rc_path = '/command/s6-rc'
+
+        # Populate outdated only when everything was provided
+        outdated = {}
+        if all((
+            options['name'], options['name'].strip(),
+            options['installed'], options['installed'].strip(),
+            options['latest'], options['latest'].strip(),
+        )):
+            outdated = dict(
+                name=options['name'].strip(),
+                installed=options['installed'].strip(),
+                latest=options['latest'].strip(),
+            )
 
         # Parse configured Django-Huey settings properties immediately
         configured_queues = DJANGO_HUEY.get('queues', {})
@@ -144,3 +172,12 @@ class Command(BaseCommand):
                 msg = f'The s6-rc subsystem failed to alter the service execution state: {e.stderr.strip()}'
                 log.error(msg)
                 raise CommandError(msg)
+
+            # Log about the outdated software
+            if outdated:
+                msg = (
+                    'A newer version of %(name)s was released:\n'
+                    '\tinstalled version = %(installed)s\n'
+                    '\tlatest version = %(latest)s\n'
+                )
+                log.info(msg % outdated)
