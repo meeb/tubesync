@@ -125,7 +125,7 @@ def get_hostname_as_short_id():
     return None
 
 def get_root_start_time(curr=None):
-    if curr is None:
+    if curr is None or 0 >= curr:
         curr = os.getpid()
     start_time = '0'
     # Climb the process tree to find the namespace root (PPID 0)
