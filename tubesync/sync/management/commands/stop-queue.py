@@ -57,9 +57,9 @@ class Command(BaseCommand):
         # Populate outdated only when everything was provided
         outdated = {}
         if all((
-            options['name'], options['name'].strip(),
-            options['installed'], options['installed'].strip(),
-            options['latest'], options['latest'].strip(),
+            options['name'] and options['name'].strip(),
+            options['installed'] and options['installed'].strip(),
+            options['latest'] and options['latest'].strip(),
         )):
             outdated = dict(
                 name=options['name'].strip(),
