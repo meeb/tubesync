@@ -2,6 +2,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Set
+from django.views.generic import ListView
 
 
 @dataclass(frozen=True)
@@ -115,6 +116,30 @@ class S6OverlayReporter:
             if status:
                 report[name] = status
         return report
+
+
+class ServicesView(ListView):
+    """
+        A list of supervised services configured inside the s6-overlay container.
+    """
+
+    template_name = 'sync/services.html'
+    context_object_name = 'services'
+
+    def get_queryset(self):
+        """Compiles service status instances directly from system binaries."""
+        reporter = S6OverlayReporter(bundle_name='user')
+        report_data = reporter.get_report(all_services=False)
+        return sorted(report_data.values(), key=lambda svc: svc.name)
+
+    def get_context_data(self, *args, **kwargs):
+        data = super().get_context_data(*args, **kwargs)
+        services = data['services']
+
+        data['total_count'] = len(services)
+        data['running_count'] = sum(1 for svc in services if svc.is_running)
+
+        return data
 
 
 if '__main__' == __name__:
