@@ -32,8 +32,8 @@ class S6OverlayReporter:
     def _get_bundle_services(self) -> Set[str]:
         """Resolves the exact set of service names inside the target s6-rc bundle."""
         try:
-            binary = str(self.S6_BIN_DIR / 's6-rc')
-            cmd = [binary, '-e', 'list', self.bundle_name]
+            binary = str(self.S6_BIN_DIR / 's6-rc-db')
+            cmd = [binary, 'contents', self.bundle_name]
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         except (subprocess.CalledProcessError, FileNotFoundError):
             return set()

@@ -55,7 +55,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         s6_bin_path = Path('/command')
         s6_service_path = Path('/run/service')
-        s6_rc_cmd = str(s6_bin_path / 's6-rc')
+        s6_rc_db_cmd = str(s6_bin_path / 's6-rc-db')
         service_input = options['service_input'].strip()
 
         # Populate outdated only when everything was provided
@@ -84,13 +84,13 @@ class Command(BaseCommand):
         # Extract defined service names grouped under the 'huey-consumers' s6 bundle
         try:
             s6_list_proc = subprocess.run(
-                [ s6_rc_cmd, '-e', 'list', 'huey-consumers' ],
+                [ s6_rc_db_cmd, 'contents', 'huey-consumers' ],
                 capture_output=True,
                 text=True,
                 check=True,
             )
         except FileNotFoundError:
-            msg = f'Environment Error: "{s6_rc_cmd}" could not be located. Ensure this command runs inside the container.'
+            msg = f'Environment Error: "{s6_rc_db_cmd}" could not be located. Ensure this command runs inside the container.'
             log.error(msg)
             raise CommandError(msg)
         except subprocess.CalledProcessError as e:
