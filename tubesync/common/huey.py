@@ -183,10 +183,22 @@ def h_q_tuple(q, /):
 def start_consumer(queue_name):
     assert isinstance(queue_name, str), type(queue_name)
     svc_name = queue_name.replace('_', '-')
-    subprocess.Popen(
-        [ '/command/s6-rc', '-e', 'start', svc_name ],
-        stdout=-1, stderr=-1, start_new_session=True,
-    )
+    svc_dir = Path('/run') / 'service' / svc_name
+
+    try:
+        if not all((
+            svc_dir.is_dir(),
+            (svc_dir / 'supervise').is_dir(),
+            (svc_dir / 'supervise' / 'control').is_fifo(),
+        )):
+            return
+    except PermissionError:
+        pass
+    else:
+        subprocess.Popen(
+            [ '/command/s6-svc', '-U', str(svc_dir) ],
+            stdout=-1, stderr=-1, start_new_session=True,
+        )
 
 def h_q_reset_maint_func(queue, /, exception=None, status=None):
         if status is None:
