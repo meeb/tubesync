@@ -1,5 +1,7 @@
 import difflib
 import subprocess
+import time
+from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django_huey import DJANGO_HUEY
 from common.logger import log
@@ -51,8 +53,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        s6_bin_path = Path('/command')
+        s6_service_path = Path('/run/service')
+        s6_rc_db_cmd = str(s6_bin_path / 's6-rc-db')
         service_input = options['service_input'].strip()
-        s6_rc_path = '/command/s6-rc'
 
         # Populate outdated only when everything was provided
         outdated = {}
@@ -80,13 +84,13 @@ class Command(BaseCommand):
         # Extract defined service names grouped under the 'huey-consumers' s6 bundle
         try:
             s6_list_proc = subprocess.run(
-                [s6_rc_path, '-e', 'list', 'huey-consumers'],
+                [ s6_rc_db_cmd, 'contents', 'huey-consumers' ],
                 capture_output=True,
                 text=True,
                 check=True,
             )
         except FileNotFoundError:
-            msg = f'Environment Error: "{s6_rc_path}" could not be located. Ensure this command runs inside the container.'
+            msg = f'Environment Error: "{s6_rc_db_cmd}" could not be located. Ensure this command runs inside the container.'
             log.error(msg)
             raise CommandError(msg)
         except subprocess.CalledProcessError as e:
@@ -152,26 +156,54 @@ class Command(BaseCommand):
             log.info('Attempting to stop task queue consumer service "%s"', matched_service_name)
 
             try:
+                svc_dir = s6_service_path / matched_service_name
+
                 result = subprocess.run(
-                    [s6_rc_path, '-e', 'stop', matched_service_name],
+                    [ str(s6_bin_path / 's6-svc'), '-D', str(svc_dir) ],
                     capture_output=True,
                     text=True,
                     check=True,
                 )
 
-                log.info('Successfully stopped task queue consumer service "%s"', matched_service_name)
-
-                # Log a high-visibility error alerting the detached environment that tasks are no longer being processed
-                log.error('The task queue "%s" has been stopped and will no longer execute tasks.', matched_queue_name)
+                time.sleep(1)
+                status = subprocess.run(
+                    [ str(s6_bin_path / 's6-svstat'), '-o', 'up,pid', str(svc_dir) ],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                timeout = 60
+                while all((
+                    0 < timeout,
+                    hasattr(status, 'stdout'),
+                    not (status.stdout and 'false -1' in status.stdout),
+                )):
+                    timeout -= 1
+                    time.sleep(3)
+                    status = subprocess.run(
+                        [ str(s6_bin_path / 's6-svstat'), '-o', 'up,pid', str(svc_dir) ],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                    )
+                if 0 == timeout:
+                    msg = f'The s6-svstat command did not report the service as stopped for: {matched_service_name}'
+                    log.warning(msg)
+                    raise TimeoutError(msg)
 
                 self.stdout.write(self.style.SUCCESS(f'Successfully stopped task queue consumer service: "{matched_service_name}".'))
                 if result.stdout:
                     self.stdout.write(result.stdout)
 
             except subprocess.CalledProcessError as e:
-                msg = f'The s6-rc subsystem failed to alter the service execution state: {e.stderr.strip()}'
+                msg = f'The s6-svc command failed to alter the service execution state: {e.stderr.strip()}'
                 log.error(msg)
                 raise CommandError(msg)
+            else:
+                log.info('Successfully stopped task queue consumer service "%s"', matched_service_name)
+
+                # Log a high-visibility error alerting the detached environment that tasks are no longer being processed
+                log.error('The task queue "%s" has been stopped and will no longer execute tasks.', matched_queue_name)
 
             # Log about the outdated software
             if outdated:

@@ -5,7 +5,7 @@ from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceVie
                     MediaEnableView, MediaContent, TasksView, CompletedTasksView,
                     ResetTasks, TaskScheduleView, MediaServersView, AddMediaServerView,
                     MediaServerView, DeleteMediaServerView, UpdateMediaServerView,
-                    RevokeTaskView, SourceSyncNowView, )
+                    RevokeTaskView, SourceSyncNowView, ServicesView,  )
 
 
 app_name = 'sync'
@@ -113,6 +113,14 @@ urlpatterns = [
         'media-content/<uuid:pk>',
         MediaContent.as_view(),
         name='media-content',
+    ),
+
+    # Service URLs
+
+    path(
+        'services',
+        ServicesView.as_view(),
+        name='services',
     ),
 
     # Task URLs

@@ -5,6 +5,7 @@ from .sources import (SourcesView, SourceSyncNowView, ValidateSourceView,
 from .media import (MediaView, MediaThumbView, MediaItemView,
                     MediaRedownloadView, MediaSkipView, MediaEnableView,
                     MediaContent)
+from .services import ServicesView
 from .tasks import (TasksView, RevokeTaskView, CompletedTasksView,
                     ResetTasks, TaskScheduleView)
 from .mediaservers import (MediaServersView, AddMediaServerView,
@@ -18,6 +19,7 @@ __all__ = [
     'MediaView', 'MediaThumbView', 'MediaItemView',
     'MediaRedownloadView', 'MediaSkipView', 'MediaEnableView',
     'MediaContent',
+    'ServicesView',
     'TasksView', 'RevokeTaskView', 'CompletedTasksView', 'ResetTasks',
     'TaskScheduleView',
     'MediaServersView', 'AddMediaServerView', 'MediaServerView',
