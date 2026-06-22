@@ -257,6 +257,13 @@ class YouTube_VideoCodec(models.TextChoices):
     AVC1 = 'AVC1', _('AVC1 (H.264)')
 
 
+class AssetType(models.TextChoices):
+    THUMBNAIL = 'thumbnail', _('Thumbnail')
+    AUDIO = 'audio', _('Audio')
+    VIDEO = 'video', _('Video')
+    SUBTITLE = 'subtitle', _('Subtitle')
+
+
 SourceResolutionInteger = SourceResolution._integer_mapping()
 youtube_long_source_types = YouTube_SourceType._long_type_mapping()
 youtube_validation_urls = YouTube_SourceType._validation_urls()
