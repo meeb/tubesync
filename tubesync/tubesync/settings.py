@@ -1,7 +1,7 @@
 from django import VERSION as DJANGO_VERSION
 from pathlib import Path
 from common.huey import sqlite_tasks
-from common.logs import syslog
+from common.logs import level_from_environment, syslog
 from common.utils import getenv
 from sync.choices import TaskQueue
 
@@ -159,7 +159,7 @@ LOGGING = {
         },
         'stderr': {
             'class': 'logging.StreamHandler',
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': 'DEBUG' if DEBUG else level_from_environment('TUBESYNC_LOG_LEVEL', 'INFO'),
             'formatter': 'common',
         },
         'stderr_worker_process': {
