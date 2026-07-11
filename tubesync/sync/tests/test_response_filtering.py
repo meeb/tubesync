@@ -80,12 +80,9 @@ class ResponseFilteringTestCase(TestCase):
         filtered_url_keys = url_keys
         self.assertEqual(3, len(filtered_url_keys), msg=str(filtered_url_keys))
 
-        url_keys = []
-        for lang_code, captions in filtered['automatic_captions'].items():
-            for caption in captions:
-                for key in caption.keys():
-                    if 'url' in key:
-                        url_keys.append((lang_code, caption['ext'], caption[key],))
-        self.assertEqual(0, len(url_keys), msg=str(url_keys))
+        self.assertNotIn('automatic_captions', filtered.keys())
+        self.assertNotIn('subtitles', filtered.keys())
+        self.assertIn('automatic_captions', unfiltered.keys())
+        self.assertIn('subtitles', unfiltered.keys())
 
 
