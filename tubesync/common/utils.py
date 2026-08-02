@@ -400,20 +400,10 @@ def django_queryset_generator(query_set, /, *,
     if not query_set.ordered:
         qs = qs.order_by('pk')
     collecting = gc.isenabled()
-    gc.disable()
-    if use_chunked_fetch:
-        for key in qs._iterator(use_chunked_fetch, chunk_size):
-            try:
-                yield query_set.filter(pk=key)[0]
-            except IndexError as exc:
-                msg = f'missing primary key: {key}'
-                raise QuerySetEmptyError(msg, exc=exc, key=key) from exc
-            key = None
-            gc.collect(generation=1)
-        key = None
-    else:
-        for page in iter(Paginator(qs, page_size)):
-            for key in page.object_list:
+    try:
+        gc.disable()
+        if use_chunked_fetch:
+            for key in qs._iterator(use_chunked_fetch, chunk_size):
                 try:
                     yield query_set.filter(pk=key)[0]
                 except IndexError as exc:
@@ -422,11 +412,23 @@ def django_queryset_generator(query_set, /, *,
                 key = None
                 gc.collect(generation=1)
             key = None
+        else:
+            for page in iter(Paginator(qs, page_size)):
+                for key in page.object_list:
+                    try:
+                        yield query_set.filter(pk=key)[0]
+                    except IndexError as exc:
+                        msg = f'missing primary key: {key}'
+                        raise QuerySetEmptyError(msg, exc=exc, key=key) from exc
+                    key = None
+                    gc.collect(generation=1)
+                key = None
+                page = None
+                gc.collect()
             page = None
-            gc.collect()
-        page = None
-    qs = None
-    gc.collect()
-    if collecting:
-        gc.enable()
+        qs = None
+    finally:
+        gc.collect()
+        if collecting:
+            gc.enable()
 
