@@ -419,8 +419,22 @@ def cleanup_removed_media(source_id, video_keys):
         for media in qs_gen(mqs):
             if media.key not in video_keys:
                 log.info(f'{media.name} is no longer in source, removing')
-                with atomic(durable=False):
-                    media.delete()
+                try:
+                    with (
+                        huey_lock_task(
+                            f'index_media:{media.uuid}',
+                            queue=Val(TaskQueue.FS),
+                        ),
+                        huey_lock_task(
+                            f'media:{media.uuid}',
+                            queue=Val(TaskQueue.DB),
+                        ),
+                        atomic(durable=False),
+                    ):
+                        media.delete()
+                except TaskLockedException:
+                    delete_media(str(media.pk))
+                    continue
     schedule_media_servers_update()
 
 
@@ -1152,23 +1166,23 @@ def rename_all_media_for_source(source_id):
         downloaded=True,
     )
     for media in qs_gen(mqs):
-        migrating_lock = huey_lock_task(
-            f'index_media:{media.uuid}',
-            queue=Val(TaskQueue.FS),
-        )
-        if migrating_lock.acquired:
+        try:
+            with (
+                huey_lock_task(
+                    f'index_media:{media.uuid}',
+                    queue=Val(TaskQueue.FS),
+                ),
+                huey_lock_task(
+                    f'media:{media.uuid}',
+                    queue=Val(TaskQueue.DB),
+                ),
+                atomic(durable=False),
+            ):
+                media.rename_files()
+        except TaskLockedException:
             # good luck to you in the queue!
             rename_media(str(media.pk))
             continue
-        try:
-            with huey_lock_task(
-                f'media:{media.uuid}',
-                queue=Val(TaskQueue.DB),
-            ):
-                with atomic(durable=False):
-                    media.rename_files()
-        except TaskLockedException:
-            rename_media(str(media.pk))
 
 
 @dynamic_retry(db_task, delay=600, priority=70, retries=15, queue=Val(TaskQueue.FS))
