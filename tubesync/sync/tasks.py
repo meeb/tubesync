@@ -361,8 +361,10 @@ def wait_for_errors(model, /, *, queue_name=None, task_name=None):
         raise HueyConsumerError(_('queue consumer stopped'))
 
 
-@db_task(priority=90, queue=Val(TaskQueue.FS))
+@db_task(priority=90, retries=2, retry_delay=150, queue=Val(TaskQueue.FS))
+@huey_lock_task('sync.tasks.cleanup_old_media', queue=Val(TaskQueue.FS))
 def cleanup_old_media(durable=True):
+    found_locked_media = False
     with atomic(durable=durable):
         for source in qs_gen(Source.objects.filter(delete_old_media=True, days_to_keep__gt=0)):
             delta = timezone.now() - timedelta(days=source.days_to_keep)
@@ -373,13 +375,29 @@ def cleanup_old_media(durable=True):
                 download_date__lt=delta,
             )
             for media in qs_gen(mqs):
-                log.info(f'Deleting expired media: {source} / {media} '
-                         f'(now older than {source.days_to_keep} days / '
-                         f'download_date before {delta})')
-                with atomic(durable=False):
-                    # .delete() also triggers a pre_delete/post_delete signals that remove files
-                    media.delete()
+                try:
+                    with (
+                        huey_lock_task(
+                            f'index_media:{media.uuid}',
+                            queue=Val(TaskQueue.FS),
+                        ),
+                        huey_lock_task(
+                            f'media:{media.uuid}',
+                            queue=Val(TaskQueue.DB),
+                        ),
+                        atomic(durable=False),
+                    ):
+                        log.info(f'Deleting expired media: {source} / {media} '
+                                 f'(now older than {source.days_to_keep} days / '
+                                 f'download_date before {delta})')
+                        # .delete() also triggers a pre_delete/post_delete signals that remove files
+                        media.delete()
+                except TaskLockedException:
+                    found_locked_media = True
+                    continue
     schedule_media_servers_update()
+    if found_locked_media:
+        raise CancelExecution(_('some media was locked'), retry=True)
 
 
 @db_task(priority=90, queue=Val(TaskQueue.FS))
