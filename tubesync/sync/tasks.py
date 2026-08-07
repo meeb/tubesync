@@ -933,6 +933,9 @@ def download_media_metadata(media_id):
     # Don't filter media here, the post_save signal will handle that
     try:
         media.save()
+    # ruff: ignore[TRY203]
+    except Exception:
+        raise
     else:
         log.info(f'Saved {len(media.metadata_dumps())} bytes of metadata for: '
                  f'{source} / {media}: {media_id}')
