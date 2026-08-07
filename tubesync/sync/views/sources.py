@@ -330,7 +330,7 @@ class DeleteSourceView(DeleteView, FormMixin):
             filter_text=str(source.pk),
             target_schedule=source.target_schedule or timezone.now(),
         )
-        copy_fields = { f.name for f in source._meta.fields } - set(media_source.keys())
+        copy_fields = set(f.name for f in source._meta.fields) - set(media_source.keys())
         for k, v in source.__dict__.items():
             if k in copy_fields:
                 media_source[k] = v
