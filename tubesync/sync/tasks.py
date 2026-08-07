@@ -7,6 +7,7 @@
 import os
 import random
 import requests
+import signal
 import time
 import uuid
 from collections import deque as queue
@@ -1101,6 +1102,42 @@ def rescan_media_server(mediaserver_id):
     # Request an rescan / update
     log.info(f'Updating media server: {mediaserver}')
     mediaserver.update()
+
+
+@huey_task(delay=settings.MAX_RUN_TIME, expires=3600, priority=20, queue=Val(TaskQueue.NET))
+def terminate_queue_worker(media_id, worker_pid, queue, log_message):
+    try:
+        os.kill(worker_pid, 0)
+    except OSError:
+        return
+
+    proc_cmdline_path = Path(f'/proc/{worker_pid}/cmdline')
+    
+    if proc_cmdline_path.exists():
+        try:
+            raw_bytes = proc_cmdline_path.read_bytes()
+        except Exception:
+            log.exception('[Watchdog] Failed to read /proc command line')
+        else:
+            try:
+                decoded_string = raw_bytes.replace(b'\x00', b'\x20').decode('utf-8')
+            except Exception:
+                log.exception('[Watchdog] Failed decoding process command line payload')
+            else:
+                needles = ('djangohuey', f'--queue {queue}',)
+                haystack = decoded_string.rstrip(' ')
+                if haystack.endswith(needles[-1]) and all(( needle in haystack for needle in needles )):
+                    try:
+                        os.kill(worker_pid, signal.SIGKILL)
+                        log.warning('[Watchdog] %s', log_message)
+                    except OSError:
+                        log.exception('[Watchdog] Failed to kill: %d', worker_pid)
+                else:
+                    log.error(
+                        '[Watchdog] Refusing kill: PID %d was recycled by another process. '
+                        'Target media: %s Command line: "%s"', 
+                        worker_pid, media_id, haystack,
+                    )
 
 
 @dynamic_retry(db_task, backoff_func=lambda n: (n*3600)+600, priority=50, retries=15, queue=Val(TaskQueue.LIMIT))
