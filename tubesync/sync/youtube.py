@@ -310,6 +310,7 @@ def download_media(
             ),
             ( 'key', remove_end(key, 'PP'), )
         )
+        # ruff: ignore[C400]
         postprocessors = list(
             dict(
                 _postprocessor_opts_parser( *val.split(':', 1) )
