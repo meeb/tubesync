@@ -299,7 +299,7 @@ class UpdateSourceView(EditSourceMixin, UpdateView):
 
     def get_initial(self):
         initial = super().get_initial()
-        when = getattr(self.object, 'target_schedule') or timezone.now()
+        when = getattr(self.object, 'target_schedule', None) or timezone.now()
         initial['target_schedule'] = when.replace(second=0, microsecond=0)
         return initial
 
@@ -330,13 +330,14 @@ class DeleteSourceView(DeleteView, FormMixin):
             filter_text=str(source.pk),
             target_schedule=source.target_schedule or timezone.now(),
         )
+        # ruff: ignore[C401]
         copy_fields = set(f.name for f in source._meta.fields) - set(media_source.keys())
         for k, v in source.__dict__.items():
             if k in copy_fields:
                 media_source[k] = v
         media_source = Source(**media_source)
         delete_media_val = request.POST.get('delete_media', False)
-        delete_media = True if delete_media_val is not False else False
+        delete_media = delete_media_val is not False
         # overload this boolean for our own use
         media_source.delete_removed_media = delete_media
         # adjust the directory and key on the source to be deleted
