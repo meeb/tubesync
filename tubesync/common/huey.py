@@ -624,13 +624,14 @@ class AttemptsTask(Task):
     @property
     def retry_delay(self) -> int:
         attempt = getattr(self, '_custom_attempt_counter', 1)
-        initial_delay = getattr(self, '_initial_configured_delay', 0)
+        initial_delay = getattr(self, '_initial_retry_delay', 0)
 
         algo_key = getattr(self, '_backoff_key', None)
         algo_class = self.backoff_base_class.lookup(algo_key)
 
         if self.retry_backoff is None or 0 == self.retry_backoff:
-            return initial_delay
+            current_delay = getattr(self, '_retry_delay', initial_delay)
+            return current_delay
         elif algo_class and issubclass(algo_class, self.backoff_base_class):
             return algo_class.calculate(attempt)
 
@@ -642,8 +643,9 @@ class AttemptsTask(Task):
         current_state = getattr(self, '_custom_attempt_counter', None)
 
         if current_state is None:
-            self._initial_configured_delay = value
+            self._initial_retry_delay = value
             self._custom_attempt_counter = 1
         else:
             self._custom_attempt_counter = 1 + current_state
+        self._retry_delay = value
 
