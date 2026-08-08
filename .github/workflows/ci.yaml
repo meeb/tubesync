@@ -125,7 +125,7 @@ jobs:
         continue-on-error: false
         run: |
           target_version='py312'
-          ignore_csv_list='C408,E701,E722,E731,I001,UP017,UP018'
+          ignore_csv_list='C408,C409,C410,E701,E722,E731,I001,UP017,UP018'
           cd tubesync
           # output formats:
           # "full" | "concise" | "grouped" |
@@ -161,7 +161,7 @@ jobs:
               ruff check \
               --target-version "${target_version}" \
               --output-format github \
-              --select 'E4,E7,E9,F' \
+              --select 'C4,E4,E7,E9,F' \
               --ignore "${ignore_csv_list}"
       - name: Run Django tests
         timeout-minutes: 5

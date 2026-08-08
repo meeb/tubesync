@@ -7,6 +7,7 @@
 import os
 import random
 import requests
+import signal
 import time
 import uuid
 from collections import deque as queue
@@ -19,7 +20,7 @@ from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from django_huey import lock_task as huey_lock_task, task as huey_task # noqa
+from django_huey import lock_task as huey_lock_task, task as huey_task
 from django_huey import db_periodic_task, db_task, signal as huey_signal
 from huey import crontab as huey_crontab, signals as huey_signals
 from huey.exceptions import TaskLockedException
@@ -318,7 +319,7 @@ def contains_http429(q, task_id, /):
     try:
         q.result(preserve=True, id=task_id)
     except TaskException as e:
-        return True if 'HTTPError 429: Too Many Requests' in str(e) else False
+        return 'HTTPError 429: Too Many Requests' in str(e)
     return False
 
 
@@ -528,6 +529,7 @@ def index_source(source_id):
     if not indexing_lock.acquired:
         indexing_lock.acquired = True
     # update the target schedule column
+    # ruff: ignore[B018]
     source.task_run_at_dt
     update_model(source, target_schedule=source.target_schedule)
     # Reset any errors
@@ -883,9 +885,8 @@ def download_media_metadata(media_id):
                     published_datetime = now + timedelta(minutes=number(parts))
                 log.debug(unit(parts))
                 log.debug(number(parts))
-            except Exception as ee:
-                log.exception(ee)
-                pass
+            except Exception:
+                log.exception('could not assign published_datetime')
 
             if published_datetime:
                 media.published = published_datetime
@@ -932,6 +933,7 @@ def download_media_metadata(media_id):
     # Don't filter media here, the post_save signal will handle that
     try:
         media.save()
+    # ruff: ignore[TRY203]
     except Exception:
         raise
     else:
@@ -1010,8 +1012,8 @@ def on_complete_download_media_image(signal_name, task_obj, exception_obj=None, 
     if result is False or result is True:
         huey.result(preserve=False, id=task_obj.id)
 
-@db_task(delay=60, priority=70, queue=Val(TaskQueue.LIMIT))
-def download_media_file(media_id, override=False):
+@db_task(delay=60, priority=70, timeout=max(0, settings.MAX_RUN_TIME-600), context=True, queue=Val(TaskQueue.LIMIT))
+def download_media_file(media_id, override=False, *, task=None):
     '''
         Downloads the media to disk and attaches it to the Media instance.
     '''
@@ -1037,6 +1039,13 @@ def download_media_file(media_id, override=False):
         filepath = media.filepath
         container = format_str = None
         log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
+        worker_pid = os.getpid()
+        watchdog_result = terminate_queue_worker(
+            str(media.pk),
+            worker_pid,
+            Val(TaskQueue.LIMIT),
+            f'Ended process: {worker_pid}. Downloading media: {media} (UUID: {media.pk}) took longer than MAX_RUN_TIME',
+        )
         try:
             format_str, container = media.download_media()
         except FormatUnavailableError as e:
@@ -1086,6 +1095,8 @@ def download_media_file(media_id, override=False):
                 upgrade_media(str(media.pk))
             # Schedule a task to update media servers
             schedule_media_servers_update()
+        finally:
+            watchdog_result.revoke()
 
 
 @db_task(delay=30, expires=210, priority=100, queue=Val(TaskQueue.NET))
@@ -1101,6 +1112,48 @@ def rescan_media_server(mediaserver_id):
     # Request an rescan / update
     log.info(f'Updating media server: {mediaserver}')
     mediaserver.update()
+
+
+@huey_task(delay=settings.MAX_RUN_TIME, expires=3600, priority=20, queue=Val(TaskQueue.NET))
+def terminate_queue_worker(media_id, worker_pid, queue, log_message):
+    try:
+        os.kill(worker_pid, 0)
+    except OSError:
+        return
+
+    proc_cmdline_path = Path(f'/proc/{worker_pid}/cmdline')
+    
+    if proc_cmdline_path.exists():
+        try:
+            raw_bytes = proc_cmdline_path.read_bytes()
+        except Exception:
+            log.exception('[Watchdog] Failed to read /proc command line')
+        else:
+            try:
+                decoded_string = raw_bytes.replace(b'\x00', b'\x20').decode('utf-8')
+            except Exception:
+                log.exception('[Watchdog] Failed decoding process command line payload')
+            else:
+                needles = ('djangohuey', f'--queue {queue}',)
+                haystack = decoded_string.rstrip(' ')
+                if haystack.endswith(needles[-1]) and all( needle in haystack for needle in needles ):
+                    try:
+                        os.kill(worker_pid, signal.SIGKILL)
+                        log.warning('[Watchdog] %s', log_message)
+                    except OSError:
+                        log.exception('[Watchdog] Failed to kill: %d', worker_pid)
+                    else:
+                        # clear the media lock
+                        huey_lock_task(
+                            f'media:{media_id}',
+                            queue=Val(TaskQueue.DB),
+                        ).clear()
+                else:
+                    log.error(
+                        '[Watchdog] Refusing kill: PID %d was recycled by another process. '
+                        'Target media: %s Command line: "%s"', 
+                        worker_pid, media_id, haystack,
+                    )
 
 
 @dynamic_retry(db_task, backoff_func=lambda n: (n*3600)+600, priority=50, retries=15, queue=Val(TaskQueue.LIMIT))
@@ -1151,7 +1204,7 @@ def rename_all_media_for_source(source_id):
                   f'source exists with ID: {source_id}')
         raise CancelExecution(_('no such source'), retry=False) from e
     # Check that the settings allow renaming
-    rename_sources_setting = getattr(settings, 'RENAME_SOURCES') or list()
+    rename_sources_setting = getattr(settings, 'RENAME_SOURCES', None) or tuple()
     create_rename_tasks = (
         (
             source.directory and
@@ -1274,8 +1327,7 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
         # Task triggered but the source no longer exists, do nothing
         log.warning(f'Task delete_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
-        #raise CancelExecution(_('no such source'), retry=False) from e
-        pass # this task can run after a source was deleted
+        # this task can run after a source was deleted
     mqs = Media.objects.all().defer(
         'metadata',
     ).filter(
