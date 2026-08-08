@@ -1012,8 +1012,8 @@ def on_complete_download_media_image(signal_name, task_obj, exception_obj=None, 
     if result is False or result is True:
         huey.result(preserve=False, id=task_obj.id)
 
-@db_task(delay=60, priority=70, queue=Val(TaskQueue.LIMIT))
-def download_media_file(media_id, override=False):
+@db_task(delay=60, priority=70, timeout=max(0, settings.MAX_RUN_TIME-600), context=True, queue=Val(TaskQueue.LIMIT))
+def download_media_file(media_id, override=False, *, task=None):
     '''
         Downloads the media to disk and attaches it to the Media instance.
     '''
