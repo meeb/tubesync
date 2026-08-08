@@ -2,12 +2,13 @@ import datetime
 import subprocess
 import time
 import uuid
+import warnings
 from functools import partial, wraps
 from huey import (
     CancelExecution, Huey as huey_Huey,
     signals, utils,
 )
-from huey.api import TaskLock
+from huey.api import Task, TaskLock
 from huey.storage import SqliteStorage as huey_SqliteStorage
 from pathlib import Path
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
@@ -565,4 +566,83 @@ def register_huey_signals():
                 result_key = key[len(storage_key_prefix) :]
                 q.get(peek=False, key=result_key)
                 q.get(peek=False, key=key)
+
+
+class BackoffAlgorithm(object):
+    _registry = {}
+    key = None
+
+    @staticmethod
+    def calculate(attempt: int) -> int:
+        raise NotImplementedError()
+
+    @classmethod
+    def lookup(cls, key: str) -> BackoffAlgorithm | None:
+        return cls._registry.get(key, None)
+
+    @classmethod
+    def register(cls, algorithm: BackoffAlgorithm) -> str | None:
+        """
+        Merges a BackoffAlgorithm subclass into the base class registry.
+        """
+        algorithm_key = issubclass(algorithm, cls) and getattr(algorithm, 'key', cls.key)
+        if algorithm_key:
+            if algorithm_key in cls._registry:
+                warnings.warn(
+                    f'{cls.__name__} collision detected! Overwriting key: {algorithm_key}',
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+            cls._registry.update({ algorithm_key: algorithm })
+            return algorithm_key
+
+
+class DjangoBackgroundTasksBackoff(BackoffAlgorithm):
+    key = 'Django-Background-Tasks'
+
+    @staticmethod
+    def calculate(attempt: int) -> int:
+        # The exact formula used by django-background-tasks
+        return 5 + (attempt ** 4)
+
+
+class AttemptsTask(Task):
+    """
+    A Task base class that relies entirely on Task for defaults.
+    Resolves algorithms using string keys mapped onto the BackoffAlgorithm base class.
+    """
+    backoff_base_class = BackoffAlgorithm
+
+    def __init__(self, *args, backoff_class=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if backoff_class:
+            # Register directly onto the algorithm base class
+            self._backoff_key = self.backoff_base_class.register(backoff_class)
+
+    @property
+    def retry_delay(self) -> int:
+        attempt = getattr(self, '_custom_attempt_counter', 1)
+        algo_key = getattr(self, '_backoff_key', None)
+        algo_class = self.backoff_base_class.lookup(algo_key)
+        if algo_class and issubclass(algo_class, self.backoff_base_class):
+            return algo_class.calculate(attempt)
+
+        # Fallback Mode: Exponential math using Task-resolved defaults
+        initial_delay = getattr(self, '_initial_configured_delay', 0)
+        backoff_factor = getattr(self, 'retry_backoff', 1)
+
+        if backoff_factor is None or 0 == backoff_factor:
+            return initial_delay
+
+        return initial_delay * (backoff_factor ** max(0, attempt - 1))
+
+    @retry_delay.setter
+    def retry_delay(self, value):
+        current_state = getattr(self, '_custom_attempt_counter', None)
+
+        if current_state is None:
+            self._initial_configured_delay = value
+            self._custom_attempt_counter = 1
+        else:
+            self._custom_attempt_counter = 1 + current_state
 
