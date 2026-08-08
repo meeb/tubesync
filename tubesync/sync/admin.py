@@ -1,10 +1,12 @@
 from django.contrib import admin
 from .models import (
+    Codec,
     Source,
     Media,
     Metadata,
     MetadataFormat,
-    MediaServer
+    MediaServer,
+    Subtitle,
 )
 
 
@@ -45,9 +47,29 @@ class MetadataFormatAdmin(admin.ModelAdmin):
     search_fields = ('uuid', 'metadata__uuid', 'metadata__media__uuid', 'key')
 
 
+@admin.register(Codec)
+class CodecAdmin(admin.ModelAdmin):
+
+    ordering = ('asset_type', 'codec')
+    list_display = ('uuid', 'asset_type', 'codec', 'description')
+    list_filter = ('asset_type',)
+    readonly_fields = ('uuid',)
+    search_fields = ('codec', 'description')
+
+
 @admin.register(MediaServer)
 class MediaServerAdmin(admin.ModelAdmin):
 
     ordering = ('host', 'port')
     list_display = ('pk', 'server_type', 'host', 'port', 'use_https', 'verify_https')
     search_fields = ('host',)
+
+
+@admin.register(Subtitle)
+class SubtitleAdmin(admin.ModelAdmin):
+
+    ordering = ('extension', 'language')
+    list_display = ('id', 'extension', 'original_language', 'language', 'machine_generated', 'codec')
+    list_filter = ('machine_generated',)
+    search_fields = ('extension', 'language', 'original_language')
+
