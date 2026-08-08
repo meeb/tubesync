@@ -329,18 +329,22 @@ def dynamic_retry(task_func=None, /, *args, **kwargs):
             try:
                 return fn(*a, **kwa)
             except Exception as exc:
+                # when task is not available skip the work
                 try:
+                    # ruff: ignore[B015]
                     task is not None
                 except NameError:
                     raise exc
-                for attempt in range(1, 240):
-                    if backoff(attempt) > task.retry_delay:
-                        task.retry_delay = backoff(attempt)
+
+                for attempt in range(1, 1 + 240):
+                    seconds = backoff(attempt)
+                    if seconds > task.retry_delay:
+                        task.retry_delay = seconds
                         break
                     # insanity, but handle it anyway
-                    if 239 == attempt:
-                        task.retry_delay = backoff(attempt)
-                raise exc
+                    elif 240 == attempt:
+                        task.retry_delay = seconds
+                raise
         kwargs.update(dict(
             context=True,
             retry_delay=backoff_func(1),
@@ -475,6 +479,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
             try:
                 from django.core.exceptions import ValidationError
                 from sync.models import Media, Source
+            # ruff: ignore[S110]
             except:
                 pass
             else:
@@ -554,7 +559,7 @@ def register_huey_signals():
                 # so the created datetime is the fail-safe case.
                 seconds = now_time - history.get(signals.SIGNAL_EXECUTING, now_time)
                 age = datetime.timedelta(
-                    seconds=(seconds if seconds > 0 else 0),
+                    seconds=max(0, seconds),
                 )
             else:
                 age = now_dt - history['created']
