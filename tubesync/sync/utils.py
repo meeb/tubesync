@@ -230,7 +230,12 @@ def filter_response(arg_dict, copy_arg=False):
     # end of formats cleanup }}}
 
     # beginning of subtitles cleanup {{{
-    # drop urls that expire
+    # Completely delete subtitles and automatic_captions to prevent database bloat
+    for key in ('subtitles', 'automatic_captions',):
+        if key in response_dict.keys():
+            del response_dict[key]
+
+    # drop urls that expire for requested_subtitles
     def drop_subtitles_url(**kwargs):
         url = kwargs['url']
         return (
@@ -242,7 +247,7 @@ def filter_response(arg_dict, copy_arg=False):
             )
         )
 
-    for key in ('subtitles', 'requested_subtitles', 'automatic_captions',):
+    for key in ('requested_subtitles',):
         if key in response_dict.keys():
             lang_codes = response_dict[key]
             if isinstance(lang_codes, dict):
