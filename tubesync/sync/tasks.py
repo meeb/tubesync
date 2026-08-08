@@ -24,7 +24,10 @@ from django_huey import lock_task as huey_lock_task, task as huey_task
 from django_huey import db_periodic_task, db_task, signal as huey_signal
 from huey import crontab as huey_crontab, signals as huey_signals
 from huey.exceptions import TaskLockedException
-from common.huey import CancelExecution, dynamic_retry, register_huey_signals
+from common.huey import (
+    AttemptsTask, BackoffAlgorithm, CancelExecution, DjangoBackgroundTasksBackoff,
+    dynamic_retry, register_huey_signals,
+)
 from common.logger import log
 from common.models import TaskHistory
 from common.errors import (
@@ -706,7 +709,7 @@ def check_source_directory_exists(source_id):
         source.make_directory()
 
 
-@dynamic_retry(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.NET))
+@db_task(delay=10, priority=90, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.NET))
 def download_source_images(source_id):
     '''
         Downloads an image and save it as a local thumbnail attached to a
@@ -943,7 +946,7 @@ def download_media_metadata(media_id):
         metadata_lock.acquired = False
 
 
-@dynamic_retry(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.NET))
+@db_task(delay=10, priority=90, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.NET))
 def download_media_image(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
@@ -1156,7 +1159,14 @@ def terminate_queue_worker(media_id, worker_pid, queue, log_message):
                     )
 
 
-@dynamic_retry(db_task, backoff_func=lambda n: (n*3600)+600, priority=50, retries=15, queue=Val(TaskQueue.LIMIT))
+class RefreshFormatsBackoff(BackoffAlgorithm):
+    key = 'sync.tasks.refresh_formats'
+
+    @staticmethod
+    def calculate(attempt: int) -> int:
+        return 600 + (3600 * attempt)
+
+@db_task(priority=50, retries=15, backoff_class=RefreshFormatsBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.LIMIT))
 def refresh_formats(media_id):
     try:
         media = Media.objects.get(pk=media_id)
