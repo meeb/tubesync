@@ -4,7 +4,6 @@ import datetime
 import subprocess
 import time
 import uuid
-import warnings
 from functools import partial, wraps
 from huey import (
     CancelExecution, Huey as huey_Huey,
