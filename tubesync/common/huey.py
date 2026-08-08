@@ -376,16 +376,19 @@ def on_executing_remove_duplicates(signal_name, task_obj, exception_obj=None, /,
             yield t
 
     def waiting_id_generator(queue, task_obj):
-        for t in task_generator(queue):
-            matches = all((
-                task_obj.id != t.id,
-                task_obj.name == t.name,
-                task_obj.data == t.data,
-                task_obj.priority >= t.priority,
-                task_obj.retries <= t.retries,
-            ))
+        b = task_obj
+        for a in task_generator(queue):
+            matches = (
+                a.name == b.name and
+                a.id != b.id and
+                # revoke lower priority
+                a.priority <= b.priority and
+                # revoke tasks that have executed fewer times
+                a.retries >= b.retries and
+                a.data == b.data
+            )
             if matches:
-                yield t.id
+                yield a.id
 
     for task_id in waiting_id_generator(queue=huey, task_obj=task_obj):
         huey.revoke_by_id(task_id, revoke_once=True)
