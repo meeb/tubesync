@@ -589,12 +589,6 @@ class BackoffAlgorithm(object):
         """
         algorithm_key = issubclass(algorithm, cls) and getattr(algorithm, 'key', cls.key)
         if algorithm_key:
-            if algorithm_key in cls._registry:
-                warnings.warn(
-                    f'{cls.__name__} collision detected! Overwriting key: {algorithm_key}',
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
             cls._registry.update({ algorithm_key: algorithm })
             return algorithm_key
 
@@ -617,26 +611,28 @@ class AttemptsTask(Task):
 
     def __init__(self, *args, backoff_class=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if backoff_class:
+
+        self.backoff_class = backoff_class or self.backoff_class
+        if self.backoff_class:
+            self.retry_backoff = self.retry_backoff or 1
             # Register directly onto the algorithm base class
-            self._backoff_key = self.backoff_base_class.register(backoff_class)
+            self._backoff_key = self.backoff_base_class.register(self.backoff_class)
 
     @property
     def retry_delay(self) -> int:
         attempt = getattr(self, '_custom_attempt_counter', 1)
+        initial_delay = getattr(self, '_initial_configured_delay', 0)
+
         algo_key = getattr(self, '_backoff_key', None)
         algo_class = self.backoff_base_class.lookup(algo_key)
-        if algo_class and issubclass(algo_class, self.backoff_base_class):
+
+        if self.retry_backoff is None or 0 == self.retry_backoff:
+            return initial_delay
+        elif algo_class and issubclass(algo_class, self.backoff_base_class):
             return algo_class.calculate(attempt)
 
         # Fallback Mode: Exponential math using Task-resolved defaults
-        initial_delay = getattr(self, '_initial_configured_delay', 0)
-        backoff_factor = getattr(self, 'retry_backoff', 1)
-
-        if backoff_factor is None or 0 == backoff_factor:
-            return initial_delay
-
-        return initial_delay * (backoff_factor ** max(0, attempt - 1))
+        return initial_delay * (self.retry_backoff ** max(0, attempt - 1))
 
     @retry_delay.setter
     def retry_delay(self, value):
