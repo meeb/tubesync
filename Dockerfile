@@ -789,6 +789,7 @@ HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck
 
 # ENVS and ports
 ENV DENO_DIR="/config/cache/deno" \
+    PYTHON_BASIC_REPL="1" \
     PYTHONPATH="/app" \
     PYTHONPYCACHEPREFIX="/config/cache/pycache" \
     S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0" \
