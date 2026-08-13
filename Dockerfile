@@ -90,6 +90,15 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     # We must allow these upgrades
     apt-mark unhold libc6 libssl3t64 && \
     apt-get update && \
+    # Include debian-backports.sources for manual use in a container
+    _awk_prog='"Suites:" == $1 && /-security$/ { sub("security", "backports"); print; exit; }' && \
+    _awk_output=$(awk "${_awk_prog}" /etc/apt/sources.list.d/debian.sources) && \
+    printf -- >| /etc/apt/sources.list.d/debian-backports.sources \
+        '%s\n' 'Types: deb' 'URIs: http://deb.debian.org/debian' \
+        "${_awk_output}" \
+        'Components: main' 'Signed-By: /usr/share/keyrings/debian-archive-keyring.pgp' && \
+    unset -v _awk_output _awk_prog && \
+    chmod a+r /etc/apt/sources.list.d/debian-backports.sources && \
     # Install locales
     LC_ALL='C.UTF-8' LANG='C.UTF-8' LANGUAGE='C.UTF-8' \
     apt-get -y --no-install-recommends install locales && \
