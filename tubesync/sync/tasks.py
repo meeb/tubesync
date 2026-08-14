@@ -1040,11 +1040,17 @@ def download_media_file(media_id, override=False, *, task=None):
         container = format_str = None
         log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
         worker_pid = os.getpid()
+        msg = (
+            f'Ended process: {worker_pid}. '
+            f'Downloading media: {media} (UUID: {media.pk}) took longer than MAX_RUN_TIME '
+            f'({terminate_queue_worker.task_class.delay})'
+        )
         watchdog_result = terminate_queue_worker(
             str(media.pk),
             worker_pid,
             Val(TaskQueue.LIMIT),
-            f'Ended process: {worker_pid}. Downloading media: {media} (UUID: {media.pk}) took longer than MAX_RUN_TIME',
+            msg,
+            delay=terminate_queue_worker.task_class.delay,
         )
         try:
             format_str, container = media.download_media()
