@@ -76,7 +76,7 @@ class SourceSyncNowView(View):
         TaskHistory.schedule(
             index_source,
             str(source.pk),
-            delay=30,
+            delay=index_source.settings.get('delay'),
             vn_fmt=_('Index media from source "{}" once'),
             vn_args=(source.name,),
         )
