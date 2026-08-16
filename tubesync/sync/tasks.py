@@ -166,7 +166,7 @@ def get_running_tasks_by_name(arg_str, instance_id, /):
 def get_media_download_task(media_id):
     tqs = get_running_tasks_by_name('download_media_file', media_id)
     return tqs.first() or False
-    
+
 def get_media_thumbnail_task(media_id):
     tqs = get_running_tasks_by_name('download_media_image', media_id)
     return tqs.first() or False
@@ -311,7 +311,10 @@ def schedule_media_servers_update():
     # Schedule a task to update media servers
     log.info('Scheduling media server updates')
     for mediaserver in MediaServer.objects.all():
-        rescan_media_server(str(mediaserver.pk))
+        rescan_media_server(
+            str(mediaserver.pk),
+            delay=rescan_media_server.settings.get('delay'),
+        )
 
 
 def contains_http429(q, task_id, /):
@@ -434,7 +437,10 @@ def cleanup_removed_media(source_id, video_keys):
                     ):
                         media.delete()
                 except TaskLockedException:
-                    delete_media(str(media.pk))
+                    delete_media(
+                        str(media.pk),
+                        delay=delete_media.settings.get('delay'),
+                    )
                     continue
     schedule_media_servers_update()
 
@@ -626,7 +632,10 @@ def index_source(source_id):
         )
         if not migrating_lock.acquired:
             migrating_lock.acquired = True
-        migrate_to_metadata(str(media.pk))
+        migrate_to_metadata(
+            str(media.pk),
+            delay=migrate_to_metadata.settings.get('delay'),
+        )
         if not new_media:
             # update the existing media
             for key, value in media_defaults.items():
@@ -642,10 +651,11 @@ def index_source(source_id):
                     media.key,
                     prefix,
                 )
-                download_media_image.schedule(
-                    (str(media.pk), thumbnail_url,),
+                download_media_image(
+                    str(media.pk),
+                    thumbnail_url,
                     priority=10+(5*num),
-                    delay=65-(30*num),
+                    delay=max(0, 65-(30*num)),
                 )
             priority = download_media_metadata.settings.get('default_priority', 50)
             if source.download_media:
@@ -998,7 +1008,7 @@ def download_media_image(media_id, url):
     if copy_thumbnail:
         log.info(f'Copying media thumbnail from: {media.thumb.path} '
                  f'to: {media.thumbpath}')
-        copyfile(media.thumb.path, media.thumbpath)        
+        copyfile(media.thumb.path, media.thumbpath)
     return True
 
 @huey_signal(huey_signals.SIGNAL_COMPLETE, queue=Val(TaskQueue.NET))
@@ -1043,14 +1053,14 @@ def download_media_file(media_id, override=False, *, task=None):
         msg = (
             f'Ended process: {worker_pid}. '
             f'Downloading media: {media} (UUID: {media.pk}) took longer than MAX_RUN_TIME '
-            f'({terminate_queue_worker.task_class.delay})'
+            f'({terminate_queue_worker.settings.get('delay', 0)})'
         )
         watchdog_result = terminate_queue_worker(
             str(media.pk),
             worker_pid,
             Val(TaskQueue.LIMIT),
             msg,
-            delay=terminate_queue_worker.task_class.delay,
+            delay=terminate_queue_worker.settings.get('delay', 60 * 60),
         )
         try:
             format_str, container = media.download_media()
@@ -1098,7 +1108,10 @@ def download_media_file(media_id, override=False, *, task=None):
             media.write_nfo_file()
             # Try to download a better format later, if the settings allow this
             if getattr(settings, 'VIDEO_HEIGHT_UPGRADE', False):
-                upgrade_media(str(media.pk))
+                upgrade_media(
+                    str(media.pk),
+                    delay=upgrade_media.settings.get('delay'),
+                )
             # Schedule a task to update media servers
             schedule_media_servers_update()
         finally:
@@ -1128,7 +1141,7 @@ def terminate_queue_worker(media_id, worker_pid, queue, log_message):
         return
 
     proc_cmdline_path = Path(f'/proc/{worker_pid}/cmdline')
-    
+
     if proc_cmdline_path.exists():
         try:
             raw_bytes = proc_cmdline_path.read_bytes()
@@ -1157,7 +1170,7 @@ def terminate_queue_worker(media_id, worker_pid, queue, log_message):
                 else:
                     log.error(
                         '[Watchdog] Refusing kill: PID %d was recycled by another process. '
-                        'Target media: %s Command line: "%s"', 
+                        'Target media: %s Command line: "%s"',
                         worker_pid, media_id, haystack,
                     )
 
@@ -1240,7 +1253,10 @@ def rename_all_media_for_source(source_id):
                 media.rename_files()
         except TaskLockedException:
             # good luck to you in the queue!
-            rename_media(str(media.pk))
+            rename_media(
+                str(media.pk),
+                delay=rename_media.settings.get('delay'),
+            )
             continue
 
 
@@ -1310,6 +1326,7 @@ def save_all_media_for_source(source_id):
         for media in qs_gen(save_qs)
         if str(media.pk) not in saved_later
     }
+    # no delay for these tasks
     save_media.map(saved_now)
 
     TaskHistory.schedule(
@@ -1339,6 +1356,7 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
     ).filter(
         source=source or source_id,
     )
+    # no delay for these tasks
     delete_media.map({
         str(media.pk)
         for media in qs_gen(mqs)

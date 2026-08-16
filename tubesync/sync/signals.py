@@ -37,7 +37,10 @@ def source_pre_save(sender, instance, **kwargs):
     existing_copy_channel_images = existing_source.copy_channel_images
     new_copy_channel_images = instance.copy_channel_images
     if new_copy_channel_images and not existing_copy_channel_images:
-        download_source_images(str(instance.pk))
+        download_source_images(
+            str(instance.pk),
+            delay=download_source_images.settings.get('delay'),
+        )
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
     new_dirpath = instance.directory_path.resolve(strict=False)
     if existing_dirpath != new_dirpath:
@@ -111,7 +114,10 @@ def source_post_save(sender, instance, created, **kwargs):
     if created:
         check_source_directory_exists(str(source.pk))
         if source.copy_channel_images:
-            download_source_images(str(source.pk))
+            download_source_images(
+                str(source.pk),
+                delay=download_source_images.settings.get('delay'),
+            )
         if source.is_active:
             log.info(f'Scheduling first media indexing for source: {source.name}')
             TaskHistory.schedule(
@@ -401,7 +407,7 @@ def media_post_delete(sender, instance, **kwargs):
                     instance_qs.filter(uuid=md.uuid).update(media=skipped_media)
                     # delete any metadata that we are no longer using
                     instance_qs.exclude(uuid=md.uuid).delete()
-                    
+
         except IntegrityError:
             # this probably won't happen, but try it without a transaction
             try:
