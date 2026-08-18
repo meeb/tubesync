@@ -1270,7 +1270,7 @@ def rename_all_media_for_source(source_id):
             continue
 
 
-@dynamic_retry(db_task, delay=600, priority=70, retries=15, queue=Val(TaskQueue.FS))
+@db_task(delay=600, priority=70, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.FS))
 @huey_lock_task('sync.tasks.save_all_media_for_source', queue=Val(TaskQueue.FS))
 def save_all_media_for_source(source_id):
     '''
