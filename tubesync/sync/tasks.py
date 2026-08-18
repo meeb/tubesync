@@ -298,7 +298,6 @@ def schedule_indexing():
         except QuerySetEmptyError as e:
             msg = f'missing media from "{source.name}": {source.pk}: {e.key}'
             log.exception(msg, exc_info=e)
-            pass
         # schedule a new indexing task
         log.info(f'Scheduling an indexing task for source "{source.name}": {source.pk}')
         TaskHistory.schedule(
