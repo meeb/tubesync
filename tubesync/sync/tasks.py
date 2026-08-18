@@ -450,20 +450,17 @@ def cleanup_removed_media(source_id, video_keys):
 
 
 def save_db_batch(qs, objs, fields, /):
-    assert hasattr(qs, 'bulk_update')
-    assert callable(qs.bulk_update)
-    assert hasattr(objs, '__len__')
-    assert callable(objs.__len__)
+    assert callable(getattr(qs, 'bulk_update', False))
+    assert callable(getattr(objs, '__len__', False))
     assert isinstance(fields, (tuple, list, set, frozenset))
 
     num_updated = 0
     num_objs = len(objs)
     with atomic(durable=False):
         num_updated = qs.bulk_update(objs=objs, fields=fields)
-    if num_objs == num_updated:
+    if num_objs == num_updated and callable(func := getattr(objs, 'clear', False)):
         # this covers at least: list, set, deque
-        if hasattr(objs, 'clear') and callable(objs.clear):
-            objs.clear()
+        func()
     return num_updated
 
 
