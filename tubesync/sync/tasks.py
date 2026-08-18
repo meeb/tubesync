@@ -889,27 +889,28 @@ def download_media_metadata(media_id):
             now = timezone.now()
             published_datetime = None
 
-            parts = e_str.split(': ', 1)[1].rsplit(' ', 2)
-            unit = lambda p: str(p[-1]).lower()
-            number = lambda p: int(str(p[-2]), base=10)
-            log.debug(parts)
             try:
-                if 'days' == unit(parts):
+                parts = e_str.split(': ', 1)[1].rsplit(' ', 2)
+                log.debug(parts)
+                unit = parts[-1].lower()
+                log.debug(unit)
+                number = lambda p: int(str(p[-2]), base=10)
+
+                if 'days' == unit:
                     published_datetime = now + timedelta(days=number(parts))
-                if 'hours' == unit(parts):
+                if 'hours' == unit:
                     published_datetime = now + timedelta(hours=number(parts))
-                if 'minutes' == unit(parts):
+                if 'minutes' == unit:
                     published_datetime = now + timedelta(minutes=number(parts))
-                log.debug(unit(parts))
-                log.debug(number(parts))
-            except Exception:
+                if published_datetime:
+                    log.debug(number(parts))
+                    media.published = published_datetime
+                    media.manual_skip = True
+                    media.save()
+                    raise_exception = False
+            except (ValueError, IndexError, OverflowError):
                 log.exception('could not assign published_datetime')
 
-            if published_datetime:
-                media.published = published_datetime
-                media.manual_skip = True
-                media.save()
-                raise_exception = False
         if raise_exception:
             raise
         log.debug(str(e))
@@ -1142,44 +1143,40 @@ def rescan_media_server(mediaserver_id):
 
 @huey_task(delay=settings.MAX_RUN_TIME, expires=3600, priority=20, queue=Val(TaskQueue.NET))
 def terminate_queue_worker(media_id, worker_pid, queue, log_message):
+    proc_cmdline_path = Path(f'/proc/{worker_pid}/cmdline')
     try:
         os.kill(worker_pid, 0)
+        if not proc_cmdline_path.exists():
+            return
+        raw_bytes = proc_cmdline_path.read_bytes()
     except OSError:
-        return
-
-    proc_cmdline_path = Path(f'/proc/{worker_pid}/cmdline')
-
-    if proc_cmdline_path.exists():
+        log.exception('[Watchdog] Failed to read /proc command line')
+    else:
         try:
-            raw_bytes = proc_cmdline_path.read_bytes()
-        except Exception:
-            log.exception('[Watchdog] Failed to read /proc command line')
+            decoded_string = raw_bytes.replace(b'\x00', b'\x20').decode('utf-8')
+        except UnicodeDecodeError:
+            log.exception('[Watchdog] Failed decoding process command line payload')
         else:
-            try:
-                decoded_string = raw_bytes.replace(b'\x00', b'\x20').decode('utf-8')
-            except Exception:
-                log.exception('[Watchdog] Failed decoding process command line payload')
-            else:
-                needles = ('djangohuey', f'--queue {queue}',)
-                haystack = decoded_string.rstrip(' ')
-                if haystack.endswith(needles[-1]) and all( needle in haystack for needle in needles ):
-                    try:
-                        os.kill(worker_pid, signal.SIGKILL)
-                        log.warning('[Watchdog] %s', log_message)
-                    except OSError:
-                        log.exception('[Watchdog] Failed to kill: %d', worker_pid)
-                    else:
-                        # clear the media lock
-                        huey_lock_task(
-                            f'media:{media_id}',
-                            queue=Val(TaskQueue.DB),
-                        ).clear()
+            needles = ('djangohuey', f'--queue {queue}',)
+            haystack = decoded_string.rstrip(' ')
+            if haystack.endswith(needles[-1]) and all( needle in haystack for needle in needles ):
+                try:
+                    os.kill(worker_pid, signal.SIGKILL)
+                except OSError:
+                    log.exception('[Watchdog] Failed to kill: %d', worker_pid)
                 else:
-                    log.error(
-                        '[Watchdog] Refusing kill: PID %d was recycled by another process. '
-                        'Target media: %s Command line: "%s"',
-                        worker_pid, media_id, haystack,
-                    )
+                    log.warning('[Watchdog] %s', log_message)
+                    # clear the media lock
+                    huey_lock_task(
+                        f'media:{media_id}',
+                        queue=Val(TaskQueue.DB),
+                    ).clear()
+            else:
+                log.error(
+                    '[Watchdog] Refusing kill: PID %d was recycled by another process. '
+                    'Target media: %s Command line: "%s"',
+                    worker_pid, media_id, haystack,
+                )
 
 
 class RefreshFormatsBackoff(BackoffAlgorithm):
