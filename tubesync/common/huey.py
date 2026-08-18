@@ -613,9 +613,13 @@ class AttemptsTask(Task):
 
         self.backoff_class = backoff_class or self.backoff_class
         if self.backoff_class:
-            self.retry_backoff = self.retry_backoff or 1
             # Register directly onto the algorithm base class
             self._backoff_key = self.backoff_base_class.register(self.backoff_class)
+
+        algo_key = getattr(self, '_backoff_key', None)
+        retry_backoff = kwargs.get('retry_backoff', None)
+        if retry_backoff is None and not self.default_retry_backoff and algo_key:
+            self.retry_backoff = 1
 
     @property
     def retry_delay(self) -> int:
