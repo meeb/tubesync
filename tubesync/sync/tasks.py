@@ -24,7 +24,10 @@ from django_huey import lock_task as huey_lock_task, task as huey_task
 from django_huey import db_periodic_task, db_task, signal as huey_signal
 from huey import crontab as huey_crontab, signals as huey_signals
 from huey.exceptions import TaskLockedException
-from common.huey import CancelExecution, dynamic_retry, register_huey_signals
+from common.huey import (
+    AttemptsTask, CancelExecution, DjangoBackgroundTasksBackoff,
+    dynamic_retry, register_huey_signals,
+)
 from common.logger import log
 from common.models import TaskHistory
 from common.errors import (
@@ -953,7 +956,7 @@ def download_media_metadata(media_id):
         metadata_lock.acquired = False
 
 
-@dynamic_retry(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.NET))
+@db_task(delay=10, priority=90, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.NET))
 def download_media_image(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
