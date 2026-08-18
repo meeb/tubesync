@@ -125,6 +125,7 @@ class Huey(huey_Huey):
             try:
                 from common.models import TaskHistory
                 th = TaskHistory.objects.get(task_id=previous_id)
+            # ruff: ignore[S110]
             except:
                 pass
             else:
@@ -438,6 +439,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
             try:
                 from django.core.exceptions import ValidationError
                 from sync.models import Media, Source
+            # ruff: ignore[S110]
             except:
                 pass
             else:
