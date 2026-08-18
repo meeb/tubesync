@@ -700,7 +700,7 @@ def index_source(source_id):
     return True
 
 
-@dynamic_retry(db_task, priority=100, retries=15, queue=Val(TaskQueue.FS))
+@db_task(priority=100, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.FS))
 def check_source_directory_exists(source_id):
     '''
         Checks the output directory for a source exists and is writable, if it does
