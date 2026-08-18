@@ -1348,7 +1348,7 @@ def save_all_media_for_source(source_id):
     )
 
 
-@dynamic_retry(db_task, delay=90, priority=99, queue=Val(TaskQueue.FS))
+@db_task(delay=90, priority=99, queue=Val(TaskQueue.FS))
 def delete_all_media_for_source(source_id, source_name, source_directory):
     source = None
     assert source_id
