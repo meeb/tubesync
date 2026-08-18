@@ -10,6 +10,7 @@ from huey import (
     signals, utils,
 )
 from huey.api import Task, TaskLock
+from huey.exceptions import TaskLockedException
 from huey.storage import SqliteStorage as huey_SqliteStorage
 from pathlib import Path
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
@@ -21,8 +22,7 @@ def _set_acquired(self, value=True):
         return self.clear()
     try:
         self.__enter__()
-    # ruff: ignore[BLE001]
-    except Exception:
+    except TaskLockedException:
         return False
     else:
         return True
