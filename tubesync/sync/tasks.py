@@ -26,7 +26,7 @@ from huey import crontab as huey_crontab, signals as huey_signals
 from huey.exceptions import TaskLockedException
 from common.huey import (
     AttemptsTask, BackoffAlgorithm, CancelExecution, DjangoBackgroundTasksBackoff,
-    dynamic_retry, register_huey_signals,
+    register_huey_signals,
 )
 from common.logger import log
 from common.models import TaskHistory
