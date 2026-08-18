@@ -719,7 +719,7 @@ def check_source_directory_exists(source_id):
         source.make_directory()
 
 
-@dynamic_retry(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.LIMIT))
+@db_task(delay=10, priority=90, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.LIMIT))
 def download_source_images(source_id):
     '''
         Downloads an image and save it as a local thumbnail attached to a
