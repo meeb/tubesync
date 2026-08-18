@@ -164,6 +164,7 @@ def _url_keys(arg_dict, filter_func):
     return result
 
 
+# ruff: disable[SIM118]
 # expects a dictionary where the value at key is a:
 # list of dictionaries 
 def _drop_url_keys(arg_dict, key, filter_func):
@@ -284,6 +285,7 @@ def filter_response(arg_dict, copy_arg=False):
     # end of heatmap cleanup }}}
 
     return response_dict
+# ruff: enable[SIM118]
 
 
 def parse_media_format(format_dict):
