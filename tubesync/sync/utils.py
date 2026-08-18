@@ -242,12 +242,41 @@ def filter_response(arg_dict, copy_arg=False):
             )
         )
 
+    def condense_exts(arg_dict, key):
+        mapped, result_list = list_of_dictionaries(arg_dict[key], extract_exts)
+        if mapped:
+            acc = dict(names=set(), exts=dict())
+            for t in result_list:
+                reduce_ext(t, acc)
+            # promote for the shared name case, otherwise keep everything
+            if 1 == len(acc['names']):
+                acc['exts'] = sorted(e for s in acc['exts'].values() for e in s)
+                arg_dict[key] = [acc]
+            elif acc['names']:
+                arg_dict[key] = [acc]
+
+    def extract_exts(arg_dict):
+        ext = arg_dict.get('ext')
+        name = arg_dict.get('name')
+        return (name, ext)
+
+    def reduce_ext(t, results):
+        name, ext = t
+        if not name:
+            return
+        results['names'].add(name)
+        exts = results['exts'].get(name, set())
+        results['exts'][name] = exts
+        if ext:
+            exts.add(ext)
+
     for key in ('subtitles', 'requested_subtitles', 'automatic_captions',):
         if key in response_dict.keys():
             lang_codes = response_dict[key]
             if isinstance(lang_codes, dict):
                 for lang_code in lang_codes.keys():
                     _drop_url_keys(lang_codes, lang_code, drop_subtitles_url)
+                    condense_exts(lang_codes, lang_code)
     # end of subtitles cleanup }}}
  
     # beginning of heatmap cleanup {{{
