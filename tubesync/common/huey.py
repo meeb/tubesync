@@ -412,6 +412,8 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         huey.get(key=storage_key)
     else:
         huey.put(key=storage_key, data=history)
+    # created never used
+    # ruff: ignore[RUF059]
     th, created = TaskHistory.objects.get_or_create(
         task_id=str(task_obj.id),
         name=f"{task_obj.__module__}.{task_obj.name}",
