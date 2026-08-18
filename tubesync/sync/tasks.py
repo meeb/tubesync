@@ -25,7 +25,7 @@ from django_huey import db_periodic_task, db_task, signal as huey_signal
 from huey import crontab as huey_crontab, signals as huey_signals
 from huey.exceptions import TaskLockedException
 from common.huey import (
-    AttemptsTask, CancelExecution, DjangoBackgroundTasksBackoff,
+    AttemptsTask, BackoffAlgorithm, CancelExecution, DjangoBackgroundTasksBackoff,
     dynamic_retry, register_huey_signals,
 )
 from common.logger import log
@@ -1178,7 +1178,14 @@ def terminate_queue_worker(media_id, worker_pid, queue, log_message):
                     )
 
 
-@dynamic_retry(db_task, backoff_func=lambda n: (n*3600)+600, priority=50, retries=15, queue=Val(TaskQueue.LIMIT))
+class RefreshFormatsBackoff(BackoffAlgorithm):
+    key = 'sync.tasks.refresh_formats'
+
+    @staticmethod
+    def calculate(attempt: int) -> int:
+        return 600 + (3600 * attempt)
+
+@db_task(priority=50, retries=15, backoff_class=RefreshFormatsBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.LIMIT))
 def refresh_formats(media_id):
     try:
         media = Media.objects.get(pk=media_id)
