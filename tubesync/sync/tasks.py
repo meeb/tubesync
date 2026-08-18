@@ -82,6 +82,8 @@ def map_task_to_instance(task):
     task_args = task.task_params
     if len(task_args) != 2:
         return None, None
+    # kwargs never used
+    # ruff: ignore[RUF059]
     args, kwargs = task_args
     if len(args) == 0:
         return None, None
@@ -621,6 +623,8 @@ def index_source(source_id):
             *db_fields_media,
         ).get_or_create(defaults=media_defaults, source=source, key=key)
         db_batch_media.append(media)
+        # new_data returned from get_or_create never used
+        # ruff: ignore[RUF059]
         data, new_data = source.videos.defer('value').filter(
             media__isnull=True,
         ).get_or_create(source=source, key=key)
