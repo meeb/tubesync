@@ -246,6 +246,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     if maint_func and callable(maint_func):
         try:
             maint_result = maint_func(q, status='started')
+        # ruff: ignore[BLE001]
         except Exception as exc:
             maint_result = maint_func(q, exception=exc, status='exception')
         finally:
