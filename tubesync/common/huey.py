@@ -504,6 +504,7 @@ def register_huey_signals():
         # clean up old history and results from storage
         now_time = time.monotonic()
         now_dt = datetime.datetime.now(datetime.timezone.utc)
+        # ruff: ignore[SIM118]
         for key in q.all_results().keys():
             if not key.startswith(storage_key_prefix):
                 continue
