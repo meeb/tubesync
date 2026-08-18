@@ -313,12 +313,9 @@ def parse_media_format(format_dict):
     except (ValueError, TypeError):
         width = 0
     format_full = format_dict.get('format_note', '').strip().upper()
-    format_str = format_full[:-2] if format_full.endswith('60') else format_full
-    format_str = format_str.strip()
-    format_str = format_str[:-3] if format_str.endswith('HDR') else format_str
-    format_str = format_str.strip()
-    format_str = format_str[:-2] if format_str.endswith('60') else format_str
-    format_str = format_str.strip()
+    format_str = format_full.removesuffix('60').strip()
+    format_str = format_str.removesuffix('HDR').strip()
+    format_str = format_str.removesuffix('60').strip()
     is_hls = True
     is_dash = False
     if 'DASH' in format_str:
