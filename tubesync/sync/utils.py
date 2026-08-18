@@ -81,10 +81,8 @@ def resize_image_to_height(image, width, height):
     '''
     image = image.convert('RGB')
     ratio = image.width / image.height
-    scaled_width = math.ceil(height * ratio)
-    if scaled_width < width:
-        # Width too small, stretch it
-        scaled_width = width
+    # When scaled width is too small, stretch it
+    scaled_width = max(width, math.ceil(height * ratio))
     image = image.resize((scaled_width, height), Image.LANCZOS)
     if scaled_width > width:
         # Width too large, crop it
