@@ -4,7 +4,7 @@ import datetime
 import subprocess
 import time
 import uuid
-from functools import partial, wraps
+from functools import partial
 from huey import (
     CancelExecution, Huey as huey_Huey,
     signals, utils,
@@ -305,50 +305,6 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=No
             verbose=False,
         ),
     )
-
-# Decorators
-
-def dynamic_retry(task_func=None, /, *args, **kwargs):
-    if task_func is None:
-        from django_huey import task as huey_task
-        task_func = huey_task
-    backoff_func = kwargs.pop('backoff_func', None)
-    def default_backoff(attempt, /):
-        return (5+(attempt**4))
-    if backoff_func is None or not callable(backoff_func):
-        backoff_func = default_backoff
-    def deco(fn):
-        @wraps(fn)
-        def inner(*a, **kwa):
-            backoff = backoff_func
-            # the scoping becomes complicated when reusing functions
-            try:
-                _task = kwa.pop('task')
-            except KeyError:
-                pass
-            else:
-                task = _task
-            try:
-                return fn(*a, **kwa)
-            except Exception as exc:
-                try:
-                    task is not None
-                except NameError:
-                    raise exc
-                for attempt in range(1, 240):
-                    if backoff(attempt) > task.retry_delay:
-                        task.retry_delay = backoff(attempt)
-                        break
-                    # insanity, but handle it anyway
-                    if 239 == attempt:
-                        task.retry_delay = backoff(attempt)
-                raise exc
-        kwargs.update(dict(
-            context=True,
-            retry_delay=backoff_func(1),
-        ))
-        return task_func(*args, **kwargs)(inner)
-    return deco
 
 # Signal handlers shared between queues
 
