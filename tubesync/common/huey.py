@@ -21,6 +21,7 @@ def _set_acquired(self, value=True):
         return self.clear()
     try:
         self.__enter__()
+    # ruff: ignore[BLE001]
     except Exception:
         return False
     else:
@@ -80,9 +81,7 @@ class Huey(huey_Huey):
 
     # do not use __len__ (pending_count) for bool
     def __bool__(self):
-        if not (self._registry._registry or self._registry._periodic_tasks):
-            return False
-        return True
+        return (self._registry._registry or self._registry._periodic_tasks)
 
     def _emit(self, signal, task, *args, **kwargs):
         kwargs['huey'] = self
@@ -515,7 +514,7 @@ def register_huey_signals():
                 # so the created datetime is the fail-safe case.
                 seconds = now_time - history.get(signals.SIGNAL_EXECUTING, now_time)
                 age = datetime.timedelta(
-                    seconds=(seconds if seconds > 0 else 0),
+                    seconds=max(0, seconds),
                 )
             else:
                 age = now_dt - history['created']
@@ -526,6 +525,7 @@ def register_huey_signals():
 
 
 class BackoffAlgorithm:
+    # ruff: ignore[RUF012]
     _registry = {}
     key = None
 
