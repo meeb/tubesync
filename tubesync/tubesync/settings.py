@@ -426,8 +426,7 @@ except:
     MAX_RUN_TIME = 3600
 
 # Tasks scheduled with `background_task` need a chance to finish
-if MAX_RUN_TIME < 600:
-    MAX_RUN_TIME = 600
+MAX_RUN_TIME = max(600, MAX_RUN_TIME)
 
 DOWNLOAD_MEDIA_DELAY = 1 + round(MAX_RUN_TIME / 100)
 
