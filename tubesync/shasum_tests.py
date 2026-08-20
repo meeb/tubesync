@@ -6,7 +6,7 @@ import tempfile
 import io
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from contextlib import redirect_stdout, redirect_stderr
 from unittest.mock import patch, MagicMock
 
@@ -93,7 +93,7 @@ class TestShasum(unittest.TestCase):
         """Path Torture: Backslashes (common in Windows-generated sums files)"""
         name = "logs\\2024\\app.log"
         data = b"log_contents"
-        self.create_file(name, data)
+        self.create_file(PureWindowsPath(name).as_posix(), data)
         h = hashlib.sha256(data).hexdigest()
 
         sums_file = self.create_file("win.txt", f"{h} *{name}\n".encode())
