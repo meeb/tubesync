@@ -339,6 +339,12 @@ def verify_checksums(line_data, is_tag, label, algorithm):
             except (OSError, RuntimeError):
                 return 'Metadata access failed'
 
+        def update_chunks(hasher, byte_array, total_length, chunk_size):
+            with memoryview(byte_array) as view:
+                for begin in range(0, total_length, chunk_size):
+                    end = min(total_length, chunk_size + begin)
+                    hasher.update(view[begin:end])
+
         try:
             # Pre-hash integrity check
             if err := check_file_integrity(target_path, stat):
@@ -347,17 +353,18 @@ def verify_checksums(line_data, is_tag, label, algorithm):
                 return target_path, False, err
 
             hasher = hashlib.new(algorithm)
-            if buffer is not None and 0 < actual_len:
-                hasher.update(buffer[:actual_len])
+            if buffer:
+                update_chunks(hasher, buffer, actual_len, CHUNK_SIZE)
                 return_buffer(buffer)
                 buffer = None
             else:
+                if stat is None:
+                    stat = target_path.stat()
+                data = bytearray(file_buffer_size)
                 with target_path.open('rb') as fb:
-                    if sys.version_info >= (3, 11):
-                        hasher = hashlib.file_digest(fb, algorithm)
-                    else:
-                        for chunk in iter(lambda: fb.read(CHUNK_SIZE), b''):
-                            hasher.update(chunk)
+                    while actual_read := fb.readinto(data):
+                        update_chunks(hasher, data, actual_read, CHUNK_SIZE)
+                data = None
 
             # Post-hash integrity check
             if err := check_file_integrity(target_path, stat):
@@ -406,10 +413,10 @@ def verify_checksums(line_data, is_tag, label, algorithm):
             if buffer is None:
                 blen = 0
                 assigned_buffer, actual_read = fill_buffer(target_path, stat=stat)
-                if assigned_buffer and actual_read:
+                if assigned_buffer and 0 <= actual_read:
                     buffer = assigned_buffer
                     blen = actual_read
-                elif assigned_buffer:
+                elif assigned_buffer is not None:
                     return_buffer(assigned_buffer)
 
             future = executor.submit(
