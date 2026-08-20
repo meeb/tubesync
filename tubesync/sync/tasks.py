@@ -24,7 +24,10 @@ from django_huey import lock_task as huey_lock_task, task as huey_task
 from django_huey import db_periodic_task, db_task, signal as huey_signal
 from huey import crontab as huey_crontab, signals as huey_signals
 from huey.exceptions import TaskLockedException
-from common.huey import CancelExecution, dynamic_retry, register_huey_signals
+from common.huey import (
+    AttemptsTask, BackoffAlgorithm, CancelExecution, DjangoBackgroundTasksBackoff,
+    register_huey_signals,
+)
 from common.logger import log
 from common.models import TaskHistory
 from common.errors import (
@@ -79,6 +82,8 @@ def map_task_to_instance(task):
     task_args = task.task_params
     if len(task_args) != 2:
         return None, None
+    # kwargs never used
+    # ruff: ignore[RUF059]
     args, kwargs = task_args
     if len(args) == 0:
         return None, None
@@ -293,7 +298,6 @@ def schedule_indexing():
         except QuerySetEmptyError as e:
             msg = f'missing media from "{source.name}": {source.pk}: {e.key}'
             log.exception(msg, exc_info=e)
-            pass
         # schedule a new indexing task
         log.info(f'Scheduling an indexing task for source "{source.name}": {source.pk}')
         TaskHistory.schedule(
@@ -446,20 +450,17 @@ def cleanup_removed_media(source_id, video_keys):
 
 
 def save_db_batch(qs, objs, fields, /):
-    assert hasattr(qs, 'bulk_update')
-    assert callable(qs.bulk_update)
-    assert hasattr(objs, '__len__')
-    assert callable(objs.__len__)
+    assert callable(getattr(qs, 'bulk_update', False))
+    assert callable(getattr(objs, '__len__', False))
     assert isinstance(fields, (tuple, list, set, frozenset))
 
     num_updated = 0
     num_objs = len(objs)
     with atomic(durable=False):
         num_updated = qs.bulk_update(objs=objs, fields=fields)
-    if num_objs == num_updated:
+    if num_objs == num_updated and callable(func := getattr(objs, 'clear', False)):
         # this covers at least: list, set, deque
-        if hasattr(objs, 'clear') and callable(objs.clear):
-            objs.clear()
+        func()
     return num_updated
 
 
@@ -618,6 +619,8 @@ def index_source(source_id):
             *db_fields_media,
         ).get_or_create(defaults=media_defaults, source=source, key=key)
         db_batch_media.append(media)
+        # new_data returned from get_or_create never used
+        # ruff: ignore[RUF059]
         data, new_data = source.videos.defer('value').filter(
             media__isnull=True,
         ).get_or_create(source=source, key=key)
@@ -697,7 +700,7 @@ def index_source(source_id):
     return True
 
 
-@dynamic_retry(db_task, priority=100, retries=15, queue=Val(TaskQueue.FS))
+@db_task(priority=100, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.FS))
 def check_source_directory_exists(source_id):
     '''
         Checks the output directory for a source exists and is writable, if it does
@@ -716,7 +719,7 @@ def check_source_directory_exists(source_id):
         source.make_directory()
 
 
-@dynamic_retry(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.LIMIT))
+@db_task(delay=10, priority=90, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.LIMIT))
 def download_source_images(source_id):
     '''
         Downloads an image and save it as a local thumbnail attached to a
@@ -882,27 +885,28 @@ def download_media_metadata(media_id):
             now = timezone.now()
             published_datetime = None
 
-            parts = e_str.split(': ', 1)[1].rsplit(' ', 2)
-            unit = lambda p: str(p[-1]).lower()
-            number = lambda p: int(str(p[-2]), base=10)
-            log.debug(parts)
             try:
-                if 'days' == unit(parts):
+                parts = e_str.split(': ', 1)[1].rsplit(' ', 2)
+                log.debug(parts)
+                unit = parts[-1].lower()
+                log.debug(unit)
+                number = lambda p: int(str(p[-2]), base=10)
+
+                if 'days' == unit:
                     published_datetime = now + timedelta(days=number(parts))
-                if 'hours' == unit(parts):
+                if 'hours' == unit:
                     published_datetime = now + timedelta(hours=number(parts))
-                if 'minutes' == unit(parts):
+                if 'minutes' == unit:
                     published_datetime = now + timedelta(minutes=number(parts))
-                log.debug(unit(parts))
-                log.debug(number(parts))
-            except Exception:
+                if published_datetime:
+                    log.debug(number(parts))
+                    media.published = published_datetime
+                    media.manual_skip = True
+                    media.save()
+                    raise_exception = False
+            except (ValueError, IndexError, OverflowError):
                 log.exception('could not assign published_datetime')
 
-            if published_datetime:
-                media.published = published_datetime
-                media.manual_skip = True
-                media.save()
-                raise_exception = False
         if raise_exception:
             raise
         log.debug(str(e))
@@ -953,7 +957,7 @@ def download_media_metadata(media_id):
         metadata_lock.acquired = False
 
 
-@dynamic_retry(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.NET))
+@db_task(delay=10, priority=90, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.NET))
 def download_media_image(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
@@ -1135,47 +1139,50 @@ def rescan_media_server(mediaserver_id):
 
 @huey_task(delay=settings.MAX_RUN_TIME, expires=3600, priority=20, queue=Val(TaskQueue.NET))
 def terminate_queue_worker(media_id, worker_pid, queue, log_message):
+    proc_cmdline_path = Path(f'/proc/{worker_pid}/cmdline')
     try:
         os.kill(worker_pid, 0)
+        if not proc_cmdline_path.exists():
+            return
+        raw_bytes = proc_cmdline_path.read_bytes()
     except OSError:
-        return
-
-    proc_cmdline_path = Path(f'/proc/{worker_pid}/cmdline')
-
-    if proc_cmdline_path.exists():
+        log.exception('[Watchdog] Failed to read /proc command line')
+    else:
         try:
-            raw_bytes = proc_cmdline_path.read_bytes()
-        except Exception:
-            log.exception('[Watchdog] Failed to read /proc command line')
+            decoded_string = raw_bytes.replace(b'\x00', b'\x20').decode('utf-8')
+        except UnicodeDecodeError:
+            log.exception('[Watchdog] Failed decoding process command line payload')
         else:
-            try:
-                decoded_string = raw_bytes.replace(b'\x00', b'\x20').decode('utf-8')
-            except Exception:
-                log.exception('[Watchdog] Failed decoding process command line payload')
-            else:
-                needles = ('djangohuey', f'--queue {queue}',)
-                haystack = decoded_string.rstrip(' ')
-                if haystack.endswith(needles[-1]) and all( needle in haystack for needle in needles ):
-                    try:
-                        os.kill(worker_pid, signal.SIGKILL)
-                        log.warning('[Watchdog] %s', log_message)
-                    except OSError:
-                        log.exception('[Watchdog] Failed to kill: %d', worker_pid)
-                    else:
-                        # clear the media lock
-                        huey_lock_task(
-                            f'media:{media_id}',
-                            queue=Val(TaskQueue.DB),
-                        ).clear()
+            needles = ('djangohuey', f'--queue {queue}',)
+            haystack = decoded_string.rstrip(' ')
+            if haystack.endswith(needles[-1]) and all( needle in haystack for needle in needles ):
+                try:
+                    os.kill(worker_pid, signal.SIGKILL)
+                except OSError:
+                    log.exception('[Watchdog] Failed to kill: %d', worker_pid)
                 else:
-                    log.error(
-                        '[Watchdog] Refusing kill: PID %d was recycled by another process. '
-                        'Target media: %s Command line: "%s"',
-                        worker_pid, media_id, haystack,
-                    )
+                    log.warning('[Watchdog] %s', log_message)
+                    # clear the media lock
+                    huey_lock_task(
+                        f'media:{media_id}',
+                        queue=Val(TaskQueue.DB),
+                    ).clear()
+            else:
+                log.error(
+                    '[Watchdog] Refusing kill: PID %d was recycled by another process. '
+                    'Target media: %s Command line: "%s"',
+                    worker_pid, media_id, haystack,
+                )
 
 
-@dynamic_retry(db_task, backoff_func=lambda n: (n*3600)+600, priority=50, retries=15, queue=Val(TaskQueue.LIMIT))
+class RefreshFormatsBackoff(BackoffAlgorithm):
+    key = 'sync.tasks.refresh_formats'
+
+    @staticmethod
+    def calculate(attempt: int) -> int:
+        return 600 + (3600 * attempt)
+
+@db_task(priority=50, retries=15, backoff_class=RefreshFormatsBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.LIMIT))
 def refresh_formats(media_id):
     try:
         media = Media.objects.get(pk=media_id)
@@ -1260,7 +1267,7 @@ def rename_all_media_for_source(source_id):
             continue
 
 
-@dynamic_retry(db_task, delay=600, priority=70, retries=15, queue=Val(TaskQueue.FS))
+@db_task(delay=600, priority=70, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.FS))
 @huey_lock_task('sync.tasks.save_all_media_for_source', queue=Val(TaskQueue.FS))
 def save_all_media_for_source(source_id):
     '''
@@ -1338,7 +1345,7 @@ def save_all_media_for_source(source_id):
     )
 
 
-@dynamic_retry(db_task, delay=90, priority=99, queue=Val(TaskQueue.FS))
+@db_task(delay=90, priority=99, queue=Val(TaskQueue.FS))
 def delete_all_media_for_source(source_id, source_name, source_directory):
     source = None
     assert source_id

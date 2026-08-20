@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 import datetime
 import subprocess
 import time
 import uuid
-from functools import partial, wraps
+from functools import partial
 from huey import (
     CancelExecution, Huey as huey_Huey,
     signals, utils,
 )
-from huey.api import TaskLock
+from huey.api import Task, TaskLock
+from huey.exceptions import TaskLockedException
 from huey.storage import SqliteStorage as huey_SqliteStorage
 from pathlib import Path
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
@@ -19,7 +22,7 @@ def _set_acquired(self, value=True):
         return self.clear()
     try:
         self.__enter__()
-    except Exception:
+    except TaskLockedException:
         return False
     else:
         return True
@@ -78,9 +81,7 @@ class Huey(huey_Huey):
 
     # do not use __len__ (pending_count) for bool
     def __bool__(self):
-        if not (self._registry._registry or self._registry._periodic_tasks):
-            return False
-        return True
+        return (self._registry._registry or self._registry._periodic_tasks)
 
     def _emit(self, signal, task, *args, **kwargs):
         kwargs['huey'] = self
@@ -124,6 +125,7 @@ class Huey(huey_Huey):
             try:
                 from common.models import TaskHistory
                 th = TaskHistory.objects.get(task_id=previous_id)
+            # ruff: ignore[S110]
             except:
                 pass
             else:
@@ -245,6 +247,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     if maint_func and callable(maint_func):
         try:
             maint_result = maint_func(q, status='started')
+        # ruff: ignore[BLE001]
         except Exception as exc:
             maint_result = maint_func(q, exception=exc, status='exception')
         finally:
@@ -303,50 +306,6 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=No
             verbose=False,
         ),
     )
-
-# Decorators
-
-def dynamic_retry(task_func=None, /, *args, **kwargs):
-    if task_func is None:
-        from django_huey import task as huey_task
-        task_func = huey_task
-    backoff_func = kwargs.pop('backoff_func', None)
-    def default_backoff(attempt, /):
-        return (5+(attempt**4))
-    if backoff_func is None or not callable(backoff_func):
-        backoff_func = default_backoff
-    def deco(fn):
-        @wraps(fn)
-        def inner(*a, **kwa):
-            backoff = backoff_func
-            # the scoping becomes complicated when reusing functions
-            try:
-                _task = kwa.pop('task')
-            except KeyError:
-                pass
-            else:
-                task = _task
-            try:
-                return fn(*a, **kwa)
-            except Exception as exc:
-                try:
-                    task is not None
-                except NameError:
-                    raise exc
-                for attempt in range(1, 240):
-                    if backoff(attempt) > task.retry_delay:
-                        task.retry_delay = backoff(attempt)
-                        break
-                    # insanity, but handle it anyway
-                    if 239 == attempt:
-                        task.retry_delay = backoff(attempt)
-                raise exc
-        kwargs.update(dict(
-            context=True,
-            retry_delay=backoff_func(1),
-        ))
-        return task_func(*args, **kwargs)(inner)
-    return deco
 
 # Signal handlers shared between queues
 
@@ -454,6 +413,8 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         huey.get(key=storage_key)
     else:
         huey.put(key=storage_key, data=history)
+    # created never used
+    # ruff: ignore[RUF059]
     th, created = TaskHistory.objects.get_or_create(
         task_id=str(task_obj.id),
         name=f"{task_obj.__module__}.{task_obj.name}",
@@ -478,6 +439,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
             try:
                 from django.core.exceptions import ValidationError
                 from sync.models import Media, Source
+            # ruff: ignore[S110]
             except:
                 pass
             else:
@@ -542,6 +504,7 @@ def register_huey_signals():
         # clean up old history and results from storage
         now_time = time.monotonic()
         now_dt = datetime.datetime.now(datetime.timezone.utc)
+        # ruff: ignore[SIM118]
         for key in q.all_results().keys():
             if not key.startswith(storage_key_prefix):
                 continue
@@ -557,7 +520,7 @@ def register_huey_signals():
                 # so the created datetime is the fail-safe case.
                 seconds = now_time - history.get(signals.SIGNAL_EXECUTING, now_time)
                 age = datetime.timedelta(
-                    seconds=(seconds if seconds > 0 else 0),
+                    seconds=max(0, seconds),
                 )
             else:
                 age = now_dt - history['created']
@@ -565,4 +528,86 @@ def register_huey_signals():
                 result_key = key[len(storage_key_prefix) :]
                 q.get(peek=False, key=result_key)
                 q.get(peek=False, key=key)
+
+
+class BackoffAlgorithm:
+    # ruff: ignore[RUF012]
+    _registry = {}
+    key = None
+
+    @staticmethod
+    def calculate(attempt: int) -> int:
+        raise NotImplementedError()
+
+    @classmethod
+    def lookup(cls, key: str) -> BackoffAlgorithm | None:
+        return cls._registry.get(key, None)
+
+    @classmethod
+    def register(cls, algorithm: BackoffAlgorithm) -> str | None:
+        """
+        Merges a BackoffAlgorithm subclass into the base class registry.
+        """
+        algorithm_key = issubclass(algorithm, cls) and getattr(algorithm, 'key', cls.key)
+        if algorithm_key:
+            cls._registry.update({ algorithm_key: algorithm })
+            return algorithm_key
+
+
+class DjangoBackgroundTasksBackoff(BackoffAlgorithm):
+    key = 'Django-Background-Tasks'
+
+    @staticmethod
+    def calculate(attempt: int) -> int:
+        # The exact formula used by django-background-tasks
+        return 5 + (attempt ** 4)
+
+
+class AttemptsTask(Task):
+    """
+    A Task base class that relies entirely on Task for defaults.
+    Resolves algorithms using string keys mapped onto the BackoffAlgorithm base class.
+    """
+    backoff_base_class = BackoffAlgorithm
+
+    def __init__(self, *args, backoff_class=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.backoff_class = backoff_class or self.backoff_class
+        if self.backoff_class:
+            # Register directly onto the algorithm base class
+            self._backoff_key = self.backoff_base_class.register(self.backoff_class)
+
+        algo_key = getattr(self, '_backoff_key', None)
+        retry_backoff = kwargs.get('retry_backoff', None)
+        if retry_backoff is None and not self.default_retry_backoff and algo_key:
+            self.retry_backoff = 1
+
+    @property
+    def retry_delay(self) -> int:
+        attempt = getattr(self, '_custom_attempt_counter', 1)
+        initial_delay = getattr(self, '_initial_retry_delay', 0)
+
+        algo_key = getattr(self, '_backoff_key', None)
+        algo_class = self.backoff_base_class.lookup(algo_key)
+
+        if self.retry_backoff is None or 0 == self.retry_backoff:
+            current_delay = getattr(self, '_retry_delay', initial_delay)
+            return current_delay
+        elif algo_class and issubclass(algo_class, self.backoff_base_class):
+            return algo_class.calculate(attempt)
+
+        # Fallback Mode: Exponential math using Task-resolved defaults
+        return initial_delay * (self.retry_backoff ** max(0, attempt - 1))
+
+    @retry_delay.setter
+    def retry_delay(self, value):
+        current_state = getattr(self, '_custom_attempt_counter', None)
+
+        if current_state is None:
+            self._initial_retry_delay = value
+            self._custom_attempt_counter = 1
+        else:
+            self._custom_attempt_counter = 1 + current_state
+        self._retry_delay = value
 
