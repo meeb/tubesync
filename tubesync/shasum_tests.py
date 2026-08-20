@@ -412,7 +412,7 @@ class TestShasum(unittest.TestCase):
         exit_code, out, err = self.run_verify(content, False, "dirty.txt", "sha256")
 
         # 1. Should warn about the '#' in the filename
-        self.assertIn("contained a '#' character", err)
+        self.assertIn('contained a "#" character', err)
         # 2. Should eventually report no files verified (since 'target.txt #...' doesn't exist)
         self.assertIn("no file was verified", err)
         self.assertEqual(exit_code, 1)
