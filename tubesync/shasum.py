@@ -10,7 +10,7 @@ import re
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 # Buffer size to match common coreutils I/O block size
 CHUNK_SIZE = (1024) * 32 # KiB
@@ -19,7 +19,7 @@ CHUNK_SIZE = (1024) * 32 # KiB
 PROG_NAME = Path(__file__).stem
 
 # Versioning
-VERSION = (1, 1, 4)
+VERSION = (1, 1, 5)
 VERSION_STR = 'v' + '.'.join(map(str, VERSION))
 
 def _std_base(*args, **kwargs):
@@ -224,11 +224,11 @@ def verify_checksums(line_data, is_tag, label, algorithm):
     exit_code = 0
     file_buffers = 32
     file_buffer_size = (1024 * 1024) * 1 # MiB
-    file_buffer_pool = queue.Queue()
+    file_buffer_pool = queue.SimpleQueue()
     files_verified = 0
     format_errors = 0
     is_windows = "Windows" == platform.system()
-    max_pending_tasks = 50_000
+    max_pending_tasks = 2_500
     semaphore = threading.Semaphore(max_pending_tasks)
     tasks = []
 
@@ -238,6 +238,9 @@ def verify_checksums(line_data, is_tag, label, algorithm):
     else:
         pattern = re.compile(r'^([a-fA-F0-9]+) ([ \*])(.+)$')
 
+    def create_view():
+        return memoryview(bytearray(file_buffer_size)).cast('B')
+
     def fill_buffer(target_path, /, stat = None, pool = file_buffer_pool, max_size = file_buffer_size):
         """Attempts to grab a buffer from the pool and fill it with file content."""
         try:
@@ -246,17 +249,20 @@ def verify_checksums(line_data, is_tag, label, algorithm):
             if stat.st_size > max_size:
                 return None, 0
             buf = pool.get_nowait()
-            with target_path.open('rb') as f:
+            with target_path.open(mode='rb', buffering=0) as f:
                 actual_read = f.readinto(buf)
             return buf, actual_read
         except (queue.Empty, OSError):
             return None, 0
 
     def return_buffer(buffer, /, pool = file_buffer_pool):
-        pool.put(buffer)
+        try:
+            pool.put_nowait(buffer)
+        except queue.Full:
+            pass
 
     for _ in range(file_buffers):
-        return_buffer(bytearray(file_buffer_size))
+        return_buffer(create_view())
 
     for line_no, data in line_data.items():
         line = data.get('value')
@@ -295,7 +301,12 @@ def verify_checksums(line_data, is_tag, label, algorithm):
             )
             stderr(msg)
 
-        target_path = Path(filename_str)
+        path_in = filename_str
+        if not hasattr(PureWindowsPath, 'parser') and (m := getattr(PureWindowsPath, '_flavour', None)):
+            PureWindowsPath.parser = m
+        if not is_windows and PureWindowsPath.parser.sep in path_in:
+            path_in = PureWindowsPath(path_in).as_posix()
+        target_path = Path(path_in)
 
         # Security: Prevent Path Traversal
         # Skip files outside the directory to prevent traversal attacks
@@ -339,11 +350,10 @@ def verify_checksums(line_data, is_tag, label, algorithm):
             except (OSError, RuntimeError):
                 return 'Metadata access failed'
 
-        def update_chunks(hasher, byte_array, total_length, chunk_size):
-            with memoryview(byte_array) as view:
-                for begin in range(0, total_length, chunk_size):
-                    end = min(total_length, chunk_size + begin)
-                    hasher.update(view[begin:end])
+        def update_chunks(hasher, view, total_length, chunk_size):
+            for begin in range(0, total_length, chunk_size):
+                end = min(total_length, chunk_size + begin)
+                hasher.update(view[begin:end])
 
         try:
             # Pre-hash integrity check
@@ -355,16 +365,13 @@ def verify_checksums(line_data, is_tag, label, algorithm):
             hasher = hashlib.new(algorithm)
             if buffer:
                 update_chunks(hasher, buffer, actual_len, CHUNK_SIZE)
-                return_buffer(buffer)
-                buffer = None
             else:
+                buffer = file_buffer_pool.get()
                 if stat is None:
                     stat = target_path.stat()
-                data = bytearray(file_buffer_size)
-                with target_path.open('rb') as fb:
-                    while actual_read := fb.readinto(data):
-                        update_chunks(hasher, data, actual_read, CHUNK_SIZE)
-                data = None
+                with target_path.open(mode='rb', buffering=0) as fb:
+                    while actual_read := fb.readinto(buffer):
+                        update_chunks(hasher, buffer, actual_read, CHUNK_SIZE)
 
             # Post-hash integrity check
             if err := check_file_integrity(target_path, stat):
@@ -380,9 +387,20 @@ def verify_checksums(line_data, is_tag, label, algorithm):
         finally:
             if buffer is not None:
                 return_buffer(buffer)
+                buffer = None
 
     def harvest(future, path):
         nonlocal files_verified, checksum_failures, exit_code
+        # At the end, reduce the file_buffer_pool
+        if not tasks:
+            work_left_in_flight = max_pending_tasks - semaphore._value
+            if file_buffer_pool.qsize() > work_left_in_flight:
+                try:
+                    excess_buf = file_buffer_pool.get_nowait()
+                except queue.Empty:
+                    return_buffer(create_view())
+                else:
+                    del excess_buf
         # Release semaphore slot so a new task can be submitted.
         semaphore.release()
         try:
@@ -404,7 +422,7 @@ def verify_checksums(line_data, is_tag, label, algorithm):
             exit_code = 1
             stdout(f'{path}: FAILED (Unexpected Error: {e!r})')
 
-    tasks.sort(key=lambda x: x[0], reverse=True)
+    tasks.sort(key=lambda x: (x[4] is not None, -x[0]))
     with ThreadPoolExecutor() as executor:
         while tasks:
             semaphore.acquire()
