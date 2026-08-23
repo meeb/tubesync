@@ -92,6 +92,7 @@ def get_image_info(url):
         'logger': log,
         'extract_flat': True,  # Change to False to get detailed info
         'check_formats': False,
+        'playlist_items': '1',
     })
 
     with yt_dlp.YoutubeDL(opts) as y:
@@ -107,42 +108,14 @@ def get_image_info(url):
                     thumbnail_height = int(thumbnail_height)
                 except (TypeError, ValueError,):
                     thumbnail_height = int()
-                if thumbnail['id'] == 'avatar_uncropped':
+                if 'avatar_uncropped' == thumbnail['id']:
                     avatar_url = thumbnail['url']
-                elif thumbnail['id'] == 'banner_uncropped':
+                elif 'banner_uncropped' == thumbnail['id']:
                     banner_url = thumbnail['url']
                 elif thumbnail_height > max_height:
                     max_height = thumbnail_height
                     thumbnail_url = thumbnail['url']
-            try:
-                entry_type = response['entries'][0].get('_type')
-            except IndexError:
-                # an empty entries list
-                pass
-            else:
-                if 'url' == entry_type:
-                    del response['entries']
-                elif 'playlist' == entry_type:
-                    for playlist in response['entries']:
-                        del playlist['entries']
-            from .models import Metadata
-            t = Metadata.objects.defer('value').filter(
-                source__isnull=True,
-                media__isnull=True,
-            ).get_or_create(
-                key=response['id'],
-                site=response['extractor_key'],
-            )
-            md = t[0]
-            field_defaults = {
-                f.attname: f.get_default()
-                for f in md._meta.fields
-                if f.has_default()
-            }
-            if 'retrieved' in field_defaults:
-                md.retrieved = field_defaults['retrieved']
-            md.value = response
-            md.save()
+
     return avatar_url, banner_url, thumbnail_url
 
 
