@@ -508,6 +508,8 @@ def migrate_to_metadata(media_id):
                 if existing_value and ('epoch' == key or value == existing_value):
                     continue
                 media.save_to_metadata(field, value)
+        # clean up the record created during indexing
+        data.delete()
     migrating_lock.acquired = False
 
 
@@ -733,6 +735,10 @@ def download_source_images(source_id):
                   f'source exists with ID: {source_id}')
         raise CancelExecution(_('no such source'), retry=False) from e
     avatar, banner, thumbnail = source.get_image_url
+    Metadata.objects.filter(
+        value__original_url=source.url,
+        media__isnull=True, source__isnull=True,
+    ).update(source=source)
     log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
         f'Banner: {banner} '
