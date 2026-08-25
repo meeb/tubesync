@@ -744,7 +744,7 @@ def download_source_images(source_id):
     if not qs:
         raise CancelExecution(_('metadata not yet available'))
 
-    avatar, banner, thumbnail = source.get_image_url
+    avatar, banner, thumbnail = source.get_image_urls(qs)
     log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
         f'Banner: {banner} '
