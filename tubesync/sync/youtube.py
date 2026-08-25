@@ -4,6 +4,8 @@
 '''
 
 
+# ruff: file-ignore[SIM118]
+
 import os
 
 from common.errors import FormatUnavailableError
@@ -43,6 +45,7 @@ class YouTubeError(yt_dlp.utils.DownloadError):
     '''
         Generic wrapped error for all errors that could be raised by youtube-dl.
     '''
+    # ruff: ignore[PIE790]
     pass
 
 
@@ -263,7 +266,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'postprocessors': postprocessors,
         'skip_unavailable_fragments': False,
         'sleep_interval_requests': sleep_interval_requests,
-        'verbose': True if settings.DEBUG else False,
+        'verbose': bool(settings.DEBUG),
         'writeinfojson': True,
     })
     if start:
@@ -395,8 +398,8 @@ def download_media(
         'merge_output_format': extension,
         'outtmpl': os.path.basename(output_file),
         'remuxvideo': pp_opts.remuxvideo,
-        'quiet': False if settings.DEBUG else True,
-        'verbose': True if settings.DEBUG else False,
+        'quiet': not bool(settings.DEBUG),
+        'verbose': bool(settings.DEBUG),
         'noprogress': None if settings.DEBUG else True,
         'writeinfojson': info_json,
         'writesubtitles': write_subtitles,
