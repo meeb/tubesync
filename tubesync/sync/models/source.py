@@ -485,6 +485,27 @@ class Source(db.models.Model):
     def get_image_url(self):
         return get_youtube_image_info(self.url)
 
+    def get_image_urls(self, qs):
+        avatar_url = None
+        banner_url = None
+        thumbnail_url = None
+        for md in qs.order_by('key'):
+            max_height = 0
+            for thumbnail in md.value.get('thumbnails', dict()):
+                thumbnail_height = thumbnail.get('height')
+                try:
+                    thumbnail_height = int(thumbnail_height)
+                except (TypeError, ValueError,):
+                    thumbnail_height = int()
+                if 'avatar_uncropped' == thumbnail.get('id'):
+                    avatar_url = thumbnail['url']
+                elif 'banner_uncropped' == thumbnail.get('id'):
+                    banner_url = thumbnail['url']
+                elif thumbnail_height > max_height:
+                    max_height = thumbnail_height
+                    thumbnail_url = thumbnail['url']
+
+        return avatar_url, banner_url, thumbnail_url
 
     def directory_exists(self):
         return (os.path.isdir(self.directory_path) and
