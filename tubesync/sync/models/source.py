@@ -598,9 +598,7 @@ class Source(db.models.Model):
                 return entries
             entries = response.pop('entries', list())
             # save the response without the `entries` key as metadata
-            from .metadata import Metadata
-            md, _ = Metadata.objects.defer('value').filter(
-                source=self,
+            md, _ = self.videos.defer('value').filter(
                 media__isnull=True,
             ).get_or_create(
                 source=self,
