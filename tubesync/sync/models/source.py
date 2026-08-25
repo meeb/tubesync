@@ -566,7 +566,8 @@ class Source(db.models.Model):
             days = timezone.timedelta(seconds=self.download_cap).days
         entries = list()
         try:
-            response = indexer(self.get_index_url(url_type), days=days)
+            url = self.get_index_url(url_type)
+            response = indexer(url, days=days)
         except DownloadError as e:
             if str(e).endswith(f': This channel does not have a {url_type} tab'):
                 return entries
@@ -574,7 +575,26 @@ class Source(db.models.Model):
         else:
             if not isinstance(response, dict):
                 return entries
-            entries = response.get('entries', list())
+            entries = response.pop('entries', list())
+            # save the response without the `entries` key as metadata
+            from .metadata import Metadata
+            md, _ = Metadata.objects.defer('value').filter(
+                source=self,
+                media__isnull=True,
+            ).get_or_create(
+                source=self,
+                site=response['extractor_key'],
+                key=url,
+            )
+            field_defaults = {
+                f.attname: f.get_default()
+                for f in md._meta.fields
+                if f.has_default()
+            }
+            if 'retrieved' in field_defaults:
+                md.retrieved = field_defaults['retrieved']
+            md.value = response
+            md.save()
         return entries
 
     def index_media(self):
