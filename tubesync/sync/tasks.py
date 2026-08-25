@@ -734,12 +734,9 @@ def download_source_images(source_id):
         log.error(f'Task download_source_images(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         raise CancelExecution(_('no such source'), retry=False) from e
-    avatar = source.avatar_image_url
-    banner = source.banner_image_url
-    thumbnail = source.thumbnail_image_url
+    avatar, banner, thumbnail = source.get_image_url
     if not any((avatar, banner, thumbnail)):
-        # No URLs stored yet; fall back to a direct extraction.
-        avatar, banner, thumbnail = source.get_image_url
+        raise CancelExecution(_('data not yet available'))
     log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
         f'Banner: {banner} '

@@ -81,10 +81,34 @@ def get_channel_id(url):
             else:
                 return channel_id
 
-def get_image_info(url):
+def get_image_urls(response):
     avatar_url = None
     banner_url = None
     thumbnail_url = None
+    max_height = 0
+    for thumbnail in response.get('thumbnails', list()):
+        if not isinstance(thumbnail, dict):
+            continue
+        thumbnail_height = thumbnail.get('height')
+        try:
+            thumbnail_height = int(thumbnail_height)
+        except (TypeError, ValueError,):
+            thumbnail_height = int()
+        thumbnail_id = thumbnail.get('id')
+        thumbnail_url_value = thumbnail.get('url')
+        if not thumbnail_url_value:
+            continue
+        if 'avatar_uncropped' == thumbnail_id:
+            avatar_url = thumbnail_url_value
+        elif 'banner_uncropped' == thumbnail_id:
+            banner_url = thumbnail_url_value
+        elif thumbnail_height > max_height:
+            max_height = thumbnail_height
+            thumbnail_url = thumbnail_url_value
+    return avatar_url, banner_url, thumbnail_url
+
+
+def get_image_info(url):
     opts = get_yt_opts()
     opts.update({
         'skip_download': True,
@@ -101,22 +125,7 @@ def get_image_info(url):
         except yt_dlp.utils.DownloadError as e:
             raise YouTubeError(f'Failed to extract info for "{url}": {e}') from e
         else:
-            max_height = 0
-            for thumbnail in response['thumbnails']:
-                thumbnail_height = thumbnail.get('height')
-                try:
-                    thumbnail_height = int(thumbnail_height)
-                except (TypeError, ValueError,):
-                    thumbnail_height = int()
-                if 'avatar_uncropped' == thumbnail['id']:
-                    avatar_url = thumbnail['url']
-                elif 'banner_uncropped' == thumbnail['id']:
-                    banner_url = thumbnail['url']
-                elif thumbnail_height > max_height:
-                    max_height = thumbnail_height
-                    thumbnail_url = thumbnail['url']
-
-    return avatar_url, banner_url, thumbnail_url
+            return get_image_urls(response)
 
 
 def _subscriber_only(msg='', response=None):

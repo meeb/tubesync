@@ -19,10 +19,16 @@ from ..choices import (Val,
 from ..fields import CommaSepChoiceField
 from ..youtube import (
     get_media_info as get_youtube_media_info,
-    get_image_info as get_youtube_image_info,
+    get_image_urls as get_youtube_image_urls,
 )
 from ._migrations import media_file_storage
 from ._private import _srctype_dict
+
+
+def _has_index_metadata_value(value):
+    return value is not None and (
+        not isinstance(value, (str, list, dict)) or bool(value)
+    )
 
 
 class Source(db.models.Model):
@@ -258,24 +264,6 @@ class Source(db.models.Model):
         default=False,
         help_text=_('Copy channel banner and avatar. These may be detected and used by some media servers'),
     )
-    avatar_image_url = db.models.URLField(
-        _('avatar image URL'),
-        blank=True,
-        null=True,
-        help_text=_('Avatar image URL captured during indexing'),
-    )
-    banner_image_url = db.models.URLField(
-        _('banner image URL'),
-        blank=True,
-        null=True,
-        help_text=_('Banner image URL captured during indexing'),
-    )
-    thumbnail_image_url = db.models.URLField(
-        _('thumbnail image URL'),
-        blank=True,
-        null=True,
-        help_text=_('Thumbnail image URL captured during indexing'),
-    )
     copy_thumbnails = db.models.BooleanField(
         _('copy thumbnails'),
         default=False,
@@ -501,50 +489,17 @@ class Source(db.models.Model):
 
     @property
     def get_image_url(self):
-        return get_youtube_image_info(self.url)
-
-    def save_indexed_image_urls(self, response, /):
-        '''
-            Persist channel image URLs from an index response so that
-            downloading source images does not need its own extraction.
-        '''
-        if not isinstance(response, dict):
-            return False
-        thumbnails = response.get('thumbnails')
-        if not thumbnails:
-            return False
-        avatar_url = banner_url = thumbnail_url = None
-        max_height = 0
-        for thumbnail in thumbnails:
-            height = thumbnail.get('height')
-            try:
-                height = int(height)
-            except (TypeError, ValueError):
-                height = 0
-            thumbnail_id = thumbnail.get('id')
-            url = thumbnail.get('url')
-            if 'avatar_uncropped' == thumbnail_id:
-                avatar_url = url
-            elif 'banner_uncropped' == thumbnail_id:
-                banner_url = url
-            elif height > max_height:
-                max_height = height
-                thumbnail_url = url
-        self.avatar_image_url = avatar_url
-        self.banner_image_url = banner_url
-        self.thumbnail_image_url = thumbnail_url
-        update_fields = (
-            'avatar_image_url',
-            'banner_image_url',
-            'thumbnail_image_url',
-        )
-        try:
-            self.save(update_fields=update_fields)
-        except ValueError:
-            # The row may not exist in the database yet (e.g. during
-            # indexing of a newly created Source before any save()).
-            self.save()
-        return True
+        metadata = self.videos.filter(
+            media__isnull=True,
+        ).exclude(
+            key__in=self.media_source.values('key'),
+        ).order_by(
+            '-retrieved',
+            '-created',
+        ).first()
+        if metadata is None:
+            return None, None, None
+        return get_youtube_image_urls(metadata.value)
 
 
     def directory_exists(self):
@@ -635,10 +590,25 @@ class Source(db.models.Model):
         else:
             if not isinstance(response, dict):
                 return entries
-            # Keep the channel image URLs from this response so downloading
-            # source images does not need a separate extraction later.
-            self.save_indexed_image_urls(response)
-            entries = response.get('entries', list())
+            entries = response.pop('entries', list())
+            from .metadata import Metadata
+            metadata, created = Metadata.objects.filter(
+                media__isnull=True,
+            ).get_or_create(
+                source=self,
+                site=response['extractor_key'],
+                key=response.get('id', self.key),
+            )
+            if not created and isinstance(metadata.value, dict):
+                for key, value in metadata.value.items():
+                    if (
+                        _has_index_metadata_value(value) and
+                        not _has_index_metadata_value(response.get(key))
+                    ):
+                        response[key] = value
+            metadata.retrieved = metadata._meta.get_field('retrieved').get_default()
+            metadata.value = response
+            metadata.save(update_fields=('retrieved', 'value'))
         return entries
 
     def index_media(self):
