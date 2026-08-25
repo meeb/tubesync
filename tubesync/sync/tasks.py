@@ -734,6 +734,16 @@ def download_source_images(source_id):
         log.error(f'Task download_source_images(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         raise CancelExecution(_('no such source'), retry=False) from e
+
+    keys = list()
+    if source.index_videos:
+        keys.append(source.get_index_url('videos'))
+    if not source.is_playlist and source.index_streams:
+        keys.append(source.get_index_url('streams'))
+    qs = Metadata.objects.filter(source=source, media__isnull=True, key__in=keys)
+    if not qs:
+        raise CancelExecution(_('metadata not yet available'))
+
     avatar, banner, thumbnail = source.get_image_url
     log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
