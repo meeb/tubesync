@@ -610,10 +610,12 @@ class Source(db.models.Model):
                 for f in md._meta.fields
                 if f.has_default()
             }
+            updated = {'value'}
             if 'retrieved' in field_defaults:
                 md.retrieved = field_defaults['retrieved']
+                updated.add('retrieved')
             md.value = response
-            md.save()
+            md.save(update_fields=updated)
         return entries
 
     def index_media(self):
