@@ -6,6 +6,7 @@ from django.test import TestCase
 from common.huey import CancelExecution
 from sync.models import Media, Metadata, Source
 from sync.tasks import download_source_images
+from sync.youtube import merge_image_thumbnails
 
 
 class SourceImagesTestCase(TestCase):
@@ -55,10 +56,26 @@ class SourceImagesTestCase(TestCase):
             site='YoutubeTab',
             key=index_url,
         )
-        self.assertIn('entries', response)
+        self.assertNotIn('entries', response)
         self.assertNotIn('entries', metadata.value)
         self.assertEqual(metadata.value['id'], 'channel-id')
         self.assertEqual(metadata.value['thumbnails'], self._response()['thumbnails'])
+
+    def test_merge_image_thumbnails_normalises_invalid_dimensions(self):
+        previous = [{
+            'id': 'uncropped',
+            'width': None,
+            'height': None,
+            'url': 'https://example.com/old.jpg',
+        }]
+        current = [{
+            'id': 'uncropped',
+            'width': None,
+            'height': {},
+            'url': 'https://example.com/current.jpg',
+        }]
+
+        self.assertEqual(merge_image_thumbnails(previous, current), current)
 
     def test_get_index_preserves_valid_metadata_values(self):
         source = self._source()
@@ -117,6 +134,26 @@ class SourceImagesTestCase(TestCase):
         self.assertEqual(metadata.value['extractor_key'], 'YoutubeTab')
         self.assertEqual(metadata.value['id'], 'channel-id')
         self.assertEqual(metadata.value['title'], 'Updated channel title')
+
+    def test_get_index_updates_the_default_site_for_later_complete_responses(self):
+        source = self._source()
+        incomplete_response = self._response(
+            extractor_key=None,
+            id=None,
+            entries=[],
+        )
+        responses = [incomplete_response, self._response(entries=[])]
+
+        with patch.dict(source.INDEXERS, {
+            source.source_type: lambda *args, **kwargs: responses.pop(0),
+        }):
+            source.get_index('videos')
+            source.get_index('videos')
+
+        self.assertEqual(Metadata.objects.filter(source=source).count(), 1)
+        metadata = Metadata.objects.get(source=source)
+        self.assertEqual(metadata.key, source.get_index_url('videos'))
+        self.assertEqual(metadata.site, 'YoutubeTab')
 
     def test_download_source_images_uses_index_metadata_without_extraction(self):
         source = self._source()

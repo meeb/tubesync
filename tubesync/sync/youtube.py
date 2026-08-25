@@ -97,7 +97,7 @@ def _thumbnail_identity(thumbnail):
         try:
             return int(value)
         except (TypeError, ValueError):
-            return value
+            return int()
 
     return thumbnail_id, dimension('width'), dimension('height')
 

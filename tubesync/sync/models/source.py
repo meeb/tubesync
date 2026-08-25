@@ -28,9 +28,7 @@ from ._private import _srctype_dict
 
 
 def _has_index_metadata_value(value):
-    return value is not None and (
-        not isinstance(value, (str, list, dict)) or bool(value)
-    )
+    return bool(value) or value in (0, False,)
 
 
 class Source(db.models.Model):
@@ -596,7 +594,6 @@ class Source(db.models.Model):
         else:
             if not isinstance(response, dict):
                 return entries
-            response = response.copy()
             entries = response.pop('entries', list())
             site = response.get('extractor_key')
             metadata, _ = self.videos.filter(
@@ -623,10 +620,10 @@ class Source(db.models.Model):
                     not _has_index_metadata_value(response.get(key))
                 ):
                     response[key] = value
-            update_fields = ['retrieved', 'value']
+            update_fields = {'retrieved', 'value'}
             if site and metadata.site != site:
                 metadata.site = site
-                update_fields.append('site')
+                update_fields.add('site')
             metadata.retrieved = metadata._meta.get_field('retrieved').get_default()
             metadata.value = response
             metadata.save(update_fields=update_fields)
