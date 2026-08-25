@@ -29,3 +29,8 @@ bgutil-ytdlp-pot-provider = "==1.3.2"
 yt-dlp-remote-cipher = "*"
 babi = "*"
 hat-syslog = "==0.7.28"
+# pinned to match patches/hat/juggler/server.py, which fixes an unquoted
+# forward reference (`-> Connection` instead of `-> 'Connection'`) that
+# crashes hat-syslog-server on Python 3.13; update the pin and the patch
+# together if upstream releases a fixed hat-juggler version.
+hat-juggler = "==0.7.4"
