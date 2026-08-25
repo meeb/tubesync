@@ -740,7 +740,7 @@ def download_source_images(source_id):
         keys.append(source.get_index_url('videos'))
     if not source.is_playlist and source.index_streams:
         keys.append(source.get_index_url('streams'))
-    qs = Metadata.objects.filter(source=source, media__isnull=True, key__in=keys)
+    qs = source.videos.filter(media__isnull=True, key__in=keys)
     if not qs:
         raise CancelExecution(_('metadata not yet available'))
 
