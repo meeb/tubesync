@@ -52,19 +52,26 @@ class SourceImagesTestCase(TestCase):
             source=source,
             media=None,
             site='YoutubeTab',
-            key='channel-id',
+            key='source-key',
         )
+        self.assertIn('entries', response)
         self.assertNotIn('entries', metadata.value)
+        self.assertEqual(metadata.value['id'], 'channel-id')
         self.assertEqual(metadata.value['thumbnails'], self._response()['thumbnails'])
 
     def test_get_index_preserves_valid_metadata_values(self):
         source = self._source()
+        replacement_avatar = {
+            'id': 'avatar_uncropped',
+            'height': 100,
+            'url': 'https://example.com/new-avatar.jpg',
+        }
         responses = [
             self._response(),
             self._response(
                 title='Updated channel title',
                 description=None,
-                thumbnails=[],
+                thumbnails=[replacement_avatar],
                 entries=[],
             ),
         ]
@@ -79,14 +86,42 @@ class SourceImagesTestCase(TestCase):
         metadata = Metadata.objects.get(source=source)
         self.assertEqual(metadata.value['title'], 'Updated channel title')
         self.assertEqual(metadata.value['description'], 'Channel description')
-        self.assertEqual(metadata.value['thumbnails'], self._response()['thumbnails'])
+        self.assertEqual(source.get_image_url, (
+            'https://example.com/new-avatar.jpg',
+            'https://example.com/banner.jpg',
+            'https://example.com/big.jpg',
+        ))
+
+    def test_get_index_uses_stable_identity_for_incomplete_responses(self):
+        source = self._source()
+        incomplete_response = self._response(
+            extractor_key=None,
+            id=None,
+            title='Updated channel title',
+            entries=[],
+        )
+        responses = [self._response(), incomplete_response]
+
+        with patch.dict(source.INDEXERS, {
+            source.source_type: lambda *args, **kwargs: responses.pop(0),
+        }):
+            source.get_index('videos')
+            source.get_index('videos')
+
+        self.assertEqual(Metadata.objects.filter(source=source).count(), 1)
+        metadata = Metadata.objects.get(source=source)
+        self.assertEqual(metadata.key, source.key)
+        self.assertEqual(metadata.site, 'YoutubeTab')
+        self.assertEqual(metadata.value['extractor_key'], 'YoutubeTab')
+        self.assertEqual(metadata.value['id'], 'channel-id')
+        self.assertEqual(metadata.value['title'], 'Updated channel title')
 
     def test_download_source_images_uses_index_metadata_without_extraction(self):
         source = self._source()
         Metadata.objects.create(
             source=source,
             site='YoutubeTab',
-            key='channel-id',
+            key=source.key,
             value=self._response(entries=[]),
         )
         Media.objects.create(source=source, key='video-id')
@@ -106,7 +141,7 @@ class SourceImagesTestCase(TestCase):
                 image_file.write(b'image')
 
         with patch('sync.tasks.get_remote_image', return_value=FakeImage()) as get_img, \
-             patch('sync.youtube.get_image_info') as extract, \
+             patch('sync.youtube.yt_dlp.YoutubeDL') as youtube_dl, \
              patch('builtins.open', mock_open()):
             download_source_images.call_local(str(source.pk))
 
@@ -115,7 +150,7 @@ class SourceImagesTestCase(TestCase):
             call('https://example.com/banner.jpg'),
             call('https://example.com/avatar.jpg'),
         ])
-        extract.assert_not_called()
+        youtube_dl.assert_not_called()
 
     def test_download_source_images_retries_until_index_data_is_available(self):
         source = self._source()
@@ -130,8 +165,8 @@ class SourceImagesTestCase(TestCase):
         Metadata.objects.create(
             source=source,
             site='YoutubeTab',
-            key='channel-id',
-            value=self._response(thumbnails=[], entries=[]),
+            key=source.key,
+            value=self._response(thumbnails=None, entries=[]),
         )
 
         with self.assertRaisesRegex(CancelExecution, 'data not yet available'):

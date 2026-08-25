@@ -81,12 +81,47 @@ def get_channel_id(url):
             else:
                 return channel_id
 
+def _thumbnail_items(value):
+    if not isinstance(value, (list, tuple)):
+        return tuple()
+    return value
+
+
+def _thumbnail_identity(thumbnail):
+    thumbnail_id = thumbnail.get('id')
+    if thumbnail_id in ('avatar_uncropped', 'banner_uncropped'):
+        return thumbnail_id,
+
+    def dimension(name):
+        value = thumbnail.get(name)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return value
+
+    return thumbnail_id, dimension('width'), dimension('height')
+
+
+def merge_image_thumbnails(previous, current):
+    thumbnails = dict()
+    for thumbnail in (
+        *_thumbnail_items(previous),
+        *_thumbnail_items(current),
+    ):
+        if not isinstance(thumbnail, dict) or not thumbnail.get('url'):
+            continue
+        thumbnails[_thumbnail_identity(thumbnail)] = thumbnail
+    return list(thumbnails.values())
+
+
 def get_image_urls(response):
     avatar_url = None
     banner_url = None
     thumbnail_url = None
+    if not isinstance(response, dict):
+        return avatar_url, banner_url, thumbnail_url
     max_height = 0
-    for thumbnail in response.get('thumbnails', list()):
+    for thumbnail in _thumbnail_items(response.get('thumbnails')):
         if not isinstance(thumbnail, dict):
             continue
         thumbnail_height = thumbnail.get('height')

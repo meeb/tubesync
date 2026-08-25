@@ -20,6 +20,7 @@ from ..fields import CommaSepChoiceField
 from ..youtube import (
     get_media_info as get_youtube_media_info,
     get_image_urls as get_youtube_image_urls,
+    merge_image_thumbnails,
 )
 from ._migrations import media_file_storage
 from ._private import _srctype_dict
@@ -491,8 +492,7 @@ class Source(db.models.Model):
     def get_image_url(self):
         metadata = self.videos.filter(
             media__isnull=True,
-        ).exclude(
-            key__in=self.media_source.values('key'),
+            key=self.key,
         ).order_by(
             '-retrieved',
             '-created',
@@ -590,25 +590,39 @@ class Source(db.models.Model):
         else:
             if not isinstance(response, dict):
                 return entries
+            response = response.copy()
             entries = response.pop('entries', list())
             from .metadata import Metadata
-            metadata, created = Metadata.objects.filter(
+            site = response.get('extractor_key')
+            metadata, _ = Metadata.objects.filter(
                 media__isnull=True,
             ).get_or_create(
                 source=self,
-                site=response['extractor_key'],
-                key=response.get('id', self.key),
+                key=self.key,
+                defaults={
+                    'site': site or Metadata._meta.get_field('site').get_default(),
+                },
             )
-            if not created and isinstance(metadata.value, dict):
-                for key, value in metadata.value.items():
-                    if (
-                        _has_index_metadata_value(value) and
-                        not _has_index_metadata_value(response.get(key))
-                    ):
-                        response[key] = value
+            previous = metadata.value if isinstance(metadata.value, dict) else dict()
+            response['thumbnails'] = merge_image_thumbnails(
+                previous.get('thumbnails'),
+                response.get('thumbnails'),
+            )
+            for key, value in previous.items():
+                if 'thumbnails' == key:
+                    continue
+                if (
+                    _has_index_metadata_value(value) and
+                    not _has_index_metadata_value(response.get(key))
+                ):
+                    response[key] = value
+            update_fields = ['retrieved', 'value']
+            if site and metadata.site != site:
+                metadata.site = site
+                update_fields.append('site')
             metadata.retrieved = metadata._meta.get_field('retrieved').get_default()
             metadata.value = response
-            metadata.save(update_fields=('retrieved', 'value'))
+            metadata.save(update_fields=update_fields)
         return entries
 
     def index_media(self):
