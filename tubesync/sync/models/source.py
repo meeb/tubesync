@@ -19,6 +19,7 @@ from ..choices import (Val,
 from ..fields import CommaSepChoiceField
 from ..youtube import (
     get_media_info as get_youtube_media_info,
+    get_image_info as get_youtube_image_info,
     get_image_urls as get_youtube_image_urls,
     merge_image_thumbnails,
 )
@@ -490,16 +491,20 @@ class Source(db.models.Model):
 
     @property
     def get_image_url(self):
-        metadata = self.videos.filter(
-            media__isnull=True,
-            key=self.key,
-        ).order_by(
-            '-retrieved',
-            '-created',
-        ).first()
-        if metadata is None:
-            return None, None, None
-        return get_youtube_image_urls(metadata.value)
+        return get_youtube_image_info(self.url)
+
+    def get_image_urls(self, qs):
+        avatar_url = banner_url = thumbnail_url = None
+        for metadata in qs.order_by('-retrieved', '-created'):
+            next_avatar, next_banner, next_thumbnail = get_youtube_image_urls(
+                metadata.value,
+            )
+            avatar_url = avatar_url or next_avatar
+            banner_url = banner_url or next_banner
+            thumbnail_url = thumbnail_url or next_thumbnail
+            if avatar_url and banner_url and thumbnail_url:
+                break
+        return avatar_url, banner_url, thumbnail_url
 
 
     def directory_exists(self):
@@ -582,7 +587,8 @@ class Source(db.models.Model):
             days = timezone.timedelta(seconds=self.download_cap).days
         entries = list()
         try:
-            response = indexer(self.get_index_url(url_type), days=days)
+            url = self.get_index_url(url_type)
+            response = indexer(url, days=days)
         except DownloadError as e:
             if str(e).endswith(f': This channel does not have a {url_type} tab'):
                 return entries
@@ -592,15 +598,16 @@ class Source(db.models.Model):
                 return entries
             response = response.copy()
             entries = response.pop('entries', list())
-            from .metadata import Metadata
             site = response.get('extractor_key')
-            metadata, _ = Metadata.objects.filter(
+            metadata, _ = self.videos.filter(
                 media__isnull=True,
             ).get_or_create(
                 source=self,
-                key=self.key,
+                key=url,
                 defaults={
-                    'site': site or Metadata._meta.get_field('site').get_default(),
+                    'site': site or self.videos.model._meta.get_field(
+                        'site',
+                    ).get_default(),
                 },
             )
             previous = metadata.value if isinstance(metadata.value, dict) else dict()

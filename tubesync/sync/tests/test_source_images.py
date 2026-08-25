@@ -41,6 +41,7 @@ class SourceImagesTestCase(TestCase):
     def test_get_index_stores_source_metadata_without_entries(self):
         source = self._source()
         response = self._response()
+        index_url = source.get_index_url('videos')
 
         with patch.dict(source.INDEXERS, {
             source.source_type: lambda *args, **kwargs: response,
@@ -52,7 +53,7 @@ class SourceImagesTestCase(TestCase):
             source=source,
             media=None,
             site='YoutubeTab',
-            key='source-key',
+            key=index_url,
         )
         self.assertIn('entries', response)
         self.assertNotIn('entries', metadata.value)
@@ -84,9 +85,10 @@ class SourceImagesTestCase(TestCase):
 
         self.assertEqual(Metadata.objects.filter(source=source).count(), 1)
         metadata = Metadata.objects.get(source=source)
+        self.assertEqual(metadata.key, source.get_index_url('videos'))
         self.assertEqual(metadata.value['title'], 'Updated channel title')
         self.assertEqual(metadata.value['description'], 'Channel description')
-        self.assertEqual(source.get_image_url, (
+        self.assertEqual(source.get_image_urls(source.videos.all()), (
             'https://example.com/new-avatar.jpg',
             'https://example.com/banner.jpg',
             'https://example.com/big.jpg',
@@ -110,7 +112,7 @@ class SourceImagesTestCase(TestCase):
 
         self.assertEqual(Metadata.objects.filter(source=source).count(), 1)
         metadata = Metadata.objects.get(source=source)
-        self.assertEqual(metadata.key, source.key)
+        self.assertEqual(metadata.key, source.get_index_url('videos'))
         self.assertEqual(metadata.site, 'YoutubeTab')
         self.assertEqual(metadata.value['extractor_key'], 'YoutubeTab')
         self.assertEqual(metadata.value['id'], 'channel-id')
@@ -121,7 +123,7 @@ class SourceImagesTestCase(TestCase):
         Metadata.objects.create(
             source=source,
             site='YoutubeTab',
-            key=source.key,
+            key=source.get_index_url('videos'),
             value=self._response(entries=[]),
         )
         Media.objects.create(source=source, key='video-id')
@@ -165,7 +167,7 @@ class SourceImagesTestCase(TestCase):
         Metadata.objects.create(
             source=source,
             site='YoutubeTab',
-            key=source.key,
+            key=source.get_index_url('videos'),
             value=self._response(thumbnails=None, entries=[]),
         )
 
