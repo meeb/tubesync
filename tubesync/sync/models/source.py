@@ -604,14 +604,14 @@ class Source(db.models.Model):
             if not isinstance(response, dict):
                 return entries
             entries = response.pop('entries', list())
-            site = response.get('extractor_key')
             default_site = self.videos.model._meta.get_field('site').get_default()
+            site = response.get('extractor_key') or default_site
             metadata, _ = self.videos.filter(
                 media__isnull=True,
             ).get_or_create(
                 source=self,
                 key=url,
-                defaults=dict(site=site or default_site),
+                defaults=dict(site=site),
             )
             previous = metadata.value if isinstance(metadata.value, dict) else dict()
             response['thumbnails'] = merge_image_thumbnails(
@@ -627,7 +627,7 @@ class Source(db.models.Model):
                 ):
                     response[key] = value
             update_fields = {'retrieved', 'value'}
-            if site and metadata.site != site:
+            if site and site not in (metadata.site, default_site):
                 metadata.site = site
                 update_fields.add('site')
             metadata.retrieved = metadata._meta.get_field('retrieved').get_default()
