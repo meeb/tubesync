@@ -15,6 +15,7 @@ from huey.storage import SqliteStorage as huey_SqliteStorage
 from pathlib import Path
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
 from .utils import get_usable_cpu_count
+from .yt_dlp import retry_django_db
 
 
 def _set_acquired(self, value=True):
@@ -415,7 +416,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         huey.put(key=storage_key, data=history)
     # created never used
     # ruff: ignore[RUF059]
-    th, created = TaskHistory.objects.get_or_create(
+    th, created = retry_django_db(5)(TaskHistory.objects.get_or_create)(
         task_id=str(task_obj.id),
         name=f"{task_obj.__module__}.{task_obj.name}",
         queue=huey.name,
