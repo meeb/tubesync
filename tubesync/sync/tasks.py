@@ -5,7 +5,6 @@
 
 
 import os
-import random
 import requests
 import signal
 import time
@@ -37,14 +36,14 @@ from common.errors import (
     QuerySetEmptyError,
 )
 from common.utils import (  django_queryset_generator as qs_gen,
-                            remove_enclosed, seconds_to_timestr, )
+                            remove_enclosed, seconds_to_timestr,
+                            sqlite_retry_delay, )
 from .choices import Val, IndexSchedule, TaskQueue
 from .models import Source, Media, MediaServer, Metadata
 from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
 
 atomic = db.transaction.atomic
-db_vendor = db.connection.vendor
 register_huey_signals()
 
 
@@ -205,13 +204,7 @@ def cleanup_completed_tasks():
 def save_model(instance):
     with atomic(durable=False):
         instance.save()
-    if 'sqlite' != db_vendor:
-        return
-
-    # work around for SQLite and its many
-    # "database is locked" errors
-    arg = getattr(settings, 'SQLITE_DELAY_FLOAT', 1.5)
-    time.sleep(random.expovariate(arg))
+    sqlite_retry_delay()
 
 
 def update_model(instance, **kwargs):

@@ -18,7 +18,7 @@ from common.errors import NoFormatException
 from common.json_encoder import JSONEncoder
 from common.utils import (
     clean_filename, clean_emoji, directory_and_stem,
-    glob_quote, mkdir_p, seconds_to_timestr,
+    glob_quote, mkdir_p, seconds_to_timestr, sqlite_retry_delay,
 )
 from ..youtube import (
     get_media_info as get_youtube_media_info,
@@ -646,6 +646,7 @@ class Media(models.Model):
             migrated['_using_table'] = True
             self.metadata = self.metadata_dumps(arg_dict=migrated)
             self.save()
+            sqlite_retry_delay()
         from common.logger import log
         log.debug(f'Saved to metadata: {self.key} / {self.uuid}: {key=}: {value}')
 
