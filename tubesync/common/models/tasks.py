@@ -81,6 +81,7 @@ def thqs_from_huey_ids(self, /, huey_task_ids):
                 log.warning(f"Skipping malformed Huey task ID: {tid}")
                 continue
 
+    # ruff: ignore[SIM117]
     with transaction.atomic():
         with connection.cursor() as cursor:
             # Stage 1: Store and normalize input IDs
@@ -220,9 +221,6 @@ class TaskHistory(models.Model):
         return bool(self.last_error)
 
     def __str__(self):
-        return u'{} - {}'.format(
-            self.verbose_name or self.name,
-            self.end_at,
-        )
+        return f'{self.verbose_name or self.name} - {self.end_at}'
 
 
