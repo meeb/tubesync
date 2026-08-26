@@ -52,7 +52,7 @@ else:
                 # journal_mode WAL offers increased concurrency, the default is DELETE.
                 "init_command": """
                     PRAGMA locking_mode = NORMAL;
-                    PRAGMA journal_mode = TRUNCATE;
+                    PRAGMA journal_mode = WAL;
                     PRAGMA journal_size_limit = 67108864;
                     PRAGMA legacy_alter_table = OFF;
                     PRAGMA auto_vacuum = INCREMENTAL;
