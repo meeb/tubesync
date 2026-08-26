@@ -602,16 +602,13 @@ class Source(db.models.Model):
                 return entries
             entries = response.pop('entries', list())
             site = response.get('extractor_key')
+            default_site = self.videos.model._meta.get_field('site').get_default()
             metadata, _ = self.videos.filter(
                 media__isnull=True,
             ).get_or_create(
                 source=self,
                 key=url,
-                defaults={
-                    'site': site or self.videos.model._meta.get_field(
-                        'site',
-                    ).get_default(),
-                },
+                defaults=dict(site=site or default_site),
             )
             previous = metadata.value if isinstance(metadata.value, dict) else dict()
             response['thumbnails'] = merge_image_thumbnails(
