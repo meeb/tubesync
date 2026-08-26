@@ -5,7 +5,8 @@ from unittest.mock import call, mock_open, patch
 from django.test import TestCase
 from django.utils import timezone
 
-from common.huey import CancelExecution
+from huey import CancelExecution
+
 from sync.models import Media, Metadata, Source
 from sync.tasks import download_source_images
 from sync.youtube import merge_image_thumbnails
