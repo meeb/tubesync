@@ -85,9 +85,14 @@ def get_channel_id(url):
                 return channel_id
 
 def _thumbnail_items(value):
-    if not isinstance(value, (list, tuple)):
-        return tuple()
-    return value
+    return value if isinstance(value, (list, tuple)) else tuple()
+
+
+def _thumbnail_dimension(thumbnail, name):
+    try:
+        return int(thumbnail.get(name, int()))
+    except (TypeError, ValueError):
+        return int()
 
 
 def _thumbnail_identity(thumbnail):
@@ -95,14 +100,11 @@ def _thumbnail_identity(thumbnail):
     if thumbnail_id in ('avatar_uncropped', 'banner_uncropped'):
         return thumbnail_id,
 
-    def dimension(name):
-        value = thumbnail.get(name)
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return int()
-
-    return thumbnail_id, dimension('width'), dimension('height')
+    return (
+        thumbnail_id,
+        _thumbnail_dimension(thumbnail, 'width'),
+        _thumbnail_dimension(thumbnail, 'height'),
+    )
 
 
 def merge_image_thumbnails(previous, current):
@@ -127,11 +129,7 @@ def get_image_urls(response):
     for thumbnail in _thumbnail_items(response.get('thumbnails')):
         if not isinstance(thumbnail, dict):
             continue
-        thumbnail_height = thumbnail.get('height')
-        try:
-            thumbnail_height = int(thumbnail_height)
-        except (TypeError, ValueError,):
-            thumbnail_height = int()
+        thumbnail_height = _thumbnail_dimension(thumbnail, 'height')
         thumbnail_id = thumbnail.get('id')
         thumbnail_url_value = thumbnail.get('url')
         if not thumbnail_url_value:

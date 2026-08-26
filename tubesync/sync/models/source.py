@@ -493,7 +493,13 @@ class Source(db.models.Model):
 
     def get_image_urls(self, qs):
         avatar_url = banner_url = thumbnail_url = None
-        for metadata in qs.order_by('-retrieved', '-created'):
+        index_preference = db.models.Case(
+            db.models.When(key=self.get_index_url('videos'), then=0),
+            db.models.When(key=self.get_index_url('streams'), then=1),
+            default=2,
+            output_field=db.models.IntegerField(),
+        )
+        for metadata in qs.order_by(index_preference, '-retrieved', '-created'):
             next_avatar, next_banner, next_thumbnail = get_youtube_image_urls(
                 metadata.value,
             )

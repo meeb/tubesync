@@ -1,7 +1,9 @@
 import logging
+from datetime import timedelta
 from unittest.mock import call, mock_open, patch
 
 from django.test import TestCase
+from django.utils import timezone
 
 from common.huey import CancelExecution
 from sync.models import Media, Metadata, Source
@@ -154,6 +156,65 @@ class SourceImagesTestCase(TestCase):
         metadata = Metadata.objects.get(source=source)
         self.assertEqual(metadata.key, source.get_index_url('videos'))
         self.assertEqual(metadata.site, 'YoutubeTab')
+
+    def test_get_image_urls_prefers_videos_and_uses_streams_for_missing_images(self):
+        source = self._source()
+        source.index_streams = True
+        source.save(update_fields={'index_streams'})
+        Metadata.objects.create(
+            source=source,
+            site='YoutubeTab',
+            key=source.get_index_url('videos'),
+            retrieved=timezone.now() - timedelta(days=1),
+            value={
+                'thumbnails': [
+                    {
+                        'id': 'avatar_uncropped',
+                        'height': 100,
+                        'url': 'https://example.com/videos-avatar.jpg',
+                    },
+                    {
+                        'id': 'uncropped',
+                        'height': 720,
+                        'url': 'https://example.com/videos-thumbnail.jpg',
+                    },
+                ],
+            },
+        )
+        Metadata.objects.create(
+            source=source,
+            site='YoutubeTab',
+            key=source.get_index_url('streams'),
+            retrieved=timezone.now(),
+            value={
+                'thumbnails': [
+                    {
+                        'id': 'avatar_uncropped',
+                        'height': 100,
+                        'url': 'https://example.com/streams-avatar.jpg',
+                    },
+                    {
+                        'id': 'banner_uncropped',
+                        'height': 200,
+                        'url': 'https://example.com/streams-banner.jpg',
+                    },
+                    {
+                        'id': 'uncropped',
+                        'height': 1080,
+                        'url': 'https://example.com/streams-thumbnail.jpg',
+                    },
+                ],
+            },
+        )
+
+        self.assertEqual(
+            source.get_image_urls(source.videos.filter(media__isnull=True)),
+            (
+                'https://example.com/videos-avatar.jpg',
+                'https://example.com/streams-banner.jpg',
+                'https://example.com/videos-thumbnail.jpg',
+            ),
+        )
 
     def test_download_source_images_uses_index_metadata_without_extraction(self):
         source = self._source()
