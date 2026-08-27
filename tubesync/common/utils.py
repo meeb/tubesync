@@ -220,6 +220,8 @@ def parse_database_connection_string(database_connection_string):
     if len(host_parts) != 2 or len(user_pass_parts) != 2:
         raise DatabaseConnectionError('Database connection string netloc must be in '
                                       'the format of user:pass@host')
+    # user_pass never used
+    # ruff: ignore[RUF059]
     user_pass, host_port = host_parts
     username, password = user_pass_parts
     host_port_parts = host_port.split(':')
