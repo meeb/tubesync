@@ -47,6 +47,8 @@ from .media__tasks import (
 )
 from .source import Source
 
+# ruff: file-ignore[B010,RUF059,SIM118]
+
 
 class Media(models.Model):
     '''
