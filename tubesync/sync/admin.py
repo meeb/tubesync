@@ -82,10 +82,13 @@ class MediaAdmin(admin.ModelAdmin):
         for media in qs_gen(queryset):
             media.metadata_clear(save=True)
 
-    @admin.action(description='Redownload selected Media instances')
+    @admin.action(description='Unset "downloaded" for the selected media')
     def redownload(self, request, queryset):
         # unset skip, manual_skip and downloaded
-        queryset.update(skip=False, manual_skip=False, downloaded=False)
+        updated = queryset.update(skip=False, manual_skip=False, downloaded=False)
+        self._queue_save_media_tasks(queryset)
+        self.message_user(
+            request, f'Unset "downloaded" on {updated} media item(s).')
 
 
 @admin.register(Metadata)
