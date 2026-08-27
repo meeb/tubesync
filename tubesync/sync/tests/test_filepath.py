@@ -226,6 +226,7 @@ class FilepathTestCase(TestCase):
     def test_truncate_filename_bytes_rejects_non_str(self):
 
         for bad in (None, 42, b'bytes.mkv', Path('p.mkv')):
+            # ruff: ignore[SIM117]
             with self.subTest(bad=bad):
                 with self.assertRaises(TypeError):
                     truncate_filename(bad)
