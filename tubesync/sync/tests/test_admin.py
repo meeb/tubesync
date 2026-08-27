@@ -1,8 +1,9 @@
 import logging
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.admin.sites import AdminSite
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 
 from sync.admin import MediaAdmin
 from sync.models import Source, Media
@@ -84,3 +85,26 @@ class MediaAdminBulkActionsTestCase(TestCase):
             'enable_can_download', 'disable_can_download',
         ):
             self.assertIn(action, self.model_admin.actions)
+
+    def test_save_media_tasks_not_queued_by_default(self):
+        queryset = Media.objects.filter(source=self.source)
+
+        with patch('sync.admin.save_media') as mock_save_media:
+            self.model_admin.enable_skip(self.request, queryset)
+
+        mock_save_media.map.assert_not_called()
+
+    @override_settings(SAVE_MEDIA_AFTER_BULK_ACTION=True)
+    def test_save_media_tasks_queued_when_enabled(self):
+        queryset = Media.objects.filter(source=self.source)
+
+        with patch('sync.admin.save_media') as mock_save_media:
+            self.model_admin.enable_skip(self.request, queryset)
+
+        mock_save_media.map.assert_called_once()
+        queued = set(mock_save_media.map.call_args.args[0])
+        expected = {
+            str(media_uuid)
+            for media_uuid in queryset.values_list('uuid', flat=True)
+        }
+        self.assertEqual(queued, expected)

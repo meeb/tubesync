@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin
 from .models import (
     Source,
@@ -6,6 +7,7 @@ from .models import (
     MetadataFormat,
     MediaServer
 )
+from .tasks import save_media
 
 
 @admin.register(Source)
@@ -31,25 +33,42 @@ class MediaAdmin(admin.ModelAdmin):
         'enable_can_download', 'disable_can_download',
     )
 
+    def _queue_save_media_tasks(self, queryset):
+        '''
+            Optionally queue a `save_media` task per changed item, so flags
+            are re-evaluated without waiting for the next source edit/index.
+            Disabled by default: SAVE_MEDIA_AFTER_BULK_ACTION = True enables it.
+        '''
+        if not getattr(settings, 'SAVE_MEDIA_AFTER_BULK_ACTION', False):
+            return
+        save_media.map(
+            str(media_uuid)
+            for media_uuid in queryset.values_list('uuid', flat=True)
+        )
+
     @admin.action(description='Set "skip" for the selected media')
     def enable_skip(self, request, queryset):
         updated = queryset.update(skip=True, manual_skip=True)
+        self._queue_save_media_tasks(queryset)
         self.message_user(request, f'Set "skip" on {updated} media item(s).')
 
     @admin.action(description='Unset "skip" for the selected media')
     def disable_skip(self, request, queryset):
         updated = queryset.update(skip=False, manual_skip=False)
+        self._queue_save_media_tasks(queryset)
         self.message_user(request, f'Unset "skip" on {updated} media item(s).')
 
     @admin.action(description='Set "can download" for the selected media')
     def enable_can_download(self, request, queryset):
         updated = queryset.update(can_download=True)
+        self._queue_save_media_tasks(queryset)
         self.message_user(
             request, f'Set "can download" on {updated} media item(s).')
 
     @admin.action(description='Unset "can download" for the selected media')
     def disable_can_download(self, request, queryset):
         updated = queryset.update(can_download=False)
+        self._queue_save_media_tasks(queryset)
         self.message_user(
             request, f'Unset "can download" on {updated} media item(s).')
 
