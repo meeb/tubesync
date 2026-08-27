@@ -12,7 +12,7 @@ from django.core.paginator import Paginator
 from functools import partial
 from itertools import chain
 from operator import attrgetter, itemgetter
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from urllib.parse import urlunsplit, urlencode, urlparse
 from .errors import DatabaseConnectionError, QuerySetEmptyError
 
@@ -326,8 +326,8 @@ def truncate_filename(filename: str, *, max_bytes=216, encoding='utf-8') -> str:
         raise TypeError(f'filename must be a str, got {type(filename)}')
     if len(filename.encode(encoding)) <= max_bytes:
         return filename
-    path = PurePosixPath(filename)
-    name, ext = path.stem, path.suffix
+    path = Path(filename)
+    name, ext = clean_filename(path.stem), clean_filename(path.suffix)
     ext_bytes = ext.encode(encoding)
     if len(ext_bytes) >= max_bytes:
         # Pathological extension; fall back to a plain byte cut
