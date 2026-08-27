@@ -209,7 +209,7 @@ def parse_database_connection_string(database_connection_string):
                                       f'as a database connection string: {e}') from e
     driver = parts.scheme
     user_pass_host_port = parts.netloc
-    database = parts.path
+    database = parts.path.removeprefix('/')
     if driver not in valid_drivers:
         raise DatabaseConnectionError(f'Database connection string '
                                       f'"{database_connection_string}" specified an '
@@ -244,8 +244,6 @@ def parse_database_connection_string(database_connection_string):
         # Malformed
         raise DatabaseConnectionError('Database connection host must be a hostname or '
                                       'a hostname:port combination')
-    if database.startswith('/'):
-        database = database[1:]
     if not database:
         raise DatabaseConnectionError('Database connection string path must be a '
                                       'string in the format of /databasename')    
