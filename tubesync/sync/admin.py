@@ -43,7 +43,7 @@ class MediaAdmin(admin.ModelAdmin):
             return
         save_media.map(
             str(media_uuid)
-            for media_uuid in queryset.values_list('uuid', flat=True)
+            for media_uuid in queryset.distinct().values_list('uuid', flat=True).iterator()
         )
 
     @admin.action(description='Set "skip" for the selected media')
