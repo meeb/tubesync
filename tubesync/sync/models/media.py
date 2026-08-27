@@ -5,6 +5,7 @@ from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone as tz
 from pathlib import Path, PurePosixPath
+from typing import ClassVar
 from xml.etree import ElementTree
 from django.conf import settings
 from django.db import models
@@ -57,14 +58,14 @@ class Media(models.Model):
     posix_epoch = datetime(1970, 1, 1, tzinfo=tz.utc)
 
     # Format to use to display a URL for the media
-    URLS = _srctype_dict('https://www.youtube.com/watch?v={key}')
+    URLS: ClassVar[dict[str, str]] = _srctype_dict('https://www.youtube.com/watch?v={key}')
 
     # Callback functions to get a list of media from the source
-    INDEXERS = _srctype_dict(get_youtube_media_info)
+    INDEXERS: ClassVar[dict[str, type(get_youtube_media_info)]] = _srctype_dict(get_youtube_media_info)
 
     # Maps standardised names to names used in source metdata
     _same_name = lambda n, k=None: {k or n: _srctype_dict(n) }
-    METADATA_FIELDS = {
+    METADATA_FIELDS: ClassVar[dict[str, dict[str, str]]] = {
         **(_same_name('upload_date')),
         **(_same_name('timestamp')),
         **(_same_name('title')),
@@ -81,7 +82,7 @@ class Media(models.Model):
         **(_same_name('playlist_title')),
     }
 
-    STATE_ICONS = dict(zip(
+    STATE_ICONS: ClassVar[dict[str, str]] = dict(zip(
         MediaState.values,
         (
             '<i class="far fa-question-circle" title="Unknown download state"></i>',
