@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 from django.conf import settings
@@ -162,7 +163,6 @@ class FilepathTestCase(TestCase):
         # Filesystems limit each name component to 255 bytes (issue #522).
         # Multi-byte titles reach that with far fewer characters, and the
         # download then fails with '[Errno 36] File name too long'.
-        import json
         long_metadata = json.loads(metadata)
         long_metadata['title'] = '耳' * 120  # 3 bytes per char = 360 bytes
         long_title_media = Media.objects.create(
