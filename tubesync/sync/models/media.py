@@ -776,11 +776,16 @@ class Media(models.Model):
 
     @property
     def upload_date(self):
+        ts = self.get_metadata_first_value('timestamp')
+        dt = self.ts_to_dt(ts) if ts else None
+        if dt and dt > self.posix_epoch:
+            return dt
+
         upload_date_str = self.get_metadata_first_value('upload_date')
         if not upload_date_str:
             return None
         try:
-            return datetime.strptime(upload_date_str, '%Y%m%d')
+            return datetime.strptime(upload_date_str, '%Y%m%d').replace(tzinfo=tz.utc)
         except (AttributeError, ValueError) as e:
             log.debug(f'Media.upload_date: {self.source} / {self}: strptime: {e}')
         return None
