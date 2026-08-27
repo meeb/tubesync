@@ -647,7 +647,6 @@ class Media(models.Model):
             migrated['_using_table'] = True
             self.metadata = self.metadata_dumps(arg_dict=migrated)
             self.save()
-        from common.logger import log
         log.debug(f'Saved to metadata: {self.key} / {self.uuid}: {key=}: {value}')
 
 
@@ -679,10 +678,8 @@ class Media(models.Model):
             filtered_data['_reduce_data_ran_at'] = round((now - self.posix_epoch).total_seconds())
             filtered_json = self.metadata_dumps(arg_dict=filtered_data)
         except Exception as e:
-            from common.logger import log
             log.exception('reduce_data: %s', e)
         else:
-            from common.logger import log
             # log the results of filtering / compacting on metadata size
             new_mdl = len(compact_json)
             if old_mdl > new_mdl:
@@ -1038,10 +1035,11 @@ class Media(models.Model):
         if self.downloaded:
             return Val(MediaState.DOWNLOADED)
         if task:
+            # Avoid the circular import `ImportError` from using this at the top of the file.
+            from ..tasks import get_media_download_task
             def running(arg_task, /):
                 if hasattr(arg_task, 'locked_by_pid_running'):
                     return arg_task.locked_by_pid_running()
-                from ..tasks import get_media_download_task
                 return get_media_download_task(str(self.pk))
             if running(task):
                 return Val(MediaState.DOWNLOADING)
