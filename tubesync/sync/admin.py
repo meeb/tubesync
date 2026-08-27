@@ -24,16 +24,17 @@ class SourceAdmin(admin.ModelAdmin):
 @admin.register(Media)
 class MediaAdmin(admin.ModelAdmin):
 
-    # https://docs.djangoproject.com/en/5.2/ref/contrib/admin/actions/
-    actions = ['clear_metadata', 'redownload', 'skip', 'unskip']
     ordering = ('-created',)
     list_display = ('uuid', 'key', 'source', 'can_download', 'skip', 'downloaded')
     readonly_fields = ('uuid', 'created')
     search_fields = ('uuid', 'source__key', 'key')
     list_filter = ('can_download', 'skip', 'downloaded')
+    # https://docs.djangoproject.com/en/6.0/ref/contrib/admin/actions/
     actions = (
+        'clear_metadata',
         'enable_skip', 'disable_skip',
         'enable_can_download', 'disable_can_download',
+        'redownload',
     )
 
     def _queue_save_media_tasks(self, queryset):
@@ -85,16 +86,6 @@ class MediaAdmin(admin.ModelAdmin):
     def redownload(self, request, queryset):
         # unset skip, manual_skip and downloaded
         queryset.update(skip=False, manual_skip=False, downloaded=False)
-
-    @admin.action(description='Skip selected Media instances')
-    def skip(self, request, queryset):
-        # set skip and manual_skip
-        queryset.update(skip=True, manual_skip=True)
-
-    @admin.action(description='Unskip selected Media instances')
-    def unskip(self, request, queryset):
-        # unset skip and manual_skip
-        queryset.update(skip=False, manual_skip=False)
 
 
 @admin.register(Metadata)
