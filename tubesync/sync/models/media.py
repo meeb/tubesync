@@ -681,8 +681,9 @@ class Media(models.Model):
             filtered_data = filter_response(data, True)
             filtered_data['_reduce_data_ran_at'] = round((now - self.posix_epoch).total_seconds())
             filtered_json = self.metadata_dumps(arg_dict=filtered_data)
-        except Exception as e:
-            log.exception('reduce_data: %s', e)
+        # ruff: ignore[BLE001]
+        except Exception:
+            log.exception(f'Media.reduce_data: {self.pk}')
         else:
             # log the results of filtering / compacting on metadata size
             new_mdl = len(compact_json)
@@ -722,6 +723,7 @@ class Media(models.Model):
                 pass
             setattr(self, '_cached_metadata_dict', data)
             return data
+        # ruff: ignore[BLE001]
         except Exception:
             return {}
 
