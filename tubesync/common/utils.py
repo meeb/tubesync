@@ -321,6 +321,7 @@ def truncate_filename(filename: str, *, max_bytes=216, encoding='utf-8') -> str:
         by `_..._`. Truncation never splits a multi-byte character: partial
         trailing/leading sequences are dropped when decoding.
     '''
+    max_bytes = max(96, min(232, max_bytes))
     if not isinstance(filename, str):
         raise TypeError(f'filename must be a str, got {type(filename)}')
     if len(filename.encode(encoding)) <= max_bytes:
@@ -334,9 +335,9 @@ def truncate_filename(filename: str, *, max_bytes=216, encoding='utf-8') -> str:
     marker = '_..._'
     stem_budget = max_bytes - len(ext_bytes) - len(marker.encode(encoding))
     stem_bytes = name.encode(encoding)
-    # Keep the unique suffixes at the end of the stem intact (up to half of
-    # the budget), then fill the rest from the front.
-    tail_keep = min(stem_budget // 2, 64)
+    # Keep the unique suffixes at the end of the stem intact (up to a third of
+    # the bytes limit), then fill the rest from the front.
+    tail_keep = min(stem_budget // 2, max_bytes // 3)
     head_keep = stem_budget - tail_keep
     head = stem_bytes[:head_keep].decode(encoding, errors='ignore').rstrip()
     tail = stem_bytes[-tail_keep:].decode(encoding, errors='ignore').lstrip()
