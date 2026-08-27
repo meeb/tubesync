@@ -20,7 +20,7 @@ from common.json_encoder import JSONEncoder
 from common.utils import (
     clean_filename, clean_emoji, directory_and_stem,
     glob_quote, mkdir_p, seconds_to_timestr,
-    truncate_filename_bytes,
+    truncate_filename,
 )
 from ..youtube import (
     get_media_info as get_youtube_media_info,
@@ -860,7 +860,7 @@ class Media(models.Model):
         # leaves headroom for suffixes appended during download
         # (`.fNNN.ext.part-FragNNN.part` and thumbnail/subtitle siblings).
         path = PurePosixPath(result)
-        truncated = truncate_filename_bytes(path.name)
+        truncated = truncate_filename(path.name)
         if truncated != path.name:
             log.warning(f'Media filename exceeded the filesystem byte limit '
                         f'and was shortened: {self!r}')

@@ -305,7 +305,7 @@ def clean_emoji(s: str) -> str:
     return emoji.replace_emoji(s)
 
 
-def truncate_filename_bytes(filename: str, *, max_bytes=216, encoding='utf-8') -> str:
+def truncate_filename(filename: str, *, max_bytes=216, encoding='utf-8') -> str:
     '''
         Shortens a filename to fit within `max_bytes` bytes (not characters)
         while keeping its extension intact. Filesystems limit name length in

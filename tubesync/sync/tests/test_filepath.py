@@ -4,6 +4,7 @@ from pathlib import Path
 from django.conf import settings
 from django.test import TestCase
 from django.utils import timezone
+from common.utils import truncate_filename
 from sync.models import Source, Media
 from sync.choices import (
     Val, Fallback, SourceResolution,
@@ -190,7 +191,6 @@ class FilepathTestCase(TestCase):
         # Bytes known to cause encoding/decoding trouble must never produce
         # an invalid or over-budget name: the cut points land inside
         # multi-byte sequences on purpose here.
-        from common.utils import truncate_filename_bytes
 
         cases = [
             # 4-byte astral plane (emoji): cut lands mid-sequence
@@ -212,7 +212,7 @@ class FilepathTestCase(TestCase):
         ]
         for original in cases:
             with self.subTest(original=original[:24]):
-                result = truncate_filename_bytes(original, max_bytes=208)
+                result = truncate_filename(original, max_bytes=208)
                 # fits the byte budget
                 self.assertLessEqual(len(result.encode('utf-8')), 208)
                 # still valid UTF-8 round-trip (no partial sequences kept)
@@ -224,12 +224,11 @@ class FilepathTestCase(TestCase):
                 self.assertTrue(result)
 
     def test_truncate_filename_bytes_rejects_non_str(self):
-        from common.utils import truncate_filename_bytes
 
         for bad in (None, 42, b'bytes.mkv', Path('p.mkv')):
             with self.subTest(bad=bad):
                 with self.assertRaises(TypeError):
-                    truncate_filename_bytes(bad)
+                    truncate_filename(bad)
 
     def test_directory_prefix(self):
         # Confirm the setting exists and is valid
