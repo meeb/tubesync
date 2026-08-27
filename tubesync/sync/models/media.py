@@ -598,14 +598,17 @@ class Media(models.Model):
             self.save()
 
 
-    def metadata_dumps(self, arg_dict=dict()):
+    def metadata_dumps(self, arg_dict=None):
         fallback = dict()
         try:
             fallback.update(self.new_metadata.with_formats)
         except ObjectDoesNotExist:
             pass
-        data = arg_dict or fallback
-        return json.dumps(data, separators=(',', ':'), cls=JSONEncoder)
+        return json.dumps(
+            arg_dict or fallback,
+            separators=(',', ':'),
+            cls=JSONEncoder,
+        )
 
 
     def metadata_loads(self, arg_str='{}'):
