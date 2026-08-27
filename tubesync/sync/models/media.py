@@ -4,7 +4,7 @@ import json
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone as tz
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import ClassVar
 from xml.etree import ElementTree
 from django.conf import settings
@@ -859,7 +859,7 @@ class Media(models.Model):
         # any directories in the format string are preserved. The budget
         # leaves headroom for suffixes appended during download
         # (`.fNNN.ext.part-FragNNN.part` and thumbnail/subtitle siblings).
-        path = PurePosixPath(result)
+        path = Path(result)
         truncated = truncate_filename(path.name)
         if truncated != path.name:
             log.warning(f'Media filename exceeded the filesystem byte limit '
