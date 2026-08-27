@@ -176,7 +176,7 @@ class FilepathTestCase(TestCase):
         # Directories from the format string survive untouched
         self.assertEqual('2017', directory)
         # The name component fits in the byte budget...
-        self.assertLessEqual(len(name.encode('utf-8')), 200)
+        self.assertLessEqual(len(name.encode('utf-8')), 216)
         # ... keeps its extension and key suffix material intact ...
         self.assertTrue(name.endswith('_longkey.mkv'))
         # ... and was not cut mid multi-byte character (encodes cleanly)

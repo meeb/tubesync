@@ -284,9 +284,9 @@ def append_uri_params(uri, params):
     return urlunsplit(('', '', uri, qs, ''))
 
 
-def clean_filename(filename):
+def clean_filename(filename: str) -> str:
     if not isinstance(filename, str):
-        raise ValueError(f'filename must be a str, got {type(filename)}')
+        raise TypeError(f'filename must be a str, got {type(filename)}')
     to_scrub = r'<>\/:*?"|%'
     for char in list(to_scrub):
         filename = filename.replace(char, '')
@@ -299,13 +299,13 @@ def clean_filename(filename):
     return clean_filename.strip()
 
 
-def clean_emoji(s):
+def clean_emoji(s: str) -> str:
     if not isinstance(s, str):
-        raise ValueError(f'parameter must be a str, got {type(s)}')
+        raise TypeError(f'parameter must be a str, got {type(s)}')
     return emoji.replace_emoji(s)
 
 
-def truncate_filename_bytes(filename, /, max_bytes=200, encoding='utf-8'):
+def truncate_filename_bytes(filename: str, *, max_bytes=216, encoding='utf-8') -> str:
     '''
         Shortens a filename to fit within `max_bytes` bytes (not characters)
         while keeping its extension intact. Filesystems limit name length in
