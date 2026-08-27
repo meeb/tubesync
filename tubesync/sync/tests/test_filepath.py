@@ -212,9 +212,9 @@ class FilepathTestCase(TestCase):
         ]
         for original in cases:
             with self.subTest(original=original[:24]):
-                result = truncate_filename_bytes(original)
+                result = truncate_filename_bytes(original, max_bytes=208)
                 # fits the byte budget
-                self.assertLessEqual(len(result.encode('utf-8')), 200)
+                self.assertLessEqual(len(result.encode('utf-8')), 208)
                 # still valid UTF-8 round-trip (no partial sequences kept)
                 self.assertEqual(
                     result,
