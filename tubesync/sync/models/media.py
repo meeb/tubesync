@@ -744,7 +744,6 @@ class Media(models.Model):
             timestamp_float = float(timestamp)
         except (TypeError, ValueError,) as e:
             log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
-            pass
         else:
             return self.posix_epoch + timedelta(seconds=timestamp_float)
         return None
@@ -784,7 +783,6 @@ class Media(models.Model):
             return datetime.strptime(upload_date_str, '%Y%m%d')
         except (AttributeError, ValueError) as e:
             log.debug(f'Media.upload_date: {self.source} / {self}: strptime: {e}')
-            pass
         return None
 
     @property
