@@ -38,6 +38,7 @@ from common.errors import (
 )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, seconds_to_timestr, )
+from common.yt_dlp import retry_django_db
 from .choices import Val, IndexSchedule, TaskQueue
 from .models import Source, Media, MediaServer, Metadata
 from .utils import get_remote_image, resize_image_to_height, filter_response
@@ -202,6 +203,7 @@ def cleanup_completed_tasks():
     TaskHistory.objects.filter(end_at__lt=delta).delete()
 
 
+@retry_django_db(3)
 def save_model(instance):
     with atomic(durable=False):
         instance.save()
@@ -214,6 +216,7 @@ def save_model(instance):
     time.sleep(random.expovariate(arg))
 
 
+@retry_django_db(3)
 def update_model(instance, **kwargs):
     qs = instance.__class__.objects.all()
     return qs.filter(

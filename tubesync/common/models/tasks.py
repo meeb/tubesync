@@ -8,7 +8,9 @@ from django.utils import timezone
 from ..json_encoder import JSONEncoder
 # from common.json_encoder import JSONEncoder
 from ..utils import is_empty_iterator
-#from common.utils import is_empty_iterator
+# from common.utils import is_empty_iterator
+from ..yt_dlp import retry_django_db
+# from common.yt_dlp import retry_django_db
 
 # cls = TaskHistory
 # TaskHistory is defined below this function in this file
@@ -79,6 +81,7 @@ def thqs_from_huey_ids(self, /, huey_task_ids):
                 log.warning(f"Skipping malformed Huey task ID: {tid}")
                 continue
 
+    # ruff: ignore[SIM117]
     with transaction.atomic():
         with connection.cursor() as cursor:
             # Stage 1: Store and normalize input IDs
@@ -205,6 +208,7 @@ class TaskHistory(models.Model):
     def schedule(cls, task_wrapper, /, *args, vn_args=(), vn_fmt=None, **kwargs):
         return th_schedule(cls, task_wrapper, *args, vn_fmt=vn_fmt, vn_args=vn_args, **kwargs)
 
+    @retry_django_db(10)
     def save(self, *args, **kwargs):
         self.queue = self.queue or None
         self.verbose_name = self.verbose_name or None
@@ -217,9 +221,6 @@ class TaskHistory(models.Model):
         return bool(self.last_error)
 
     def __str__(self):
-        return u'{} - {}'.format(
-            self.verbose_name or self.name,
-            self.end_at,
-        )
+        return f'{self.verbose_name or self.name} - {self.end_at}'
 
 
