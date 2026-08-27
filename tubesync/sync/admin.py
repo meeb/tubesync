@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib import admin
+from common.utils import django_queryset_generator as qs_gen
 from .models import (
     Source,
     Media,
@@ -28,9 +29,12 @@ class MediaAdmin(admin.ModelAdmin):
     readonly_fields = ('uuid', 'created')
     search_fields = ('uuid', 'source__key', 'key')
     list_filter = ('can_download', 'skip', 'downloaded')
+    # https://docs.djangoproject.com/en/6.0/ref/contrib/admin/actions/
     actions = (
+        'clear_metadata',
         'enable_skip', 'disable_skip',
         'enable_can_download', 'disable_can_download',
+        'redownload',
     )
 
     def _queue_save_media_tasks(self, queryset):
@@ -71,6 +75,25 @@ class MediaAdmin(admin.ModelAdmin):
         self._queue_save_media_tasks(queryset)
         self.message_user(
             request, f'Unset "can download" on {updated} media item(s).')
+
+    @admin.action(description='Clear all metadata from the selected Media instances')
+    def clear_metadata(self, request, queryset):
+        # clear the metadata
+        updated = 0
+        for media in qs_gen(queryset):
+            media.metadata_clear(save=True)
+            updated += 1
+        self._queue_save_media_tasks(queryset)
+        self.message_user(
+            request, f'Cleared metadata from {updated} media item(s).')
+
+    @admin.action(description='Unset "downloaded" for the selected media')
+    def redownload(self, request, queryset):
+        # unset skip, manual_skip and downloaded
+        updated = queryset.update(skip=False, manual_skip=False, downloaded=False)
+        self._queue_save_media_tasks(queryset)
+        self.message_user(
+            request, f'Unset "downloaded" on {updated} media item(s).')
 
 
 @admin.register(Metadata)
