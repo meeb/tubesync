@@ -4,20 +4,18 @@ from django.utils.translation import gettext_lazy as _
 from copy import deepcopy
 
 
-DOMAINS = dict({
-    'youtube': frozenset({
+DOMAINS = {
+    'youtube': frozenset((
         'youtube.com',
         'm.youtube.com',
         'music.youtube.com',
         'www.youtube.com',
-    }),
-})
+    )),
+}
 
 
 def Val(*args):
-    results = list(
-        a.value if isinstance(a, models.enums.Choices) else a for a in args
-    )
+    results = [ a.value if isinstance(a, models.enums.Choices) else a for a in args ]
     return results.pop(0) if 1 == len(results) else (*results,)
 
 

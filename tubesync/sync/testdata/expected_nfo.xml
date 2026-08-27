@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf8'?>
+<episodedetails>
+  <title>no fancy stuff title</title>
+  <showtitle>testname</showtitle>
+  <season>2017</season>
+  <episode></episode>
+  <ratings>
+    <rating default="True" max="5" name="youtube">
+      <value>1.2345</value>
+      <votes>579</votes>
+    </rating>
+  </ratings>
+  <plot>no fancy stuff desc</plot>
+  <thumb />
+  <mpaa>50</mpaa>
+  <runtime>401</runtime>
+  <id>mediakey</id>
+  <uniqueid default="True" type="youtube">mediakey</uniqueid>
+  <studio>test uploader</studio>
+  <aired>2017-09-11</aired>
+  <dateadded>2020-01-01 01:01:01</dateadded>
+  <genre>test category 1</genre>
+  <genre>test category 2</genre>
+</episodedetails>

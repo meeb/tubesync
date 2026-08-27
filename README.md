@@ -25,25 +25,30 @@ ghcr.io/meeb/tubesync:latest
 
 # Screenshots
 
+<details>
+<summary>Click to expand screenshots</summary>
+
 ### Dashboard
 
-![TubeSync Dashboard](https://github.com/meeb/tubesync/blob/main/docs/dashboard-v0.5.png?raw=true)
+![TubeSync Dashboard](docs/dashboard-v0.5.png)
 
 ### Sources overview
 
-![TubeSync sources overview](https://github.com/meeb/tubesync/blob/main/docs/sources-v0.5.png?raw=true)
+![TubeSync sources overview](docs/sources-v0.5.png)
 
 ### Source details
 
-![TubeSync source details](https://github.com/meeb/tubesync/blob/main/docs/source-v0.5.png?raw=true)
+![TubeSync source details](docs/source-v0.5.png)
 
 ### Media overview
 
-![TubeSync media overview](https://github.com/meeb/tubesync/blob/main/docs/media-v0.5.png?raw=true)
+![TubeSync media overview](docs/media-v0.5.png)
 
 ### Media details
 
-![TubeSync media-details](https://github.com/meeb/tubesync/blob/main/docs/media-item-v0.5.png?raw=true)
+![TubeSync media-details](docs/media-item-v0.5.png)
+
+</details>
 
 
 # Requirements
@@ -146,36 +151,9 @@ services:
 
 ## Optional authentication
 
-Available in `v1.0` (or `:latest`) and later. If you want to enable a basic username and
-password to be required to access the TubeSync dashboard you can set them with the
-following environment variables:
-
-```bash
-HTTP_USER
-HTTP_PASS
-```
-
-For example, in the `docker run ...` line add in:
-
-```bash
-...
--e HTTP_USER=some-username \
--e HTTP_PASS=some-secure-password \
-...
-```
-
-Or in your Docker Compose file you would add in:
-
-```yaml
-...
-    environment:
-      - HTTP_USER=some-username
-      - HTTP_PASS=some-secure-password
-...
-```
-
-When BOTH `HTTP_USER` and `HTTP_PASS` are set then basic HTTP authentication will be
-enabled.
+You can enable basic HTTP authentication by setting the `HTTP_USER` and `HTTP_PASS`
+environment variables. See the [environment variables reference](https://github.com/meeb/tubesync/wiki/Environment-Variables#authentication)
+for details.
 
 
 # Updating
@@ -235,37 +213,12 @@ under the "media servers" tab.
 
 # Logging and debugging
 
-> [!TIP]
-> Even more detailed logs are produced when the environment variable `TUBESYNC_DEBUG` is set to `True`.
-
-TubeSync outputs useful logs, errors and debugging information to the console. You can
-view these with:
-
-```bash
-$ docker logs --follow tubesync
-```
-
-To include logs with an issue report, please extract a file and attach it to the issue.
-The command below creates the `TubeSync.logs.txt` file with the logs from the `tubesync` container:
-
-```bash
-docker logs -t tubesync > TubeSync.logs.txt 2>&1
-```
+Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Logging-and-debugging#logging-and-debugging).
 
 
 # Advanced usage guides
 
-Once you're happy using TubeSync there are some advanced usage guides for more complex
-and less common features:
-
- * [Using Plex](https://github.com/meeb/tubesync/blob/main/docs/plex-notes.md)
- * [Import existing media into TubeSync](https://github.com/meeb/tubesync/blob/main/docs/import-existing-media.md)
- * [Sync or create missing metadata files](https://github.com/meeb/tubesync/blob/main/docs/create-missing-metadata.md)
- * [Reset tasks from the command line](https://github.com/meeb/tubesync/blob/main/docs/reset-tasks.md)
- * [Using PostgreSQL, MySQL or MariaDB as database backends](https://github.com/meeb/tubesync/blob/main/docs/other-database-backends.md)
- * [YouTube Proof-of-Origin Tokens](https://github.com/meeb/tubesync/blob/main/docs/youtube-pot.md)
- * [Using cookies](https://github.com/meeb/tubesync/blob/main/docs/using-cookies.md)
- * [Reset metadata](https://github.com/meeb/tubesync/blob/main/docs/reset-metadata.md)
+Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Advanced-usage-guides#advanced-usage-guides).
 
 
 # Warnings
@@ -289,97 +242,10 @@ downloading any media. Check your tasks for the status of your TubeSync install.
 source, if you try to crawl extremely large amounts quickly. **Try to be polite
 with the smallest amount of indexing and concurrent downloads possible for your needs.**
 
+
 # FAQ
 
-### Can I use TubeSync to download single videos?
-
-No, TubeSync is designed to repeatedly scan and download new media from channels or
-playlists. If you want to download single videos the best suggestion would be to create
-your own playlist, add the playlist to TubeSync and then add single videos to your
-playlist as you browse about YouTube. Your "favourites" playlist of videos will download
-automatically.
-
-### Does TubeSync support any other video platforms?
-
-At the moment, no. This is a pre-release. The library TubeSync uses that does most
-of the downloading work, `yt-dlp`, supports many hundreds of video sources so it's
-likely more will be added to TubeSync if there is demand for it.
-
-### Is there a progress bar?
-
-No, in fact, there is no JavaScript at all in the web interface at the moment. TubeSync
-is designed to be more set-and-forget than something you watch download. You can see
-what active tasks are being run in the "tasks" tab and if you want to see exactly what
-your install is doing check the container logs.
-
-### Are there alerts when a download is complete?
-
-No, this feature is best served by existing services such as the excellent 
-[Tautulli](https://tautulli.com/) which can monitor your Plex server and send alerts
-that way.
-
-### There are errors in my "tasks" tab!
-
-You only really need to worry about these if there is a permanent failure. Some errors
-are temporary and will be retried for you automatically, such as a download got
-interrupted and will be tried again later. Sources with permanent errors (such as no
-media available because you got a channel name wrong) will be shown as errors on the
-"sources" tab.
-
-### What is TubeSync written in?
-
-Python3 using Django, embedding yt-dlp. It's pretty much glue between other much
-larger libraries.
-
-Notable libraries and software used:
-
- * [Django](https://www.djangoproject.com/)
- * [yt-dlp](https://github.com/yt-dlp/yt-dlp)
- * [ffmpeg](https://ffmpeg.org/)
- * [QuickJS](https://bellard.org/quickjs/)
- * [Django Huey](https://github.com/gaiacoop/django-huey)
- * [Huey](https://github.com/coleifer/huey)
- * [django-sass](https://github.com/coderedcorp/django-sass/)
- * The container bundles with `s6-init` and `openresty`
-
-See the [Pipfile](https://github.com/meeb/tubesync/blob/main/Pipfile) for a full list.
-
-### Can I get access to the full Django admin?
-
-Yes, although pretty much all operations are available through the front-end interface
-and you can probably break things by playing in the admin. If you still want to access
-it you can run:
-
-```bash
-$ docker exec -it tubesync python3 /app/manage.py createsuperuser
-```
-
-And follow the instructions to create an initial Django superuser, once created, you
-can log in at http://localhost:4848/admin
-
-### Are there user accounts or multi-user support?
-
-There is support for basic HTTP authentication by setting the `HTTP_USER` and
-`HTTP_PASS` environment variables. There is not support for multi-user or user
-management.
-
-### Does TubeSync support HTTPS?
-
-No, you should deploy it behind an HTTPS-capable proxy if you want this (nginx, caddy,
-etc.). Configuration of this is beyond the scope of this README.
-
-### What architectures does the container support?
-
-Only two are supported, for the moment:
-- `amd64` (most desktop PCs and servers)
--  `arm64`
-(modern ARM computers, such as the Raspberry Pi 3 or later)
-
-Others may be made available, if there is demand.
-
-### The pipenv install fails with "Locking failed"!
-
-Make sure that you have `mysql_config` or `mariadb_config` available, as required by the python module `mysqlclient`. On Debian-based systems this is usually found in the package `libmysqlclient-dev`
+Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Frequently-Asked-Questions#faq).
 
 
 # Advanced configuration
@@ -401,6 +267,7 @@ useful if you are manually installing TubeSync in some other environment. These 
 | TUBESYNC_DIRECTORY_PREFIX    | Enable `video` and `audio` directory prefixes in `/downloads` | True                                                                          |
 | TUBESYNC_SHRINK_NEW          | Filter unneeded information from newly retrieved metadata     | True                                                                          |
 | TUBESYNC_SHRINK_OLD          | Filter unneeded information from metadata loaded from the database | True                                                                     |
+| TUBESYNC_SAVE_MEDIA_AFTER_BULK_ACTION | Queue a `save_media` task per item changed by an admin bulk action | True                                                |
 | GUNICORN_WORKERS             | Number of `gunicorn` (web request) workers to spawn           | 3                                                                             |
 | LISTEN_HOST                  | IP address for `gunicorn` to listen on                        | 127.0.0.1                                                                     |
 | LISTEN_PORT                  | Port number for `gunicorn` to listen on                       | 8080                                                                          |
@@ -416,14 +283,14 @@ following this rough guide, you are on your own and should be knowledgeable abou
 installing and running WSGI-based Python web applications before attempting this.
 
 1. Clone or download this repo
-2. Make sure you're running a modern version of Python (>=3.10) and have Pipenv
+2. Make sure you're running a modern version of Python (>=3.12) and have Pipenv
    installed
 3. Set up the environment with `pipenv install`
 4. Copy `tubesync/tubesync/local_settings.py.example` to
    `tubesync/tubesync/local_settings.py` and edit it as appropriate
 5. Run migrations with `./manage.py migrate`
 6. Collect static files with `./manage.py collectstatic`
-6. Set up your prefered WSGI server, such as `gunicorn` pointing it to the application
+6. Set up your preferred WSGI server, such as `gunicorn` pointing it to the application
    in `tubesync/tubesync/wsgi.py`
 7. Set up your proxy server such as `nginx` and forward it to the WSGI server
 8. Check the web interface is working

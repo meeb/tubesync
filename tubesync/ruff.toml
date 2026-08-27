@@ -1,0 +1,6 @@
+[lint.per-file-ignores]
+"**/management/commands/*.py" = ["N999"]
+"**/migrations/0*.py" = ["I001", "RUF012"]
+
+[per-file-target-version]
+"shasum.py" = "py310"

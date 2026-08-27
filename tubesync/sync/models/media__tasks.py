@@ -79,50 +79,53 @@ def download_checklist(self, skip_checks=False):
 
 
 def download_finished(self, format_str, container, downloaded_filepath=None):
-    media = self
     if downloaded_filepath is None:
         downloaded_filepath = self.filepath
     filepath = Path(downloaded_filepath)
 
     # Media has been downloaded successfully
-    log.info(f'Successfully downloaded media: {media} (UUID: {media.pk}) to: '
+    log.info(f'Successfully downloaded media: {self} (UUID: {self.pk}) to: '
              f'"{filepath}"')
     # Link the media file to the object and update info about the download
     self.media_file.name = str(filepath.relative_to(self.media_file.storage.location))
-    media.downloaded = True
-    media.download_date = timezone.now()
-    media.downloaded_filesize = os.path.getsize(filepath)
-    media.downloaded_container = container
-    media.manual_skip = False
-    media.skip = False
+    self.downloaded = True
+    self.download_date = timezone.now()
+    self.downloaded_filesize = os.path.getsize(filepath)
+    self.downloaded_container = container
+    self.manual_skip = False
+    self.skip = False
     if '+' in format_str:
         # Seperate audio and video streams
         vformat_code, aformat_code = format_str.split('+')
-        aformat = media.get_format_by_code(aformat_code)
-        vformat = media.get_format_by_code(vformat_code)
-        media.downloaded_format = vformat['format']
-        media.downloaded_height = vformat['height']
-        media.downloaded_width = vformat['width']
-        media.downloaded_audio_codec = aformat['acodec']
-        media.downloaded_video_codec = vformat['vcodec']
-        media.downloaded_container = container
-        media.downloaded_fps = round(vformat['fps'])
-        media.downloaded_hdr = vformat['is_hdr']
+        aformat = self.get_format_by_code(aformat_code)
+        vformat = self.get_format_by_code(vformat_code)
+        self.downloaded_format = vformat['format']
+        self.downloaded_height = vformat['height']
+        self.downloaded_width = vformat['width']
+        self.downloaded_audio_codec = aformat['acodec']
+        self.downloaded_video_codec = vformat['vcodec']
+        self.downloaded_fps = round(vformat['fps'])
+        self.downloaded_hdr = vformat['is_hdr']
     else:
         # Combined stream or audio-only stream
         cformat_code = format_str
-        cformat = media.get_format_by_code(cformat_code)
-        media.downloaded_audio_codec = cformat['acodec']
+        cformat = self.get_format_by_code(cformat_code)
+        self.downloaded_audio_codec = cformat['acodec']
         if cformat['vcodec']:
             # Combined
-            media.downloaded_format = cformat['format']
-            media.downloaded_height = cformat['height']
-            media.downloaded_width = cformat['width']
-            media.downloaded_video_codec = cformat['vcodec']
-            media.downloaded_fps = round(cformat['fps'])
-            media.downloaded_hdr = cformat['is_hdr']
+            self.downloaded_format = cformat['format']
+            self.downloaded_height = cformat['height']
+            self.downloaded_width = cformat['width']
+            self.downloaded_video_codec = cformat['vcodec']
+            self.downloaded_fps = round(cformat['fps'])
+            self.downloaded_hdr = cformat['is_hdr']
         else:
             self.downloaded_format = Val(SourceResolution.AUDIO)
+            self.downloaded_height = None
+            self.downloaded_width = None
+            self.downloaded_video_codec = None
+            self.downloaded_fps = None
+            self.downloaded_hdr = False
 
 
 def failed_format(self, format_str, /, *, cause=None, exc=None):

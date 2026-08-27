@@ -15,7 +15,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.logger import log
 from common.errors import NoFormatException
-from common.json import JSONEncoder
+from common.json_encoder import JSONEncoder
 from common.utils import (
     clean_filename, clean_emoji, directory_and_stem,
     glob_quote, mkdir_p, seconds_to_timestr,
@@ -444,20 +444,30 @@ class Media(models.Model):
                     'hdr': hdr,
                     'format': tuple(fmt),
                 }
-            if self.downloaded_format:
-                resolution = self.downloaded_format.lower()
-            elif self.downloaded_height:
+            is_audio_download = (
+                (self.downloaded_format or '').lower() == Val(SourceResolution.AUDIO)
+            )
+            if is_audio_download:
+                resolution = Val(SourceResolution.AUDIO)
+            elif self.downloaded_height and self.downloaded_height > 0:
                 resolution = f'{self.downloaded_height}p'
+            elif self.downloaded_format:
+                resolution = self.downloaded_format.lower()
             if resolution:
                 fmt.append(resolution)
-            if self.downloaded_format != Val(SourceResolution.AUDIO):
-                vcodec = self.downloaded_video_codec.lower()
-            if vcodec:
+            vcodec = self.downloaded_video_codec
+            if not is_audio_download and vcodec:
+                vcodec = vcodec.lower()
                 fmt.append(vcodec)
-            acodec = self.downloaded_audio_codec.lower()
+            else:
+                vcodec = ''
+            acodec = self.downloaded_audio_codec
             if acodec:
+                acodec = acodec.lower()
                 fmt.append(acodec)
-            if self.downloaded_format != Val(SourceResolution.AUDIO):
+            else:
+                acodec = ''
+            if not is_audio_download:
                 fps = str(self.downloaded_fps)
                 if fps:
                     fmt.append(f'{fps}fps')
@@ -492,10 +502,10 @@ class Media(models.Model):
                 # Combined
                 vformat = cformat
         if vformat:
-            if vformat['format']:
-                resolution = vformat['format'].lower()
-            else:
+            if vformat.get('height', 0) > 0:
                 resolution = f"{vformat['height']}p"
+            elif vformat.get('format'):
+                resolution = str(vformat['format']).lower()
             if resolution:
                 fmt.append(resolution)
             vcodec = vformat['vcodec'].lower()

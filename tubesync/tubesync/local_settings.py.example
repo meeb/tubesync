@@ -1,4 +1,5 @@
 from pathlib import Path
+from common.logs import syslog
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -6,7 +7,82 @@ CONFIG_BASE_DIR = BASE_DIR
 DOWNLOADS_BASE_DIR = BASE_DIR
 
 
+DEBUG = False
 SECRET_KEY = 'example-secret-key'
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {},
+        'syslog': {
+            'format': '%(asctime)s %(name)s: %(message)s',
+            'datefmt': '%b %d %H:%M:%S',
+        },
+        'common': {
+            'format':  '%(asctime)s [%(name)s/%(levelname)s] %(message)s',
+            'datefmt': None,
+        },
+        'consumer_simple': {
+            'format': '%(asctime)s %(message)s',
+            'datefmt': '%H:%M:%S',
+        },
+        'worker_process': {
+            'format': '[%(asctime)s] %(levelname)s:%(name)s:%(process)d:%(message)s',
+            'datefmt': None,
+        },
+        'worker_thread': {
+            'format': '[%(asctime)s] %(levelname)s:%(name)s:%(process)d:%(threadName)s:%(message)s',
+            'datefmt': None,
+        },
+    },
+    'handlers': {
+        'stderr': {
+            'class': 'logging.StreamHandler',
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'formatter': 'common',
+        },
+        'stderr_worker_process': {
+            'class': 'logging.StreamHandler',
+            'level': 'INFO' if DEBUG else 'WARNING',
+            'formatter': 'worker_process',
+        },
+        'stderr_worker_thread': {
+            'class': 'logging.StreamHandler',
+            'level': 'INFO' if DEBUG else 'WARNING',
+            'formatter': 'worker_thread',
+        },
+        'syslog': {
+            'class': syslog.std.handler,
+            'address': syslog.std.default_handler.address,
+            'facility': syslog.std.default_handler.facility,
+            'level': 'DEBUG',
+            'formatter': 'syslog',
+        },
+    },
+    'root': {
+        'handlers': ['syslog', 'stderr'],
+        'level': 'DEBUG',
+    },
+    'loggers': {
+        'huey': {
+            'handlers': ['syslog', 'stderr_worker_thread'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'huey.consumer.worker.process': {
+            'handlers': ['syslog', 'stderr_worker_process'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'huey.consumer.worker.thread': {
+            'handlers': ['syslog', 'stderr_worker_thread'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
 
 
 DATABASES = {

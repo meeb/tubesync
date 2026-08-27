@@ -1,14 +1,21 @@
+from __future__ import annotations
+
 import datetime
-import os
+import subprocess
+import time
 import uuid
-from functools import wraps
+from functools import partial
 from huey import (
     CancelExecution, Huey as huey_Huey,
     signals, utils,
 )
-from huey.api import TaskLock
+from huey.api import Task, TaskLock
+from huey.exceptions import TaskLockedException
 from huey.storage import SqliteStorage as huey_SqliteStorage
+from pathlib import Path
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
+from .utils import get_usable_cpu_count
+from .yt_dlp import retry_django_db
 
 
 def _set_acquired(self, value=True):
@@ -16,7 +23,7 @@ def _set_acquired(self, value=True):
         return self.clear()
     try:
         self.__enter__()
-    except Exception:
+    except TaskLockedException:
         return False
     else:
         return True
@@ -75,13 +82,17 @@ class Huey(huey_Huey):
 
     # do not use __len__ (pending_count) for bool
     def __bool__(self):
-        if not (self._registry._registry or self._registry._periodic_tasks):
-            return False
-        return True
+        return (self._registry._registry or self._registry._periodic_tasks)
 
     def _emit(self, signal, task, *args, **kwargs):
         kwargs['huey'] = self
         super()._emit(signal, task, *args, **kwargs)
+
+    def create_consumer(self, **options):
+        consumer = super().create_consumer(**options)
+        suffix = f'worker.{consumer.worker_type}'
+        consumer._logger = consumer._logger.getChild(suffix)
+        return consumer
 
     def reschedule(self, task_id, eta):
         pc = self.pending_count()
@@ -115,6 +126,7 @@ class Huey(huey_Huey):
             try:
                 from common.models import TaskHistory
                 th = TaskHistory.objects.get(task_id=previous_id)
+            # ruff: ignore[S110]
             except:
                 pass
             else:
@@ -171,6 +183,40 @@ def h_q_tuple(q, /):
         h_q_dict(q),
     )
 
+def start_consumer(queue_name):
+    assert isinstance(queue_name, str), type(queue_name)
+    svc_name = queue_name.replace('_', '-')
+    svc_dir = Path('/run') / 'service' / svc_name
+
+    try:
+        if not all((
+            svc_dir.is_dir(),
+            (svc_dir / 'supervise').is_dir(),
+            (svc_dir / 'supervise' / 'control').is_fifo(),
+        )):
+            return
+    except PermissionError:
+        pass
+    else:
+        subprocess.Popen(
+            [ '/command/s6-svc', '-U', str(svc_dir) ],
+            stdout=-1, stderr=-1, start_new_session=True,
+        )
+
+def h_q_reset_maint_func(queue, /, exception=None, status=None):
+        if status is None:
+            return
+        elif 'started' == status:
+            start_consumer(queue.name)
+        elif 'exception' == status and exception is not None:
+            # log, but do not raise an exception
+            from huey.api import logger
+            logger.error(
+                f'{queue.name}: maintenance function exception: {exception}'
+            )
+            return
+        return True
+
 # Configuration convenience helpers
 
 def h_q_reset_tasks(q, /, *, maint_func=None):
@@ -202,9 +248,9 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     if maint_func and callable(maint_func):
         try:
             maint_result = maint_func(q, status='started')
+        # ruff: ignore[BLE001]
         except Exception as exc:
             maint_result = maint_func(q, exception=exc, status='exception')
-            pass
         finally:
             maint_func(q, status='finished')
     # clear everything now that we are done
@@ -214,7 +260,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     return maint_result
 
 
-def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
+def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=None):
     name_fmt = 'huey_{}'
     if prefix:
         name_fmt = f'huey_{prefix}_' + '{}'
@@ -226,8 +272,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
         workers = 2
     finally:
         if 0 >= workers:
-            useful_cpus = os.sched_getaffinity(0)
-            workers = max(2, len(useful_cpus) // 2)
+            workers = max(2, get_usable_cpu_count() // 2)
         elif 1 == workers:
             thread = False
     return dict(
@@ -239,7 +284,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
         utc=True,
         compression=True,
         connection=dict(
-            filename=f'/config/tasks/{name}.db',
+            filename=str(Path(tasks_dir or '/config/tasks') / f'{name}.db'),
             fsync=True,
             isolation_level='IMMEDIATE', # _create_connection sets this to None
             strict_fifo=True,
@@ -249,6 +294,9 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
             workers=workers if thread else 1,
             worker_type='thread' if thread else 'process',
             max_delay=20.0,
+            max_tasks=10_000,
+            check_worker_health=True,
+            health_check_interval=30.0,
             flush_locks=True,
             scheduler_interval=10,
             simple_log=False,
@@ -259,50 +307,6 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None):
             verbose=False,
         ),
     )
-
-# Decorators
-
-def dynamic_retry(task_func=None, /, *args, **kwargs):
-    if task_func is None:
-        from django_huey import task as huey_task
-        task_func = huey_task
-    backoff_func = kwargs.pop('backoff_func', None)
-    def default_backoff(attempt, /):
-        return (5+(attempt**4))
-    if backoff_func is None or not callable(backoff_func):
-        backoff_func = default_backoff
-    def deco(fn):
-        @wraps(fn)
-        def inner(*a, **kwa):
-            backoff = backoff_func
-            # the scoping becomes complicated when reusing functions
-            try:
-                _task = kwa.pop('task')
-            except KeyError:
-                pass
-            else:
-                task = _task
-            try:
-                return fn(*a, **kwa)
-            except Exception as exc:
-                try:
-                    task is not None
-                except NameError:
-                    raise exc
-                for attempt in range(1, 240):
-                    if backoff(attempt) > task.retry_delay:
-                        task.retry_delay = backoff(attempt)
-                        break
-                    # insanity, but handle it anyway
-                    if 239 == attempt:
-                        task.retry_delay = backoff(attempt)
-                raise exc
-        kwargs.update(dict(
-            context=True,
-            retry_delay=backoff_func(1),
-        ))
-        return task_func(*args, **kwargs)(inner)
-    return deco
 
 # Signal handlers shared between queues
 
@@ -325,17 +329,29 @@ def on_executing_remove_duplicates(signal_name, task_obj, exception_obj=None, /,
         if not th.remove_duplicates:
             return
 
-    waiting = [
-        t
-        for t in huey.pending() + huey.scheduled()
-        if task_obj.id != t.id and
-        task_obj.name == t.name and
-        task_obj.data == t.data and
-        task_obj.priority >= t.priority and
-        task_obj.retries <= t.retries
-    ]
-    for t in waiting:
-        huey.revoke_by_id(t.id, revoke_once=True)
+    def task_generator(queue):
+        for t in queue.pending():
+            yield t
+        for t in queue.scheduled():
+            yield t
+
+    def waiting_id_generator(queue, task_obj):
+        b = task_obj
+        for a in task_generator(queue):
+            matches = (
+                a.name == b.name and
+                a.id != b.id and
+                # revoke lower priority
+                a.priority <= b.priority and
+                # revoke tasks that have executed fewer times
+                a.retries >= b.retries and
+                a.data == b.data
+            )
+            if matches:
+                yield a.id
+
+    for task_id in waiting_id_generator(queue=huey, task_obj=task_obj):
+        huey.revoke_by_id(task_id, revoke_once=True)
 
 def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     if signals.SIGNAL_INTERRUPTED != signal_name:
@@ -348,7 +364,7 @@ def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 storage_key_prefix = 'task_history:'
 
 def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
-    signal_time = utils.time_clock()
+    signal_time = time.monotonic()
     signal_dt = datetime.datetime.now(datetime.timezone.utc)
     assert huey is not None
     assert hasattr(huey, 'get') and callable(huey.get)
@@ -356,6 +372,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 
     from common.models import TaskHistory
     add_to_elapsed_signals = frozenset((
+        signals.SIGNAL_TIMEOUT,
         signals.SIGNAL_INTERRUPTED,
         signals.SIGNAL_ERROR,
         signals.SIGNAL_CANCELED,
@@ -367,6 +384,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         signals.SIGNAL_LOCKED,
         signals.SIGNAL_EXECUTING,
         signals.SIGNAL_RETRYING,
+        signals.SIGNAL_RATE_LIMITED,
     )) | add_to_elapsed_signals
     storage_key = f'{storage_key_prefix}{task_obj.id}'
     task_obj_attr = '_signals_history'
@@ -396,7 +414,9 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         huey.get(key=storage_key)
     else:
         huey.put(key=storage_key, data=history)
-    th, created = TaskHistory.objects.get_or_create(
+    # created never used
+    # ruff: ignore[RUF059]
+    th, created = retry_django_db(5)(TaskHistory.objects.get_or_create)(
         task_id=str(task_obj.id),
         name=f"{task_obj.__module__}.{task_obj.name}",
         queue=huey.name,
@@ -420,6 +440,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
             try:
                 from django.core.exceptions import ValidationError
                 from sync.models import Media, Source
+            # ruff: ignore[S110]
             except:
                 pass
             else:
@@ -456,16 +477,35 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 # Registration of shared signal handlers
 
 def register_huey_signals():
-    from django_huey import DJANGO_HUEY, get_queue, signal
+    from django import db
+    from django_huey import DJANGO_HUEY, get_queue, pre_execute, post_execute, signal
+    def close_db(task, task_value=None, exception=None, /, *, huey=None):
+        assert huey is not None
+        assert hasattr(huey, 'immediate')
+        # Guard against immediate mode and transactions
+        if (
+            any((huey is None, not hasattr(huey, 'immediate'), huey.immediate,)) or
+            any(dbw.in_atomic_block for dbw in db.connections.all())
+        ):
+            return
+        db.close_old_connections()
+
     for qn in DJANGO_HUEY.get('queues', dict()):
+        q = get_queue(qn)
+
+        # hooks to clean up database connections at task boundaries
+        pre_execute(queue=qn, name='close_db')(partial(close_db, huey=q))
+        post_execute(queue=qn, name='close_db')(partial(close_db, huey=q))
+
+        # signals for tracking / maintenance of tasks
         signal(signals.SIGNAL_INTERRUPTED, queue=qn)(on_interrupted)
         signal(queue=qn)(historical_task)
         signal(signals.SIGNAL_EXECUTING, queue=qn)(on_executing_remove_duplicates)
 
         # clean up old history and results from storage
-        q = get_queue(qn)
-        now_time = utils.time_clock()
+        now_time = time.monotonic()
         now_dt = datetime.datetime.now(datetime.timezone.utc)
+        # ruff: ignore[SIM118]
         for key in q.all_results().keys():
             if not key.startswith(storage_key_prefix):
                 continue
@@ -481,7 +521,7 @@ def register_huey_signals():
                 # so the created datetime is the fail-safe case.
                 seconds = now_time - history.get(signals.SIGNAL_EXECUTING, now_time)
                 age = datetime.timedelta(
-                    seconds=(seconds if seconds > 0 else 0),
+                    seconds=max(0, seconds),
                 )
             else:
                 age = now_dt - history['created']
@@ -489,4 +529,86 @@ def register_huey_signals():
                 result_key = key[len(storage_key_prefix) :]
                 q.get(peek=False, key=result_key)
                 q.get(peek=False, key=key)
+
+
+class BackoffAlgorithm:
+    # ruff: ignore[RUF012]
+    _registry = {}
+    key = None
+
+    @staticmethod
+    def calculate(attempt: int) -> int:
+        raise NotImplementedError()
+
+    @classmethod
+    def lookup(cls, key: str) -> BackoffAlgorithm | None:
+        return cls._registry.get(key, None)
+
+    @classmethod
+    def register(cls, algorithm: BackoffAlgorithm) -> str | None:
+        """
+        Merges a BackoffAlgorithm subclass into the base class registry.
+        """
+        algorithm_key = issubclass(algorithm, cls) and getattr(algorithm, 'key', cls.key)
+        if algorithm_key:
+            cls._registry.update({ algorithm_key: algorithm })
+            return algorithm_key
+
+
+class DjangoBackgroundTasksBackoff(BackoffAlgorithm):
+    key = 'Django-Background-Tasks'
+
+    @staticmethod
+    def calculate(attempt: int) -> int:
+        # The exact formula used by django-background-tasks
+        return 5 + (attempt ** 4)
+
+
+class AttemptsTask(Task):
+    """
+    A Task base class that relies entirely on Task for defaults.
+    Resolves algorithms using string keys mapped onto the BackoffAlgorithm base class.
+    """
+    backoff_base_class = BackoffAlgorithm
+
+    def __init__(self, *args, backoff_class=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.backoff_class = backoff_class or self.backoff_class
+        if self.backoff_class:
+            # Register directly onto the algorithm base class
+            self._backoff_key = self.backoff_base_class.register(self.backoff_class)
+
+        algo_key = getattr(self, '_backoff_key', None)
+        retry_backoff = kwargs.get('retry_backoff', None)
+        if retry_backoff is None and not self.default_retry_backoff and algo_key:
+            self.retry_backoff = 1
+
+    @property
+    def retry_delay(self) -> int:
+        attempt = getattr(self, '_custom_attempt_counter', 1)
+        initial_delay = getattr(self, '_initial_retry_delay', 0)
+
+        algo_key = getattr(self, '_backoff_key', None)
+        algo_class = self.backoff_base_class.lookup(algo_key)
+
+        if self.retry_backoff is None or 0 == self.retry_backoff:
+            current_delay = getattr(self, '_retry_delay', initial_delay)
+            return current_delay
+        elif algo_class and issubclass(algo_class, self.backoff_base_class):
+            return algo_class.calculate(attempt)
+
+        # Fallback Mode: Exponential math using Task-resolved defaults
+        return initial_delay * (self.retry_backoff ** max(0, attempt - 1))
+
+    @retry_delay.setter
+    def retry_delay(self, value):
+        current_state = getattr(self, '_custom_attempt_counter', None)
+
+        if current_state is None:
+            self._initial_retry_delay = value
+            self._custom_attempt_counter = 1
+        else:
+            self._custom_attempt_counter = 1 + current_state
+        self._retry_delay = value
 

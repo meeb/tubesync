@@ -1,0 +1,28 @@
+--- /etc/debconf.conf.orig	2025-03-10 12:07:15.000000000 +0000
++++ /etc/debconf.conf	2026-03-01 12:49:05.110194306 +0000
+@@ -33,13 +33,23 @@
+ Driver: Stack
+ Stack: config, passwords
+ 
+-# Set up the templatedb database, which is a single flat text file
++# Set up the templates database, which is a single flat text file
+ # by default.
+-Name: templatedb
++Name: templates
+ Driver: File
+ Mode: 644
++Readonly: true
+ Filename: /var/cache/debconf/templates.dat
+ 
++Name: docker-templates
++Driver: PackageDir
++Mode: 644
++Directory: /var/cache/debconf/docker-templates
++
++Name: templatedb
++Driver: Stack
++Stack: docker-templates, templates
++
+ # Well that was pretty straightforward, and it will be enough for most
+ # people's needs, but debconf's database drivers can be used to do much
+ # more interesting things. For example, suppose you want to use config
