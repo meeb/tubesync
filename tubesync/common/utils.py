@@ -305,6 +305,46 @@ def clean_emoji(s):
     return emoji.replace_emoji(s)
 
 
+def truncate_filename_bytes(filename, /, max_bytes=200, encoding='utf-8'):
+    '''
+        Shortens a filename to fit within `max_bytes` bytes (not characters)
+        while keeping its extension intact. Filesystems limit name length in
+        bytes (commonly 255), so multi-byte titles can exceed the limit with
+        far fewer characters (see issue #522). The default budget leaves
+        headroom for prefixes/suffixes appended later (e.g. `.fNNN`,
+        `.part-FragNN` fragments written by yt-dlp during downloads).
+
+        Bytes are removed from the middle of the stem, keeping its start
+        (usually the beginning of the title) and its end (usually unique
+        suffixes such as the media key and format details, e.g.
+        `{title_full}_{key}_{format}` from the default media format), joined
+        by `_..._`. Truncation never splits a multi-byte character: partial
+        trailing/leading sequences are dropped when decoding.
+    '''
+    if not isinstance(filename, str):
+        raise ValueError(f'filename must be a str, got {type(filename)}')
+    if len(filename.encode(encoding)) <= max_bytes:
+        return filename
+    name, dot, ext = filename.rpartition('.')
+    if not dot:
+        name, ext_bytes = filename, b''
+    else:
+        ext_bytes = (dot + ext).encode(encoding)
+        if len(ext_bytes) >= max_bytes:
+            # Pathological extension; fall back to a plain byte cut
+            name, ext_bytes = filename, b''
+    marker = '_..._'
+    stem_budget = max_bytes - len(ext_bytes) - len(marker.encode(encoding))
+    stem_bytes = name.encode(encoding)
+    # Keep the unique suffixes at the end of the stem intact (up to half of
+    # the budget), then fill the rest from the front.
+    tail_keep = min(stem_budget // 2, 64)
+    head_keep = stem_budget - tail_keep
+    head = stem_bytes[:head_keep].decode(encoding, errors='ignore').rstrip()
+    tail = stem_bytes[-tail_keep:].decode(encoding, errors='ignore').lstrip()
+    return head + marker + tail + ext_bytes.decode(encoding)
+
+
 def seconds_to_timestr(seconds):
     seconds = seconds % (24 * 3600)
     hour = seconds // 3600

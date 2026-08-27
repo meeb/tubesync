@@ -19,6 +19,7 @@ from common.json_encoder import JSONEncoder
 from common.utils import (
     clean_filename, clean_emoji, directory_and_stem,
     glob_quote, mkdir_p, seconds_to_timestr,
+    truncate_filename_bytes,
 )
 from ..youtube import (
     get_media_info as get_youtube_media_info,
@@ -841,7 +842,22 @@ class Media(models.Model):
         media_format = str(self.source.media_format)
         media_details = self.format_dict
         result = media_format.format(**media_details)
-        return '.' + result if '/' == result[0] else result
+        result = '.' + result if '/' == result[0] else result
+        # Filesystems limit each path component to 255 bytes (not
+        # characters), and multi-byte titles can blow past that with far
+        # fewer characters — downloads then fail with:
+        #   [Errno 36] File name too long
+        # (issue #522). Only the final component (the name) is shortened;
+        # any directories in the format string are preserved. The budget
+        # leaves headroom for suffixes appended during download
+        # (`.fNNN.ext.part-FragNNN.part` and thumbnail/subtitle siblings).
+        head, _, tail = result.rpartition('/')
+        truncated = truncate_filename_bytes(tail)
+        if truncated != tail:
+            log.warning(f'Media filename exceeded the filesystem byte limit '
+                        f'and was shortened: {self!r}')
+            return f'{head}/{truncated}' if head else truncated
+        return result
 
     @property
     def directory_path(self):

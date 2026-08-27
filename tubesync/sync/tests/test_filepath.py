@@ -158,6 +158,34 @@ class FilepathTestCase(TestCase):
                          ('no-fancy-stuff-title_test_720p-720x1280-opus'
                           '-vp9-30fps-hdr.mkv'))
 
+    def test_media_filename_truncates_to_filesystem_byte_limit(self):
+        # Filesystems limit each name component to 255 bytes (issue #522).
+        # Multi-byte titles reach that with far fewer characters, and the
+        # download then fails with '[Errno 36] File name too long'.
+        import json
+        long_metadata = json.loads(metadata)
+        long_metadata['title'] = '耳' * 120  # 3 bytes per char = 360 bytes
+        long_title_media = Media.objects.create(
+            key='longkey',
+            source=self.source,
+            metadata=json.dumps(long_metadata),
+        )
+        self.source.media_format = '{yyyy}/{title_full}_{key}.{ext}'
+        filename = long_title_media.filename
+        directory, _, name = filename.rpartition('/')
+        # Directories from the format string survive untouched
+        self.assertEqual('2017', directory)
+        # The name component fits in the byte budget...
+        self.assertLessEqual(len(name.encode('utf-8')), 200)
+        # ... keeps its extension and key suffix material intact ...
+        self.assertTrue(name.endswith('_longkey.mkv'))
+        # ... and was not cut mid multi-byte character (encodes cleanly)
+        name.encode('utf-8').decode('utf-8')
+
+    def test_media_filename_unchanged_when_within_limit(self):
+        self.source.media_format = '{yyyy}/{key}.{ext}'
+        self.assertEqual(self.media.filename, '2017/mediakey.mkv')
+
     def test_directory_prefix(self):
         # Confirm the setting exists and is valid
         self.assertTrue(hasattr(settings, 'SOURCE_DOWNLOAD_DIRECTORY_PREFIX'))
