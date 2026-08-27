@@ -12,7 +12,7 @@ from django.core.paginator import Paginator
 from functools import partial
 from itertools import chain
 from operator import attrgetter, itemgetter
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import urlunsplit, urlencode, urlparse
 from .errors import DatabaseConnectionError, QuerySetEmptyError
 
@@ -322,17 +322,15 @@ def truncate_filename_bytes(filename, /, max_bytes=200, encoding='utf-8'):
         trailing/leading sequences are dropped when decoding.
     '''
     if not isinstance(filename, str):
-        raise ValueError(f'filename must be a str, got {type(filename)}')
+        raise TypeError(f'filename must be a str, got {type(filename)}')
     if len(filename.encode(encoding)) <= max_bytes:
         return filename
-    name, dot, ext = filename.rpartition('.')
-    if not dot:
+    path = PurePosixPath(filename)
+    name, ext = path.stem, path.suffix
+    ext_bytes = ext.encode(encoding)
+    if len(ext_bytes) >= max_bytes:
+        # Pathological extension; fall back to a plain byte cut
         name, ext_bytes = filename, b''
-    else:
-        ext_bytes = (dot + ext).encode(encoding)
-        if len(ext_bytes) >= max_bytes:
-            # Pathological extension; fall back to a plain byte cut
-            name, ext_bytes = filename, b''
     marker = '_..._'
     stem_budget = max_bytes - len(ext_bytes) - len(marker.encode(encoding))
     stem_bytes = name.encode(encoding)

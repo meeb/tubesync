@@ -186,6 +186,51 @@ class FilepathTestCase(TestCase):
         self.source.media_format = '{yyyy}/{key}.{ext}'
         self.assertEqual(self.media.filename, '2017/mediakey.mkv')
 
+    def test_truncate_filename_bytes_encoding_edge_cases(self):
+        # Bytes known to cause encoding/decoding trouble must never produce
+        # an invalid or over-budget name: the cut points land inside
+        # multi-byte sequences on purpose here.
+        from common.utils import truncate_filename_bytes
+
+        cases = [
+            # 4-byte astral plane (emoji): cut lands mid-sequence
+            '🍣' * 100 + '_key.mkv',
+            # combining characters (é as e + U+0301)
+            ('e\u0301' * 150) + '_key.mkv',
+            # zero-width joiner sequences (family emoji)
+            ('👨\u200d👩\u200d👧\u200d👦' * 30) + '_key.mkv',
+            # mixed 1-byte/3-byte at every boundary parity
+            ('a耳' * 120) + '_key.mkv',
+            # right-to-left text
+            ('שלום' * 60) + '_key.mkv',
+            # no extension at all
+            '⽕' * 200,
+            # dotfile-style name (suffix is empty for PurePosixPath)
+            '.' + ('h' * 300),
+            # very long "extension" exceeding the whole budget
+            'name.' + ('x' * 300),
+        ]
+        for original in cases:
+            with self.subTest(original=original[:24]):
+                result = truncate_filename_bytes(original)
+                # fits the byte budget
+                self.assertLessEqual(len(result.encode('utf-8')), 200)
+                # still valid UTF-8 round-trip (no partial sequences kept)
+                self.assertEqual(
+                    result,
+                    result.encode('utf-8').decode('utf-8'),
+                )
+                # never empty
+                self.assertTrue(result)
+
+    def test_truncate_filename_bytes_rejects_non_str(self):
+        from common.utils import truncate_filename_bytes
+
+        for bad in (None, 42, b'bytes.mkv', Path('p.mkv')):
+            with self.subTest(bad=bad):
+                with self.assertRaises(TypeError):
+                    truncate_filename_bytes(bad)
+
     def test_directory_prefix(self):
         # Confirm the setting exists and is valid
         self.assertTrue(hasattr(settings, 'SOURCE_DOWNLOAD_DIRECTORY_PREFIX'))
