@@ -347,7 +347,7 @@ def seconds_to_timestr(seconds):
     seconds %= 3600
     minutes = seconds // 60
     seconds %= 60
-    return '{:02d}:{:02d}:{:02d}'.format(hour, minutes, seconds)
+    return f'{hour:02d}:{minutes:02d}:{seconds:02d}'
 
 
 def time_func(func):
