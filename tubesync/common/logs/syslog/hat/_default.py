@@ -371,6 +371,7 @@ else:
 
             self.__thread = None
             self._initial_pid = os.getpid()
+            self._after_fork_lock = threading.Lock()
             self._closing = threading.Event()
             self._logger = logger
 
@@ -407,22 +408,27 @@ else:
                 # Return early when we have not forked.
                 return
 
-            self._initial_pid = current_pid
+            with self._after_fork_lock:
+                # Return early if we locked too late.
+                if current_pid == self._initial_pid:
+                    return
 
-            state = self.__state
-            new_state = _ThreadState(
-                host=state.host,
-                port=state.port,
-                comm_type=state.comm_type,
-                queue=queue.Queue(maxsize=state.queue_size),
-                queue_size=state.queue_size,
-                reconnect_delay=state.reconnect_delay,
-                cv=threading.Condition(),
-                closed=threading.Event(),
-                dropped=list((0,)),
-            )
-            self.__state = new_state
-            self.__thread = None
+                self._initial_pid = current_pid
+
+                state = self.__state
+                new_state = _ThreadState(
+                    host=state.host,
+                    port=state.port,
+                    comm_type=state.comm_type,
+                    queue=queue.Queue(maxsize=state.queue_size),
+                    queue_size=state.queue_size,
+                    reconnect_delay=state.reconnect_delay,
+                    cv=threading.Condition(),
+                    closed=threading.Event(),
+                    dropped=list((0,)),
+                )
+                self.__state = new_state
+                self.__thread = None
 
         def _create_thread(self):
             """Aligns process states and builds a clean worker thread context."""
