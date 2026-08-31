@@ -484,7 +484,7 @@ def register_huey_signals():
         assert hasattr(huey, 'immediate')
         # Guard against immediate mode and transactions
         if (
-            any((huey is None, not hasattr(huey, 'immediate'), huey.immediate,)) or
+            huey is None or getattr(huey, 'immediate', True) or
             any(dbw.in_atomic_block for dbw in db.connections.all())
         ):
             return
