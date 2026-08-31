@@ -209,7 +209,7 @@ def parse_database_connection_string(database_connection_string):
                                       f'as a database connection string: {e}') from e
     driver = parts.scheme
     user_pass_host_port = parts.netloc
-    database = parts.path
+    database = parts.path.removeprefix('/')
     if driver not in valid_drivers:
         raise DatabaseConnectionError(f'Database connection string '
                                       f'"{database_connection_string}" specified an '
@@ -220,6 +220,8 @@ def parse_database_connection_string(database_connection_string):
     if len(host_parts) != 2 or len(user_pass_parts) != 2:
         raise DatabaseConnectionError('Database connection string netloc must be in '
                                       'the format of user:pass@host')
+    # user_pass never used
+    # ruff: ignore[RUF059]
     user_pass, host_port = host_parts
     username, password = user_pass_parts
     host_port_parts = host_port.split(':')
@@ -244,8 +246,6 @@ def parse_database_connection_string(database_connection_string):
         # Malformed
         raise DatabaseConnectionError('Database connection host must be a hostname or '
                                       'a hostname:port combination')
-    if database.startswith('/'):
-        database = database[1:]
     if not database:
         raise DatabaseConnectionError('Database connection string path must be a '
                                       'string in the format of /databasename')    
@@ -284,9 +284,9 @@ def append_uri_params(uri, params):
     return urlunsplit(('', '', uri, qs, ''))
 
 
-def clean_filename(filename):
+def clean_filename(filename: str) -> str:
     if not isinstance(filename, str):
-        raise ValueError(f'filename must be a str, got {type(filename)}')
+        raise TypeError(f'filename must be a str, got {type(filename)}')
     to_scrub = r'<>\/:*?"|%'
     for char in list(to_scrub):
         filename = filename.replace(char, '')
@@ -299,10 +299,49 @@ def clean_filename(filename):
     return clean_filename.strip()
 
 
-def clean_emoji(s):
+def clean_emoji(s: str) -> str:
     if not isinstance(s, str):
-        raise ValueError(f'parameter must be a str, got {type(s)}')
+        raise TypeError(f'parameter must be a str, got {type(s)}')
     return emoji.replace_emoji(s)
+
+
+def truncate_filename(filename: str, *, max_bytes=216, encoding='utf-8') -> str:
+    '''
+        Shortens a filename to fit within `max_bytes` bytes (not characters)
+        while keeping its extension intact. Filesystems limit name length in
+        bytes (commonly 255), so multi-byte titles can exceed the limit with
+        far fewer characters (see issue #522). The default budget leaves
+        headroom for prefixes/suffixes appended later (e.g. `.fNNN`,
+        `.part-FragNN` fragments written by yt-dlp during downloads).
+
+        Bytes are removed from the middle of the stem, keeping its start
+        (usually the beginning of the title) and its end (usually unique
+        suffixes such as the media key and format details, e.g.
+        `{title_full}_{key}_{format}` from the default media format), joined
+        by `_..._`. Truncation never splits a multi-byte character: partial
+        trailing/leading sequences are dropped when decoding.
+    '''
+    max_bytes = max(96, min(232, max_bytes))
+    if not isinstance(filename, str):
+        raise TypeError(f'filename must be a str, got {type(filename)}')
+    if len(filename.encode(encoding)) <= max_bytes:
+        return filename
+    path = Path(filename)
+    name, ext = clean_filename(path.stem), clean_filename(path.suffix)
+    ext_bytes = ext.encode(encoding)
+    if len(ext_bytes) >= max_bytes:
+        # Pathological extension; fall back to a plain byte cut
+        name, ext_bytes = filename, b''
+    marker = '_..._'
+    stem_budget = max_bytes - len(ext_bytes) - len(marker.encode(encoding))
+    stem_bytes = name.encode(encoding)
+    # Keep the unique suffixes at the end of the stem intact (up to a third of
+    # the bytes limit), then fill the rest from the front.
+    tail_keep = min(stem_budget // 2, max_bytes // 3)
+    head_keep = stem_budget - tail_keep
+    head = stem_bytes[:head_keep].decode(encoding, errors='ignore').rstrip()
+    tail = stem_bytes[-tail_keep:].decode(encoding, errors='ignore').lstrip()
+    return head + marker + tail + ext_bytes.decode(encoding)
 
 
 def seconds_to_timestr(seconds):
@@ -311,7 +350,7 @@ def seconds_to_timestr(seconds):
     seconds %= 3600
     minutes = seconds // 60
     seconds %= 60
-    return '{:02d}:{:02d}:{:02d}'.format(hour, minutes, seconds)
+    return f'{hour:02d}:{minutes:02d}:{seconds:02d}'
 
 
 def time_func(func):
