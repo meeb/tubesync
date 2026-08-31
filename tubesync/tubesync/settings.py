@@ -379,6 +379,7 @@ YOUTUBE_DEFAULTS = {
     },
     'postprocessor_args': {
         'videoremuxer+ffmpeg': ['-bsf:v', 'setts=pts=DTS'],
+        'merger+ffmpeg': ['-fflags', '+genpts'],
     },
     'js_runtimes': {
         'deno': {'path': None,},
