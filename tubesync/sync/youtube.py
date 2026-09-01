@@ -51,6 +51,7 @@ class YouTubeError(yt_dlp.utils.DownloadError):
 
 def get_yt_opts():
     opts = deepcopy(_defaults)
+    opts.update(dict(logger=log))
     cookie_file = settings.COOKIES_FILE
     if cookie_file.is_file():
         cookie_file_path = str(cookie_file.resolve())
@@ -65,7 +66,6 @@ def get_channel_id(url):
     opts.update({
         'skip_download': True,
         'simulate': True,
-        'logger': log,
         'extract_flat': True,  # Change to False to get detailed info
         'check_formats': False,
         'playlist_items': '1',
@@ -149,7 +149,6 @@ def get_image_info(url):
     opts.update({
         'skip_download': True,
         'simulate': True,
-        'logger': log,
         'extract_flat': True,  # Change to False to get detailed info
         'check_formats': False,
         'playlist_items': '1',
@@ -250,7 +249,6 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'ignore_no_formats_error': False, # we must fail first to try again with this enabled
         'skip_download': True,
         'simulate': False,
-        'logger': log,
         'extract_flat': True,
         'allow_playlist_files': True,
         'check_formats': True,
@@ -312,6 +310,8 @@ def download_media(
     opts = get_yt_opts()
     default_opts = yt_dlp.parse_options([]).options
     pp_opts = deepcopy(default_opts)
+    # maintain logging while postprocessors are set-up
+    pp_opts.logger = opts.get('logger', default_opts.logger)
 
     # We fake up this option to make it easier for the user to add post processors.
     postprocessors = opts.get('add_postprocessors', pp_opts.add_postprocessors)
