@@ -311,7 +311,7 @@ def download_media(
     default_opts = yt_dlp.parse_options([]).options
     pp_opts = deepcopy(default_opts)
     # maintain logging while postprocessors are set-up
-    pp_opts.logger = opts.get('logger', default_opts.logger)
+    pp_opts.logger = opts.get('logger')
 
     # We fake up this option to make it easier for the user to add post processors.
     postprocessors = opts.get('add_postprocessors', pp_opts.add_postprocessors)
