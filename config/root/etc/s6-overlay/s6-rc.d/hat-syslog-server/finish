@@ -43,7 +43,7 @@ CLEANUP_TARGETS+=("${ANCHOR}")
 # Clear the sub-second/same-second timestamp collision window
 sleep 1
 
-s6-setuidgid app python3 /app/manage.py archive_hat_syslog "${DATABASE}" "${DEST_DIR}" "${DB_LOW_SIZE}" &&
+s6-setuidgid app python3 /app/manage.py archive_hat_syslog --stopped "${DATABASE}" "${DEST_DIR}" "${DB_LOW_SIZE}" &&
     s6-setuidgid app find "${DEST_DIR}" -name "${DATABASE##*/}" -type f -newer "${ANCHOR}" -exec mv -v -T '{}' "${DATABASE}.0.new" ';' -quit &&
     [[ -s "${DATABASE}.0.new" ]] &&
     s6-setuidgid app mv -v -T "${DATABASE}" "${DATABASE}.0" &&
