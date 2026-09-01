@@ -1,0 +1,60 @@
+#!/command/with-contenv bash
+
+set -e
+cd /app
+
+# Setup cleanup framework
+_cleanup_at_exit() {
+    for target in "${CLEANUP_TARGETS[@]}"; do
+        # If file is missing, exits 0 early. If it exists, calls rm.
+        ! [[ -e "${target}" ]] || s6-setuidgid app rm -f "${target}"
+    done
+}
+declare -a CLEANUP_TARGETS=()
+trap _cleanup_at_exit EXIT
+
+DB_HIGH_SIZE='1000000'
+DB_LOW_SIZE='100000'
+
+DEST_DIR='/downloads/cache/'
+DIR="${XDG_STATE_HOME:-/config/state}/hat"
+DATABASE="${DIR}/syslog.db"
+
+if ! [[ -s "${DATABASE}" ]]; then
+    exit 0
+fi
+
+ROW_RAW="$(s6-setuidgid app sqlite3 "${DATABASE}" 'SELECT count(rowid) FROM log;')"
+
+case "${ROW_RAW}" in
+    ('('*')') ROW_COUNT="$(s6-setuidgid app python3 -c 'print( tuple('"${ROW_RAW}"')[0] )')" ;;
+    (*) ROW_COUNT="${ROW_RAW}" ;;
+esac
+
+if ! [[ "${ROW_COUNT:-0}" -gt "${DB_HIGH_SIZE}" ]]; then
+    exit 0
+fi
+
+# Allocate an anchor file on the same filesystem to isolate modification times
+s6-setuidgid app mkdir -p "${DEST_DIR}"
+ANCHOR="$(s6-setuidgid app mktemp "${DEST_DIR}/anchor.XXXXXX")"
+CLEANUP_TARGETS+=("${ANCHOR}")
+
+# Clear the sub-second/same-second timestamp collision window
+sleep 1
+
+s6-setuidgid app python3 /app/manage.py archive_hat_syslog "${DATABASE}" "${DEST_DIR}" "${DB_LOW_SIZE}" &&
+    s6-setuidgid app find "${DEST_DIR}" -name "${DATABASE##*/}" -type f -newer "${ANCHOR}" -exec mv -v -T '{}' "${DATABASE}.0.new" ';' -quit &&
+    [[ -s "${DATABASE}.0.new" ]] &&
+    s6-setuidgid app mv -v -T "${DATABASE}" "${DATABASE}.0" &&
+    s6-setuidgid app mv -v -T "${DATABASE}.0.new" "${DATABASE}" &&
+    s6-setuidgid app rm -f "${ANCHOR}" || exit 1
+
+i=1
+# Loop as long as a file OR symlink exists
+while [[ -e "${DATABASE}.${i}" || -L "${DATABASE}.${i}" ]]; do
+    ((++i))
+done
+s6-setuidgid app mv -v -T "${DATABASE}.0" "${DATABASE}.${i}"
+
+exit 0
