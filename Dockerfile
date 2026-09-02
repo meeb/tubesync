@@ -798,6 +798,7 @@ ENV DENO_DIR="/config/cache/deno" \
     PYTHONPATH="/app" \
     PYTHONPYCACHEPREFIX="/config/cache/pycache" \
     S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0" \
+    SQLITE_TMPDIR="/config/cache" \
     XDG_CACHE_HOME="/config/cache" \
     XDG_CONFIG_HOME="/config/tubesync" \
     XDG_STATE_HOME="/config/state"
