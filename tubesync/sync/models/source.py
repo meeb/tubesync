@@ -252,6 +252,17 @@ class Source(db.models.Model):
         default=False,
         help_text=_('Where possible, prefer HDR media for this source'),
     )
+    prefer_original_audio = db.models.BooleanField(
+        _('prefer original audio'),
+        default=True,
+        help_text=_(
+            'Some videos offer more than one audio language: the language the video was '
+            'recorded in ("original"), plus dubbed tracks, one of which the site marks as '
+            'the "default". Prefer the original-language track when enabled, or the default '
+            'track when disabled. This has no effect on videos with only one audio language, '
+            'or when audio and video are downloaded as separate streams'
+        ),
+    )
     fallback = db.models.CharField(
         _('fallback'),
         max_length=1,

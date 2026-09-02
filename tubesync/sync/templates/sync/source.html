@@ -119,6 +119,10 @@
         <td class="hide-on-small-only">Prefer HDR?</td>
         <td><span class="hide-on-med-and-up">Prefer HDR?<br></span><strong>{% if source.prefer_hdr %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
       </tr>
+      <tr title="If the source media has multiple audio languages, prefer the 'original' audio track over the 'default' audio track (combined streams only)">
+        <td class="hide-on-small-only">Prefer original audio?</td>
+        <td><span class="hide-on-med-and-up">Prefer original audio?<br></span><strong>{% if source.prefer_original_audio %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+      </tr>
       <tr title="Output file extension">
         <td class="hide-on-small-only">Output extension</td>
         <td><span class="hide-on-med-and-up">Output extension<br></span><strong>{{ source.extension }}</strong></td>
