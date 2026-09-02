@@ -938,22 +938,21 @@ def download_media_metadata(media_id):
     upload_date = media.upload_date
     # Media must have a valid upload date
     if upload_date:
-        if timezone.is_naive(upload_date):
-            upload_date = timezone.make_aware(upload_date)
         media.published = upload_date
     timestamp = media.get_metadata_first_value(
         ('release_timestamp', 'timestamp',),
         arg_dict=response,
     )
-    try:
-        published_dt = media.ts_to_dt(timestamp)
-    except AssertionError:
-        pass
-    else:
-        if published_dt:
-            if timezone.is_naive(published_dt):
-                published_dt = timezone.make_aware(published_dt)
-            media.published = published_dt
+    if timestamp:
+        try:
+            published_dt = media.ts_to_dt(timestamp)
+        except AssertionError:
+            pass
+        else:
+            if published_dt:
+                media.published = published_dt
+    if timezone.is_naive(media.published):
+        media.published = timezone.make_aware(media.published)
 
     # Store title in DB so it's fast to access
     if media.metadata_title:
