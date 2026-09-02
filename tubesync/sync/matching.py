@@ -83,9 +83,10 @@ def get_best_combined_format(media):
     if not matches:
         return False, False
 
-    # prefer original
-    if 'original' in by_fmt_id and 'id' in by_fmt_id['original']:
-        return True, by_fmt_id['original']['id']
+    # prefer original, unless the source prefers the default audio track
+    if media.source.prefer_original_audio:
+        if 'original' in by_fmt_id and 'id' in by_fmt_id['original']:
+            return True, by_fmt_id['original']['id']
 
     # use any available matching format
     return get_fallback_id(by_fmt_id, by_language, exact=True, fallback_id=matches.pop())

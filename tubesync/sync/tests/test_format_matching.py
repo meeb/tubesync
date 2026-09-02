@@ -1,3 +1,4 @@
+import json
 import logging
 from django.test import TestCase
 from sync.models import Source, Media
@@ -166,6 +167,62 @@ class FormatMatchingTestCase(TestCase):
             match_type, format_code = self.media.get_best_combined_format()
             self.assertEqual(format_code, expected_format_code)
             self.assertEqual(match_type, expected_match_type)
+
+    def test_prefer_original_audio_format_matching(self):
+        # A combined format is available with both an "original" and a
+        # "default" audio language track, other than that they are identical
+        # matches for the source. The "prefer_original_audio" setting should
+        # decide which one is chosen.
+        self.source.fallback = Val(Fallback.FAIL)
+        self.source.source_resolution = Val(SourceResolution.VIDEO_1080P)
+        self.source.source_vcodec = Val(YouTube_VideoCodec.VP9)
+        self.source.source_acodec = Val(YouTube_AudioCodec.OPUS)
+        self.source.prefer_60fps = False
+        self.source.prefer_hdr = False
+        self.media.metadata = json.dumps({
+            'channel_id': 'testkey',
+            'formats': [
+                {
+                    'format_id': 'original_track',
+                    'ext': 'webm',
+                    'height': 1080,
+                    'width': 1920,
+                    'format_note': '1080p (original)',
+                    'format': '1080p (original)',
+                    'language': 'en-orig',
+                    'vcodec': 'vp9',
+                    'acodec': 'opus',
+                    'fps': 30,
+                    'tbr': 2500,
+                    'protocol': 'https',
+                },
+                {
+                    'format_id': 'default_track',
+                    'ext': 'webm',
+                    'height': 1080,
+                    'width': 1920,
+                    'format_note': '1080p (default)',
+                    'format': '1080p (default)',
+                    'language': 'es',
+                    'vcodec': 'vp9',
+                    'acodec': 'opus',
+                    'fps': 30,
+                    'tbr': 2500,
+                    'protocol': 'https',
+                },
+            ],
+        })
+        self.media.save()
+        # prefer_original_audio=True (the default) picks the "original" track
+        self.source.prefer_original_audio = True
+        match_type, format_code = self.media.get_best_combined_format()
+        self.assertEqual(format_code, 'original_track')
+        self.assertEqual(match_type, True)
+        # prefer_original_audio=False picks the "default" track instead
+        self.source.prefer_original_audio = False
+        match_type, format_code = self.media.get_best_combined_format()
+        self.assertEqual(format_code, 'default_track')
+        self.assertEqual(match_type, True)
 
     def test_audio_exact_format_matching(self):
         self.source.fallback = Val(Fallback.FAIL)
