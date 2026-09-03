@@ -55,7 +55,7 @@ FORCE_SCRIPT_NAME = None
 TASKS = {
     "default": {
         "BACKEND": "django_tasks_db.DatabaseBackend",
-        "QUEUES": [ qn for qn in TaskQueue.values ],
+        "QUEUES": TaskQueue.values + ['default'],
     },
 }
 
