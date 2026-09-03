@@ -214,6 +214,25 @@ Currently TubeSync supports Plex and Jellyfin as media servers. You can add your
 under the "media servers" tab.
 
 
+### 4. Bulk-importing sources (API + command)
+
+This fork can create many sources at once, for example when importing a set of
+playlists. Two equivalent entry points share the same validation core:
+
+| Entry point | What |
+| --- | --- |
+| `POST /api/sources` | Bulk create / upsert-by-key from a JSON body. Partial success returns `200` with a per-item `results` list. |
+| `GET /api/sources` | List sources (filters: `type`, `active`, `has_failed`, `key`, `limit`, `offset`). |
+| `DELETE /api/sources/<uuid>` | Remove one source. |
+| `docker exec -it tubesync python3 /app/manage.py import-sources <FILE\|->` | Same import from a JSON file, a line list, or stdin. `--dry-run`, `--activate` / `--no-activate`, `--defer-indexing`. |
+
+The HTTP endpoints sit behind the same optional HTTP basic auth as the rest of
+TubeSync (`HTTP_USER` / `HTTP_PASS`); with auth disabled they are open on the
+LAN, exactly like the web UI. They do not add any new dependency and DRF is not
+used. See [`docs/bulk-importing-sources.md`](docs/bulk-importing-sources.md) for
+the item schema and `curl` examples.
+
+
 # Logging and debugging
 
 Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Logging-and-debugging#logging-and-debugging).
