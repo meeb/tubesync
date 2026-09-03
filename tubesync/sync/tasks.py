@@ -388,7 +388,7 @@ def cleanup_huey_storage():
             pass
         worker.join()
     workers.clear()
-cleanup_huey_storage_result = cleanup_huey_storage.enqueue()
+#cleanup_huey_storage_result = cleanup_huey_storage.enqueue()
 
 
 @db_task(priority=90, retries=2, retry_delay=150, queue=Val(TaskQueue.FS))
