@@ -45,7 +45,6 @@ from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
 
 atomic = db.transaction.atomic
-db_vendor = db.connection.vendor
 register_huey_signals()
 
 
@@ -207,7 +206,7 @@ def cleanup_completed_tasks():
 def save_model(instance):
     with atomic(durable=False):
         instance.save()
-    if 'sqlite' != db_vendor:
+    if 'sqlite' != db.connection.vendor:
         return
 
     # work around for SQLite and its many
