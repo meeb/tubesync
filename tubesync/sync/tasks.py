@@ -18,6 +18,7 @@ from shutil import copyfile, rmtree
 from django import db
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.tasks import task as django_task
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_huey import lock_task as huey_lock_task, task as huey_task
@@ -45,7 +46,7 @@ from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
 
 atomic = db.transaction.atomic
-register_huey_signals()
+cleanup_threads = register_huey_signals()
 
 
 def get_task_map():
@@ -369,6 +370,25 @@ def wait_for_errors(model, /, *, queue_name=None, task_name=None):
         update_task_status(task, None)
     if delay > 0:
         raise HueyConsumerError(_('queue consumer stopped'))
+
+
+@django_task(queue_name=Val(TaskQueue.FS))
+def cleanup_huey_storage():
+    workers = cleanup_threads
+    if not all(
+        (callable(getattr(workers, 'clear', None)),) +
+        tuple(callable(getattr(w, 'join', None)) for w in workers) +
+        tuple(callable(getattr(w, 'start', None)) for w in workers),
+    ):
+        return
+    for worker in workers:
+        try:
+            w.start()
+        except RuntimeError:
+            pass
+        worker.join()
+    workers.clear()
+cleanup_huey_storage_result = cleanup_huey_storage.enqueue()
 
 
 @db_task(priority=90, retries=2, retry_delay=150, queue=Val(TaskQueue.FS))
