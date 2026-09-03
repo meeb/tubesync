@@ -383,7 +383,7 @@ def cleanup_huey_storage():
         return
     for worker in workers:
         try:
-            w.start()
+            worker.start()
         except RuntimeError:
             pass
         worker.join()
