@@ -1,5 +1,27 @@
 #!/command/with-contenv bash
 
+# Wait for the embedded PostgreSQL server to accept connections. The
+# 'postgres' s6 service being "up" only means the process started, not
+# that it is ready. Skipped for an external database or the SQLite
+# backend (nothing local to wait for).
+if [[ -z "${DATABASE_CONNECTION:-}" ]] && \
+   [[ 'sqlite' != "$(printf -- '%s' "${TUBESYNC_DATABASE_BACKEND:-}" | tr '[:upper:]' '[:lower:]')" ]]
+then
+    pg_socket='/run/postgres'
+    pg_user="${TUBESYNC_POSTGRES_USER:-tubesync}"
+    pg_database="${TUBESYNC_POSTGRES_DB:-tubesync}"
+    pg_isready='/usr/lib/postgresql/17/bin/pg_isready'
+    for _ in $(seq 1 60)
+    do
+        if "${pg_isready}" -h "${pg_socket}" -U "${pg_user}" -d "${pg_database}" -q
+        then
+            break
+        fi
+        echo "Waiting for PostgreSQL to accept connections..."
+        sleep 1
+    done
+fi
+
 if [[ 'True' == "${TUBESYNC_DEBUG:-False}" ]]
 then
     s6-setuidgid app \

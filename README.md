@@ -178,9 +178,12 @@ Back-end updates such as database migrations should be automatic.
 # Moving, backing up, etc.
 
 TubeSync, when running in its default container, stores thumbnails, cache and its
-SQLite database into the `/config` directory and wherever you've mapped that to on your
-file system. Just copying or moving this directory and making sure the permissions are
-correct is sufficient to move, back up or migrate your TubeSync install.
+database (an embedded PostgreSQL cluster under `/config/postgres`, or the legacy
+`db.sqlite3` file when `TUBESYNC_DATABASE_BACKEND=sqlite`) into the `/config`
+directory and wherever you've mapped that to on your file system. Just copying or
+moving this directory, while the container is stopped, and making sure the
+permissions are correct is sufficient to move, back up or migrate your TubeSync
+install.
 
 
 # Using TubeSync
@@ -272,7 +275,8 @@ useful if you are manually installing TubeSync in some other environment. These 
 | LISTEN_PORT                  | Port number for `gunicorn` to listen on                       | 8080                                                                          |
 | HTTP_USER                    | Sets the username for HTTP basic authentication               | some-username                                                                 |
 | HTTP_PASS                    | Sets the password for HTTP basic authentication               | some-secure-password                                                          |
-| DATABASE_CONNECTION          | Optional external database connection details                 | postgresql://user:pass@host:port/database          |
+| DATABASE_CONNECTION          | Optional external database connection details (overrides the embedded server) | postgresql://user:pass@host:port/database          |
+| TUBESYNC_DATABASE_BACKEND    | `postgres` (default) runs an embedded PostgreSQL server in `/config/postgres`; `sqlite` keeps the legacy `/config/db.sqlite3` file | postgres                                          |
 
 
 # Manual, non-containerised, installation

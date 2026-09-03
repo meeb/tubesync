@@ -1,0 +1,93 @@
+#!/command/with-contenv bash
+
+# Initialise the embedded PostgreSQL server.
+#
+# This is a no-op when an external database is configured
+# (DATABASE_CONNECTION) or when the legacy SQLite backend is
+# requested (TUBESYNC_DATABASE_BACKEND=sqlite).
+
+set -eu
+
+if [ -n "${DATABASE_CONNECTION:-}" ]; then
+    echo "DATABASE_CONNECTION is set, skipping the embedded PostgreSQL server"
+    exit 0
+fi
+if [ 'sqlite' = "$(printf -- '%s' "${TUBESYNC_DATABASE_BACKEND:-}" | tr '[:upper:]' '[:lower:]')" ]; then
+    echo "TUBESYNC_DATABASE_BACKEND=sqlite, skipping the embedded PostgreSQL server"
+    exit 0
+fi
+
+PG_MAJOR=17
+PGBIN="/usr/lib/postgresql/${PG_MAJOR}/bin"
+PGROOT="/config/postgres/${PG_MAJOR}"
+PGDATA="${PGROOT}/data"
+PGSOCKET="/run/postgres"
+PGDATABASE="${TUBESYNC_POSTGRES_DB:-tubesync}"
+PGUSER="${TUBESYNC_POSTGRES_USER:-tubesync}"
+
+# Runtime socket directory (tmpfs, recreated every boot)
+mkdir -p "${PGSOCKET}"
+chown app:app "${PGSOCKET}"
+chmod 0775 "${PGSOCKET}"
+
+# Data directory. tubesync-config-init already ran `chown -R app:app
+# /config`, but its `chmod -R 0755 /config` loosens the data directory,
+# and PostgreSQL refuses to start unless PGDATA is 0700/0750 - so the
+# mode must be re-applied here on every boot.
+mkdir -p "${PGDATA}"
+chown app:app "${PGROOT}" "${PGDATA}"
+chmod 0700 "${PGROOT}" "${PGDATA}"
+
+fresh_initdb=0
+if [ ! -s "${PGDATA}/PG_VERSION" ]; then
+    echo "Initialising a new PostgreSQL ${PG_MAJOR} cluster in ${PGDATA}"
+    s6-setuidgid app "${PGBIN}/initdb" \
+        --pgdata="${PGDATA}" \
+        --encoding=UTF8 \
+        --locale=C.UTF-8 \
+        --username="${PGUSER}" \
+        --auth-local=trust \
+        --auth-host=reject
+    fresh_initdb=1
+fi
+
+# Drop our overrides into a conf.d snippet so postgresql.conf stays
+# whatever initdb produced. The include line is added exactly once.
+mkdir -p "${PGDATA}/conf.d"
+cat >| "${PGDATA}/conf.d/tubesync.conf" <<EOF
+# Managed by tubesync-postgres-init - edits are overwritten on restart.
+listen_addresses = ''
+unix_socket_directories = '${PGSOCKET}'
+logging_collector = off
+shared_buffers = 128MB
+max_connections = 100
+EOF
+if ! grep -q "^include_dir = 'conf.d'" "${PGDATA}/postgresql.conf"; then
+    printf -- "\ninclude_dir = 'conf.d'\n" >> "${PGDATA}/postgresql.conf"
+fi
+chown -R app:app "${PGDATA}/conf.d"
+
+# Create the application database on first init. On later boots the
+# cluster already holds it and the persistent 'postgres' service plus
+# tubesync-migrations-init take over.
+if [ "${fresh_initdb}" = 1 ]; then
+    echo "Creating database '${PGDATABASE}'"
+    s6-setuidgid app "${PGBIN}/pg_ctl" \
+        --pgdata="${PGDATA}" --wait --silent \
+        --options="-k ${PGSOCKET} -c listen_addresses=''" \
+        start
+    if ! s6-setuidgid app "${PGBIN}/psql" \
+            --host="${PGSOCKET}" --username="${PGUSER}" --dbname=postgres \
+            --no-align --tuples-only \
+            --command="SELECT 1 FROM pg_database WHERE datname = '${PGDATABASE}'" \
+            | grep -q 1; then
+        s6-setuidgid app "${PGBIN}/createdb" \
+            --host="${PGSOCKET}" --username="${PGUSER}" \
+            --owner="${PGUSER}" "${PGDATABASE}"
+    fi
+    s6-setuidgid app "${PGBIN}/pg_ctl" \
+        --pgdata="${PGDATA}" --wait --silent --mode=fast \
+        stop
+fi
+
+echo "Embedded PostgreSQL ${PG_MAJOR} is ready to be started"
