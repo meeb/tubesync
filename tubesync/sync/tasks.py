@@ -1381,3 +1381,57 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
         rmtree(directory_path, True)
 
 
+# --- Direct-download jobs (sync/direct_download.py) -----------------------
+
+@db_task(priority=50, queue=Val(TaskQueue.DIRECT))
+def run_direct_download_job(job_id):
+    '''
+        Run one DirectDownloadJob to completion on the dedicated `direct` queue
+        (single process worker). Long-running and self-paced; resumable from the
+        job's cursor after a restart.
+    '''
+    from .models import DirectDownloadJob
+    from . import direct_download
+    try:
+        job = DirectDownloadJob.objects.get(pk=job_id)
+    except DirectDownloadJob.DoesNotExist as e:
+        raise CancelExecution(_('no such direct-download job'), retry=False) from e
+    if job.status != Val(DirectDownloadJob.Status.RUNNING):
+        log.info(f'run_direct_download_job: {job_id} is {job.status}, nothing to do')
+        return
+    try:
+        direct_download.run_job(job)
+    except Exception:
+        log.exception(f'run_direct_download_job: {job_id} crashed')
+        DirectDownloadJob.objects.filter(pk=job_id).update(
+            status=Val(DirectDownloadJob.Status.ERROR),
+        )
+        raise
+
+
+@db_periodic_task(
+    huey_crontab(minute='*/10', strict=True),
+    priority=10,
+    expires=9*60,
+    queue=Val(TaskQueue.DB),
+)
+def resume_direct_download_jobs():
+    '''
+        Belt-and-braces: re-enqueue any job still marked running (huey's
+        on_interrupted usually handles restarts, this covers the gaps).
+        remove_duplicates keeps it a no-op while one is already queued.
+    '''
+    from .models import DirectDownloadJob
+    qs = DirectDownloadJob.objects.filter(status=Val(DirectDownloadJob.Status.RUNNING))
+    for job in qs_gen(qs):
+        TaskHistory.schedule(
+            run_direct_download_job,
+            str(job.pk),
+            delay=5,
+            expires=8*60,
+            remove_duplicates=True,
+            vn_fmt=_('Direct download job {}'),
+            vn_args=(str(job.pk),),
+        )
+
+

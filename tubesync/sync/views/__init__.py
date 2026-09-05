@@ -11,7 +11,8 @@ from .tasks import (TasksView, RevokeTaskView, CompletedTasksView,
 from .mediaservers import (MediaServersView, AddMediaServerView,
                            MediaServerView, DeleteMediaServerView,
                            UpdateMediaServerView)
-from .api import SourceListCreateAPIView, SourceDetailAPIView
+from .api import (SourceListCreateAPIView, SourceDetailAPIView,
+                  DownloadJobListCreateAPIView, DownloadJobDetailAPIView)
 
 __all__ = [
     'DashboardView',
@@ -26,4 +27,5 @@ __all__ = [
     'MediaServersView', 'AddMediaServerView', 'MediaServerView',
     'DeleteMediaServerView', 'UpdateMediaServerView',
     'SourceListCreateAPIView', 'SourceDetailAPIView',
+    'DownloadJobListCreateAPIView', 'DownloadJobDetailAPIView',
 ]

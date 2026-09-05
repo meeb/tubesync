@@ -170,6 +170,10 @@ class TaskQueue(models.TextChoices):
     FS = 'filesystem', _('Filesystem')
     NET = 'network', _('Networking')
     LIMIT = 'limited', _('Limited Networking')
+    # One long-running, self-paced worker for direct-download jobs
+    # (sync/direct_download.py). Kept off `limited` so a multi-day job neither
+    # starves indexing/downloads nor trips the limited-queue MAX_RUN_TIME watchdog.
+    DIRECT = 'direct', _('Direct Download')
 
 
 class WeekDay(models.IntegerChoices):

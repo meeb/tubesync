@@ -8,19 +8,23 @@
 '''
 
 import json
+import re
 
 from django.core.exceptions import RequestDataTooBig, ValidationError
 from django.db.models import Count
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
+from django.utils.translation import gettext_lazy as _
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from common.json_encoder import JSONEncoder
+from common.models import TaskHistory
 
-from ..choices import YouTube_SourceType
-from ..models import Source
+from ..choices import Val, YouTube_SourceType
+from ..models import DirectDownloadJob, Source
 from ..source_import import ImportReport, import_sources
+from .. import direct_download as dd
 
 
 def _json_response(data, status=200):
@@ -191,3 +195,160 @@ class SourceDetailAPIView(View):
         name = source.name
         source.delete()
         return _json_response({'deleted': str(pk), 'name': name}, status=200)
+
+
+# ---- Direct-download jobs (sync/direct_download.py) --------------------------
+
+_VIDEO_ID_RE = re.compile(r'^[A-Za-z0-9_-]{11}$')
+MAX_DIRECT_VIDEOS = 25_000
+
+
+def _clean_directory(raw, title, taken):
+    d = str(raw).strip() if raw else ''
+    if d:
+        if d.startswith(('/', '\\')) or '..' in d.replace('\\', '/').split('/') or '/' in d:
+            raise ValidationError(_("invalid 'directory' %(d)r") % {'d': d})
+        d = dd.safe_directory(d)
+    else:
+        d = dd.safe_directory(title)
+    base, n = d, 2
+    while d in taken:
+        d = f'{base}-{n}'
+        n += 1
+    taken.add(d)
+    return d
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DownloadJobListCreateAPIView(View):
+
+    http_method_names = ['get', 'post', 'head', 'options']
+
+    def get(self, request):
+        try:
+            limit = int(request.GET.get('limit', 20))
+        except (TypeError, ValueError):
+            return _error("'limit' must be an integer")
+        limit = max(1, min(limit, 200))
+        rows = DirectDownloadJob.objects.all()[:limit]
+        return _json_response({
+            'count': DirectDownloadJob.objects.count(),
+            'results': [{
+                'id': str(j.uuid),
+                'status': j.status,
+                'completed': j.completed,
+                'failed': j.failed,
+                'total': j.total,
+                'created_at': j.created_at,
+            } for j in rows],
+        })
+
+    def post(self, request):
+        try:
+            payload = _read_json_body(request)
+        except _PayloadTooBig:
+            return _error('payload too large, split into multiple requests', status=413)
+        except _BadRequest as e:
+            return _error(e)
+        if not isinstance(payload, dict):
+            return _error('request body must be a JSON object')
+
+        raw_playlists = payload.get('playlists')
+        if not isinstance(raw_playlists, list) or not raw_playlists:
+            return _error("'playlists' must be a non-empty list")
+
+        resolution = str(payload.get('resolution') or '1080p')
+
+        taken = set()
+        playlists = []
+        total = 0
+        try:
+            for entry in raw_playlists:
+                if not isinstance(entry, dict):
+                    raise ValidationError(_('each playlist must be a JSON object'))
+                title = str(entry.get('title') or '').strip()
+                if not title:
+                    raise ValidationError(_("each playlist needs a 'title'"))
+                ids = [
+                    v for v in (entry.get('video_ids') or [])
+                    if isinstance(v, str) and _VIDEO_ID_RE.match(v)
+                ]
+                if not ids:
+                    raise ValidationError(
+                        _("playlist %(t)r has no valid video_ids") % {'t': title}
+                    )
+                # de-dupe ids, keep order
+                ids = list(dict.fromkeys(ids))
+                directory = _clean_directory(entry.get('directory'), title, taken)
+                total += len(ids)
+                playlists.append({
+                    'title': title[:200],
+                    'playlist_id': (str(entry['playlist_id'])
+                                    if entry.get('playlist_id') else None),
+                    'directory': directory,
+                    'video_ids': ids,
+                })
+        except ValidationError as e:
+            return _error('; '.join(e.messages))
+
+        if total > MAX_DIRECT_VIDEOS:
+            return _error(
+                f'too many videos ({total}), the limit is {MAX_DIRECT_VIDEOS}'
+            )
+
+        if DirectDownloadJob.objects.filter(
+            status=Val(DirectDownloadJob.Status.RUNNING),
+        ).exists():
+            return _error('a direct-download job is already running', status=409)
+
+        job = DirectDownloadJob.objects.create(
+            playlists=playlists,
+            resolution=resolution,
+            total=total,
+            status=Val(DirectDownloadJob.Status.RUNNING),
+        )
+        from ..tasks import run_direct_download_job
+        TaskHistory.schedule(
+            run_direct_download_job,
+            str(job.uuid),
+            delay=1,
+            remove_duplicates=True,
+            vn_fmt=_('Direct download job {}'),
+            vn_args=(str(job.uuid),),
+        )
+        return _json_response(
+            {'id': str(job.uuid), 'total': total, 'playlists': len(playlists)},
+            status=201,
+        )
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class DownloadJobDetailAPIView(View):
+
+    http_method_names = ['get', 'post', 'head', 'options']
+
+    def _get(self, pk):
+        try:
+            return DirectDownloadJob.objects.get(pk=pk)
+        except DirectDownloadJob.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        job = self._get(pk)
+        if job is None:
+            return _error('no download job with that id', status=404)
+        return _json_response(job.as_status_dict())
+
+    def post(self, request, pk):
+        job = self._get(pk)
+        if job is None:
+            return _error('no download job with that id', status=404)
+        try:
+            payload = _read_json_body(request)
+        except (_BadRequest, _PayloadTooBig):
+            payload = {}
+        if isinstance(payload, dict) and payload.get('stop'):
+            if job.status == Val(DirectDownloadJob.Status.RUNNING):
+                DirectDownloadJob.objects.filter(pk=pk).update(stop_requested=True)
+            return _json_response({'stopping': str(pk)})
+        return _error("expected {'stop': true}")
