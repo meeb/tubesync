@@ -122,11 +122,12 @@ class DirectDownloadEngineTestCase(TestCase):
     def setUp(self):
         logging.disable(logging.CRITICAL)
 
+    @patch('sync.direct_download.interruptible_sleep', lambda *_: None)
     @patch('sync.direct_download.time.sleep', lambda *_: None)
     @patch('sync.direct_download.patch_info_json')
     @patch('sync.direct_download.download_one')
     def test_run_job_advances_and_finishes(self, m_dl, m_patch):
-        m_dl.return_value = True
+        m_dl.return_value = 'ok'
         job = DirectDownloadJob.objects.create(
             playlists=[
                 {'title': 'A', 'playlist_id': 'PLA', 'directory': 'a', 'video_ids': [VID_A, VID_B]},
@@ -145,11 +146,12 @@ class DirectDownloadEngineTestCase(TestCase):
         self.assertEqual(m_dl.call_count, 3)
         self.assertEqual(m_patch.call_count, 2)
 
+    @patch('sync.direct_download.interruptible_sleep', lambda *_: None)
     @patch('sync.direct_download.time.sleep', lambda *_: None)
     @patch('sync.direct_download.patch_info_json')
     @patch('sync.direct_download.download_one')
     def test_stop_between_videos(self, m_dl, m_patch):
-        m_dl.return_value = True
+        m_dl.return_value = 'ok'
         job = DirectDownloadJob.objects.create(
             playlists=[{'title': 'A', 'directory': 'a', 'video_ids': [VID_A, VID_B, VID_C]}],
             total=3, status=DirectDownloadJob.Status.RUNNING,
@@ -157,7 +159,7 @@ class DirectDownloadEngineTestCase(TestCase):
 
         def stopper(*args, **kwargs):
             DirectDownloadJob.objects.filter(pk=job.pk).update(stop_requested=True)
-            return True
+            return 'ok'
 
         m_dl.side_effect = stopper
         with override_settings(DOWNLOAD_ROOT=self._tmp()):
@@ -166,11 +168,12 @@ class DirectDownloadEngineTestCase(TestCase):
         self.assertEqual(job.status, DirectDownloadJob.Status.STOPPED)
         self.assertLess(job.completed, 3)
 
+    @patch('sync.direct_download.interruptible_sleep', lambda *_: None)
     @patch('sync.direct_download.time.sleep', lambda *_: None)
     @patch('sync.direct_download.patch_info_json')
     @patch('sync.direct_download.download_one')
     def test_resume_from_cursor(self, m_dl, m_patch):
-        m_dl.return_value = True
+        m_dl.return_value = 'ok'
         job = DirectDownloadJob.objects.create(
             playlists=[{'title': 'A', 'directory': 'a', 'video_ids': [VID_A, VID_B, VID_C]}],
             total=3, completed=2, cursor_playlist=0, cursor_video=2,
@@ -182,6 +185,26 @@ class DirectDownloadEngineTestCase(TestCase):
         self.assertEqual(job.status, DirectDownloadJob.Status.DONE)
         self.assertEqual(m_dl.call_count, 1)  # only the last video
         self.assertEqual(job.completed, 3)
+
+    @patch('sync.direct_download.time.sleep', lambda *_: None)
+    @patch('sync.direct_download.patch_info_json')
+    @patch('sync.direct_download.download_one')
+    def test_backoff_on_consecutive_blocks(self, m_dl, m_patch):
+        m_dl.side_effect = ['blocked', 'blocked', 'blocked', 'blocked', 'ok']
+        pauses = []
+        job = DirectDownloadJob.objects.create(
+            playlists=[{'title': 'A', 'directory': 'a',
+                        'video_ids': [VID_A, VID_B, VID_C, 'ddddddddddd', 'eeeeeeeeeee']}],
+            total=5, status=DirectDownloadJob.Status.RUNNING,
+        )
+        with patch('sync.direct_download.interruptible_sleep', lambda s, j: pauses.append(s)), \
+             override_settings(DOWNLOAD_ROOT=self._tmp()):
+            dd.run_job(job)
+        job.refresh_from_db()
+        self.assertEqual(job.status, DirectDownloadJob.Status.DONE)
+        self.assertEqual(job.failed, 4)
+        self.assertEqual(job.completed, 1)
+        self.assertGreaterEqual(max(pauses), 300)   # backoff kicked in
 
     def test_already_have(self):
         d = Path(self._tmp())

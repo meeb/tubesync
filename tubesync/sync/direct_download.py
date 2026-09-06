@@ -32,6 +32,12 @@ MAX_SLEEP_S = 15
 PLAYLIST_PAUSE_S = 30
 LOG_MAX = 60
 
+# When YouTube starts refusing ("Sign in to confirm you're not a bot"), backing
+# off hard is the only thing that helps (archive-playlists.sh: "wait ~24h").
+# Ramp the pause on consecutive failures; reset on the next success.
+BACKOFF_S = {3: 300, 6: 1800, 10: 3600}
+BOT_MARKERS = ("confirm you", "not a bot", "sign in to confirm", "HTTP Error 429")
+
 _ID_RE = re.compile(r'^[A-Za-z0-9_-]{11}$')
 
 
@@ -76,6 +82,19 @@ def _fmt_eta(secs):
 def _short(err):
     s = str(err).replace('\n', ' ').strip()
     return s[:300]
+
+
+def interruptible_sleep(secs, job):
+    '''Sleep in 3s steps, bail out early if the job was asked to stop.'''
+    end = time.monotonic() + secs
+    while time.monotonic() < end:
+        time.sleep(min(3.0, end - time.monotonic()))
+        try:
+            job.refresh_from_db(fields=['stop_requested'])
+        except Exception:
+            return
+        if job.stop_requested:
+            return
 
 
 def make_progress_hook(job, playlist_title):
@@ -134,7 +153,8 @@ def already_have(out_dir, video_id):
 
 def download_one(video_id, out_dir, *, resolution, hook, log_line):
     '''
-        Download one video by watch URL into out_dir. Returns True on success.
+        Download one video by watch URL into out_dir.
+        Returns 'ok', 'blocked' (YouTube anti-bot / 429) or 'fail'.
     '''
     h = height_for(resolution)
     url = f'https://www.youtube.com/watch?v={video_id}'
@@ -166,34 +186,53 @@ def download_one(video_id, out_dir, *, resolution, hook, log_line):
     try:
         with yt_dlp.YoutubeDL(opts) as y:
             rc = y.download([url])
-        return rc == 0
+        return 'ok' if rc == 0 else 'fail'
     except yt_dlp.utils.DownloadError as e:
-        log_line(f'! {video_id}: {_short(e)}')
-        return False
+        msg = _short(e)
+        log_line(f'! {video_id}: {msg}')
+        return 'blocked' if any(m.lower() in msg.lower() for m in BOT_MARKERS) else 'fail'
     except Exception as e:  # noqa: BLE001 - keep the job alive on any single-video failure
         log_line(f'! {video_id}: {e.__class__.__name__}: {_short(e)}')
-        return False
+        return 'fail'
+
+
+def _patch_one(p, playlist_id, playlist_title):
+    try:
+        data = json.loads(p.read_text())
+    except Exception:
+        return
+    if data.get('playlist_id'):
+        return
+    data['playlist_id'] = playlist_id
+    data['playlist_title'] = playlist_title
+    try:
+        p.write_text(json.dumps(data, ensure_ascii=False))
+    except Exception:
+        pass
+
+
+def patch_video_info_json(out_dir, video_id, playlist_id, playlist_title):
+    '''
+        Patch the single just-downloaded video's *.info.json right away, so
+        OffTube groups it as a playlist member even if the job is stopped or
+        fails before the playlist finishes.
+    '''
+    d = Path(out_dir)
+    if not d.is_dir():
+        return
+    for p in d.iterdir():
+        if p.name.endswith('.info.json') and video_id in p.name:
+            _patch_one(p, playlist_id, playlist_title)
 
 
 def patch_info_json(out_dir, playlist_id, playlist_title):
     '''
-        Write playlist_id / playlist_title into every *.info.json in out_dir that
-        does not have them yet, so OffTube groups the videos as a playlist
-        (lib/scan.js reads exactly these fields).
+        Catch-all pass over every *.info.json in out_dir (idempotent - skips
+        ones already carrying playlist_id). Runs when a playlist finishes; the
+        per-video patch above does most of the work.
     '''
     for p in Path(out_dir).glob('*.info.json'):
-        try:
-            data = json.loads(p.read_text())
-        except Exception:
-            continue
-        if data.get('playlist_id'):
-            continue
-        data['playlist_id'] = playlist_id
-        data['playlist_title'] = playlist_title
-        try:
-            p.write_text(json.dumps(data, ensure_ascii=False))
-        except Exception:
-            pass
+        _patch_one(p, playlist_id, playlist_title)
 
 
 def run_job(job):
@@ -213,6 +252,8 @@ def run_job(job):
         log_lines.append(f'[{time.strftime("%H:%M:%S")}] {line}')
         del log_lines[:-LOG_MAX]
         job.log = log_lines
+
+    consecutive_blocked = 0
 
     start_pi = job.cursor_playlist
     for pi in range(start_pi, len(playlists)):
@@ -242,11 +283,11 @@ def run_job(job):
 
             if not _ID_RE.match(str(video_id)):
                 add_log(f'! ungueltige ID uebersprungen: {video_id}')
-                ok = False
+                res = 'fail'
             elif already_have(out_dir, video_id):
-                ok = True
+                res = 'ok'
             else:
-                ok = download_one(
+                res = download_one(
                     video_id, out_dir,
                     resolution=job.resolution,
                     hook=make_progress_hook(job, pl.get('title')),
@@ -254,15 +295,27 @@ def run_job(job):
                 )
 
             job.cursor_playlist, job.cursor_video = pi, vi + 1
-            if ok:
+            if res == 'ok':
                 job.completed += 1
+                consecutive_blocked = 0
+                patch_video_info_json(out_dir, video_id, pl.get('playlist_id'), pl.get('title'))
             else:
                 job.failed += 1
+                if res == 'blocked':
+                    consecutive_blocked += 1
             job.save(update_fields=[
                 'cursor_playlist', 'cursor_video', 'completed', 'failed',
                 'log', 'updated_at',
             ])
-            time.sleep(random.uniform(MIN_SLEEP_S, MAX_SLEEP_S))
+
+            pause = random.uniform(MIN_SLEEP_S, MAX_SLEEP_S)
+            for threshold, secs in sorted(BACKOFF_S.items(), reverse=True):
+                if consecutive_blocked >= threshold:
+                    pause = secs
+                    add_log(f'YouTube blockt ({consecutive_blocked}x) - pausiere {secs // 60} min')
+                    job.save(update_fields=['log', 'updated_at'])
+                    break
+            interruptible_sleep(pause, job)
 
         patch_info_json(out_dir, pl.get('playlist_id'), pl.get('title'))
         job.playlists_done = pi + 1
@@ -273,7 +326,7 @@ def run_job(job):
             'log', 'updated_at',
         ])
         if pi + 1 < len(playlists):
-            time.sleep(PLAYLIST_PAUSE_S)
+            interruptible_sleep(PLAYLIST_PAUSE_S, job)
 
     add_log(
         f'Fertig: {job.completed} geladen, {job.failed} fehlgeschlagen '
