@@ -38,6 +38,7 @@ from common.errors import (
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, seconds_to_timestr,
                             sqlite_retry_delay, )
+from common.yt_dlp import retry_django_db
 from .choices import Val, IndexSchedule, TaskQueue
 from .models import Source, Media, MediaServer, Metadata
 from .utils import get_remote_image, resize_image_to_height, filter_response
@@ -201,12 +202,14 @@ def cleanup_completed_tasks():
     TaskHistory.objects.filter(end_at__lt=delta).delete()
 
 
+@retry_django_db(3)
 def save_model(instance):
     with atomic(durable=False):
         instance.save()
     sqlite_retry_delay()
 
 
+@retry_django_db(3)
 def update_model(instance, **kwargs):
     qs = instance.__class__.objects.all()
     return qs.filter(
@@ -727,7 +730,17 @@ def download_source_images(source_id):
         log.error(f'Task download_source_images(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         raise CancelExecution(_('no such source'), retry=False) from e
-    avatar, banner, thumbnail = source.get_image_url
+    keys = list()
+    if source.index_videos:
+        keys.append(source.get_index_url('videos'))
+    if not source.is_playlist and source.index_streams:
+        keys.append(source.get_index_url('streams'))
+    qs = source.videos.filter(media__isnull=True, key__in=keys)
+    if not qs.exists():
+        raise CancelExecution(_('data not yet available'))
+    avatar, banner, thumbnail = source.get_image_urls(qs)
+    if not any((avatar, banner, thumbnail)):
+        raise CancelExecution(_('data not yet available'))
     log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
         f'Banner: {banner} '
@@ -918,18 +931,21 @@ def download_media_metadata(media_id):
     upload_date = media.upload_date
     # Media must have a valid upload date
     if upload_date:
-        media.published = timezone.make_aware(upload_date)
+        media.published = upload_date
     timestamp = media.get_metadata_first_value(
         ('release_timestamp', 'timestamp',),
         arg_dict=response,
     )
-    try:
-        published_dt = media.ts_to_dt(timestamp)
-    except AssertionError:
-        pass
-    else:
-        if published_dt:
-            media.published = published_dt
+    if timestamp:
+        try:
+            published_dt = media.ts_to_dt(timestamp)
+        except AssertionError:
+            pass
+        else:
+            if published_dt:
+                media.published = published_dt
+    if timezone.is_naive(media.published):
+        media.published = timezone.make_aware(media.published)
 
     # Store title in DB so it's fast to access
     if media.metadata_title:

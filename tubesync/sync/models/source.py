@@ -3,6 +3,7 @@ import re
 import uuid
 from collections import deque as queue
 from pathlib import Path
+from typing import ClassVar
 from django import db
 from django.conf import settings
 from django.core.validators import RegexValidator
@@ -20,9 +21,15 @@ from ..fields import CommaSepChoiceField
 from ..youtube import (
     get_media_info as get_youtube_media_info,
     get_image_info as get_youtube_image_info,
+    get_image_urls as get_youtube_image_urls,
+    merge_image_thumbnails,
 )
 from ._migrations import media_file_storage
 from ._private import _srctype_dict
+
+
+def _has_index_metadata_value(value):
+    return bool(value) or value in (0, False,)
 
 
 class Source(db.models.Model):
@@ -43,10 +50,10 @@ class Source(db.models.Model):
     )
 
     # Fontawesome icons used for the source on the front end
-    ICONS = _srctype_dict('<i class="fab fa-youtube"></i>')
+    ICONS: ClassVar[dict[str, str]] = _srctype_dict('<i class="fab fa-youtube"></i>')
 
     # Format to use to display a URL for the source
-    URLS = dict(zip(
+    URLS: ClassVar[dict[str, str]] = dict(zip(
         YouTube_SourceType.values,
         (
             'https://www.youtube.com/c/{key}',
@@ -56,7 +63,7 @@ class Source(db.models.Model):
     ))
 
     # Format used to create indexable URLs
-    INDEX_URLS = dict(zip(
+    INDEX_URLS: ClassVar[dict[str, str]] = dict(zip(
         YouTube_SourceType.values,
         (
             'https://www.youtube.com/c/{key}/{type}',
@@ -66,10 +73,10 @@ class Source(db.models.Model):
     ))
 
     # Callback functions to get a list of media from the source
-    INDEXERS = _srctype_dict(get_youtube_media_info)
+    INDEXERS: ClassVar[dict[str, type(get_youtube_media_info)]] = _srctype_dict(get_youtube_media_info)
 
     # Field names to find the media ID used as the key when storing media
-    KEY_FIELD = _srctype_dict('id')
+    KEY_FIELD: ClassVar[dict[str, str]] = _srctype_dict('id')
 
     uuid = db.models.UUIDField(
         _('uuid'),
@@ -485,6 +492,25 @@ class Source(db.models.Model):
     def get_image_url(self):
         return get_youtube_image_info(self.url)
 
+    def get_image_urls(self, qs):
+        avatar_url = banner_url = thumbnail_url = None
+        index_preference = db.models.Case(
+            db.models.When(key=self.get_index_url('videos'), then=0),
+            db.models.When(key=self.get_index_url('streams'), then=1),
+            default=2,
+            output_field=db.models.IntegerField(),
+        )
+        for metadata in qs.order_by(index_preference, '-retrieved', '-created'):
+            next_avatar, next_banner, next_thumbnail = get_youtube_image_urls(
+                metadata.value,
+            )
+            avatar_url = avatar_url or next_avatar
+            banner_url = banner_url or next_banner
+            thumbnail_url = thumbnail_url or next_thumbnail
+            if avatar_url and banner_url and thumbnail_url:
+                break
+        return avatar_url, banner_url, thumbnail_url
+
 
     def directory_exists(self):
         return (os.path.isdir(self.directory_path) and
@@ -549,6 +575,7 @@ class Source(db.models.Model):
     def get_example_media_format(self):
         try:
             return self.media_format.format(**self.example_media_format_dict)
+        # ruff: ignore[BLE001]
         except Exception:
             return ''
 
@@ -560,13 +587,15 @@ class Source(db.models.Model):
     def get_index(self, url_type, /):
         indexer = self.INDEXERS.get(self.source_type, None)
         if not callable(indexer):
+            # ruff: ignore[TRY002,TRY004]
             raise Exception(f'Source type f"{self.source_type}" has no indexer')
         days = None
         if self.download_cap_date:
             days = timezone.timedelta(seconds=self.download_cap).days
         entries = list()
         try:
-            response = indexer(self.get_index_url(url_type), days=days)
+            url = self.get_index_url(url_type)
+            response = indexer(url, days=days)
         except DownloadError as e:
             if str(e).endswith(f': This channel does not have a {url_type} tab'):
                 return entries
@@ -574,7 +603,36 @@ class Source(db.models.Model):
         else:
             if not isinstance(response, dict):
                 return entries
-            entries = response.get('entries', list())
+            entries = response.pop('entries', list())
+            default_site = self.videos.model._meta.get_field('site').get_default()
+            site = response.get('extractor_key') or default_site
+            metadata, _ = self.videos.filter(
+                media__isnull=True,
+            ).get_or_create(
+                source=self,
+                key=url,
+                defaults=dict(site=site),
+            )
+            previous = metadata.value if isinstance(metadata.value, dict) else dict()
+            response['thumbnails'] = merge_image_thumbnails(
+                previous.get('thumbnails'),
+                response.get('thumbnails'),
+            )
+            for key, value in previous.items():
+                if 'thumbnails' == key:
+                    continue
+                if (
+                    _has_index_metadata_value(value) and
+                    not _has_index_metadata_value(response.get(key))
+                ):
+                    response[key] = value
+            update_fields = {'retrieved', 'value'}
+            if site and site not in (metadata.site, default_site):
+                metadata.site = site
+                update_fields.add('site')
+            metadata.retrieved = metadata._meta.get_field('retrieved').get_default()
+            metadata.value = response
+            metadata.save(update_fields=update_fields)
         return entries
 
     def index_media(self):
@@ -587,6 +645,7 @@ class Source(db.models.Model):
             entries.extend(reversed(videos))
 
         # Playlists do something different that I have yet to figure out
+        # ruff: ignore[SIM102]
         if not self.is_playlist:
             if self.index_streams:
                 streams = self.get_index('streams')

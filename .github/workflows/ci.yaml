@@ -67,6 +67,8 @@ jobs:
 
   scripts:
     runs-on: ubuntu-24.04-arm
+    env:
+      GITHUB_API_KEY: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
       - name: Make directories
