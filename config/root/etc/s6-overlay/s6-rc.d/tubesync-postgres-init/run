@@ -88,6 +88,17 @@ if [ "${fresh_initdb}" = 1 ]; then
     s6-setuidgid app "${PGBIN}/pg_ctl" \
         --pgdata="${PGDATA}" --wait --silent --mode=fast \
         stop
+
+    # A brand-new database cannot resolve any of the Media/Source UUIDs that
+    # the persisted huey task queues still reference. Left in place they
+    # replay against the empty database - thousands of "no media exists"
+    # errors, and orphaned rows from half-run delete tasks. Discard them; huey
+    # recreates the (empty) schema on next start. A genuinely fresh /config
+    # has no such files, so this is a no-op there.
+    if compgen -G '/config/tasks/huey_*.db*' >/dev/null; then
+        echo "Fresh database: clearing stale huey task queues in /config/tasks"
+        rm -f /config/tasks/huey_*.db /config/tasks/huey_*.db-* /config/tasks/huey_*.db.*
+    fi
 fi
 
 echo "Embedded PostgreSQL ${PG_MAJOR} is ready to be started"
