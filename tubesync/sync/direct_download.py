@@ -264,6 +264,10 @@ def run_job(job):
         vids = pl.get('video_ids') or []
         start_vi = job.cursor_video if pi == start_pi else 0
         add_log(f'Playlist "{pl.get("title")}" ({start_vi}/{len(vids)}) -> {directory}')
+        if start_vi:
+            # resuming mid-playlist: backfill playlist_id/title into whatever was
+            # already downloaded before the restart
+            patch_info_json(out_dir, pl.get('playlist_id'), pl.get('title'))
 
         for vi in range(start_vi, len(vids)):
             job.refresh_from_db(fields=['stop_requested'])
