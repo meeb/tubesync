@@ -114,7 +114,22 @@ def make_progress_hook(job, playlist_title):
 
 
 def already_have(out_dir, video_id):
-    return any(Path(out_dir).glob(f'*[{video_id}]*'))
+    # Cross-mechanism dedup: a media file whose name contains this id already
+    # sits here (from a TubeSync Source download `..._<id>_...`, the standalone
+    # importer `... [<id>].ext`, or an earlier run). --download-archive covers
+    # our own repeats; this covers everyone else's.
+    d = Path(out_dir)
+    if not d.is_dir():
+        return False
+    for f in d.iterdir():
+        if not f.is_file():
+            continue
+        name = f.name
+        if name.endswith(('.info.json', '.jpg', '.webp', '.png', '.nfo', '.part', '.ytdl')):
+            continue
+        if video_id in name:
+            return True
+    return False
 
 
 def download_one(video_id, out_dir, *, resolution, hook, log_line):

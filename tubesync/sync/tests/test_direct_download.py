@@ -183,6 +183,16 @@ class DirectDownloadEngineTestCase(TestCase):
         self.assertEqual(m_dl.call_count, 1)  # only the last video
         self.assertEqual(job.completed, 3)
 
+    def test_already_have(self):
+        d = Path(self._tmp())
+        self.assertFalse(dd.already_have(d, VID_A))
+        (d / f'2024-01-01_Chan_Some Title_{VID_A}_h264.mkv').write_text('x')
+        (d / f'Uploader - Title [{VID_B}].mp4').write_text('x')
+        (d / f'{VID_C}.info.json').write_text('{}')  # sidecar only -> not "have"
+        self.assertTrue(dd.already_have(d, VID_A))
+        self.assertTrue(dd.already_have(d, VID_B))
+        self.assertFalse(dd.already_have(d, VID_C))
+
     def test_patch_info_json(self):
         d = Path(self._tmp()) / 'video' / 'x'
         d.mkdir(parents=True)
