@@ -32,6 +32,11 @@ class CapChoices(models.IntegerChoices):
     CAP_10YEARS = 315360000, _('10 years (3650 days)')
 
 
+class AudioTrack(models.TextChoices):
+    ORIGINAL = 'original', _('Original audio (recorded language)')
+    DEFAULT = 'default', _("Publisher's default audio (often an auto-dub)")
+
+
 class Fallback(models.TextChoices):
     FAIL = 'f', _('Fail, do not download any media')
     REQUIRE_CODEC = 'c', _('Get next best resolution, only the preferred codec')
