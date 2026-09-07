@@ -98,8 +98,8 @@ problem.
   `ValidationError(f"unknown field '{k}'")`.
 - For every choices-backed field, validate the value is in that field's
   `choices` (`source_type`, `index_schedule`, `download_cap`,
-  `source_resolution`, `source_vcodec`, `source_acodec`, `fallback`). Invalid →
-  `ValidationError` listing valid values.
+  `source_resolution`, `source_vcodec`, `source_acodec`, `prefer_audio_track`,
+  `fallback`). Invalid → `ValidationError` listing valid values.
 - `sponsorblock_categories`: accept a list or comma string; validate against
   `SponsorBlock_Category` values plus `'all'` (the field is a
   `CommaSepChoiceField`, see `sync/fields.py`).
@@ -362,6 +362,7 @@ parens, from `sync/models/source.py` / `sync/choices.py`):
 | `filter_seconds_min` | `true` | |
 | `prefer_60fps` | `true` | |
 | `prefer_hdr` | `false` | |
+| `prefer_audio_track` | `original` | `original` / `default`; which audio track when a video has more than one |
 | `fallback` | `h` | `Fallback` values |
 | `copy_channel_images` | `false` | |
 | `copy_thumbnails` | `false` | |

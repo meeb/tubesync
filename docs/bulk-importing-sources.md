@@ -60,6 +60,7 @@ All other keys map 1:1 onto `Source` model fields. The commonly useful ones
 | `source_resolution` | `1080p` | `audio`, `360p` … `4320p` |
 | `source_vcodec` | `VP9` | `AV1` / `VP9` / `AVC1` |
 | `source_acodec` | `OPUS` | `OPUS` / `MP4A` |
+| `prefer_audio_track` | `original` | `original` / `default` — which audio track when a video has more than one |
 | `index_schedule` | `86400` | seconds; `0` = never (source is inactive) |
 | `download_media` | `true` | `false` = index only, do not download |
 | `index_videos` | `true` | |
