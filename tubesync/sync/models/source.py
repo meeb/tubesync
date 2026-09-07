@@ -12,7 +12,7 @@ from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from yt_dlp import DownloadError
 from ..choices import (Val,
-    SponsorBlock_Category, YouTube_SourceType, IndexSchedule,
+    AudioTrack, SponsorBlock_Category, YouTube_SourceType, IndexSchedule,
     CapChoices, Fallback, FileExtension, FilterSeconds,
     SourceResolution, SourceResolutionInteger,
     YouTube_VideoCodec, YouTube_AudioCodec,
@@ -252,6 +252,21 @@ class Source(db.models.Model):
         default=False,
         help_text=_('Where possible, prefer HDR media for this source'),
     )
+    prefer_audio_track = db.models.CharField(
+        _('prefer audio track'),
+        max_length=8,
+        db_index=True,
+        choices=AudioTrack.choices,
+        default=AudioTrack.ORIGINAL,
+        help_text=_(
+            'Which audio track to download when the source publishes more than one. '
+            '"Original audio" is the track in the language the video was actually '
+            'recorded in. "Publisher\'s default audio" is whichever track the uploader '
+            'set as the default for viewers, which for many channels is an automatic '
+            'dubbed translation. This setting has no effect when a video only offers a '
+            'single audio track.'
+        ),
+    )
     fallback = db.models.CharField(
         _('fallback'),
         max_length=1,
@@ -468,7 +483,8 @@ class Source(db.models.Model):
         ac = self.source_acodec
         f = ' 60FPS' if self.is_video and self.prefer_60fps else ''
         h = ' HDR' if self.is_video and self.prefer_hdr else ''
-        return f'{self.source_resolution} (video:{vc}, audio:{ac}){f}{h}'.strip()
+        a = '' if self.prefer_audio_track == Val(AudioTrack.ORIGINAL) else ' DEFAULT-AUDIO'
+        return f'{self.source_resolution} (video:{vc}, audio:{ac}){f}{h}{a}'.strip()
 
     @property
     def directory_path(self):
