@@ -1,11 +1,18 @@
 import base64
 import json
 import logging
+import tempfile
+from pathlib import Path
 
 from django.test import Client, TestCase, override_settings
 from django_huey import DJANGO_HUEY, get_queue
 
 from sync.models import Source
+
+NETSCAPE = (
+    '# Netscape HTTP Cookie File\n'
+    '.youtube.com\tTRUE\t/\tFALSE\t0\tPREF\tabc\n'
+)
 
 
 def _b64(user, password):
@@ -176,3 +183,55 @@ class SourceAPITestCase(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()['deleted'], str(source.uuid))
         self.assertFalse(Source.objects.filter(pk=source.uuid).exists())
+
+
+class CookiesAPITestCase(TestCase):
+
+    def setUp(self):
+        logging.disable(logging.CRITICAL)
+        self.client = Client()
+        self._tmp = tempfile.TemporaryDirectory()
+        self.cookie_file = Path(self._tmp.name) / 'cookies.txt'
+        self._ctx = override_settings(COOKIES_FILE=self.cookie_file)
+        self._ctx.enable()
+
+    def tearDown(self):
+        self._ctx.disable()
+        self._tmp.cleanup()
+
+    def test_get_when_absent(self):
+        body = self.client.get('/api/cookies').json()
+        self.assertEqual(body, {'has_cookies': False, 'size': 0})
+
+    def test_post_sets_file_and_never_returns_content(self):
+        resp = self.client.post('/api/cookies',
+                                data=json.dumps({'text': NETSCAPE}),
+                                content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertTrue(body['has_cookies'])
+        self.assertGreater(body['size'], 0)
+        self.assertNotIn('text', body)
+        self.assertEqual(self.cookie_file.read_text(), NETSCAPE)
+
+    def test_post_raw_body(self):
+        resp = self.client.post('/api/cookies', data=NETSCAPE,
+                                content_type='text/plain')
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(self.cookie_file.is_file())
+
+    def test_post_empty_deletes(self):
+        self.cookie_file.write_text(NETSCAPE)
+        resp = self.client.post('/api/cookies',
+                                data=json.dumps({'text': '  '}),
+                                content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(self.cookie_file.exists())
+        self.assertFalse(resp.json()['has_cookies'])
+
+    def test_post_garbage_rejected(self):
+        resp = self.client.post('/api/cookies',
+                                data=json.dumps({'text': 'not a cookie file'}),
+                                content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(self.cookie_file.exists())

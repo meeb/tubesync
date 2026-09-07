@@ -7,7 +7,8 @@ from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceVie
                     MediaServerView, DeleteMediaServerView, UpdateMediaServerView,
                     RevokeTaskView, SourceSyncNowView, ServicesView,
                     SourceListCreateAPIView, SourceDetailAPIView,
-                    DownloadJobListCreateAPIView, DownloadJobDetailAPIView,  )
+                    DownloadJobListCreateAPIView, DownloadJobDetailAPIView,
+                    CookiesAPIView,  )
 
 
 app_name = 'sync'
@@ -187,6 +188,12 @@ urlpatterns = [
         'api/downloads/<uuid:pk>',
         DownloadJobDetailAPIView.as_view(),
         name='api-download',
+    ),
+
+    path(
+        'api/cookies',
+        CookiesAPIView.as_view(),
+        name='api-cookies',
     ),
 
     # Media Server URLs

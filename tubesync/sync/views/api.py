@@ -10,6 +10,7 @@
 import json
 import re
 
+from django.conf import settings
 from django.core.exceptions import RequestDataTooBig, ValidationError
 from django.db.models import Count
 from django.http import JsonResponse
@@ -352,3 +353,50 @@ class DownloadJobDetailAPIView(View):
                 DirectDownloadJob.objects.filter(pk=pk).update(stop_requested=True)
             return _json_response({'stopping': str(pk)})
         return _error("expected {'stop': true}")
+
+
+# yt-dlp cookies.txt: a single global file (settings.COOKIES_FILE, read by
+# sync.youtube.get_yt_opts). This endpoint lets a trusted caller (OffTube's
+# /backend "Musik Download" tab) set it once instead of copying it into the
+# container by hand. The content is never returned.
+COOKIE_HEADER_RE = re.compile(r'^#\s*(HTTP Cookie File|Netscape)', re.IGNORECASE | re.MULTILINE)
+COOKIE_ROW_RE = re.compile(r'(^|\n)[^\s#]+\t(TRUE|FALSE)\t', re.IGNORECASE)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CookiesAPIView(View):
+
+    http_method_names = ['get', 'post', 'head', 'options']
+
+    def _status(self):
+        f = settings.COOKIES_FILE
+        exists = f.is_file()
+        return {
+            'has_cookies': bool(exists and f.stat().st_size > 0),
+            'size': f.stat().st_size if exists else 0,
+        }
+
+    def get(self, request):
+        return _json_response(self._status())
+
+    def post(self, request):
+        try:
+            body = request.body
+        except RequestDataTooBig:
+            return _error('cookies file too large', status=413)
+        text = ''
+        if body:
+            try:
+                data = json.loads(body)
+                text = data.get('text', '') if isinstance(data, dict) else ''
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                # not JSON -> treat the raw body as the cookies.txt
+                text = body.decode('utf-8', 'replace')
+        if not text.strip():
+            settings.COOKIES_FILE.unlink(missing_ok=True)
+            return _json_response(self._status())
+        if not (COOKIE_HEADER_RE.search(text) or COOKIE_ROW_RE.search(text)):
+            return _error('does not look like a Netscape cookies.txt')
+        settings.COOKIES_FILE.parent.mkdir(parents=True, exist_ok=True)
+        settings.COOKIES_FILE.write_text(text if text.endswith('\n') else text + '\n')
+        return _json_response(self._status())

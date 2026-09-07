@@ -12,7 +12,8 @@ from .mediaservers import (MediaServersView, AddMediaServerView,
                            MediaServerView, DeleteMediaServerView,
                            UpdateMediaServerView)
 from .api import (SourceListCreateAPIView, SourceDetailAPIView,
-                  DownloadJobListCreateAPIView, DownloadJobDetailAPIView)
+                  DownloadJobListCreateAPIView, DownloadJobDetailAPIView,
+                  CookiesAPIView)
 
 __all__ = [
     'DashboardView',
@@ -28,4 +29,5 @@ __all__ = [
     'DeleteMediaServerView', 'UpdateMediaServerView',
     'SourceListCreateAPIView', 'SourceDetailAPIView',
     'DownloadJobListCreateAPIView', 'DownloadJobDetailAPIView',
+    'CookiesAPIView',
 ]

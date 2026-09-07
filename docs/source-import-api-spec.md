@@ -442,11 +442,28 @@ unaffected.
 
 ## 7. Behaviour notes (put these in the wiki page)
 
-- **Cookies unchanged.** yt-dlp still reads a single global
-  `settings.COOKIES_FILE` = `/config/cookies.txt`
-  (`sync/youtube.py::get_yt_opts`). The import only creates rows. Private
-  playlists index only if the cookie account can see them; otherwise
-  `has_failed=True` + exponential-backoff retry (existing behaviour).
+- **Cookies.** yt-dlp reads a single global `settings.COOKIES_FILE` =
+  `/config/cookies.txt` (`sync/youtube.py::get_yt_opts`). The bulk import only
+  creates rows. Private playlists index only if the cookie account can see them;
+  otherwise `has_failed=True` + exponential-backoff retry (existing behaviour).
+  The file can be set over HTTP, see §7a.
+
+### 7a. `GET`/`POST /api/cookies` — set the global cookies.txt
+
+`CookiesAPIView` (`sync/views/api.py`), same plain-view + `BasicAuthMiddleware`
+auth as the rest of the API. Added so a trusted caller (OffTube's `/backend`
+"Musik Download" tab) can set the cookie once instead of copying it into the
+container by hand.
+
+- `GET /api/cookies` → `{"has_cookies": bool, "size": <bytes>}`. **The content is
+  never returned.**
+- `POST /api/cookies` with `{"text": "<netscape cookies.txt>"}` (or the raw body)
+  → writes `settings.COOKIES_FILE`. Empty/whitespace body → deletes the file.
+  A body that is neither a `# Netscape`/`# HTTP Cookie File` header nor a
+  tab-separated `\tTRUE\t`/`\tFALSE\t` row → `400`. Oversized body → `413`.
+  Response is the same shape as `GET`.
+- No versioning/rotation: a second `POST` replaces the file. yt-dlp picks the new
+  file up on the next download (it re-reads `get_yt_opts` per job).
 - **No reachability check at import time** — matches the current ORM/`shell`
   path. A bad `key` fails on the first `index_source` run.
 - **Politeness is unchanged and sufficient:** `index_source` runs on
