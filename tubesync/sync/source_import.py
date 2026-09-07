@@ -23,6 +23,7 @@ from common.models import TaskHistory
 
 from .choices import (
     Val,
+    AudioTrack,
     CapChoices,
     Fallback,
     IndexSchedule,
@@ -60,6 +61,7 @@ CHOICE_FIELDS = {
     'source_resolution': SourceResolution,
     'source_vcodec': YouTube_VideoCodec,
     'source_acodec': YouTube_AudioCodec,
+    'prefer_audio_track': AudioTrack,
     'fallback': Fallback,
 }
 
