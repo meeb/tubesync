@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0037_alter_source_fallback'),
+        ('sync', '0038_directdownloadjob'),
     ]
 
     operations = [
