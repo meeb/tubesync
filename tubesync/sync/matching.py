@@ -7,7 +7,7 @@
 
 from django.conf import settings
 from common.utils import multi_key_sort, resolve_priority_order
-from .choices import Val, Fallback
+from .choices import Val, AudioTrack, Fallback
 
 
 english_language_codes = resolve_priority_order(
@@ -22,14 +22,17 @@ min_height = getattr(settings, 'VIDEO_HEIGHT_CUTOFF', 360)
 fallback_hd_cutoff = getattr(settings, 'VIDEO_HEIGHT_IS_HD', 500)
 
 
-def get_fallback_id(by_fmt_id, /, by_language = {}, *, exact = False, fallback_id = False):
+def get_fallback_id(by_fmt_id, /, by_language = {}, *, exact = False, fallback_id = False,
+                    prefer = Val(AudioTrack.ORIGINAL)):
     assert isinstance(by_fmt_id, dict), type(by_fmt_id)
     assert isinstance(by_language, dict), type(by_language)
     assert exact in (True, False,), 'invalid value for exact'
 
-    # prefer default
-    if 'default' in by_fmt_id and 'id' in by_fmt_id['default']:
-        return exact, by_fmt_id['default']['id']
+    # prefer the audio track role the source asked for, then the other marked track
+    for key in (prefer, Val(AudioTrack.ORIGINAL), Val(AudioTrack.DEFAULT)):
+        fmt = by_fmt_id.get(key)
+        if fmt and 'id' in fmt:
+            return exact, fmt['id']
 
     # try for English
     for lc in english_language_codes:
@@ -73,22 +76,24 @@ def get_best_combined_format(media):
         matches.add(fmt['id'])
         by_fmt_id[fmt['id']] = fmt
         by_language[fmt['language_code']] = fmt['id']
-        if 'format_note' in fmt:
-            if '(original)' in fmt['format_note']:
-                by_fmt_id['original'] = fmt
-            if '(default)' in fmt['format_note']:
-                by_fmt_id['default'] = fmt
+        if fmt['is_original']:
+            by_fmt_id[Val(AudioTrack.ORIGINAL)] = fmt
+        if fmt['is_default']:
+            by_fmt_id[Val(AudioTrack.DEFAULT)] = fmt
 
     # nothing matched, return early
     if not matches:
         return False, False
 
-    # prefer original
-    if 'original' in by_fmt_id and 'id' in by_fmt_id['original']:
-        return True, by_fmt_id['original']['id']
+    # honour the source's audio-track preference
+    prefer = Val(media.source.prefer_audio_track)
+    preferred = by_fmt_id.get(prefer)
+    if preferred and 'id' in preferred:
+        return True, preferred['id']
 
     # use any available matching format
-    return get_fallback_id(by_fmt_id, by_language, exact=True, fallback_id=matches.pop())
+    return get_fallback_id(by_fmt_id, by_language, exact=True,
+                           fallback_id=matches.pop(), prefer=prefer)
 
 
 def get_best_audio_format(media):
@@ -99,6 +104,7 @@ def get_best_audio_format(media):
     # Reverse order all audio-only formats
     audio_formats = set()
     by_fmt_acodec = dict()
+    by_fmt_acodec_track = {Val(AudioTrack.ORIGINAL): dict(), Val(AudioTrack.DEFAULT): dict()}
     by_fmt_id = dict()
     by_language = dict()
     for fmt in media.iter_formats():
@@ -111,13 +117,24 @@ def get_best_audio_format(media):
         by_fmt_id[fmt['id']] = fmt
         by_fmt_acodec[fmt['acodec']] = fmt['id']
         by_language[fmt['language_code']] = fmt['id']
-        if 'format_note' in fmt and '(default)' in fmt['format_note']:
-            by_fmt_id['default'] = fmt
+        if fmt['is_original']:
+            by_fmt_id[Val(AudioTrack.ORIGINAL)] = fmt
+            by_fmt_acodec_track[Val(AudioTrack.ORIGINAL)][fmt['acodec']] = fmt['id']
+        if fmt['is_default']:
+            by_fmt_id[Val(AudioTrack.DEFAULT)] = fmt
+            by_fmt_acodec_track[Val(AudioTrack.DEFAULT)][fmt['acodec']] = fmt['id']
     if not audio_formats:
         # Media has no audio formats at all
         return False, False
-    # Find the first audio format with a matching codec
-    if (fmt_id := by_fmt_acodec.get(media.source.source_acodec)) is not None:
+    source_acodec = media.source.source_acodec
+    prefer = Val(media.source.prefer_audio_track)
+    # Among formats with the requested codec, honour the audio-track preference.
+    # A codec match still beats the track preference: if the source wants OPUS
+    # and only the "original" track is MP4A, the OPUS "default" track wins.
+    if (fmt_id := by_fmt_acodec_track.get(prefer, {}).get(source_acodec)) is not None:
+        return True, fmt_id
+    # Otherwise, the first audio format with a matching codec (last one seen wins)
+    if (fmt_id := by_fmt_acodec.get(source_acodec)) is not None:
         # Matched!
         return True, fmt_id
     # No codecs matched
@@ -126,7 +143,8 @@ def get_best_audio_format(media):
         return False, False
 
     # Can fallback, find the next non-matching codec
-    return get_fallback_id(by_fmt_id, by_language, exact=False, fallback_id=audio_formats.pop())
+    return get_fallback_id(by_fmt_id, by_language, exact=False,
+                           fallback_id=audio_formats.pop(), prefer=prefer)
 
 
 def get_best_video_format(media):
