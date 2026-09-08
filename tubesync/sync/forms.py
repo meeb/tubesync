@@ -80,10 +80,12 @@ _media_server_type_label = 'Jellyfin'
 class JellyfinMediaServerForm(forms.Form):
 
     host = forms.CharField(
+        # ruff: ignore[INT001]
         label=_(f'Host name or IP address of the {_media_server_type_label} server'),
         required=True,
     )
     port = forms.IntegerField(
+        # ruff: ignore[INT001]
         label=_(f'Port number of the {_media_server_type_label} server'),
         required=True,
         initial=8096,
@@ -99,10 +101,12 @@ class JellyfinMediaServerForm(forms.Form):
         initial=True,
     )
     token = forms.CharField(
+        # ruff: ignore[INT001]
         label=_(f'{_media_server_type_label} token'),
         required=True,
     )
     libraries = forms.CharField(
+        # ruff: ignore[INT001]
         label=_(f'Comma-separated list of {_media_server_type_label} library IDs to update'),
         required=False,
     )
