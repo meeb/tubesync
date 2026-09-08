@@ -28,7 +28,7 @@ class Migration(migrations.Migration):
                     'dubbed translation. This setting has no effect when a video only offers a '
                     'single audio track.'
                 ),
-                max_length=8,
+                max_length=1,
                 verbose_name='prefer audio track',
             ),
         ),

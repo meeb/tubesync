@@ -254,7 +254,7 @@ class Source(db.models.Model):
     )
     prefer_audio_track = db.models.CharField(
         _('prefer audio track'),
-        max_length=8,
+        max_length=1,
         db_index=True,
         choices=AudioTrack.choices,
         default=AudioTrack.ORIGINAL,
