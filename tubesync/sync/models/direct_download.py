@@ -39,9 +39,10 @@ class DirectDownloadJob(models.Model):
     # [{title, playlist_id, directory, video_ids: [...]}]
     playlists = models.JSONField(_('playlists'), default=list)
     resolution = models.CharField(_('resolution'), max_length=8, default='1080p')
-    # audio=True -> download the best audio track only (no video), extract to
-    # acodec ('opus' -> .opus, 'mp4a' -> .m4a), embed cover + metadata, and land
-    # in settings.DOWNLOAD_AUDIO_DIR instead of DOWNLOAD_VIDEO_DIR.
+    # audio=True -> download the best audio track only (no video), keep it in
+    # its native codec (no re-encode), tag metadata, thumbnail as a sidecar,
+    # and land in settings.DOWNLOAD_AUDIO_DIR instead of DOWNLOAD_VIDEO_DIR.
+    # acodec is advisory (YouTube audio is already opus or m4a).
     audio = models.BooleanField(_('audio only'), default=False)
     acodec = models.CharField(_('audio codec'), max_length=8, default='opus')
 

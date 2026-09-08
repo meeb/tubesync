@@ -163,7 +163,8 @@ def download_one(video_id, out_dir, *, resolution, hook, log_line,
                  audio=False, acodec='opus'):
     '''
         Download one video by watch URL into out_dir. With audio=True: best
-        audio track only, extracted to .opus / .m4a, cover + metadata embedded.
+        audio track only, kept in its native codec (no re-encode), metadata
+        tagged, thumbnail written as a sidecar (.jpg/.webp - OffTube reads it).
         Returns 'ok', 'blocked' (YouTube anti-bot / 429) or 'fail'.
     '''
     opts = get_yt_opts()  # base: cookies (if present), cachedir, extractor_args, sleeps
@@ -178,6 +179,7 @@ def download_one(video_id, out_dir, *, resolution, hook, log_line,
         'download_archive': str(archive_path()),
         'retries': 3,
         'fragment_retries': 3,
+        'socket_timeout': 30,
         'sleep_interval_requests': 2,
         'ignoreerrors': False,
         'quiet': True,
@@ -187,16 +189,17 @@ def download_one(video_id, out_dir, *, resolution, hook, log_line,
     })
     if audio:
         # music.youtube.com gives clean artist/album/track tags that
-        # FFmpegMetadata then writes into the file.
+        # FFmpegMetadata then writes into the file. Keep the native codec
+        # (YouTube audio is opus or m4a already) - no re-encode, no quality
+        # loss. Thumbnail stays a sidecar: EmbedThumbnail into opus/ogg is
+        # flaky ("Postprocessing: Conversion failed!"), and OffTube's scanner
+        # uses the <basename>.jpg/.webp sidecar anyway.
         url = f'https://music.youtube.com/watch?v={video_id}'
-        pref = 'm4a' if acodec == 'mp4a' else 'opus'
         opts.update({
             'format': 'bestaudio/best',
             'postprocessors': [
-                {'key': 'FFmpegExtractAudio', 'preferredcodec': pref,
-                 'preferredquality': '0', 'nopostoverwrites': False},
-                {'key': 'FFmpegThumbnailsConvertor', 'format': 'jpg'},
-                {'key': 'EmbedThumbnail', 'already_have_thumbnail': False},
+                {'key': 'FFmpegExtractAudio', 'preferredcodec': 'best',
+                 'nopostoverwrites': False},
                 {'key': 'FFmpegMetadata', 'add_metadata': True, 'add_chapters': True},
             ],
         })
