@@ -39,6 +39,11 @@ class DirectDownloadJob(models.Model):
     # [{title, playlist_id, directory, video_ids: [...]}]
     playlists = models.JSONField(_('playlists'), default=list)
     resolution = models.CharField(_('resolution'), max_length=8, default='1080p')
+    # audio=True -> download the best audio track only (no video), extract to
+    # acodec ('opus' -> .opus, 'mp4a' -> .m4a), embed cover + metadata, and land
+    # in settings.DOWNLOAD_AUDIO_DIR instead of DOWNLOAD_VIDEO_DIR.
+    audio = models.BooleanField(_('audio only'), default=False)
+    acodec = models.CharField(_('audio codec'), max_length=8, default='opus')
 
     cursor_playlist = models.PositiveIntegerField(_('cursor playlist'), default=0)
     cursor_video = models.PositiveIntegerField(_('cursor video'), default=0)
@@ -77,6 +82,8 @@ class DirectDownloadJob(models.Model):
             'status': self.status,
             'phase': self.phase,
             'resolution': self.resolution,
+            'audio': self.audio,
+            'acodec': self.acodec,
             'overall': {
                 'completed': self.completed,
                 'failed': self.failed,

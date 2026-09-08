@@ -455,15 +455,32 @@ auth as the rest of the API. Added so a trusted caller (OffTube's `/backend`
 "Musik Download" tab) can set the cookie once instead of copying it into the
 container by hand.
 
-- `GET /api/cookies` → `{"has_cookies": bool, "size": <bytes>}`. **The content is
-  never returned.**
+- `GET /api/cookies` → `{"has_cookies": bool, "size": <bytes>, "valid_netscape":
+  bool}`. **The content is never returned.** `valid_netscape` is false when the
+  stored file's first line is not `#( Netscape)? HTTP Cookie File` or it has no
+  tab-separated cookie rows.
 - `POST /api/cookies` with `{"text": "<netscape cookies.txt>"}` (or the raw body)
-  → writes `settings.COOKIES_FILE`. Empty/whitespace body → deletes the file.
-  A body that is neither a `# Netscape`/`# HTTP Cookie File` header nor a
-  tab-separated `\tTRUE\t`/`\tFALSE\t` row → `400`. Oversized body → `413`.
-  Response is the same shape as `GET`.
+  → normalises (CRLF→LF, strip BOM, **prepend the magic header line if missing** —
+  `http.cookiejar` checks only the first line and yt-dlp rejects the whole file
+  otherwise) and writes `settings.COOKIES_FILE`. Empty/whitespace body → deletes
+  the file. A body with no tab-separated `\tTRUE\t`/`\tFALSE\t` cookie row →
+  `400`. Oversized body → `413`. Response is the same shape as `GET`.
 - No versioning/rotation: a second `POST` replaces the file. yt-dlp picks the new
   file up on the next download (it re-reads `get_yt_opts` per job).
+
+### 7b. `POST /api/downloads` — audio-only (Weg B)
+
+The direct-download job accepts two extra fields:
+
+- `"audio": true` — download the best **audio** track only (no video), extract to
+  `.opus` (default) or `.m4a`, embed cover + metadata, land in
+  `settings.DOWNLOAD_AUDIO_DIR` instead of `DOWNLOAD_VIDEO_DIR`. yt-dlp is pointed
+  at `music.youtube.com/watch?v=…` for clean artist/album/track tags.
+- `"acodec": "opus" | "mp4a"` — default `opus`.
+
+Used by OffTube's `/backend` "Musik Download" tab for a YouTube-Music library
+export (a flat song-ID list with no playlist URL, so Weg A / `/api/sources` does
+not apply).
 - **No reachability check at import time** — matches the current ORM/`shell`
   path. A bad `key` fails on the first `index_source` run.
 - **Politeness is unchanged and sufficient:** `index_source` runs on

@@ -9,10 +9,8 @@ from django_huey import DJANGO_HUEY, get_queue
 
 from sync.models import Source
 
-NETSCAPE = (
-    '# Netscape HTTP Cookie File\n'
-    '.youtube.com\tTRUE\t/\tFALSE\t0\tPREF\tabc\n'
-)
+COOKIE_ROW = '.youtube.com\tTRUE\t/\tFALSE\t0\tPREF\tabc\n'
+NETSCAPE = '# Netscape HTTP Cookie File\n' + COOKIE_ROW
 
 
 def _b64(user, password):
@@ -199,39 +197,62 @@ class CookiesAPITestCase(TestCase):
         self._ctx.disable()
         self._tmp.cleanup()
 
+    def _put(self, text, raw=False):
+        if raw:
+            return self.client.post('/api/cookies', data=text,
+                                    content_type='text/plain')
+        return self.client.post('/api/cookies', data=json.dumps({'text': text}),
+                                content_type='application/json')
+
     def test_get_when_absent(self):
         body = self.client.get('/api/cookies').json()
-        self.assertEqual(body, {'has_cookies': False, 'size': 0})
+        self.assertEqual(body, {'has_cookies': False, 'size': 0, 'valid_netscape': False})
 
     def test_post_sets_file_and_never_returns_content(self):
-        resp = self.client.post('/api/cookies',
-                                data=json.dumps({'text': NETSCAPE}),
-                                content_type='application/json')
+        resp = self._put(NETSCAPE)
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
         self.assertTrue(body['has_cookies'])
+        self.assertTrue(body['valid_netscape'])
         self.assertGreater(body['size'], 0)
         self.assertNotIn('text', body)
         self.assertEqual(self.cookie_file.read_text(), NETSCAPE)
 
+    def test_post_prepends_missing_magic_header(self):
+        # yt-dlp / MozillaCookieJar rejects a file whose first line is not the
+        # magic header - the endpoint must add it.
+        resp = self._put(COOKIE_ROW)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['valid_netscape'])
+        self.assertTrue(self.cookie_file.read_text().startswith('# Netscape HTTP Cookie File\n'))
+
+    def test_post_normalises_crlf_and_bom(self):
+        resp = self._put('﻿# Netscape HTTP Cookie File\r\n' + COOKIE_ROW.replace('\n', '\r\n'))
+        self.assertEqual(resp.status_code, 200)
+        txt = self.cookie_file.read_text()
+        self.assertNotIn('\r', txt)
+        self.assertFalse(txt.startswith('﻿'))
+        self.assertTrue(resp.json()['valid_netscape'])
+
     def test_post_raw_body(self):
-        resp = self.client.post('/api/cookies', data=NETSCAPE,
-                                content_type='text/plain')
+        resp = self._put(NETSCAPE, raw=True)
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(self.cookie_file.is_file())
 
     def test_post_empty_deletes(self):
         self.cookie_file.write_text(NETSCAPE)
-        resp = self.client.post('/api/cookies',
-                                data=json.dumps({'text': '  '}),
-                                content_type='application/json')
+        resp = self._put('  ')
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(self.cookie_file.exists())
         self.assertFalse(resp.json()['has_cookies'])
 
     def test_post_garbage_rejected(self):
-        resp = self.client.post('/api/cookies',
-                                data=json.dumps({'text': 'not a cookie file'}),
-                                content_type='application/json')
+        resp = self._put('not a cookie file, no tabs here')
         self.assertEqual(resp.status_code, 400)
         self.assertFalse(self.cookie_file.exists())
+
+    def test_get_flags_invalid_stored_file(self):
+        self.cookie_file.write_text('garbage without tabs\n')
+        body = self.client.get('/api/cookies').json()
+        self.assertTrue(body['has_cookies'])
+        self.assertFalse(body['valid_netscape'])

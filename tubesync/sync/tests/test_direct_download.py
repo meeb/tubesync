@@ -38,6 +38,23 @@ class DirectDownloadAPITestCase(TestCase):
 
     # -- POST /api/downloads --------------------------------------------------
 
+    def test_create_audio_job(self):
+        resp = self._post({
+            'audio': True, 'acodec': 'mp4a',
+            'playlists': [{'title': 'Lib', 'video_ids': [VID_A]}],
+        })
+        self.assertEqual(resp.status_code, 201, resp.content)
+        job = DirectDownloadJob.objects.get(pk=resp.json()['id'])
+        self.assertTrue(job.audio)
+        self.assertEqual(job.acodec, 'mp4a')
+        self.assertTrue(job.as_status_dict()['audio'])
+
+    def test_create_job_defaults_to_video(self):
+        resp = self._post({'playlists': [{'title': 'V', 'video_ids': [VID_A]}]})
+        job = DirectDownloadJob.objects.get(pk=resp.json()['id'])
+        self.assertFalse(job.audio)
+        self.assertEqual(job.acodec, 'opus')
+
     def test_create_job(self):
         resp = self._post({'playlists': [
             {'title': 'My List', 'playlist_id': 'PL1', 'video_ids': [VID_A, VID_B]},
@@ -145,6 +162,25 @@ class DirectDownloadEngineTestCase(TestCase):
         self.assertEqual(job.playlists_done, 2)
         self.assertEqual(m_dl.call_count, 3)
         self.assertEqual(m_patch.call_count, 2)
+
+    @patch('sync.direct_download.interruptible_sleep', lambda *_: None)
+    @patch('sync.direct_download.time.sleep', lambda *_: None)
+    @patch('sync.direct_download.patch_info_json')
+    @patch('sync.direct_download.download_one')
+    def test_run_job_audio_uses_audio_dir(self, m_dl, m_patch):
+        m_dl.return_value = 'ok'
+        job = DirectDownloadJob.objects.create(
+            playlists=[{'title': 'Lib', 'directory': 'lib', 'video_ids': [VID_A]}],
+            total=1, audio=True, acodec='opus',
+            status=DirectDownloadJob.Status.RUNNING,
+        )
+        with override_settings(DOWNLOAD_ROOT=self._tmp()):
+            dd.run_job(job)
+        self.assertEqual(m_dl.call_count, 1)
+        _args, kwargs = m_dl.call_args
+        self.assertTrue(kwargs['audio'])
+        self.assertEqual(kwargs['acodec'], 'opus')
+        self.assertIn('/audio/lib', str(m_dl.call_args[0][1]).replace('\\', '/'))
 
     @patch('sync.direct_download.interruptible_sleep', lambda *_: None)
     @patch('sync.direct_download.time.sleep', lambda *_: None)

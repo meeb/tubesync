@@ -55,6 +55,15 @@ def video_dir(directory):
     return Path(settings.DOWNLOAD_ROOT) / prefix / directory
 
 
+def audio_dir(directory):
+    prefix = getattr(settings, 'DOWNLOAD_AUDIO_DIR', 'audio')
+    return Path(settings.DOWNLOAD_ROOT) / prefix / directory
+
+
+def out_dir_for(job, directory):
+    return (audio_dir if getattr(job, 'audio', False) else video_dir)(directory)
+
+
 def archive_path():
     p = Path(settings.CONFIG_BASE_DIR) / 'state' / 'direct-download-archive.txt'
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -150,28 +159,22 @@ def already_have(out_dir, video_id):
     return False
 
 
-def download_one(video_id, out_dir, *, resolution, hook, log_line):
+def download_one(video_id, out_dir, *, resolution, hook, log_line,
+                 audio=False, acodec='opus'):
     '''
-        Download one video by watch URL into out_dir.
+        Download one video by watch URL into out_dir. With audio=True: best
+        audio track only, extracted to .opus / .m4a, cover + metadata embedded.
         Returns 'ok', 'blocked' (YouTube anti-bot / 429) or 'fail'.
     '''
-    h = height_for(resolution)
-    url = f'https://www.youtube.com/watch?v={video_id}'
     opts = get_yt_opts()  # base: cookies (if present), cachedir, extractor_args, sleeps
     paths = dict(opts.get('paths') or {})
     paths['home'] = str(out_dir)
     opts.update({
-        'format': f'bv*[height<={h}]+ba/b[height<={h}]/b',
-        'merge_output_format': 'mkv',
-        'final_ext': 'mkv',
         'outtmpl': '%(uploader)s - %(title)s [%(id)s].%(ext)s',
         'paths': paths,
         'writeinfojson': True,
         'writethumbnail': True,
         'addmetadata': True,
-        'postprocessors': [
-            {'key': 'FFmpegMetadata', 'add_metadata': True, 'add_chapters': True},
-        ],
         'download_archive': str(archive_path()),
         'retries': 3,
         'fragment_retries': 3,
@@ -182,6 +185,32 @@ def download_one(video_id, out_dir, *, resolution, hook, log_line):
         'noprogress': True,
         'progress_hooks': [hook],
     })
+    if audio:
+        # music.youtube.com gives clean artist/album/track tags that
+        # FFmpegMetadata then writes into the file.
+        url = f'https://music.youtube.com/watch?v={video_id}'
+        pref = 'm4a' if acodec == 'mp4a' else 'opus'
+        opts.update({
+            'format': 'bestaudio/best',
+            'postprocessors': [
+                {'key': 'FFmpegExtractAudio', 'preferredcodec': pref,
+                 'preferredquality': '0', 'nopostoverwrites': False},
+                {'key': 'FFmpegThumbnailsConvertor', 'format': 'jpg'},
+                {'key': 'EmbedThumbnail', 'already_have_thumbnail': False},
+                {'key': 'FFmpegMetadata', 'add_metadata': True, 'add_chapters': True},
+            ],
+        })
+    else:
+        h = height_for(resolution)
+        url = f'https://www.youtube.com/watch?v={video_id}'
+        opts.update({
+            'format': f'bv*[height<={h}]+ba/b[height<={h}]/b',
+            'merge_output_format': 'mkv',
+            'final_ext': 'mkv',
+            'postprocessors': [
+                {'key': 'FFmpegMetadata', 'add_metadata': True, 'add_chapters': True},
+            ],
+        })
     try:
         with yt_dlp.YoutubeDL(opts) as y:
             rc = y.download([url])
@@ -253,12 +282,15 @@ def run_job(job):
         job.log = log_lines
 
     consecutive_blocked = 0
+    is_audio = bool(getattr(job, 'audio', False))
+    if is_audio:
+        add_log(f'Nur Audio ({"AAC/m4a" if job.acodec == "mp4a" else "Opus"})')
 
     start_pi = job.cursor_playlist
     for pi in range(start_pi, len(playlists)):
         pl = playlists[pi]
         directory = pl.get('directory') or safe_directory(pl.get('title'))
-        out_dir = video_dir(directory)
+        out_dir = out_dir_for(job, directory)
         out_dir.mkdir(parents=True, exist_ok=True)
         vids = pl.get('video_ids') or []
         start_vi = job.cursor_video if pi == start_pi else 0
@@ -295,6 +327,8 @@ def run_job(job):
                     resolution=job.resolution,
                     hook=make_progress_hook(job, pl.get('title')),
                     log_line=add_log,
+                    audio=is_audio,
+                    acodec=job.acodec,
                 )
 
             job.cursor_playlist, job.cursor_video = pi, vi + 1

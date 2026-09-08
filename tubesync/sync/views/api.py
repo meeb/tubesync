@@ -259,6 +259,8 @@ class DownloadJobListCreateAPIView(View):
             return _error("'playlists' must be a non-empty list")
 
         resolution = str(payload.get('resolution') or '1080p')
+        audio = bool(payload.get('audio'))
+        acodec = 'mp4a' if str(payload.get('acodec') or '').lower() == 'mp4a' else 'opus'
 
         taken = set()
         playlists = []
@@ -305,6 +307,8 @@ class DownloadJobListCreateAPIView(View):
         job = DirectDownloadJob.objects.create(
             playlists=playlists,
             resolution=resolution,
+            audio=audio,
+            acodec=acodec,
             total=total,
             status=Val(DirectDownloadJob.Status.RUNNING),
         )
@@ -359,8 +363,30 @@ class DownloadJobDetailAPIView(View):
 # sync.youtube.get_yt_opts). This endpoint lets a trusted caller (OffTube's
 # /backend "Musik Download" tab) set it once instead of copying it into the
 # container by hand. The content is never returned.
-COOKIE_HEADER_RE = re.compile(r'^#\s*(HTTP Cookie File|Netscape)', re.IGNORECASE | re.MULTILINE)
-COOKIE_ROW_RE = re.compile(r'(^|\n)[^\s#]+\t(TRUE|FALSE)\t', re.IGNORECASE)
+#
+# http.cookiejar.MozillaCookieJar checks the FIRST line against this - if the
+# pasted file lacks the magic header (or it is not first) yt-dlp rejects the
+# whole file with "does not look like a Netscape format cookies file".
+COOKIE_MAGIC_RE = re.compile(r'#( Netscape)? HTTP Cookie File')
+COOKIE_MAGIC_LINE = '# Netscape HTTP Cookie File'
+# A real data row: 7 tab-separated fields, col 2 is TRUE/FALSE. Browser exports
+# may prefix host-only rows with "#HttpOnly_" - still a data row for yt-dlp.
+COOKIE_ROW_RE = re.compile(r'^(#HttpOnly_)?[^\t\n]+\t(TRUE|FALSE)\t', re.IGNORECASE | re.MULTILINE)
+
+
+def _normalise_cookies(text):
+    '''
+        Return a cookies.txt that http.cookiejar / yt-dlp will accept, or None
+        if it carries no cookie rows at all.
+    '''
+    text = text.lstrip('﻿').replace('\r\n', '\n').replace('\r', '\n')
+    lines = text.split('\n')
+    first = next((ln for ln in lines if ln.strip()), '')
+    if not COOKIE_MAGIC_RE.search(first):
+        text = COOKIE_MAGIC_LINE + '\n' + text
+    if not COOKIE_ROW_RE.search(text):
+        return None
+    return text if text.endswith('\n') else text + '\n'
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -370,10 +396,19 @@ class CookiesAPIView(View):
 
     def _status(self):
         f = settings.COOKIES_FILE
-        exists = f.is_file()
+        if not f.is_file():
+            return {'has_cookies': False, 'size': 0, 'valid_netscape': False}
+        try:
+            head = f.read_text(encoding='utf-8', errors='replace')
+        except OSError:
+            head = ''
+        first = next((ln for ln in head.split('\n') if ln.strip()), '')
         return {
-            'has_cookies': bool(exists and f.stat().st_size > 0),
-            'size': f.stat().st_size if exists else 0,
+            'has_cookies': f.stat().st_size > 0,
+            'size': f.stat().st_size,
+            'valid_netscape': bool(
+                COOKIE_MAGIC_RE.search(first) and COOKIE_ROW_RE.search(head)
+            ),
         }
 
     def get(self, request):
@@ -395,8 +430,12 @@ class CookiesAPIView(View):
         if not text.strip():
             settings.COOKIES_FILE.unlink(missing_ok=True)
             return _json_response(self._status())
-        if not (COOKIE_HEADER_RE.search(text) or COOKIE_ROW_RE.search(text)):
-            return _error('does not look like a Netscape cookies.txt')
+        normalised = _normalise_cookies(text)
+        if normalised is None:
+            return _error(
+                'does not look like a Netscape cookies.txt '
+                '(no tab-separated cookie rows found)'
+            )
         settings.COOKIES_FILE.parent.mkdir(parents=True, exist_ok=True)
-        settings.COOKIES_FILE.write_text(text if text.endswith('\n') else text + '\n')
+        settings.COOKIES_FILE.write_text(normalised, encoding='utf-8')
         return _json_response(self._status())
