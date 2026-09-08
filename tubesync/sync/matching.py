@@ -36,7 +36,7 @@ def get_fallback_id(by_fmt_id, /, by_language = None, *, exact = False, fallback
 
     # prefer the audio track role the source asked for, then the other marked track
     for key in (prefer, Val(AudioTrack.ORIGINAL), Val(AudioTrack.DEFAULT)):
-        fmt = by_fmt_id.get(key)
+        fmt = by_fmt_id.get(f'~{key}~')
         if fmt and 'id' in fmt:
             return exact, fmt['id']
 
@@ -83,9 +83,9 @@ def get_best_combined_format(media):
         by_fmt_id[fmt['id']] = fmt
         by_language[fmt['language_code']] = fmt['id']
         if fmt['is_original']:
-            by_fmt_id[Val(AudioTrack.ORIGINAL)] = fmt
+            by_fmt_id[f'~{Val(AudioTrack.ORIGINAL)}~'] = fmt
         if fmt['is_default']:
-            by_fmt_id[Val(AudioTrack.DEFAULT)] = fmt
+            by_fmt_id[f'~{Val(AudioTrack.DEFAULT)}~'] = fmt
 
     # nothing matched, return early
     if not matches:
@@ -93,7 +93,7 @@ def get_best_combined_format(media):
 
     # honour the source's audio-track preference
     prefer = Val(media.source.prefer_audio_track)
-    preferred = by_fmt_id.get(prefer)
+    preferred = by_fmt_id.get(f'~{prefer}~')
     if preferred and 'id' in preferred:
         return True, preferred['id']
 
@@ -124,10 +124,10 @@ def get_best_audio_format(media):
         by_fmt_acodec[fmt['acodec']] = fmt['id']
         by_language[fmt['language_code']] = fmt['id']
         if fmt['is_original']:
-            by_fmt_id[Val(AudioTrack.ORIGINAL)] = fmt
+            by_fmt_id[f'~{Val(AudioTrack.ORIGINAL)}~'] = fmt
             by_fmt_acodec_track[Val(AudioTrack.ORIGINAL)][fmt['acodec']] = fmt['id']
         if fmt['is_default']:
-            by_fmt_id[Val(AudioTrack.DEFAULT)] = fmt
+            by_fmt_id[f'~{Val(AudioTrack.DEFAULT)}~'] = fmt
             by_fmt_acodec_track[Val(AudioTrack.DEFAULT)][fmt['acodec']] = fmt['id']
     if not audio_formats:
         # Media has no audio formats at all
