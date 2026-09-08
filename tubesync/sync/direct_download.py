@@ -181,6 +181,12 @@ def download_one(video_id, out_dir, *, resolution, hook, log_line,
         'fragment_retries': 3,
         'socket_timeout': 30,
         'sleep_interval_requests': 2,
+        # run_job() already pauses random.uniform(5, 15)s between videos + backs
+        # off on bot-blocks. YOUTUBE_DEFAULTS' max_sleep_interval=300 would add a
+        # random 0-300s sleep BEFORE every single download on top of that -> a
+        # 3000-track library would take days. Neutralise it here.
+        'sleep_interval': 0,
+        'max_sleep_interval': 0,
         'ignoreerrors': False,
         'quiet': True,
         'no_warnings': True,
