@@ -252,8 +252,8 @@ class Source(db.models.Model):
         default=False,
         help_text=_('Where possible, prefer HDR media for this source'),
     )
-    prefer_audio_track = db.models.CharField(
-        _('prefer audio track'),
+    audio_track = db.models.CharField(
+        _('audio track'),
         max_length=1,
         db_index=True,
         choices=AudioTrack.choices,
@@ -483,7 +483,7 @@ class Source(db.models.Model):
         ac = self.source_acodec
         f = ' 60FPS' if self.is_video and self.prefer_60fps else ''
         h = ' HDR' if self.is_video and self.prefer_hdr else ''
-        a = '' if self.prefer_audio_track == Val(AudioTrack.ORIGINAL) else ' DEFAULT-AUDIO'
+        a = '' if self.audio_track == Val(AudioTrack.ORIGINAL) else ' DEFAULT-AUDIO'
         return f'{self.source_resolution} (video:{vc}, audio:{ac}){f}{h}{a}'.strip()
 
     @property
