@@ -22,11 +22,17 @@ min_height = getattr(settings, 'VIDEO_HEIGHT_CUTOFF', 360)
 fallback_hd_cutoff = getattr(settings, 'VIDEO_HEIGHT_IS_HD', 500)
 
 
-def get_fallback_id(by_fmt_id, /, by_language = {}, *, exact = False, fallback_id = False,
-                    prefer = Val(AudioTrack.ORIGINAL)):
+def get_fallback_id(by_fmt_id, /, by_language = None, *, exact = False, fallback_id = False,
+                    prefer = None):
+    if by_language is None:
+        by_language = dict()
+
     assert isinstance(by_fmt_id, dict), type(by_fmt_id)
     assert isinstance(by_language, dict), type(by_language)
     assert exact in (True, False,), 'invalid value for exact'
+
+    if prefer is None:
+        prefer = Val(AudioTrack.ORIGINAL)
 
     # prefer the audio track role the source asked for, then the other marked track
     for key in (prefer, Val(AudioTrack.ORIGINAL), Val(AudioTrack.DEFAULT)):
