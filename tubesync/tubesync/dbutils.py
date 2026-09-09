@@ -1,27 +1,31 @@
 import importlib
 from django.conf import settings
-from django.db.backends.utils import CursorWrapper
+from django.db import DatabaseError
 
 
 def patch_ensure_connection():
-    for name, config in settings.DATABASES.items():
+    for config in settings.DATABASES.values():
+        db_engine = config['ENGINE']
 
-        # Don't patch for PostgreSQL, it doesn't need it and can cause issues
-        if config['ENGINE'] == 'django.db.backends.postgresql':
+        # Only patch for MariaDB/MySQL
+        if 'django.db.backends.mysql' != db_engine:
             continue
 
-        module = importlib.import_module(config['ENGINE'] + '.base')
+        module = importlib.import_module(f'{db_engine}.base')
 
         def ensure_connection(self):
-            if self.connection is not None:
-                try:
-                    with CursorWrapper(self.create_cursor(), self) as cursor:
-                        cursor.execute('SELECT 1;')
-                    return
-                except Exception:
-                    pass
-
             with self.wrap_database_errors:
-                self.connect()
+                self.close_if_unusable_or_obsolete()
+                if not (self.connection is None or self.is_usable()):
+                    try:
+                        with self.wrap_database_errors:
+                            self.validate_thread_sharing()
+                            raw_cursor = self.create_cursor()
+                            with self.make_cursor(raw_cursor) as cursor:
+                                cursor.execute('SELECT 1;')
+                    except DatabaseError:
+                        self.close()
+
+            super().ensure_connection()
 
         module.DatabaseWrapper.ensure_connection = ensure_connection
