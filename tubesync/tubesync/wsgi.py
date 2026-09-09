@@ -13,7 +13,7 @@ def application(environ, start_response):
         if DJANGO_URL_PREFIX.endswith('/'):
             script_name = DJANGO_URL_PREFIX
         else:
-            raise Exception(f'DJANGO_URL_PREFIX must end with a /, '
+            raise ValueError(f'DJANGO_URL_PREFIX must end with a /, '
                             f'got: {DJANGO_URL_PREFIX}')
     if script_name is not None:
         environ['SCRIPT_NAME'] = script_name
