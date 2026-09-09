@@ -36,6 +36,7 @@ def _get_pure_python_simple_queue() -> Any:
 
     isolated_globals: dict[str, Any] = {}
     compiled_code = compile(source_code, queue_source_path, 'exec')
+    # ruff: ignore [S102]
     exec(compiled_code, isolated_globals)
 
     if '_PySimpleQueue' in isolated_globals:
