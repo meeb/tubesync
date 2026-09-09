@@ -346,7 +346,6 @@ class AsyncPeekableQueue(asyncio.Queue[T]):
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exits the async context block without modifying structural tokens."""
-        pass
 
     async def get(self) -> T:
         """Removes and returns an item, exhausting the peek cache first."""
