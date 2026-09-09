@@ -40,32 +40,32 @@ class RemoveSpecificLogFilter(logging.Filter):
         ])
 
     def filter(self, record):
-        # If no arguments were configured, let everything pass through
-        if self.no_criteria:
-            return True
+        pass_the_record = (
 
-        # Check Message Content Start
-        if self.msg_starts_with and not record.getMessage().startswith(self.msg_starts_with):
-            return True
+            # If no arguments were configured, let everything pass through
+            self.no_criteria or
 
-        # Check Logger Name Path
-        if self.logger_name and record.name != self.logger_name:
-            return True
+            # Check Message Content Start
+            (self.msg_starts_with and not record.getMessage().startswith(self.msg_starts_with)) or
 
-        # Check Function Name
-        if self.func_name and record.funcName != self.func_name:
-            return True
+            # Check Logger Name Path
+            (self.logger_name and record.name != self.logger_name) or
 
-        # Check Line Number
-        if self.line_number is not None and record.lineno != self.line_number:
-            return True
+            # Check Function Name
+            (self.func_name and record.funcName != self.func_name) or
 
-        # Check Log Level
-        if self.level_number is not None and record.levelno != self.level_number:
-            return True
+            # Check Line Number
+            (self.line_number is not None and record.lineno != self.line_number) or
+
+            # Check Log Level
+            (self.level_number is not None and record.levelno != self.level_number) or
+
+            False
+
+        )
 
         # Drop the log if all active criteria are met
-        return False
+        return pass_the_record
 
 
 __all__ = [
