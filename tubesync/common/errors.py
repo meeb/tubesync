@@ -38,12 +38,6 @@ class DatabaseConnectionError(Exception):
     """
 
 
-class BgTaskWorkerError(Exception):
-    """
-        Raised when the worker process is not in a normal working state.
-    """
-
-
 class HueyConsumerError(Exception):
     """
         Raised when the consumer process is not in a normal working state.
