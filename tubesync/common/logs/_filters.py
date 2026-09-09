@@ -18,7 +18,7 @@ class RemoveSpecificLogFilter(logging.Filter):
         self.func_name = func_name
         try:
             self.line_number = int(line_number) if line_number is not None else None
-        except Exception:
+        except (TypeError, ValueError):
             self.line_number = None
 
         # Normalize the log level input to a Python integer
@@ -26,8 +26,8 @@ class RemoveSpecificLogFilter(logging.Filter):
             if isinstance(level, str):
                 self.level_number = logging.getLevelName(level.upper())
             else:
-                self.level_number = int(level)
-        except Exception:
+                self.level_number = int(level or None)
+        except (TypeError, ValueError):
             self.level_number = None
 
         # Track if any filtering rules were actually provided
