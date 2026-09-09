@@ -1,7 +1,8 @@
 [lint.per-file-ignores]
+"healthcheck.py" = ["S110"]
+"shasum_tests.py" = ["RUF059", "SIM117", "UP012"]
 "**/management/commands/*.py" = ["N999"]
 "**/migrations/0*.py" = ["I001", "RUF012"]
-"shasum_tests.py" = ["RUF059", "SIM117", "UP012"]
 
 [per-file-target-version]
 "shasum.py" = "py310"
