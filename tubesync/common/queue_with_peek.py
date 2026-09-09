@@ -338,7 +338,8 @@ class AsyncPeekableQueue(asyncio.Queue[T]):
                 item = await asyncio.wait_for(super().get(), timeout=self._timeout)
 
             self._peeked.append(item)
-        except (asyncio.TimeoutError, TimeoutError):
+        # ruff: ignore[UP041]
+        except (TimeoutError, asyncio.TimeoutError):
             raise asyncio.QueueEmpty
 
         return self
