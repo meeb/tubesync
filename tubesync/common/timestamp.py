@@ -14,7 +14,8 @@ def add_epoch(seconds):
 
 def subtract_epoch(arg_dt, /):
     assert isinstance(arg_dt, datetime.datetime)
-    if arg_dt.utcoffset() is None: # naive
+    if arg_dt.utcoffset() is None:  # naive
+        # ruff: ignore[DTZ006]
         return arg_dt - datetime.datetime.fromtimestamp(0, tz=None)
 
     utc_dt = arg_dt.astimezone(utc_tz)
