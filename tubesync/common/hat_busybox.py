@@ -65,6 +65,7 @@ def msg_from_busybox_str(msg_str: str) -> common.Msg:
         time_str = f'{m["hour"]}:{m["minute"]}:{m["second"]}'
         ts_str = f'{now.year} {m["month"]} {day_val} {time_str}'
 
+        # ruff: ignore[DTZ007]
         dt = datetime.strptime(ts_str, '%Y %b %d %H:%M:%S')
         if now < dt:
             dt = dt.replace(year=now.year - 1)
