@@ -418,7 +418,8 @@ SAVE_MEDIA_AFTER_BULK_ACTION = False
 # You have been warned!
 
 try:
-    from .local_settings import * # noqa
+    # ruff: ignore[F403]
+    from .local_settings import *
 except ImportError as e:
     import sys
     sys.stderr.write(f'Unable to import local_settings: {e}\n')
@@ -484,5 +485,6 @@ DEFAULT_ENGLISH_LCO = (
 )
 
 
-from .dbutils import patch_ensure_connection # noqa
+# ruff: ignore[E402]
+from .dbutils import patch_ensure_connection
 patch_ensure_connection()
