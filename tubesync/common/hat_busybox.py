@@ -47,6 +47,7 @@ for _dict in formats:
 
 def msg_from_busybox_str(msg_str: str) -> common.Msg:
     """Strict BusyBox RFC 3164 parser. Raises ValueError on any deviation."""
+    # ruff: ignore[DTZ005]
     now = datetime.now()
 
     for _dict in formats:
@@ -96,7 +97,7 @@ def msg_from_busybox_str(msg_str: str) -> common.Msg:
         facility=common.Facility(prival // 8),
         severity=common.Severity(prival % 8),
         version=None,
-        timestamp=dt.timestamp(),
+        timestamp=dt.astimezone(datetime.UTC).timestamp(),
         hostname=KNOWN_HOSTNAME,
         app_name=m['app_name'],
         procid=m.get('procid', None),
