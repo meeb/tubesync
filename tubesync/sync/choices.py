@@ -33,8 +33,8 @@ class CapChoices(models.IntegerChoices):
 
 
 class AudioTrack(models.TextChoices):
-    ORIGINAL = 'original', _('Original audio (recorded language)')
-    DEFAULT = 'default', _("Publisher's default audio (often an auto-dub)")
+    ORIGINAL = 'o', _('Original audio (recorded language)')
+    DEFAULT = 'd', _("Publisher's default audio (often an auto-dub)")
 
 
 class Fallback(models.TextChoices):

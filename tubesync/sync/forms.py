@@ -19,7 +19,7 @@ SourceForm = forms.modelform_factory(
         'source_type', 'key', 'name', 'directory', 'filter_text', 'filter_text_invert', 'filter_seconds', 'filter_seconds_min',
         'media_format', 'target_schedule', 'index_schedule', 'index_videos', 'index_streams', 'download_media',
         'download_cap', 'delete_old_media', 'days_to_keep', 'source_resolution', 'source_vcodec', 'source_acodec',
-        'prefer_60fps', 'prefer_hdr', 'prefer_audio_track', 'fallback', 'delete_removed_media', 'delete_files_on_disk', 'copy_channel_images',
+        'prefer_60fps', 'prefer_hdr', 'audio_track', 'fallback', 'delete_removed_media', 'delete_files_on_disk', 'copy_channel_images',
         'copy_thumbnails', 'write_nfo', 'write_json', 'embed_metadata', 'embed_thumbnail',
         'enable_sponsorblock', 'sponsorblock_categories', 'write_subtitles', 'auto_subtitles', 'sub_langs',
     ),
@@ -80,10 +80,12 @@ _media_server_type_label = 'Jellyfin'
 class JellyfinMediaServerForm(forms.Form):
 
     host = forms.CharField(
+        # ruff: ignore[INT001]
         label=_(f'Host name or IP address of the {_media_server_type_label} server'),
         required=True,
     )
     port = forms.IntegerField(
+        # ruff: ignore[INT001]
         label=_(f'Port number of the {_media_server_type_label} server'),
         required=True,
         initial=8096,
@@ -99,10 +101,12 @@ class JellyfinMediaServerForm(forms.Form):
         initial=True,
     )
     token = forms.CharField(
+        # ruff: ignore[INT001]
         label=_(f'{_media_server_type_label} token'),
         required=True,
     )
     libraries = forms.CharField(
+        # ruff: ignore[INT001]
         label=_(f'Comma-separated list of {_media_server_type_label} library IDs to update'),
         required=False,
     )

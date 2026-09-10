@@ -22,15 +22,21 @@ min_height = getattr(settings, 'VIDEO_HEIGHT_CUTOFF', 360)
 fallback_hd_cutoff = getattr(settings, 'VIDEO_HEIGHT_IS_HD', 500)
 
 
-def get_fallback_id(by_fmt_id, /, by_language = {}, *, exact = False, fallback_id = False,
-                    prefer = Val(AudioTrack.ORIGINAL)):
+def get_fallback_id(by_fmt_id, /, by_language = None, *, exact = False, fallback_id = False,
+                    prefer = None):
+    if by_language is None:
+        by_language = dict()
+
     assert isinstance(by_fmt_id, dict), type(by_fmt_id)
     assert isinstance(by_language, dict), type(by_language)
     assert exact in (True, False,), 'invalid value for exact'
 
+    if prefer is None:
+        prefer = Val(AudioTrack.ORIGINAL)
+
     # prefer the audio track role the source asked for, then the other marked track
     for key in (prefer, Val(AudioTrack.ORIGINAL), Val(AudioTrack.DEFAULT)):
-        fmt = by_fmt_id.get(key)
+        fmt = by_fmt_id.get(f'~{key}~')
         if fmt and 'id' in fmt:
             return exact, fmt['id']
 
@@ -65,29 +71,27 @@ def get_best_combined_format(media):
         if media.source.source_acodec != fmt['acodec']:
             continue
         # if the source prefers 60fps, check for it
-        if media.source.prefer_60fps:
-            if not fmt['is_60fps']:
-                continue
+        if media.source.prefer_60fps and not fmt['is_60fps']:
+            continue
         # If the source prefers HDR, check for it
-        if media.source.prefer_hdr:
-            if not fmt['is_hdr']:
-                continue
+        if media.source.prefer_hdr and not fmt['is_hdr']:
+            continue
         # If we reach here, we have a combined match!
         matches.add(fmt['id'])
         by_fmt_id[fmt['id']] = fmt
         by_language[fmt['language_code']] = fmt['id']
         if fmt['is_original']:
-            by_fmt_id[Val(AudioTrack.ORIGINAL)] = fmt
+            by_fmt_id[f'~{Val(AudioTrack.ORIGINAL)}~'] = fmt
         if fmt['is_default']:
-            by_fmt_id[Val(AudioTrack.DEFAULT)] = fmt
+            by_fmt_id[f'~{Val(AudioTrack.DEFAULT)}~'] = fmt
 
     # nothing matched, return early
     if not matches:
         return False, False
 
     # honour the source's audio-track preference
-    prefer = Val(media.source.prefer_audio_track)
-    preferred = by_fmt_id.get(prefer)
+    prefer = Val(media.source.audio_track)
+    preferred = by_fmt_id.get(f'~{prefer}~')
     if preferred and 'id' in preferred:
         return True, preferred['id']
 
@@ -118,16 +122,16 @@ def get_best_audio_format(media):
         by_fmt_acodec[fmt['acodec']] = fmt['id']
         by_language[fmt['language_code']] = fmt['id']
         if fmt['is_original']:
-            by_fmt_id[Val(AudioTrack.ORIGINAL)] = fmt
+            by_fmt_id[f'~{Val(AudioTrack.ORIGINAL)}~'] = fmt
             by_fmt_acodec_track[Val(AudioTrack.ORIGINAL)][fmt['acodec']] = fmt['id']
         if fmt['is_default']:
-            by_fmt_id[Val(AudioTrack.DEFAULT)] = fmt
+            by_fmt_id[f'~{Val(AudioTrack.DEFAULT)}~'] = fmt
             by_fmt_acodec_track[Val(AudioTrack.DEFAULT)][fmt['acodec']] = fmt['id']
     if not audio_formats:
         # Media has no audio formats at all
         return False, False
     source_acodec = media.source.source_acodec
-    prefer = Val(media.source.prefer_audio_track)
+    prefer = Val(media.source.audio_track)
     # Among formats with the requested codec, honour the audio-track preference.
     # A codec match still beats the track preference: if the source wants OPUS
     # and only the "original" track is MP4A, the OPUS "default" track wins.
@@ -165,11 +169,10 @@ def get_best_video_format(media):
         media.source.fallback != Val(Fallback.REQUIRE_CODEC)
     )
     def matched_resolution(fmt):
-        if fmt['format'] == source_resolution:
-            return True
-        elif fmt['height'] == source_resolution_height:
-            return True
-        return False
+        return (
+            fmt['format'] == source_resolution or
+            fmt['height'] == source_resolution_height
+        )
     # Filter video-only formats by resolution that matches the source
     video_formats = []
     sort_keys = [('height', False), ('vcodec', True), ('vbr', False)] # key, reverse
@@ -508,13 +511,14 @@ def get_best_video_format(media):
             return True, best_match['id']
         elif media.source.can_fallback:
             # Allow the fallback if it meets requirements
-            if (media.source.fallback == Val(Fallback.REQUIRE_HD) and
-                best_match['height'] >= fallback_hd_cutoff):
-                return False, best_match['id']
-            elif (media.source.fallback == Val(Fallback.REQUIRE_CODEC) and
-                source_vcodec == best_match['vcodec']):
-                return False, best_match['id']
-            elif media.source.fallback == Val(Fallback.NEXT_BEST_RESOLUTION):
+            accept_fallback = (
+                (media.source.fallback == Val(Fallback.REQUIRE_HD) and
+                    best_match['height'] >= fallback_hd_cutoff) or
+                (media.source.fallback == Val(Fallback.REQUIRE_CODEC) and
+                    source_vcodec == best_match['vcodec']) or
+                (media.source.fallback == Val(Fallback.NEXT_BEST_RESOLUTION))
+            )
+            if accept_fallback:
                 return False, best_match['id']
     # Nope, failed to find match
     return False, False

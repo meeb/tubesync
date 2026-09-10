@@ -61,7 +61,7 @@ CHOICE_FIELDS = {
     'source_resolution': SourceResolution,
     'source_vcodec': YouTube_VideoCodec,
     'source_acodec': YouTube_AudioCodec,
-    'prefer_audio_track': AudioTrack,
+    'audio_track': AudioTrack,
     'fallback': Fallback,
 }
 

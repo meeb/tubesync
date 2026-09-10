@@ -337,18 +337,18 @@ class FormatMatchingTestCase(TestCase):
         self.media.metadata = all_test_metadata['multi_audio']
         self.media.save()
         expected_matches = {
-            # (acodec, prefer_audio_track): (match_type, code)
+            # (acodec, audio_track): (match_type, code)
             (Val(YouTube_AudioCodec.OPUS), Val(AudioTrack.ORIGINAL)): (True, '251-en'),
             (Val(YouTube_AudioCodec.OPUS), Val(AudioTrack.DEFAULT)): (True, '251-es'),
             (Val(YouTube_AudioCodec.MP4A), Val(AudioTrack.ORIGINAL)): (True, '140-en'),
             (Val(YouTube_AudioCodec.MP4A), Val(AudioTrack.DEFAULT)): (True, '140-es'),
         }
         for params, expected in expected_matches.items():
-            acodec, prefer_audio_track = params
+            acodec, audio_track = params
             self.source.source_acodec = acodec
-            self.source.prefer_audio_track = prefer_audio_track
+            self.source.audio_track = audio_track
             self.assertEqual(self.media.get_best_audio_format(), expected,
-                             msg=f'{acodec} / {prefer_audio_track}')
+                             msg=f'{acodec} / {audio_track}')
 
     def test_audio_track_preference_combined(self):
         self.source.fallback = Val(Fallback.FAIL)
@@ -359,18 +359,18 @@ class FormatMatchingTestCase(TestCase):
         self.media.metadata = all_test_metadata['multi_audio']
         self.media.save()
         expected_matches = {
-            # (resolution, prefer_audio_track): (match_type, code)
+            # (resolution, audio_track): (match_type, code)
             ('360p', Val(AudioTrack.ORIGINAL)): (True, '18-en'),
             ('360p', Val(AudioTrack.DEFAULT)): (True, '18-es'),
             ('720p', Val(AudioTrack.ORIGINAL)): (True, '22-en'),
             ('720p', Val(AudioTrack.DEFAULT)): (True, '22-es'),
         }
         for params, expected in expected_matches.items():
-            resolution, prefer_audio_track = params
+            resolution, audio_track = params
             self.source.source_resolution = resolution
-            self.source.prefer_audio_track = prefer_audio_track
+            self.source.audio_track = audio_track
             self.assertEqual(self.media.get_best_combined_format(), expected,
-                             msg=f'{resolution} / {prefer_audio_track}')
+                             msg=f'{resolution} / {audio_track}')
 
     def test_audio_track_preference_split_video_plus_audio(self):
         self.source.fallback = Val(Fallback.NEXT_BEST_RESOLUTION)
@@ -379,9 +379,9 @@ class FormatMatchingTestCase(TestCase):
         self.source.source_acodec = Val(YouTube_AudioCodec.OPUS)
         self.media.metadata = all_test_metadata['multi_audio']
         self.media.save()
-        self.source.prefer_audio_track = Val(AudioTrack.ORIGINAL)
+        self.source.audio_track = Val(AudioTrack.ORIGINAL)
         self.assertEqual(self.media.get_format_str(), '248+251-en')
-        self.source.prefer_audio_track = Val(AudioTrack.DEFAULT)
+        self.source.audio_track = Val(AudioTrack.DEFAULT)
         self.assertEqual(self.media.get_format_str(), '248+251-es')
 
     def test_audio_track_preference_no_marker_is_noop(self):
@@ -391,7 +391,7 @@ class FormatMatchingTestCase(TestCase):
         self.media.metadata = all_test_metadata['boring']
         self.media.save()
         for prefer in (Val(AudioTrack.ORIGINAL), Val(AudioTrack.DEFAULT)):
-            self.source.prefer_audio_track = prefer
+            self.source.audio_track = prefer
             self.source.source_resolution = Val(SourceResolution.AUDIO)
             self.source.source_acodec = Val(YouTube_AudioCodec.OPUS)
             self.assertEqual(self.media.get_best_audio_format(), (True, '251'), msg=prefer)
