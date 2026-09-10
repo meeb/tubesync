@@ -88,7 +88,7 @@ def msg_from_busybox_str(msg_str: str) -> common.Msg:
                 raise ValueError('too low')
             elif 4_194_304 < _pid:
                 raise ValueError('too high')
-        except Exception as e:
+        except (TypeError, ValueError) as e:
             raise ValueError(f'BusyBox (RFC 3164) invalid process ID: {e}')
 
     return common.Msg(
