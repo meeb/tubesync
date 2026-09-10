@@ -1,0 +1,11 @@
+extend = "./ruff.toml"
+
+[lint]
+extend-ignore = [
+    "RUF100",  # limited incorrectly complains about unused rules
+    "A", "ANN", "ARG", "ASYNC", "B", "BLE", "COM", "D", "DJ", "DTZ",
+    "EM", "ERA", "EXE", "FA", "FBT", "FIX", "FLY", "FURB", "G", "I",
+    "ICN", "INP", "INT", "ISC", "LOG", "N", "NPY", "PD", "PERF", "PGH",
+    "PIE", "PL", "PT", "PTH", "PYI", "Q", "RET", "RSE", "S", "SIM",
+    "SLF", "SLOT", "T10", "T20", "TCH", "TD", "TID", "TRY", "UP", "YTT",
+]
