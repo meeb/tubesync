@@ -37,6 +37,8 @@ class Command(BaseCommand):
             for (root, dirs, files) in os.walk(sourceroot):
                 rootpath = Path(root)
                 for filename in files:
+                    # filepart never used
+                    # ruff: ignore[RUF059]
                     filepart, ext = os.path.splitext(filename)
                     if ext.removeprefix('.').strip().lower() not in file_extensions:
                         continue
