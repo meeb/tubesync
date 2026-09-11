@@ -38,10 +38,7 @@ class Command(BaseCommand):
                 rootpath = Path(root)
                 for filename in files:
                     filepart, ext = os.path.splitext(filename)
-                    if ext.startswith('.'):
-                        ext = ext[1:]
-                    ext = ext.strip().lower()
-                    if ext not in file_extensions:
+                    if ext.removeprefix('.').strip().lower() not in file_extensions:
                         continue
                     filepath = Path(rootpath / filename).resolve(strict=True)
                     on_disk.append(str(filepath))
