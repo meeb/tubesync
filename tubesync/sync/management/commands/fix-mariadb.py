@@ -236,7 +236,7 @@ class Command(BaseCommand):
                 raise CommandError(_(
                     'Deleting metadata tables that are in use is not safe!'
                 ))
-            
+
             for table in table_names:
                 schema.execute(
                     schema.sql_delete_table % dict(
