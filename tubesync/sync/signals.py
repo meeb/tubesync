@@ -230,7 +230,6 @@ def media_post_save(sender, instance, created, **kwargs):
         media_file_exists |= instance.filepath.exists()
     except OSError as e:
         log.exception(e)
-        pass
     # If the media has not yet been downloaded schedule it to be downloaded
     if not (media_file_exists or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
