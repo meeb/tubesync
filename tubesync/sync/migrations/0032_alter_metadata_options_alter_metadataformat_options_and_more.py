@@ -13,11 +13,11 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterModelOptions(
             name='metadata',
-            options={'get_latest_by': ['-retrieved', '-created'], 'verbose_name': 'Metadata about Media', 'verbose_name_plural': 'Metadata about Media'},
+            options={'get_latest_by': ('-retrieved', '-created'), 'verbose_name': 'Metadata about Media', 'verbose_name_plural': 'Metadata about Media'},
         ),
         migrations.AlterModelOptions(
             name='metadataformat',
-            options={'ordering': ['site', 'key', 'number'], 'verbose_name': 'Format from Media Metadata', 'verbose_name_plural': 'Formats from Media Metadata'},
+            options={'ordering': ('site', 'key', 'number'), 'verbose_name': 'Format from Media Metadata', 'verbose_name_plural': 'Formats from Media Metadata'},
         ),
         migrations.AlterUniqueTogether(
             name='metadataformat',
