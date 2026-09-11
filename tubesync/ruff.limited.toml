@@ -8,6 +8,6 @@ extend-ignore = [
     "RUF059",  # Unpacked variable is never used
 
     # Only the expanded default rules that our old code fails with
-    "B006", "B010", "BLE001", "DTZ001", "G010", "INT001", "PERF402", "PIE790",
-    "PIE804", "RET501", "S110", "SIM", "TRY004", "UP",
+    "B006", "B010", "BLE001", "DTZ001", "G010", "INT001", "PERF402",
+    "RET501", "S110", "SIM", "TRY004", "UP",
 ]
