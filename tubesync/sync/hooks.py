@@ -1,5 +1,7 @@
 import os
 
+from typing import ClassVar
+
 from common.logger import log
 from common.utils import remove_enclosed
 from sync.utils import filter_response
@@ -15,8 +17,8 @@ postprocessor_hook = {
 
 
 class BaseStatus:
-    status_dict = dict()
-    valid = set()
+    status_dict: ClassVar[dict[str, object]] = dict()
+    valid = frozenset()
 
     @classmethod
     def get(cls, key):
