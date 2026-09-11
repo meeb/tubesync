@@ -483,3 +483,8 @@ DEFAULT_ENGLISH_LCO = (
     'en-001',   # 38. World (International English)
     'eng',      # 39. Standard 3-letter fallback (ISO 639-2)
 )
+
+# ruff: disable[F405]
+if 'patch_ensure_connection' in locals() and callable(patch_ensure_connection):
+    patch_ensure_connection()
+# ruff: enable[F405]
