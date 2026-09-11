@@ -289,8 +289,7 @@ class SourceView(DetailView):
         data['message'] = self.message
         data['errors'] = []
         for error in get_source_completed_tasks(self.object.pk, only_errors=True):
-            error_message = get_error_message(error)
-            setattr(error, 'error_message', error_message)
+            error.error_message = get_error_message(error)
             data['errors'].append(error)
         data['media'] = Media.objects.filter(source=self.object).order_by('-published').defer('metadata')
         return data

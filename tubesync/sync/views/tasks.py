@@ -116,14 +116,13 @@ class TasksView(ListView):
         data['wait_for_database_queue'] = False
 
         def add_to_task(task):
-            setattr(task, 'run_now', task.scheduled_at < now_dt)
+            task.run_now = task.scheduled_at < now_dt
             obj, url = map_task_to_instance(task)
             if obj:
-                setattr(task, 'instance', obj)
-                setattr(task, 'url', url)
+                task.instance = obj
+                task.url = url
             if task.has_error():
-                error_message = get_error_message(task)
-                setattr(task, 'error_message', error_message)
+                task.error_message = get_error_message(task)
                 return 'error'
             return True and obj
 
@@ -262,8 +261,7 @@ class CompletedTasksView(ListView):
         data = super().get_context_data(*args, **kwargs)
         for task in data['tasks']:
             if task.has_error():
-                error_message = get_error_message(task)
-                setattr(task, 'error_message', error_message)
+                task.error_message = get_error_message(task)
         data['message'] = ''
         data['source'] = self.filter_source
         if self.filter_source:
