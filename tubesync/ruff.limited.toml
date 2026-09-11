@@ -7,10 +7,7 @@ extend-ignore = [
     # I simply do not care enough about this to fail the step
     "RUF059",  # Unpacked variable is never used
 
-    # The recently expanded default rules we are not yet ready for.
-    "A", "ANN", "ARG", "ASYNC", "B", "BLE", "COM", "D", "DJ", "DTZ",
-    "EM", "ERA", "EXE", "FA", "FBT", "FIX", "FLY", "FURB", "G", "I",
-    "ICN", "INP", "INT", "ISC", "LOG", "N", "NPY", "PD", "PERF", "PGH",
-    "PIE", "PL", "PT", "PTH", "PYI", "Q", "RET", "RSE", "S", "SIM",
-    "SLF", "SLOT", "T10", "T20", "TCH", "TD", "TID", "TRY", "UP", "YTT",
+    # Only the expanded default rules that our old code fails with
+    "B006", "B010", "BLE001", "DTZ001", "G010", "INT001", "PERF402", "PIE790",
+    "PIE804", "RET501", "S110", "SIM", "TRY004", "UP",
 ]
