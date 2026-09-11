@@ -3,6 +3,11 @@ extend = "./ruff.toml"
 [lint]
 extend-ignore = [
     "RUF100",  # limited incorrectly complains about unused rules
+
+    # I simply do not care enough about this to fail the step
+    "RUF059",  # Unpacked variable is never used
+
+    # The recently expanded default rules we are not yet ready for.
     "A", "ANN", "ARG", "ASYNC", "B", "BLE", "COM", "D", "DJ", "DTZ",
     "EM", "ERA", "EXE", "FA", "FBT", "FIX", "FLY", "FURB", "G", "I",
     "ICN", "INP", "INT", "ISC", "LOG", "N", "NPY", "PD", "PERF", "PGH",
