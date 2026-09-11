@@ -67,7 +67,6 @@ class Command(BaseCommand):
                         item.ingest_metadata(json_dict)
                     except:
                         log.exception(f'could not import: {info_json}')
-                        pass
                     else:
                         epoch = item.get_metadata_first_value('epoch', arg_dict=json_dict) or None
                         if epoch:
