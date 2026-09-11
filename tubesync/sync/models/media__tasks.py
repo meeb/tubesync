@@ -192,11 +192,11 @@ def refresh_formats(self):
 
     # select and save our best thumbnail url
     try:
-        thumbnail = [ thumb.get('url') for thumb in multi_key_sort(
+        thumbnail = next(thumb.get('url') for thumb in multi_key_sort(
             thumbnails,
             [('preference', True,)],
-        ) if thumb.get('url', '').endswith('.jpg') ][0]
-    except IndexError:
+        ) if thumb.get('url', '').endswith('.jpg'))
+    except StopIteration:
         pass
     else:
         field = self.get_metadata_field('thumbnail')
