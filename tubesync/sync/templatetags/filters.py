@@ -21,6 +21,7 @@ def sub(value, arg):
     except (ValueError, TypeError):
         try:
             return value - arg
+        # ruff: ignore[BLE001]
         except Exception:
             return ""
 
