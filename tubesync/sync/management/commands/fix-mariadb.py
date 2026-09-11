@@ -152,9 +152,10 @@ class Command(BaseCommand):
             if not both_tables:
                 if uuid_column_type_str == self._column_type('sync_source', 'uuid').lower():
                     log.info('The source table is already using a native UUID column.')
-                elif uuid_column_type_str == self._column_type('sync_media', 'uuid').lower():
-                    log.info('The media table is already using a native UUID column.')
-                elif uuid_column_type_str == self._column_type('sync_media', 'source_id').lower():
+                elif (
+                    uuid_column_type_str == self._column_type('sync_media', 'uuid').lower() and
+                    uuid_column_type_str == self._column_type('sync_media', 'source_id').lower()
+                ):
                     log.info('The media table is already using a native UUID column.')
                 else:
                     raise CommandError(_(
