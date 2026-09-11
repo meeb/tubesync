@@ -483,8 +483,3 @@ DEFAULT_ENGLISH_LCO = (
     'en-001',   # 38. World (International English)
     'eng',      # 39. Standard 3-letter fallback (ISO 639-2)
 )
-
-
-# ruff: ignore[E402]
-from .dbutils import patch_ensure_connection
-patch_ensure_connection()
