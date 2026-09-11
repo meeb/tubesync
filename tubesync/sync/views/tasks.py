@@ -1,4 +1,8 @@
+from typing import ClassVar
+
+from django import forms
 from django.conf import settings
+from django.forms import ValidationError
 from django.http import HttpResponseNotFound, HttpResponseRedirect
 from django.views import View
 from django.views.generic import ListView
@@ -6,18 +10,17 @@ from django.views.generic.edit import FormView
 from django.views.generic.detail import SingleObjectMixin
 from django.urls import reverse_lazy
 from django.db.models import F
-from django.forms import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django_huey import DJANGO_HUEY, get_queue
+
 from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params, multi_key_sort
 from common.huey import h_q_reset_maint_func, h_q_reset_tasks
 from common.logger import log
-from django_huey import DJANGO_HUEY, get_queue
 from .utils import get_waiting_tasks
 from ..models import Source
-from django import forms
 from ..forms import ScheduleTaskForm
 from ..tasks import (
     get_task_map, map_task_to_instance, get_error_message,
@@ -34,7 +37,7 @@ class TasksView(ListView):
     template_name = 'sync/tasks.html'
     context_object_name = 'tasks'
     paginate_by = settings.TASKS_PER_PAGE
-    messages = {
+    messages: ClassVar[dict[str, str]] = {
         'filter': _('Viewing tasks filtered for source: <strong>{name}</strong>'),
         'reset': _('All tasks have been reset'),
         'revoked': _('Revoked task: {task_id}'),
@@ -228,7 +231,7 @@ class CompletedTasksView(ListView):
     template_name = 'sync/tasks-completed.html'
     context_object_name = 'tasks'
     paginate_by = settings.TASKS_PER_PAGE
-    messages = {
+    messages: ClassVar[dict[str, str]] = {
         'filter': _('Viewing tasks filtered for source: <strong>{name}</strong>'),
     }
 
@@ -305,7 +308,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
     form_class = ScheduleTaskForm
     model = TaskHistory
     context_object_name = 'task'
-    errors = dict(
+    errors: ClassVar[dict[str, str]] = dict(
         invalid_when=_('The type ({}) was incorrect.'),
         when_before_now=_('The date and time must be in the future.'),
     )

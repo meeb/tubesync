@@ -1,8 +1,11 @@
 import glob
 import os
-from base64 import b64decode
 import pathlib
 import sys
+from base64 import b64decode
+from typing import ClassVar
+
+from django import forms
 from django.conf import settings
 from django.http import FileResponse, HttpResponseNotFound, HttpResponseRedirect
 from django.views.generic import ListView, DetailView
@@ -15,7 +18,6 @@ from django.utils.translation import gettext_lazy as _
 from common.models import TaskHistory
 from common.utils import append_uri_params, glob_quote
 from ..models import Source, Media, Metadata
-from django import forms
 from ..utils import delete_file
 from ..tasks import (
     get_media_download_task, download_media_image, download_media_file,
@@ -31,7 +33,7 @@ class MediaView(ListView):
     template_name = 'sync/media.html'
     context_object_name = 'media'
     paginate_by = settings.MEDIA_PER_PAGE
-    messages = {
+    messages: ClassVar[dict[str, str]] = {
         'filter': _('Viewing media filtered for source: <strong>{name}</strong>'),
     }
 
@@ -173,7 +175,7 @@ class MediaItemView(DetailView):
 
     template_name = 'sync/media-item.html'
     model = Media
-    messages = {
+    messages: ClassVar[dict[str, str]] = {
         'thumbnail': _('Thumbnail has been scheduled to redownload'),
         'redownloading': _('Media file has been deleted and scheduled to redownload'),
         'skipped': _('Media file has been deleted and marked to never download'),

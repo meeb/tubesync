@@ -13,7 +13,7 @@ class Command(BaseCommand):
 
     help = ('Scans download media directories for media not yet downloaded and '
             'marks them as downloaded')
-    extra_extensions = ['mp3', 'mp4', 'avi']
+    extra_extensions = ('mp3', 'mp4', 'avi')
 
     def handle(self, *args, **options):
         log.info('Building directory to Source map...')
@@ -21,7 +21,9 @@ class Command(BaseCommand):
         for s in Source.objects.all():
             dirmap[str(s.directory_path)] = s
         log.info('Scanning sources...')
-        file_extensions = list(FileExtension.values) + self.extra_extensions
+        file_extensions = set().union(
+            FileExtension.values, self.extra_extensions,
+        )
         for sourceroot, source in dirmap.items():
             media = list(Media.objects.filter(source=source, downloaded=False,
                                               skip=False))
