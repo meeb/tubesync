@@ -38,13 +38,16 @@ FROM debian:${DEBIAN_VERSION} AS tubesync-prepare-etc
 COPY patches/ /var/tmp/patches/
 RUN --mount=type=tmpfs,target=/cache \
     set -eux && cd /var/tmp/patches/ && \
-    ./fettle.pl --dry-run ./docker/tubesync-base/debconf.diff && \
-    ./fettle.pl ./docker/tubesync-base/debconf.diff && \
-    ./fettle.pl --clean ./docker/tubesync-base/debconf.diff
+    for _df in ./docker/tubesync-base/*.diff ; do \
+        ./fettle.pl --dry-run "${_df}" && \
+        ./fettle.pl "${_df}" && \
+        ./fettle.pl --clean "${_df}" || exit ; \
+    done ; unset -v _df ;
 
 FROM scratch AS tubesync-etc
 
 COPY --from=tubesync-prepare-etc /etc/ /etc/
+COPY --from=tubesync-prepare-etc /usr/share/perl5/Debconf/ /usr/share/perl5/Debconf/
 
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
@@ -63,6 +66,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_ROOT_USER_ACTION='ignore'
 
 COPY --from=tubesync-etc /etc/debconf.conf /etc/debconf.conf
+COPY --from=tubesync-etc /usr/share/perl5/Debconf/DbDriver/PackageDir.pm /usr/share/perl5/Debconf/DbDriver/PackageDir.pm
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
