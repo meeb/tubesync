@@ -1,0 +1,18 @@
+--- /usr/share/perl5/Debconf/DbDriver/PackageDir.pm.orig	2025-03-10 12:07:15.000000000 +0000
++++ /usr/share/perl5/Debconf/DbDriver/PackageDir.pm	2026-09-12 13:09:18.637740142 +0000
+@@ -52,6 +52,7 @@
+ sub load {
+ 	my $this=shift;
+ 	my $item=shift;
++	return if !defined($item) || $item eq "" || $item =~ /^\./;
+ 	$this->loadfile($this->filename($item));
+ }
+ 
+@@ -59,6 +60,7 @@
+ sub filename {
+ 	my $this=shift;
+ 	my $item=shift;
++	return ".lock" if !defined($item) || $item eq "" || $item =~ /^\./;
+ 
+ 	if ($item =~ m!^([^/]+)(?:/|$)!) {
+ 		return $1.$this->{extension};

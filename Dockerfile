@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="1.3.2"
+ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="2.0.0"
 ARG FFMPEG_VERSION="N"
 ARG YTDLP_EJS_VERSION="0.8.0"
 
@@ -38,13 +38,16 @@ FROM debian:${DEBIAN_VERSION} AS tubesync-prepare-etc
 COPY patches/ /var/tmp/patches/
 RUN --mount=type=tmpfs,target=/cache \
     set -eux && cd /var/tmp/patches/ && \
-    ./fettle.pl --dry-run ./docker/tubesync-base/debconf.diff && \
-    ./fettle.pl ./docker/tubesync-base/debconf.diff && \
-    ./fettle.pl --clean ./docker/tubesync-base/debconf.diff
+    for _df in ./docker/tubesync-base/*.diff ; do \
+        ./fettle.pl --dry-run "${_df}" && \
+        ./fettle.pl "${_df}" && \
+        ./fettle.pl --clean "${_df}" || exit ; \
+    done ; unset -v _df ;
 
 FROM scratch AS tubesync-etc
 
 COPY --from=tubesync-prepare-etc /etc/ /etc/
+COPY --from=tubesync-prepare-etc /usr/share/perl5/Debconf/ /usr/share/perl5/Debconf/
 
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
@@ -63,6 +66,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_ROOT_USER_ACTION='ignore'
 
 COPY --from=tubesync-etc /etc/debconf.conf /etc/debconf.conf
+COPY --from=tubesync-etc /usr/share/perl5/Debconf/DbDriver/PackageDir.pm /usr/share/perl5/Debconf/DbDriver/PackageDir.pm
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
@@ -88,7 +92,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
       cut -d : -f 2- | \
       xargs -r -t apt-mark hold && \
     # We must allow these upgrades
-    apt-mark unhold libc6 libssl3t64 && \
+    apt-mark unhold libc6 libssl3t64 perl-base && \
     apt-get update && \
     # Include debian-backports.sources for manual use in a container
     _awk_prog='"Suites:" == $1 && /-security$/ { sub("security", "backports"); print; exit; }' && \
@@ -500,7 +504,7 @@ RUN --mount=type=bind,source=fontawesome-free,target=/fontawesome-free \
   mv -v /app/tubesync/local_settings.py.container /app/tubesync/local_settings.py
 
 ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION
-ADD --checksum=7511309af023b09788dc8f2efc96cc3671291e6c "https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git#${BGUTIL_YTDLP_POT_PROVIDER_VERSION}:server" /app/bgutil-ytdlp-pot-provider/server
+ADD --checksum=37169ee2656e08c5c2e5dc9df4c598c0cb4c88a8 "https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git#${BGUTIL_YTDLP_POT_PROVIDER_VERSION}:server" /app/bgutil-ytdlp-pot-provider/server
 RUN ls -alR /app/bgutil-ytdlp-pot-provider
 
 ARG YTDLP_EJS_VERSION

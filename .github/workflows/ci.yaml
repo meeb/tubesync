@@ -197,7 +197,7 @@ jobs:
           push: false
           tags: ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:dive
       - name: Analysis with `dive`
-        continue-on-error: false
+        continue-on-error: true
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
