@@ -92,7 +92,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
       cut -d : -f 2- | \
       xargs -r -t apt-mark hold && \
     # We must allow these upgrades
-    apt-mark unhold libc6 libssl3t64 perl-base && \
+    apt-mark unhold libc6 libssl3t64 && \
     apt-get update && \
     # Include debian-backports.sources for manual use in a container
     _awk_prog='"Suites:" == $1 && /-security$/ { sub("security", "backports"); print; exit; }' && \
