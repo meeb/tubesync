@@ -12,7 +12,6 @@ class MediaServerError(Exception):
     '''
         Raised when a back-end error occurs.
     '''
-    pass
 
 
 class MediaServer:

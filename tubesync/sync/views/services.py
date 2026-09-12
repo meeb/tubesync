@@ -1,7 +1,6 @@
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Set
 from django.views.generic import ListView
 
 
@@ -13,10 +12,10 @@ class ServiceStatus:
     is_wanted_up: bool
     is_normally_up: bool
     is_ready: bool
-    pid: Optional[int]
-    pgid: Optional[int]
-    exit_code: Optional[int]
-    signal_name: Optional[str]
+    pid: int | None
+    pgid: int | None
+    exit_code: int | None
+    signal_name: str | None
     elapsed_seconds: int
 
 
@@ -29,7 +28,7 @@ class S6OverlayReporter:
     def __init__(self, bundle_name: str = 'user'):
         self.bundle_name = bundle_name
 
-    def _get_bundle_services(self) -> Set[str]:
+    def _get_bundle_services(self) -> set[str]:
         """Resolves the exact set of service names inside the target s6-rc bundle."""
         try:
             binary = str(self.S6_BIN_DIR / 's6-rc-db')
@@ -40,7 +39,7 @@ class S6OverlayReporter:
         else:
             return set(result.stdout.strip().split())
 
-    def list_services(self, *, all_services: bool = False) -> List[str]:
+    def list_services(self, *, all_services: bool = False) -> list[str]:
         """Finds active supervised directories, optionally filtering by the bundle."""
         services = []
 
@@ -56,7 +55,7 @@ class S6OverlayReporter:
 
         return sorted(services)
 
-    def get_service_status(self, service_name: str) -> Optional[ServiceStatus]:
+    def get_service_status(self, service_name: str) -> ServiceStatus | None:
         """Queries programmatic fields directly from s6-svstat."""
         service_path = self.SERVICE_DIR / service_name
         if not service_path.exists():
@@ -76,7 +75,7 @@ class S6OverlayReporter:
         else:
             return self._parse_tokens(service_name, result.stdout.strip().split())
 
-    def _parse_tokens(self, name: str, tokens: List[str]) -> ServiceStatus:
+    def _parse_tokens(self, name: str, tokens: list[str]) -> ServiceStatus:
         """Transforms ordered string outputs from s6-svstat -o into explicit types."""
         is_running = ('true' == tokens.__getitem__(0))
         is_wanted_up = ('true' == tokens.__getitem__(1))
@@ -108,7 +107,7 @@ class S6OverlayReporter:
             elapsed_seconds=elapsed_seconds,
         )
 
-    def get_report(self, *, all_services: bool = False) -> Dict[str, ServiceStatus]:
+    def get_report(self, *, all_services: bool = False) -> dict[str, ServiceStatus]:
         """Gathers a system status map of the target supervised services."""
         report = {}
         for name in self.list_services(all_services=all_services):
