@@ -1,18 +1,188 @@
 --- /usr/share/perl5/Debconf/DbDriver/PackageDir.pm.orig	2025-03-10 12:07:15.000000000 +0000
-+++ /usr/share/perl5/Debconf/DbDriver/PackageDir.pm	2026-09-12 13:09:18.637740142 +0000
-@@ -52,6 +52,7 @@
++++ /usr/share/perl5/Debconf/DbDriver/PackageDir.pm	2026-09-12 21:52:21.004319888 +0000
+@@ -28,44 +28,51 @@
+ }
+ 
+ 
++sub filename {
++	my $this=shift;
++	my $item=shift;
++
++	$item='' if !defined($item);
++	if ($item =~ /\.\./ || $item eq '.empty' || $item eq '.lock') {
++		$this->error("prohibited item name \"$item\"\n");
++	}
++	elsif ($item =~ m!^([^/]+)(?:/|$)!) {
++		return $1.$this->{extension};
++	}
++	else {
++		return '.empty'.$this->{extension} if $item eq '';
++		$this->error("failed parsing item name \"$item\"\n");
++	}
++}
++
++
+ sub loadfile {
+ 	my $this=shift;
+-	my $file=$this->{directory}."/".shift;
++	my $file=$this->{directory}.'/'.shift;
++	return unless -f $file;
+ 
+ 	return if $this->{_loaded}->{$file};
+-	$this->{_loaded}->{$file}=1;
+ 
+ 	debug "db $this->{name}" => "loading $file";
+-	return unless -e $file;
+ 
+ 	my $fh=IO::File->new;
+-	open($fh, "<", $file) or $this->error("$file: $!");
++	open($fh, '<', $file) or $this->error("$file: $!");
+ 	my @item = $this->{format}->read($fh);
+ 	while (@item) {
+ 		$this->cacheadd(@item);
+ 		@item = $this->{format}->read($fh);
+ 	}
+ 	close $fh;
++	$this->{_loaded}->{$file}=1;
+ }
+ 
+ 
  sub load {
  	my $this=shift;
  	my $item=shift;
-+	return if !defined($item) || $item eq "" || $item =~ /^\./;
- 	$this->loadfile($this->filename($item));
+-	$this->loadfile($this->filename($item));
+-}
+-
+-
+-sub filename {
+-	my $this=shift;
+-	my $item=shift;
+ 
+-	if ($item =~ m!^([^/]+)(?:/|$)!) {
+-		return $1.$this->{extension};
+-	}
+-	else {
+-		$this->error("failed parsing item name \"$item\"\n");
+-	}
++	my $filename=$this->filename($item);
++	$this->loadfile($filename);
  }
  
-@@ -59,6 +60,7 @@
- sub filename {
- 	my $this=shift;
- 	my $item=shift;
-+	return ".lock" if !defined($item) || $item eq "" || $item =~ /^\./;
  
- 	if ($item =~ m!^([^/]+)(?:/|$)!) {
- 		return $1.$this->{extension};
+@@ -76,11 +83,11 @@
+ 	opendir($handle, $this->{directory}) ||
+ 		$this->error("opendir: $!");
+ 
+-	while (my $file=readdir($handle)) {
++	while (my $filename=readdir($handle)) {
+ 		next if length $this->{extension} and
+-		        not $file=~m/$this->{extension}/;
+-		next unless -f $this->{directory}."/".$file;
+-		next if $file eq '.lock' || $file =~ /-old$/;
++		        not $filename=~m/$this->{extension}/;
++		my $file=$this->{directory}.'/'.$filename;
++		next if $filename =~ /^\.(empty|lock)$/ || $file =~ /-old$/;
+ 		$this->loadfile($file);
+ 	}
+ 
+@@ -93,8 +100,6 @@
+ 	my $name=shift;
+ 	my $incache=$this->Debconf::DbDriver::Cache::exists($name);
+ 	return $incache if not defined $incache or $incache;
+-	my $file=$this->{directory}.'/'.$this->filename($name);
+-	return unless -e $file;
+ 
+ 	$this->load($name);
+ 
+@@ -109,56 +114,64 @@
+ 
+ 	my (%files, %filecontents, %killfiles, %dirtyfiles);
+ 	foreach my $item (keys %{$this->{cache}}) {
+-		my $file=$this->filename($item);
+-		$files{$file}++;
++		my $filename=$this->filename($item);
++		$files{$filename}++;
+ 
+ 		if (! defined $this->{cache}->{$item}) {
+-			$killfiles{$file}++;
++			$killfiles{$filename}++;
+ 			delete $this->{cache}->{$item};
+ 		}
+ 		else {
+-			push @{$filecontents{$file}}, $item;
++			push @{$filecontents{$filename}}, $item;
+ 		}
+ 
+ 		if ($this->{dirty}->{$item}) {
+-			$dirtyfiles{$file}++;
++			$dirtyfiles{$filename}++;
+ 			$this->{dirty}->{$item}=0;
+ 		}
+ 	}
+-
+-	foreach my $file (keys %files) {
+-		if (! $filecontents{$file} && $killfiles{$file}) {
+-			debug "db $this->{name}" => "removing $file";
+-			my $filename=$this->{directory}."/".$file;
+-			unlink $filename or
+-				$this->error("unable to remove $filename: $!");
+-			if (-e $filename."-old") {
+-				unlink $filename."-old" or
+-					$this->error("unable to remove $filename-old: $!");
++
++	foreach my $filename (qw(.empty .lock)) {
++		my $file=$this->{directory}.'/'.$filename;
++		if (-f $file) {
++			$files{$filename}++;
++			$killfiles{$filename}++;
++		}
++	}
++
++	foreach my $filename (keys %files) {
++		if (! $filecontents{$filename} && $killfiles{$filename}) {
++			debug "db $this->{name}" => "removing $filename";
++			my $file=$this->{directory}.'/'.$filename;
++			unlink $file or
++				$this->error("unable to remove $file: $!");
++			if (-e $file.'-old') {
++				unlink $file.'-old' or
++					$this->error("unable to remove $file-old: $!");
+ 			}
+ 		}
+-		elsif ($dirtyfiles{$file}) {
+-			debug "db $this->{name}" => "saving $file";
+-			my $filename=$this->{directory}."/".$file;
++		elsif ($dirtyfiles{$filename}) {
++			debug "db $this->{name}" => "saving $filename";
++			my $file=$this->{directory}.'/'.$filename;
+ 
+-			sysopen(my $fh, $filename."-new",
++			sysopen(my $fh, $file.'-new',
+ 			                O_WRONLY|O_TRUNC|O_CREAT,$this->{mode}) or
+-				$this->error("could not write $filename-new: $!");
++				$this->error("could not write $file-new: $!");
+ 			$this->{format}->beginfile;
+-			foreach my $item (@{$filecontents{$file}}) {
++			foreach my $item (@{$filecontents{$filename}}) {
+ 				$this->{format}->write($fh, $this->{cache}->{$item}, $item)
+-					or $this->error("could not write $filename-new: $!");
++					or $this->error("could not write $file-new: $!");
+ 			}
+ 			$this->{format}->endfile;
+ 
+-			$fh->flush or $this->error("could not flush $filename-new: $!");
+-			$fh->sync or $this->error("could not sync $filename-new: $!");
++			$fh->flush or $this->error("could not flush $file-new: $!");
++			$fh->sync or $this->error("could not sync $file-new: $!");
+ 
+-			if (-e $filename && $this->{backup}) {
+-				rename($filename, $filename."-old") or
++			if (-f $file && $this->{backup}) {
++				rename($file, $file.'-old') or
+ 					debug "db $this->{name}" => "rename failed: $!";
+ 			}
+-			rename($filename."-new", $filename) or
++			rename($file.'-new', $file) or
+ 				$this->error("rename failed: $!");
+ 		}
+ 	}
