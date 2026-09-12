@@ -1,7 +1,11 @@
-from common.json_encoder import JSONEncoder
+from typing import ClassVar
+
 from django import db
 from django.utils.translation import gettext_lazy as _
+
+from common.json_encoder import JSONEncoder
 from ..choices import Val, MediaServerType
+from ..mediaservers import MediaServer as MediaServerBase
 
 
 class MediaServer(db.models.Model):
@@ -9,11 +13,11 @@ class MediaServer(db.models.Model):
         A remote media server, such as a Plex server.
     '''
 
-    ICONS = {
+    ICONS: ClassVar[dict[str, str]] = {
         Val(MediaServerType.JELLYFIN): '<i class="fas fa-server"></i>',
         Val(MediaServerType.PLEX): '<i class="fas fa-server"></i>',
     }
-    HANDLERS = MediaServerType.handlers_dict()
+    HANDLERS: ClassVar[dict[str, MediaServerBase]]  = MediaServerType.handlers_dict()
 
     server_type = db.models.CharField(
         _('server type'),

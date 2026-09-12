@@ -1,25 +1,27 @@
-import warnings
-from xml.etree import ElementTree
 import requests
-from django.forms import ValidationError
+import warnings
+from typing import ClassVar
 from urllib.parse import urlsplit, urlunsplit, urlencode
-from django.utils.translation import gettext_lazy as _
-from common.logger import log
+from xml.etree import ElementTree
+
 from django.conf import settings
+from django.forms import ValidationError
+from django.utils.translation import gettext_lazy as _
+
+from common.logger import log
 
 
 class MediaServerError(Exception):
-    '''
+    """
         Raised when a back-end error occurs.
-    '''
-    pass
+    """
 
 
 class MediaServer:
 
     TIMEOUT = 0
     HELP = ''
-    default_headers = {'User-Agent': 'TubeSync'}
+    default_headers: ClassVar[dict[str, str]] = {'User-Agent': 'TubeSync'}
 
     def __init__(self, mediaserver_instance):
         self.object = mediaserver_instance

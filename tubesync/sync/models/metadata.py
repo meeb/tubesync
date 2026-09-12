@@ -20,7 +20,7 @@ class Metadata(db.models.Model):
             ('media', 'site', 'key'),
             ('source', 'site', 'key', ),
         )
-        get_latest_by = ["-retrieved", "-created"]
+        get_latest_by = ("-retrieved", "-created")
 
     uuid = db.models.UUIDField(
         _('uuid'),

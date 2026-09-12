@@ -1,3 +1,4 @@
+import contextlib
 import os
 import multiprocessing
 
@@ -8,25 +9,16 @@ def get_bind():
     return f'{host}:{port}'
 
 def get_num_workers():
+    keys = ('GUNICORN_WORKERS', 'WEB_CONCURRENCY')
     # Sane max workers to allow to be spawned
-    cpu_workers = multiprocessing.cpu_count() * 2 + 1
+    cpu_workers = 1 + 2 * multiprocessing.cpu_count()
     # But default to 3
     num_workers = 3
-    try:
-        gunicorn_workers = os.getenv('GUNICORN_WORKERS')
-        web_concurrency = os.getenv('WEB_CONCURRENCY')
-        if gunicorn_workers is not None:
-            try:
-                num_workers = int(gunicorn_workers)
-            except:
-                pass
-        elif web_concurrency is not None:
-            try:
-                num_workers = int(web_concurrency)
-            except:
-                pass
-    except:
-        pass
+    for key in (k for k in keys if k in os.environ):
+        value = os.getenv(key)
+        with contextlib.suppress(ValueError):
+            num_workers = int(float(value))
+            break
     return max(1, min(num_workers, cpu_workers))
 
 

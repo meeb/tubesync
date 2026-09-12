@@ -12,6 +12,7 @@ from .mediaservers import (MediaServersView, AddMediaServerView,
                            MediaServerView, DeleteMediaServerView,
                            UpdateMediaServerView)
 
+# ruff: ignore[RUF022]
 __all__ = [
     'DashboardView',
     'SourcesView', 'SourceSyncNowView', 'ValidateSourceView', 'AddSourceView',

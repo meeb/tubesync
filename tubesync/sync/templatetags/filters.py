@@ -21,6 +21,7 @@ def sub(value, arg):
     except (ValueError, TypeError):
         try:
             return value - arg
+        # ruff: ignore[BLE001]
         except Exception:
             return ""
 
@@ -69,19 +70,23 @@ def timedelta(value, arg=None, /, *, fmt_2=None):
             prefix_days = '{days_total} days, '
         arg = prefix_years + prefix_days + arg
 
-    return arg.format(**{
-        'seconds': seconds,
-        'seconds2': fmt_2.format(seconds),
-        'minutes': minutes,
-        'minutes2': fmt_2.format(minutes),
-        'hours': hours,
-        'hours2': fmt_2.format(hours),
-        'days': days,
-        'years': years,
-        'seconds_total': seconds_total,
-        'minutes_total': minutes_total,
-        'hours_total': hours_total,
-        'days_total': days_total,
-        'years_total': years_total,
-    })
+    return arg.format(
+        seconds=seconds,
+        seconds2=fmt_2.format(seconds),
+        seconds_total=seconds_total,
+
+        minutes=minutes,
+        minutes2=fmt_2.format(minutes),
+        minutes_total=minutes_total,
+
+        hours=hours,
+        hours2=fmt_2.format(hours),
+        hours_total=hours_total,
+
+        days=days,
+        days_total=days_total,
+
+        years=years,
+        years_total=years_total,
+    )
 
