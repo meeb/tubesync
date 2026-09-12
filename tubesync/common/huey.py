@@ -14,7 +14,7 @@ from huey.exceptions import TaskLockedException
 from huey.storage import SqliteStorage as huey_SqliteStorage
 from pathlib import Path
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
-from .utils import get_usable_cpu_count
+from .utils import get_usable_cpu_count, sqlite_retry_delay
 from .yt_dlp import retry_django_db
 
 
@@ -473,6 +473,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     th.end_at = signal_dt
     th.elapsed = history['elapsed']
     th.save()
+    sqlite_retry_delay()
 
 # Registration of shared signal handlers
 

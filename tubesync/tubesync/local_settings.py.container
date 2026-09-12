@@ -13,15 +13,41 @@ if DJANGO_URL_PREFIX and STATIC_URL:
     STATIC_URL = urljoin(DJANGO_URL_PREFIX, STATIC_URL[1:])
 
 
-ALLOWED_HOSTS_STR = getenv('TUBESYNC_HOSTS', '*')
+ALLOWED_HOSTS_STR = getenv('TUBESYNC_HOSTS', '*').strip() or '*'
 ALLOWED_HOSTS = ALLOWED_HOSTS_STR.split(',')
 FORCE_SCRIPT_NAME = getenv('DJANGO_FORCE_SCRIPT_NAME', DJANGO_URL_PREFIX)
 
 
 database_dict = {}
 database_connection_env = getenv('DATABASE_CONNECTION')
+database_backend_env = getenv('TUBESYNC_DATABASE_BACKEND').strip().lower()
 if database_connection_env:
+    # An external database always wins and disables the embedded server.
     database_dict = parse_database_connection_string(database_connection_env)
+elif database_backend_env != 'sqlite':
+    # Default: the embedded PostgreSQL server, reached over its local
+    # Unix socket. The 'postgres' s6 service runs the server and
+    # 'tubesync-postgres-init' creates the data directory and database.
+    # Set TUBESYNC_DATABASE_BACKEND=sqlite to keep the legacy SQLite file.
+    database_dict = {
+        'DRIVER': 'postgresql',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': getenv('TUBESYNC_POSTGRES_DB', 'tubesync'),
+        'USER': getenv('TUBESYNC_POSTGRES_USER', 'tubesync'),
+        'PASSWORD': getenv('TUBESYNC_POSTGRES_PASSWORD'),
+        'HOST': getenv('TUBESYNC_POSTGRES_HOST', '/run/postgres'),
+        'PORT': getenv('TUBESYNC_POSTGRES_PORT'),
+        'CONN_HEALTH_CHECKS': True,
+        'CONN_MAX_AGE': 0,
+        'OPTIONS': {
+            'pool': {
+                'max_size': getenv('TUBESYNC_POSTGRES_POOL_MAX', 8, integer=True),
+                'min_size': getenv('TUBESYNC_POSTGRES_POOL_MIN', 1, integer=True),
+                'num_workers': 2,
+                'timeout': 180,
+            },
+        },
+    }
 
 
 if database_dict:
@@ -50,6 +76,10 @@ else:
                 # DO NOT change locking_mode to EXCLUSIVE!
                 # This is a foot-gun, and invalidates a behavior the code relies on.
                 # journal_mode WAL offers increased concurrency, the default is DELETE.
+                # WAL was tried here but is unsafe on Unraid appdata: if /config sits
+                # on a /mnt/user (shfs/FUSE) share, or the -wal file is lost to the
+                # mover / an appdata backup / an unclean stop, SQLite refuses the file
+                # with "file is not a database". TRUNCATE is the safe default there.
                 "init_command": """
                     PRAGMA locking_mode = NORMAL;
                     PRAGMA journal_mode = TRUNCATE;

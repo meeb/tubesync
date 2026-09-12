@@ -28,15 +28,21 @@ class Command(BaseCommand):
             raise CommandError(f'Source does not exist with '
                                f'UUID: {source_uuid}')
         # Reconfigure the source to not update the disk or media servers
-        with atomic(durable=True):
-            source.deactivate()
+        try:
+            with atomic(durable=True):
+                source.deactivate()
+        except (Source.NotUpdated, Source.DoesNotExist):
+            raise CommandError(f'Source {source_uuid} was removed by another '
+                               f'process before it could be deleted')
         # Delete the source, triggering pre-delete signals for each media item
         log.info(f'Found source with UUID "{source.uuid}" with name '
                  f'"{source.name}" and deleting it, this may take some time!')
         log.info(f'Source directory: {source.directory_path}')
         with atomic(durable=True):
-            source.delete()
+            deleted_count = source.delete()[0]
             # Update any media servers
             schedule_media_servers_update()
+        if not deleted_count:
+            log.info(f'Source {source_uuid} was already gone')
         # All done
         log.info('Done')

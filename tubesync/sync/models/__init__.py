@@ -16,10 +16,11 @@ from .source import Source
 from .media import Media
 from .metadata import Metadata
 from .metadata_format import MetadataFormat
+from .direct_download import DirectDownloadJob
 
 __all__ = [
     'get_media_file_path', 'get_media_thumb_path',
     'media_file_storage', 'MediaServer', 'Source',
-    'Media', 'Metadata', 'MetadataFormat',
+    'Media', 'Metadata', 'MetadataFormat', 'DirectDownloadJob',
 ]
 

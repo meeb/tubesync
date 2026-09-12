@@ -1,0 +1,20 @@
+#!/command/with-contenv bash
+
+# The embedded PostgreSQL server.
+#
+# When an external database is configured (DATABASE_CONNECTION) or the
+# legacy SQLite backend is requested (TUBESYNC_DATABASE_BACKEND=sqlite),
+# there is nothing to run: park the service without spinning the CPU so
+# s6 can still supervise and cleanly stop it.
+
+if [ -n "${DATABASE_CONNECTION:-}" ] || \
+   [ 'sqlite' = "$(printf -- '%s' "${TUBESYNC_DATABASE_BACKEND:-}" | tr '[:upper:]' '[:lower:]')" ]; then
+    # Nothing to supervise; wait for SIGTERM without burning CPU.
+    exec tail -f /dev/null
+fi
+
+PG_MAJOR=17
+
+exec nice -n "${TUBESYNC_NICE:-1}" s6-setuidgid app \
+    "/usr/lib/postgresql/${PG_MAJOR}/bin/postgres" \
+    -D "/config/postgres/${PG_MAJOR}/data"

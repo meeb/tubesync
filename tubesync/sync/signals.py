@@ -21,6 +21,13 @@ from .utils import delete_file
 from .filtering import filter_media
 
 
+# UUIDs (as str) of Source rows whose delete() is currently in progress.
+# media_post_delete consults this so it does not recreate "skipped media"
+# placeholder rows that point at a Source about to disappear - those would be
+# orphaned and, on PostgreSQL, fail the deferred FK check at COMMIT.
+_sources_being_deleted = set()
+
+
 @receiver(pre_save, sender=Source)
 def source_pre_save(sender, instance, **kwargs):
     source = instance # noqa: F841
@@ -144,8 +151,14 @@ def source_pre_delete(sender, instance, **kwargs):
     # Triggered before a source is deleted, delete all media objects to trigger
     # the Media models post_delete signal
     source = instance
+    _sources_being_deleted.add(str(source.pk))
     log.info(f'Deactivating source: {instance.name}')
-    instance.deactivate()
+    try:
+        instance.deactivate()
+    except (Source.NotUpdated, Source.DoesNotExist):
+        # The row was already removed (a concurrent delete, or a stale
+        # delete_all_media_for_source task). Nothing left to deactivate.
+        log.debug(f'source_pre_delete: {source.pk} already gone, skipping deactivate()')
 
     # Fetch the media source
     sqs = Source.objects.filter(filter_text=str(source.pk))
@@ -163,6 +176,11 @@ def source_pre_delete(sender, instance, **kwargs):
                 media_source.name,
             ),
         ))
+
+
+@receiver(post_delete, sender=Source)
+def source_post_delete(sender, instance, **kwargs):
+    _sources_being_deleted.discard(str(instance.pk))
 
 
 @receiver(post_save, sender=Media)
@@ -230,7 +248,6 @@ def media_post_save(sender, instance, created, **kwargs):
         media_file_exists |= instance.filepath.exists()
     except OSError as e:
         log.exception(e)
-        pass
     # If the media has not yet been downloaded schedule it to be downloaded
     if not (media_file_exists or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
@@ -283,11 +300,22 @@ def media_pre_delete(sender, instance, **kwargs):
 
 
 @receiver(post_delete, sender=Media)
-def media_post_delete(sender, instance, **kwargs):
+def media_post_delete(sender, instance, origin=None, **kwargs):
+    # Resolve the source without going through instance.source, which raises
+    # Source.DoesNotExist for an already-orphaned Media row.
+    source = None
+    if instance.source_id is not None:
+        source = Source.objects.filter(pk=instance.source_id).first()
+    source_is_going_away = (
+        source is None
+        or str(instance.source_id) in _sources_being_deleted
+        or (isinstance(origin, Source) and str(origin.pk) == str(instance.source_id))
+    )
+
     # Remove the video file, when configured to do so
     remove_files = (
-        instance.source and
-        instance.source.delete_files_on_disk and
+        source is not None and
+        source.delete_files_on_disk and
         instance.downloaded and
         instance.media_file
     )
@@ -351,6 +379,7 @@ def media_post_delete(sender, instance, **kwargs):
     #     source, key, duration, title, published
     created = False
     create_for_indexing_task = (
+        not source_is_going_away and
         not (
             #not instance.downloaded and
             instance.skip and
@@ -371,7 +400,7 @@ def media_post_delete(sender, instance, **kwargs):
         })
         skipped_media, created = Media.objects.get_or_create(
             key=instance.key,
-            source=instance.source,
+            source=source,
             defaults=dict(
                 skip=True,
                 manual_skip=True,

@@ -726,6 +726,26 @@ RUN --mount=type=tmpfs,target=/cache \
 # Bundle deno with the image
 ##COPY --from=deno /usr/local/bin/ /usr/local/bin/
 
+# Install the embedded PostgreSQL server (the default database backend).
+# Kept in its own layer, after the build-dependency cleanup above, so the
+# `apt-get autoremove --purge postgresql-common` there cannot take the
+# server packages with it. Debian 13 ("trixie") ships the 17.x series;
+# pinning the major is enough, security updates arrive within it via apt.
+# The data directory path binds this major (/config/postgres/17).
+RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+  set -x && \
+  apt-get update && \
+  apt-get -y --no-install-recommends install \
+  postgresql-17 \
+  postgresql-client-17 \
+  && \
+  /usr/lib/postgresql/17/bin/postgres --version && \
+  # No auto-created cluster: tubesync-postgres-init runs initdb into /config
+  ( pg_dropcluster --stop 17 main || true ) && \
+  apt-get -y autopurge && \
+  apt-get -y autoclean
+
 # Copy root
 COPY config/root /
 

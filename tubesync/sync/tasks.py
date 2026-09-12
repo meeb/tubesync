@@ -5,7 +5,6 @@
 
 
 import os
-import random
 import requests
 import signal
 import time
@@ -37,7 +36,8 @@ from common.errors import (
     QuerySetEmptyError,
 )
 from common.utils import (  django_queryset_generator as qs_gen,
-                            remove_enclosed, seconds_to_timestr, )
+                            remove_enclosed, seconds_to_timestr,
+                            sqlite_retry_delay, )
 from common.yt_dlp import retry_django_db
 from .choices import Val, IndexSchedule, TaskQueue
 from .models import Source, Media, MediaServer, Metadata
@@ -45,7 +45,6 @@ from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
 
 atomic = db.transaction.atomic
-db_vendor = db.connection.vendor
 register_huey_signals()
 
 
@@ -207,13 +206,7 @@ def cleanup_completed_tasks():
 def save_model(instance):
     with atomic(durable=False):
         instance.save()
-    if 'sqlite' != db_vendor:
-        return
-
-    # work around for SQLite and its many
-    # "database is locked" errors
-    arg = getattr(settings, 'SQLITE_DELAY_FLOAT', 1.5)
-    time.sleep(random.expovariate(arg))
+    sqlite_retry_delay()
 
 
 @retry_django_db(3)
@@ -1402,5 +1395,59 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
     if remove:
         log.info(f'Deleting directory for: {source_name}: {directory_path}')
         rmtree(directory_path, True)
+
+
+# --- Direct-download jobs (sync/direct_download.py) -----------------------
+
+@db_task(priority=50, queue=Val(TaskQueue.DIRECT))
+def run_direct_download_job(job_id):
+    '''
+        Run one DirectDownloadJob to completion on the dedicated `direct` queue
+        (single process worker). Long-running and self-paced; resumable from the
+        job's cursor after a restart.
+    '''
+    from .models import DirectDownloadJob
+    from . import direct_download
+    try:
+        job = DirectDownloadJob.objects.get(pk=job_id)
+    except DirectDownloadJob.DoesNotExist as e:
+        raise CancelExecution(_('no such direct-download job'), retry=False) from e
+    if job.status != Val(DirectDownloadJob.Status.RUNNING):
+        log.info(f'run_direct_download_job: {job_id} is {job.status}, nothing to do')
+        return
+    try:
+        direct_download.run_job(job)
+    except Exception:
+        log.exception(f'run_direct_download_job: {job_id} crashed')
+        DirectDownloadJob.objects.filter(pk=job_id).update(
+            status=Val(DirectDownloadJob.Status.ERROR),
+        )
+        raise
+
+
+@db_periodic_task(
+    huey_crontab(minute='*/10', strict=True),
+    priority=10,
+    expires=9*60,
+    queue=Val(TaskQueue.DB),
+)
+def resume_direct_download_jobs():
+    '''
+        Belt-and-braces: re-enqueue any job still marked running (huey's
+        on_interrupted usually handles restarts, this covers the gaps).
+        remove_duplicates keeps it a no-op while one is already queued.
+    '''
+    from .models import DirectDownloadJob
+    qs = DirectDownloadJob.objects.filter(status=Val(DirectDownloadJob.Status.RUNNING))
+    for job in qs_gen(qs):
+        TaskHistory.schedule(
+            run_direct_download_job,
+            str(job.pk),
+            delay=5,
+            expires=8*60,
+            remove_duplicates=True,
+            vn_fmt=_('Direct download job {}'),
+            vn_args=(str(job.pk),),
+        )
 
 

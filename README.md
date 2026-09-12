@@ -17,6 +17,44 @@ so media which fails to download will be retried for an extended period making i
 hopefully, quite reliable.
 
 
+# About this fork
+
+This is a fork of [`meeb/tubesync`](https://github.com/meeb/tubesync), kept close to
+upstream (its `main` is merged in regularly). It adds the following. None of it pulls in
+a new runtime Python dependency.
+
+| Area | Change |
+| --- | --- |
+| Database | An **embedded PostgreSQL 17** server is the default backend instead of SQLite, which ends the "database is locked" contention between `gunicorn` and the `huey` consumers. The data lives in `/config/postgres`. Set `TUBESYNC_DATABASE_BACKEND=sqlite` to keep the legacy `/config/db.sqlite3` file; `DATABASE_CONNECTION` still overrides both with an external server. The `huey` task queues stay on SQLite. |
+| Bulk source import | `GET` / `POST /api/sources`, `DELETE /api/sources/<uuid>` and a `manage.py import-sources` command to create, list and delete many sources in one call, for example when importing a set of playlists. Plain Django views, the same optional HTTP basic auth as the web UI, no DRF. See [`docs/bulk-importing-sources.md`](docs/bulk-importing-sources.md). |
+| Direct-download API | `GET` / `POST /api/downloads` (plus `/<uuid>` for status and stop) runs a resumable, one-video-at-a-time download of a **prepared list of video IDs** straight by watch URL — the playlist itself is never queried — with adaptive back-off when YouTube starts rate-limiting, and per-video `.info.json` patching. It runs on its own `direct` task queue and adds the `DirectDownloadJob` model (migration `0038`). Niche: built to pair with a Google Takeout playlist importer. |
+| Reliability | Wildcard `ALLOWED_HOSTS` fallback when `TUBESYNC_HOSTS` is set but empty, so a blank value no longer locks you out; deleting a source no longer leaves orphaned `Media` rows (a foreign-key violation on PostgreSQL); the SQLite lock-contention back-off is applied to two write paths that previously skipped it. SQLite WAL mode was evaluated and rejected — it is unsafe on Unraid `/mnt/user` appdata. |
+| Container image | A manual (`workflow_dispatch`) GitHub Action builds an `amd64` image and pushes it to this fork's `ghcr.io` namespace, since upstream CI only publishes images for `meeb`. |
+
+> [!IMPORTANT]
+> Existing SQLite installs: the default backend is now the embedded PostgreSQL server, so
+> swapping the image straight over comes up with an **empty database**. Set
+> `TUBESYNC_DATABASE_BACKEND=sqlite` to keep using your existing `/config/db.sqlite3`, or
+> migrate the data across first.
+
+## This fork's container image
+
+Upstream's `ghcr.io/meeb/tubesync` does **not** carry these changes. This fork's image is
+built on demand (not on a schedule) and is `linux/amd64` only:
+
+```bash
+$ docker pull ghcr.io/masterdot/tubesync:test
+```
+
+Otherwise it is used exactly like the upstream image described below.
+
+## Supporting this fork
+
+> [!NOTE]
+> The features above are maintained in my spare time. If this fork is useful to you,
+> please consider sponsoring the work: <https://github.com/sponsors/masterdot>
+
+
 # Latest container image
 
 ```yaml
@@ -178,9 +216,12 @@ Back-end updates such as database migrations should be automatic.
 # Moving, backing up, etc.
 
 TubeSync, when running in its default container, stores thumbnails, cache and its
-SQLite database into the `/config` directory and wherever you've mapped that to on your
-file system. Just copying or moving this directory and making sure the permissions are
-correct is sufficient to move, back up or migrate your TubeSync install.
+database (an embedded PostgreSQL cluster under `/config/postgres`, or the legacy
+`db.sqlite3` file when `TUBESYNC_DATABASE_BACKEND=sqlite`) into the `/config`
+directory and wherever you've mapped that to on your file system. Just copying or
+moving this directory, while the container is stopped, and making sure the
+permissions are correct is sufficient to move, back up or migrate your TubeSync
+install.
 
 
 # Using TubeSync
@@ -209,6 +250,25 @@ As media is indexed and downloaded it will appear in the "media" tab.
 
 Currently TubeSync supports Plex and Jellyfin as media servers. You can add your local Jellyfin or Plex server
 under the "media servers" tab.
+
+
+### 4. Bulk-importing sources (API + command)
+
+This fork can create many sources at once, for example when importing a set of
+playlists. Two equivalent entry points share the same validation core:
+
+| Entry point | What |
+| --- | --- |
+| `POST /api/sources` | Bulk create / upsert-by-key from a JSON body. Partial success returns `200` with a per-item `results` list. |
+| `GET /api/sources` | List sources (filters: `type`, `active`, `has_failed`, `key`, `limit`, `offset`). |
+| `DELETE /api/sources/<uuid>` | Remove one source. |
+| `docker exec -it tubesync python3 /app/manage.py import-sources <FILE\|->` | Same import from a JSON file, a line list, or stdin. `--dry-run`, `--activate` / `--no-activate`, `--defer-indexing`. |
+
+The HTTP endpoints sit behind the same optional HTTP basic auth as the rest of
+TubeSync (`HTTP_USER` / `HTTP_PASS`); with auth disabled they are open on the
+LAN, exactly like the web UI. They do not add any new dependency and DRF is not
+used. See [`docs/bulk-importing-sources.md`](docs/bulk-importing-sources.md) for
+the item schema and `curl` examples.
 
 
 # Logging and debugging
@@ -273,7 +333,14 @@ useful if you are manually installing TubeSync in some other environment. These 
 | LISTEN_PORT                  | Port number for `gunicorn` to listen on                       | 8080                                                                          |
 | HTTP_USER                    | Sets the username for HTTP basic authentication               | some-username                                                                 |
 | HTTP_PASS                    | Sets the password for HTTP basic authentication               | some-secure-password                                                          |
-| DATABASE_CONNECTION          | Optional external database connection details                 | postgresql://user:pass@host:port/database          |
+| DATABASE_CONNECTION          | Optional external database connection details (overrides the embedded server) | postgresql://user:pass@host:port/database          |
+| TUBESYNC_DATABASE_BACKEND    | `postgres` (default) runs an embedded PostgreSQL server in `/config/postgres`; `sqlite` keeps the legacy `/config/db.sqlite3` file | postgres                                          |
+| TUBESYNC_POSTGRES_DB         | Embedded PostgreSQL database name                             | tubesync                                                                      |
+| TUBESYNC_POSTGRES_USER       | Embedded PostgreSQL role                                      | tubesync                                                                      |
+| TUBESYNC_POSTGRES_PASSWORD   | Embedded PostgreSQL password (the local socket uses `trust` auth, so normally unset) |                                                       |
+| TUBESYNC_POSTGRES_HOST       | Socket directory, or host, for the database connection       | /run/postgres                                                                 |
+| TUBESYNC_POSTGRES_PORT       | Database port, when not connecting over the socket           | 5432                                                                          |
+| TUBESYNC_POSTGRES_POOL_MIN / _MAX | `psycopg` connection-pool bounds for the embedded server | 1 / 8                                                                       |
 
 
 # Manual, non-containerised, installation

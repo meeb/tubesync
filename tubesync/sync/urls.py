@@ -5,7 +5,10 @@ from .views import (DashboardView, SourcesView, ValidateSourceView, AddSourceVie
                     MediaEnableView, MediaContent, TasksView, CompletedTasksView,
                     ResetTasks, TaskScheduleView, MediaServersView, AddMediaServerView,
                     MediaServerView, DeleteMediaServerView, UpdateMediaServerView,
-                    RevokeTaskView, SourceSyncNowView, ServicesView,  )
+                    RevokeTaskView, SourceSyncNowView, ServicesView,
+                    SourceListCreateAPIView, SourceDetailAPIView,
+                    DownloadJobListCreateAPIView, DownloadJobDetailAPIView,
+                    CookiesAPIView,  )
 
 
 app_name = 'sync'
@@ -159,6 +162,38 @@ urlpatterns = [
         'tasks-reset',
         ResetTasks.as_view(),
         name='reset-tasks',
+    ),
+
+    # HTTP API URLs
+
+    path(
+        'api/sources',
+        SourceListCreateAPIView.as_view(),
+        name='api-sources',
+    ),
+
+    path(
+        'api/sources/<uuid:pk>',
+        SourceDetailAPIView.as_view(),
+        name='api-source',
+    ),
+
+    path(
+        'api/downloads',
+        DownloadJobListCreateAPIView.as_view(),
+        name='api-downloads',
+    ),
+
+    path(
+        'api/downloads/<uuid:pk>',
+        DownloadJobDetailAPIView.as_view(),
+        name='api-download',
+    ),
+
+    path(
+        'api/cookies',
+        CookiesAPIView.as_view(),
+        name='api-cookies',
     ),
 
     # Media Server URLs

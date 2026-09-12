@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Any, Dict
+from typing import Any
 from django import forms
 from django.db import connection, models
 from django.utils.translation import gettext_lazy as _
@@ -31,7 +31,7 @@ class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
     # perhaps set the 'selected' attribute too?
     # checked_attribute = {'checked': True, 'selected': True}
 
-    def get_context(self, name: str, value: Any, attrs) -> Dict[str, Any]:
+    def get_context(self, name: str, value: Any, attrs) -> dict[str, Any]:
         data = value
         select_all = False
         if isinstance(data, CommaSepChoice):
@@ -177,8 +177,8 @@ class CommaSepChoiceField(models.CharField):
         value = data.selected_choices
         s_value = super().get_prep_value(value)
         if set(s_value) != set(value):
-            self.log.warn(f'CommaSepChoiceField:get_prep_value: values did not match. '
-                          f'CommaSepChoiceField({value}) versus CharField({s_value})')
+            self.log.warning(f'CommaSepChoiceField:get_prep_value: values did not match. '
+                             f'CommaSepChoiceField({value}) versus CharField({s_value})')
         return self.__class__._tuple___str__(data)
 
     

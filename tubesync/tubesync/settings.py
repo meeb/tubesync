@@ -60,6 +60,9 @@ for queue_name in TaskQueue.values:
     queues = DJANGO_HUEY['queues']
     if TaskQueue.LIMIT.value == queue_name:
         queues[queue_name] = sqlite_tasks(queue_name, prefix='net')
+    elif TaskQueue.DIRECT.value == queue_name:
+        # single process worker, like `limited` - one direct-download job at a time
+        queues[queue_name] = sqlite_tasks(queue_name, prefix='net')
     elif TaskQueue.NET.value == queue_name:
         queues[queue_name] = sqlite_tasks(queue_name, thread=True, workers=0)
     else:

@@ -6,15 +6,30 @@ import io
 import math
 import os
 import pstats
+import random
 import string
 import time
+from django.conf import settings
 from django.core.paginator import Paginator
+from django.db import connection
 from functools import partial
 from itertools import chain
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from urllib.parse import urlunsplit, urlencode, urlparse
 from .errors import DatabaseConnectionError, QuerySetEmptyError
+
+
+def sqlite_retry_delay():
+    '''
+        After a write on SQLite, sleep for a small randomized delay to
+        reduce contention with other writers and avoid "database is
+        locked" errors. No-op on non-SQLite database backends.
+    '''
+    if 'sqlite' != connection.vendor:
+        return
+    arg = getattr(settings, 'SQLITE_DELAY_FLOAT', 1.5)
+    time.sleep(random.expovariate(arg))
 
 
 def get_usable_cpu_count() -> int:
