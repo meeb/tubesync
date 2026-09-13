@@ -66,6 +66,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_ROOT_USER_ACTION='ignore'
 
 COPY --from=tubesync-etc /etc/debconf.conf /etc/debconf.conf
+COPY --from=tubesync-etc /usr/share/perl5/Debconf/DbDriver/Copy.pm /usr/share/perl5/Debconf/DbDriver/Copy.pm
 COPY --from=tubesync-etc /usr/share/perl5/Debconf/DbDriver/PackageDir.pm /usr/share/perl5/Debconf/DbDriver/PackageDir.pm
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
