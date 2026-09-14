@@ -28,6 +28,9 @@ download_deno() {
     [[ -n "${latest_version}" ]]
 
     url="${releases_url}/download/${latest_version}/${fn}"
+    
+    download_gh_release "${owner}" "${repo}" "${fn%.zip}.sha256sum" "${latest_version}"
+    mv -v -f "${fn%.zip}.sha256sum" 'deno.sha256sum'
 
     local latest_digest='' manifest_digest='' _attempt _tmpdir="$(realpath .)"
     for _attempt in {1..10}; do
@@ -59,6 +62,7 @@ extract_deno() {
 
     command -v unzip > /dev/null || install_unzip
     unzip -u -o -d "${dest_dir}" "${fn}" && chmod -c a+rx "${dest_dir}"/deno
+    (cd "${dest_dir}" && "${HERE}/shasum.py" -a sha256 - || rm -v -rf "${dest_dir}"/deno) < './deno.sha256sum'
 }
 
 install_unzip() {
