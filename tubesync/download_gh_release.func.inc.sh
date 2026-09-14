@@ -55,5 +55,5 @@ download_gh_release() {
 
     stdout "Fetching from ${owner}/${repo}: ${filename}"
 
-    curl --progress-bar --fail --location --remote-name --remote-time --retries 5 --retry-all-errors "${dl_url}"
+    curl --progress-bar --fail --location --remote-name --remote-time --retry 5 --retry-connrefused --retry-all-errors "${dl_url}"
 }
