@@ -234,7 +234,7 @@ def media_post_save(sender, instance, created, **kwargs):
     if not (media_file_exists or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
         if instance.can_download and instance.downloaded:
-            skip_changed = True if not instance.skip else False
+            skip_changed = not instance.skip
             instance.skip = True
         downloaded = False
     if (instance.source.download_media and instance.can_download) and not (
