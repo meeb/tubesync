@@ -49,6 +49,7 @@ class S6OverlayReporter:
         bundle_services = set() if all_services else self._get_bundle_services()
 
         for entry in self.SERVICE_DIR.iterdir():
+            # ruff: ignore[SIM102]
             if entry.is_dir() and (entry / 'supervise').exists():
                 if all_services or (entry.name in bundle_services):
                     services.append(entry.name)
