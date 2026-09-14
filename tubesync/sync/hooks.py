@@ -128,7 +128,7 @@ class PPHookStatus(BaseStatus):
 def yt_dlp_progress_hook(event):
     if not ProgressHookStatus.valid_status(event['status']):
         log.warn(f'[youtube-dl] unknown progress event: {event!s}')
-        return None
+        return
 
     key = None
     if 'display_id' in event['info_dict']:
@@ -191,7 +191,7 @@ def yt_dlp_progress_hook(event):
 def yt_dlp_postprocessor_hook(event):
     if not PPHookStatus.valid_status(event['status']):
         log.warn(f'[youtube-dl] unknown postprocessor event: {event!s}')
-        return None
+        return
 
     name = key = 'Unknown'
     filename = os.path.basename(event.get('filename', '???'))

@@ -12,7 +12,6 @@ import time
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone as dt_timezone
-from typing import Optional, Tuple
 
 from ._logger import logger
 
@@ -80,10 +79,10 @@ else:
     @dataclass
     class ThreadScoreboard:
         """Tracks precision execution lifecycles and diagnostic markers for background workers."""
-        start: Tuple[float, int] = field(default_factory=lambda: (time.time(), time.monotonic_ns()))
-        alive: Optional[Tuple[float, int]] = None
-        initialized: Optional[Tuple[float, int]] = None
-        previous_start: Optional[Tuple[float, int]] = None
+        start: tuple[float, int] = field(default_factory=lambda: (time.time(), time.monotonic_ns()))
+        alive: tuple[float, int] | None = None
+        initialized: tuple[float, int] | None = None
+        previous_start: tuple[float, int] | None = None
 
 
     def _create_tcp_socket(state, ctx=None):
