@@ -180,22 +180,21 @@ def media_post_save(sender, instance, created, **kwargs):
     existing_media_thumbnail_task = get_media_thumbnail_task(str(instance.pk))
     existing_media_metadata_task = get_media_metadata_task(str(instance.pk))
     existing_media_download_task = get_media_download_task(str(instance.pk))
-    if not downloaded:
-        # the decision to download was already made if a download task exists
-        if not existing_media_download_task:
-            # Recalculate the "can_download" flag, this may
-            # need to change if the source specifications have been changed
-            if media.has_metadata:
-                if instance.get_format_str():
-                    if not instance.can_download:
-                        instance.can_download = True
-                        can_download_changed = True
-                else:
-                    if instance.can_download:
-                        instance.can_download = False
-                        can_download_changed = True
-            # Recalculate the "skip_changed" flag
-            skip_changed = filter_media(instance)
+    # the decision to download was already made if a download task exists
+    if not (downloaded or existing_media_download_task):
+        # Recalculate the "can_download" flag, this may
+        # need to change if the source specifications have been changed
+        if media.has_metadata:
+            if instance.get_format_str():
+                if not instance.can_download:
+                    instance.can_download = True
+                    can_download_changed = True
+            else:
+                if instance.can_download:
+                    instance.can_download = False
+                    can_download_changed = True
+        # Recalculate the "skip_changed" flag
+        skip_changed = filter_media(instance)
 
     # If the media is missing metadata schedule it to be downloaded
     if not (media.skip or media.has_metadata or existing_media_metadata_task):
