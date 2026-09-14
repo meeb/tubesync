@@ -70,8 +70,8 @@ download_tailwindcss() {
         if [[ -z "${manifest_digest}" ]]; then
             manifest_digest="$(./asfald-latest --get-hash -- "${releases_url}/download/${latest_version}/sha256sums.txt" || :)"
         fi
-        if ! TMPDIR="${_tmpdir}" ./asfald-latest --verbose -- "${url}"; then
-            if ! TMPDIR="${_tmpdir}" ./asfald -o "${fn}" -w -p '${path}/sha256sums.txt' -- "${url}"; then
+        if ! TMPDIR="${_tmpdir}" ./asfald-latest --quiet --verbose -- "${url}"; then
+            if ! TMPDIR="${_tmpdir}" ./asfald -q -w -o "${fn}" -p '${path}/sha256sums.txt' -- "${url}"; then
                 download_gh_release "${owner}" "${repo}" "${fn}" "${latest_version}"
             fi
         fi
@@ -81,8 +81,8 @@ download_tailwindcss() {
     [[ -z "${manifest_digest}" ]] || verify_digest "${manifest_digest}" 'sha256sums.txt' || return 1
     [[ -z "${latest_digest}" ]] || verify_digest "${latest_digest}" "${fn}" || return 1
     "${HERE}/shasum.py" -a sha256 './sha256sums.txt' && \
-        mv -v "${fn}" tailwindcss && \
-        chmod -v a+rx tailwindcss
+        chmod 'a+rx' "${fn}" && \
+        mv -v "${fn}" 'tailwindcss'
 }
 
 get_tailwindcss_version() {

@@ -40,8 +40,8 @@ download_deno() {
         if [[ -z "${manifest_digest}" ]]; then
             manifest_digest="$(./asfald-latest --get-hash -- "${url}.sha256sum" || :)"
         fi
-        if ! TMPDIR="${_tmpdir}" ./asfald-latest --verbose -- "${url}"; then
-            if ! TMPDIR="${_tmpdir}" ./asfald -o "${fn}" -w -p '${fullpath}.sha256sum' -- "${url}"; then
+        if ! TMPDIR="${_tmpdir}" ./asfald-latest --quiet --verbose -- "${url}"; then
+            if ! TMPDIR="${_tmpdir}" ./asfald -q -w -o "${fn}" -p '${fullpath}.sha256sum' -- "${url}"; then
                 download_gh_release "${owner}" "${repo}" "${fn}" "${latest_version}"
             fi
         fi
