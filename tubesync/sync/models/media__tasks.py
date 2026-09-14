@@ -232,7 +232,7 @@ def wait_for_premiere(self):
     else:
         in_hours = hours(self.published - now)
         self.manual_skip = True
-        self.title = _(f'Premieres in {in_hours} hours')
+        self.title = _('Premieres in %d hours') % in_hours
 
     return (True, in_hours,)
 
