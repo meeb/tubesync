@@ -17,18 +17,39 @@ download_deno() {
     local releases_url="https://github.com/${owner}/${repo}/releases"
     local url="${releases_url}/latest/download/${fn}"
 
-    test -n "${fn}"
-    rm -v -f "./${fn}"* # this should never do anything
+    [[ -n "${fn}" ]]
 
-    download_gh_release "${owner}" "${repo}" "${fn}" 'latest'
+    # this should never do anything
+    rm -v -f "./${fn}"*
+
+    # fetch the much smaller manifest first
+    download_gh_release "${owner}" "${repo}" "${fn}.sha256sum" 'latest'
     local latest_version="${resolved_version}"
-    test -n "${latest_version}"
+    [[ -n "${latest_version}" ]]
 
     url="${releases_url}/download/${latest_version}/${fn}"
-    local latest_digest="$(./asfald-latest --get-hash "${url}")"
-    verify_digest "${latest_digest}" "${fn}" || return 1
 
-    download_gh_release "${owner}" "${repo}" "${fn}.sha256sum" "${latest_version}"
+    download_gh_release "${owner}" "${repo}" "${fn%.zip}.sha256sum" "${latest_version}"
+    mv -v -f "${fn%.zip}.sha256sum" 'deno.sha256sum'
+
+    local latest_digest='' manifest_digest='' _attempt _tmpdir="$(realpath .)"
+    for _attempt in {1..10}; do
+        if [[ -z "${latest_digest}" ]]; then
+            latest_digest="$(./asfald-latest --get-hash -- "${url}" || :)"
+        fi
+        if [[ -z "${manifest_digest}" ]]; then
+            manifest_digest="$(./asfald-latest --get-hash -- "${url}.sha256sum" || :)"
+        fi
+        if ! TMPDIR="${_tmpdir}" ./asfald-latest --quiet --verbose -- "${url}"; then
+            if ! TMPDIR="${_tmpdir}" ./asfald -q -w -o "${fn}" -p '${fullpath}.sha256sum' -- "${url}"; then
+                download_gh_release "${owner}" "${repo}" "${fn}" "${latest_version}"
+            fi
+        fi
+        if [[ -s "./${fn}" ]]; then break; else sleep "${_attempt}"; fi
+    done
+
+    [[ -z "${manifest_digest}" ]] || verify_digest "${manifest_digest}" "${fn}.sha256sum" || return 1
+    [[ -z "${latest_digest}" ]] || verify_digest "${latest_digest}" "${fn}" || return 1
     "${HERE}/shasum.py" -a sha256 "./${fn}.sha256sum"
 }
 
@@ -41,6 +62,7 @@ extract_deno() {
 
     command -v unzip > /dev/null || install_unzip
     unzip -u -o -d "${dest_dir}" "${fn}" && chmod -c a+rx "${dest_dir}"/deno
+    (cd "${dest_dir}" && "${HERE}/shasum.py" -a sha256 - || rm -v -rf "${dest_dir}"/deno) < './deno.sha256sum'
 }
 
 install_unzip() {
@@ -66,8 +88,11 @@ trap '_cleanup' EXIT
 cd "${work_dir}"
 
 if [ '--only-record-version' != "${1-unset}" ]; then
-    download_asfald
-    download_asfald latest
+    for _attempt in {1..5}; do
+        [[ -x ./asfald ]] || download_asfald
+        download_asfald latest && break
+        sleep "${_attempt}"
+    done; unset -v _attempt ;
 
     download_deno "${deno_archive}"
     extract_deno "${deno_archive}" '/usr/local/bin'
