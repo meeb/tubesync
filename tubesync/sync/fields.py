@@ -86,6 +86,7 @@ class CommaSepChoiceField(models.CharField):
             r = value.replace('CommaSepChoice(', 'dict(', 1)
             try:
                 o = eval(r)
+            # ruff: ignore[BLE001,S110]
             except Exception:
                 pass
             else:
