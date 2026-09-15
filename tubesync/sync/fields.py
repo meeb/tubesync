@@ -76,7 +76,7 @@ class CommaSepChoiceField(models.CharField):
     # Override these functions to prevent unwanted behaviors
     def to_python(self, value):
         saved_value = None
-        arg_was_none = True if value is None else False
+        arg_was_none = value is None
         if isinstance(value, CommaSepChoice):
             return value.selected_choices
         if isinstance(value, list) and len(value) > 0 and value[0].startswith('CommaSepChoice('):
