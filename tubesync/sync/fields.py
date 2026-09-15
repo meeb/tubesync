@@ -52,18 +52,18 @@ class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
 
 # this is a database field!
 class CommaSepChoiceField(models.CharField):
-    '''
-    Implements comma-separated storage of lists
-    '''
+    """
+        Implements comma-separated storage of lists
+    """
 
     form_class = forms.MultipleChoiceField
     widget = CustomCheckboxSelectMultiple
     from common.logger import log
 
-    def __init__(self, *args, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, **kwargs):
+    def __init__(self, *args, separator=',', possible_choices=(('',''),), all_choice='', all_label='All', allow_all=False, **kwargs):
         kwargs.setdefault('max_length', 128)
         self.separator = str(separator)
-        self.possible_choices = possible_choices or kwargs.get('choices')
+        self.possible_choices = kwargs.get('choices') if possible_choices is None else possible_choices
         self.selected_choices = list()
         self.allow_all = allow_all
         self.all_label = all_label
@@ -146,9 +146,10 @@ class CommaSepChoiceField(models.CharField):
         # })
 
     def from_db_value(self, value, expression, connection):
-        '''
-        Create a data structure to be used in Python code.
-        '''
+        """
+            Create a data structure to be used in Python code.
+        """
+
         # possibly not useful?
         if isinstance(value, CommaSepChoice):
             value = value.selected_choices
@@ -163,9 +164,10 @@ class CommaSepChoiceField(models.CharField):
         return CommaSepChoice(**args_dict)
 
     def get_prep_value(self, value):
-        '''
-        Create a value to be stored in the database.
-        '''
+        """
+            Create a value to be stored in the database.
+        """
+
         data = value
         if not isinstance(data, CommaSepChoice):
             # The data was lost; we can regenerate it.
@@ -182,7 +184,7 @@ class CommaSepChoiceField(models.CharField):
                              f'CommaSepChoiceField({value}) versus CharField({s_value})')
         return self.__class__._tuple___str__(data)
 
-    
+
     # extra functions not used by any parent classes
     @staticmethod
     def _tuple___str__(data):
