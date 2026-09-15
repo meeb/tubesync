@@ -1,14 +1,16 @@
+from typing import ClassVar
+
+from django.forms import Form, ValidationError
 from django.http import Http404
 from django.views.generic import ListView, DetailView
 from django.views.generic.edit import FormView, FormMixin, DeleteView
 from django.views.generic.detail import SingleObjectMixin
 from django.urls import reverse_lazy
 from django.db import IntegrityError
-from django.forms import ValidationError
 from django.utils.translation import gettext_lazy as _
+
 from common.utils import append_uri_params
 from ..models import MediaServer
-from django import forms
 from ..choices import MediaServerType
 
 
@@ -20,7 +22,7 @@ class MediaServersView(ListView):
     template_name = 'sync/mediaservers.html'
     context_object_name = 'mediaservers'
     types_object = MediaServerType
-    messages = {
+    messages: ClassVar[dict[str, str]] = {
         'deleted': _('Your selected media server has been deleted.'),
     }
 
@@ -50,9 +52,9 @@ class AddMediaServerView(FormView):
     '''
 
     template_name = 'sync/mediaserver-add.html'
-    server_types = MediaServerType.long_types()
-    server_type_names = dict(MediaServerType.choices)
-    forms = MediaServerType.forms_dict()
+    server_types: ClassVar[dict[str, str]] = MediaServerType.long_types()
+    server_type_names: ClassVar[dict[str, str]] = dict(MediaServerType.choices)
+    forms: ClassVar[dict[str, Form]] = MediaServerType.forms_dict()
 
     def __init__(self, *args, **kwargs):
         self.server_type = None
@@ -127,7 +129,7 @@ class MediaServerView(DetailView):
     template_name = 'sync/mediaserver.html'
     model = MediaServer
     private_options = ('token',)
-    messages = {
+    messages: ClassVar[dict[str, str]] = {
         'created': _('Your media server has been successfully added'),
     }
 
@@ -154,7 +156,7 @@ class DeleteMediaServerView(DeleteView, FormMixin):
 
     template_name = 'sync/mediaserver-delete.html'
     model = MediaServer
-    form_class = forms.Form
+    form_class = Form
     context_object_name = 'mediaserver'
 
     def get_success_url(self):
@@ -170,7 +172,7 @@ class UpdateMediaServerView(FormView, SingleObjectMixin):
 
     template_name = 'sync/mediaserver-update.html'
     model = MediaServer
-    forms = MediaServerType.forms_dict()
+    forms: ClassVar[dict[str, Form]] = MediaServerType.forms_dict()
 
     def __init__(self, *args, **kwargs):
         self.object = None

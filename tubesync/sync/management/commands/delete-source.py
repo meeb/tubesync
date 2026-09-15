@@ -12,15 +12,15 @@ class Command(BaseCommand):
     help = 'Deletes a source by UUID'
 
     def add_arguments(self, parser):
-        parser.add_argument('--source', action='store', required=True, help=_('Source UUID'))
+        parser.add_argument('--source', action='store', required=True, type=str, help=_('Source UUID'))
 
     def handle(self, *args, **options):
-        source_uuid_str = options.get('source', '')
         try:
-            source_uuid = uuid.UUID(source_uuid_str)
-        except Exception as e:
+            source_uuid = uuid.UUID(hex=options.get('source'))
+        except (TypeError, ValueError) as e:
             raise CommandError(f'Failed to parse source UUID: {e}')
-        log.info(f'Deleting source with UUID: {source_uuid}')
+        else:
+            log.info(f'Deleting source with UUID: {source_uuid}')
         # Fetch the source by UUID
         try:
             source = Source.objects.get(uuid=source_uuid)

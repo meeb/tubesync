@@ -29,10 +29,12 @@ app_logger.addHandler(default_handler)
 app_logger.addHandler(hat_syslog_tcp_handler)
 
 if (
+# ruff: disable[SIM118]
     hasattr(settings, 'DATABASES') and
     'default' in settings.DATABASES.keys() and
     '_msgs' in settings.DATABASES.get('default', dict()).keys() and
     ( _msgs := settings.DATABASES.get('default', dict()).pop('_msgs', False) )
+# ruff: enable[SIM118]
 ):
     for _spec in _msgs:
         try:

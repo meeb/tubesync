@@ -1,4 +1,4 @@
-import os.path
+from pathlib import Path
 from django.conf import settings
 from django.test import TestCase, Client
 from .testutils import prevent_request_warnings
@@ -44,25 +44,28 @@ class CommonStaticTestCase(TestCase):
         self.assertEqual(response.content.decode(), settings.ROBOTS)
 
     def test_favicon(self):
+        # save the separator
+        root = Path(settings.STATIC_ROOT)
+        if hasattr(root, 'parser'):
+            root_sep = root.parser.sep
+        elif (m := getattr(root, '_flavour', None)):
+            root_sep = m.sep
+
         # /favicon.ico should be a redirect to the real icon somewhere in STATIC_FILES
         response = self.client.get('/favicon.ico')
         self.assertEqual(response.status_code, 302)
         # Given tests run with DEBUG=False calls to files in /static/ will fail, check
         # the file exists on disk in common/static/ manually
-        root = settings.STATIC_ROOT
-        root_parts = str(root).split(os.sep)
-        url = response.url
-        if url.startswith('/'):
-            url = url[1:]
-        url_parts = url.split(os.sep)
-        if url_parts[0] == root_parts[-1]:
-            del root_parts[-1]
+        url_sep = '/'
+        url = response.url.removeprefix(url_sep)
+        url_parts = url.split(url_sep)
+        if url_parts[0] == root.name:
             del url_parts[0]
-        root_parts.append('common')
-        root_parts.append('static')
-        favicon_real_path = os.path.join(os.sep.join(root_parts),
-                                         os.sep.join(url_parts))
-        self.assertTrue(os.path.exists(favicon_real_path))
+            root = root.parent
+        root /= 'common'
+        root /= 'static'
+        favicon_real_path = root.joinpath(root_sep.join(url_parts))
+        self.assertTrue(favicon_real_path.exists())
 
 
 class UtilsTestCase(TestCase):

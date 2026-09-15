@@ -13,7 +13,7 @@ class Command(BaseCommand):
 
     help = ('Scans download media directories for media not yet downloaded and '
             'marks them as downloaded')
-    extra_extensions = ['mp3', 'mp4', 'avi']
+    extra_extensions = ('mp3', 'mp4', 'avi')
 
     def handle(self, *args, **options):
         log.info('Building directory to Source map...')
@@ -21,7 +21,9 @@ class Command(BaseCommand):
         for s in Source.objects.all():
             dirmap[str(s.directory_path)] = s
         log.info('Scanning sources...')
-        file_extensions = list(FileExtension.values) + self.extra_extensions
+        file_extensions = set().union(
+            FileExtension.values, self.extra_extensions,
+        )
         for sourceroot, source in dirmap.items():
             media = list(Media.objects.filter(source=source, downloaded=False,
                                               skip=False))
@@ -35,11 +37,10 @@ class Command(BaseCommand):
             for (root, dirs, files) in os.walk(sourceroot):
                 rootpath = Path(root)
                 for filename in files:
+                    # filepart never used
+                    # ruff: ignore[RUF059]
                     filepart, ext = os.path.splitext(filename)
-                    if ext.startswith('.'):
-                        ext = ext[1:]
-                    ext = ext.strip().lower()
-                    if ext not in file_extensions:
+                    if ext.removeprefix('.').strip().lower() not in file_extensions:
                         continue
                     filepath = Path(rootpath / filename).resolve(strict=True)
                     on_disk.append(str(filepath))
@@ -65,7 +66,6 @@ class Command(BaseCommand):
                         item.ingest_metadata(json_dict)
                     except:
                         log.exception(f'could not import: {info_json}')
-                        pass
                     else:
                         epoch = item.get_metadata_first_value('epoch', arg_dict=json_dict) or None
                         if epoch:

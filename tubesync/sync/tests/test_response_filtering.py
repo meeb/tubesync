@@ -66,6 +66,7 @@ class ResponseFilteringTestCase(TestCase):
 
         url_keys = []
         for format in unfiltered['formats']:
+            # ruff: ignore[SIM118]
             for key in format.keys():
                 if 'url' in key:
                     url_keys.append((format['format_id'], key, format[key],))
@@ -74,6 +75,7 @@ class ResponseFilteringTestCase(TestCase):
 
         url_keys = []
         for format in filtered['formats']:
+            # ruff: ignore[SIM118]
             for key in format.keys():
                 if 'url' in key:
                     url_keys.append((format['format_id'], key, format[key],))
@@ -83,6 +85,7 @@ class ResponseFilteringTestCase(TestCase):
         url_keys = []
         for lang_code, captions in filtered['automatic_captions'].items():
             for caption in captions:
+                # ruff: ignore[SIM118]
                 for key in caption.keys():
                     if 'url' in key:
                         url_keys.append((lang_code, caption['ext'], caption[key],))

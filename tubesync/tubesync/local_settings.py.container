@@ -37,6 +37,89 @@ if database_dict:
     DATABASE_CONNECTION_STR = (f'{database_dict["DRIVER"]} at "{database_dict["HOST"]}:'
                                f'{database_dict["PORT"]}" database '
                                f'"{database_dict["NAME"]}"')
+
+    # previously this was in dbutils.py
+    if 'mysql' == database_dict['DRIVER']:
+        def patch_ensure_connection():
+            import importlib
+            from django.conf import settings
+            from django.db import DatabaseError
+
+            for config in settings.DATABASES.values():
+                db_engine = config['ENGINE']
+
+                # Only patch for MariaDB/MySQL
+                if 'django.db.backends.mysql' != db_engine:
+                    continue
+
+                module = importlib.import_module(f'{db_engine}.base')
+
+                def ensure_connection(self):
+                    exc = None
+                    with self.wrap_database_errors:
+                        connected = self.connection is not None
+                        fresh_connection = getattr(self, '_do_not_close_fresh_connections', False)
+                        in_transaction = self.in_atomic_block
+
+                        if connected and not (fresh_connection or in_transaction):
+                            # this exact ordering is required
+                            self._do_not_close_fresh_connections = True
+                            try:
+                                with self.wrap_database_errors:
+                                    if not self.connection.open:
+                                        self.close()
+                                    self.close_if_unusable_or_obsolete()
+                                    self.close_if_health_check_failed()
+                            except DatabaseError as e:
+                                exc = e
+                        if hasattr(self, '_do_not_close_fresh_connections'):
+                            del self._do_not_close_fresh_connections
+
+                        check_connection = (
+                            # started out as connected
+                            connected and
+
+                            # remains connected
+                            self.connection is not None and
+
+                            # was already configured
+                            not fresh_connection and
+
+                            # outside of a transaction
+                            not in_transaction and
+
+                            # health checks are not enabled
+                            not (self.health_check_enabled and self.health_check_done)
+                        )
+                        if check_connection:
+                            try:
+                                with self.wrap_database_errors:
+                                    # use the backend support
+                                    if not self.is_usable():
+                                        raise DatabaseError('connection is not usable')
+                                    self.health_check_done = True
+
+                                    # try an actual query
+                                    self.validate_thread_sharing()
+                                    raw_cursor = self.create_cursor()
+                                    with self.make_cursor(raw_cursor) as cursor:
+                                        cursor.execute('SELECT 1;')
+                            except DatabaseError:
+                                self.close()
+
+                    if connected and self.connection is None:
+                        self._do_not_close_fresh_connections = True
+                        if in_transaction:
+                            msg = 'The database connection was lost inside an atomic transaction'
+                            exc = exc or DatabaseError(msg)
+
+                    if exc is not None:
+                        raise exc
+
+                    super(module.DatabaseWrapper, self).ensure_connection()
+
+                module.DatabaseWrapper.ensure_connection = ensure_connection
+
 else:
     DATABASES = {
         'default': {

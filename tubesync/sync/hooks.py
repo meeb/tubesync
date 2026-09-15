@@ -1,5 +1,7 @@
 import os
 
+from typing import ClassVar
+
 from common.logger import log
 from common.utils import remove_enclosed
 from sync.utils import filter_response
@@ -15,8 +17,8 @@ postprocessor_hook = {
 
 
 class BaseStatus:
-    status_dict = dict()
-    valid = set()
+    status_dict: ClassVar[dict[str, object]] = dict()
+    valid = frozenset()
 
     @classmethod
     def get(cls, key):
@@ -125,8 +127,8 @@ class PPHookStatus(BaseStatus):
 
 def yt_dlp_progress_hook(event):
     if not ProgressHookStatus.valid_status(event['status']):
-        log.warn(f'[youtube-dl] unknown progress event: {str(event)}')
-        return None
+        log.warning(f'[youtube-dl] unknown progress event: {event!s}')
+        return
 
     key = None
     if 'display_id' in event['info_dict']:
@@ -188,8 +190,8 @@ def yt_dlp_progress_hook(event):
 
 def yt_dlp_postprocessor_hook(event):
     if not PPHookStatus.valid_status(event['status']):
-        log.warn(f'[youtube-dl] unknown postprocessor event: {str(event)}')
-        return None
+        log.warning(f'[youtube-dl] unknown postprocessor event: {event!s}')
+        return
 
     name = key = 'Unknown'
     filename = os.path.basename(event.get('filename', '???'))

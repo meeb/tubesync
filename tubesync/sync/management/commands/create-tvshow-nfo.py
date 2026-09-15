@@ -46,7 +46,7 @@ class Command(BaseCommand):
         try:
             key = validYoutubeID(key)
         except ValueError as e:
-            raise CommandError(_(f'not a valid YouTube ID: {key=}')) from e
+            raise CommandError(_('not a valid YouTube ID:') + f' {key=}') from e
         try:
             if channel_id is not None:
                 channel_id = validYoutubeID(channel_id)
@@ -57,7 +57,7 @@ class Command(BaseCommand):
         try:
             source = Source.objects.get(key=key)
         except Source.DoesNotExist as e:
-            raise CommandError(_(f'no such source for: {key=}')) from e
+            raise CommandError(_('no such source for:') + f' {key=}') from e
         else:
             if not source.write_nfo:
                 log.warning(

@@ -69,12 +69,11 @@ def download_checklist(self, skip_checks=False):
         return False
     max_cap_age = media.source.download_cap_date
     published = media.published
-    if max_cap_age and published:
-        if published <= max_cap_age:
-            log.warn(f'Download task triggered media: {media} (UUID: {media.pk}) but '
-                     f'the source has a download cap and the media is now too old, '
-                     f'not downloading')
-            return False
+    if max_cap_age and published and published <= max_cap_age:
+        log.warn(f'Download task triggered media: {media} (UUID: {media.pk}) but '
+                 f'the source has a download cap and the media is now too old, '
+                 f'not downloading')
+        return False
     return True
 
 
@@ -192,27 +191,27 @@ def refresh_formats(self):
 
     # select and save our best thumbnail url
     try:
-        thumbnail = [ thumb.get('url') for thumb in multi_key_sort(
+        thumbnail = next(thumb.get('url') for thumb in multi_key_sort(
             thumbnails,
             [('preference', True,)],
-        ) if thumb.get('url', '').endswith('.jpg') ][0]
-    except IndexError:
+        ) if thumb.get('url', '').endswith('.jpg'))
+    except StopIteration:
         pass
     else:
         field = self.get_metadata_field('thumbnail')
         self.save_to_metadata(field, thumbnail)
         fmt_dict['j'] = ', and '
-        fmt_dict['s'] = '; '
         fmt_dict['t'] = 'thumbnail' + fmt_dict['j'] + fmt_dict['t']
-        fmt_dict['j'] = ', '
+        fmt_dict['j'] = ''
+        fmt_dict['s'] = '; '
 
     field = self.get_metadata_field('formats')
     self.save_to_metadata(field, response.get(field, []))
     self.save_to_metadata(refreshed_key, response.get('epoch', formats_seconds))
     if data.get('availability', 'public') != response.get('availability', 'public'):
         self.save_to_metadata('availability', response.get('availability', 'public'))
-        fmt_dict['a'] = 'availability'
         fmt_dict['j'] = ', and ' if 'thumbnails' == fmt_dict['t'] else ', '
+        fmt_dict['a'] = 'availability'
         fmt_dict['s'] = '; '
     return (True, False, 'updated formats{s}{a}{j}{t}'.format(**{k:fmt_dict[k] for k in 'sajt'}))
 
@@ -232,7 +231,7 @@ def wait_for_premiere(self):
     else:
         in_hours = hours(self.published - now)
         self.manual_skip = True
-        self.title = _(f'Premieres in {in_hours} hours')
+        self.title = _('Premieres in %d hours') % in_hours
 
     return (True, in_hours,)
 

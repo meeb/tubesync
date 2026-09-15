@@ -15,7 +15,7 @@ class MetadataFormat(db.models.Model):
         unique_together = (
             ('metadata', 'site', 'key', 'number'),
         )
-        ordering = ['site', 'key', 'number']
+        ordering = ('site', 'key', 'number')
 
     uuid = db.models.UUIDField(
         _('uuid'),

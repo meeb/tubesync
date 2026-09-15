@@ -1,5 +1,8 @@
 import pathlib
+from typing import ClassVar
+
 from django.conf import settings
+from django.forms import Form, ValidationError
 from django.http import HttpResponseNotFound, HttpResponseRedirect
 from django.views import View
 from django.views.generic import ListView, DetailView
@@ -8,11 +11,11 @@ from django.core.exceptions import SuspiciousFileOperation
 from django.urls import reverse_lazy
 from django.db.models import Count, When, Case
 from django.db.models.functions import Lower
-from django.forms import Form, ValidationError
 from django.utils.text import slugify
 from django.utils._os import safe_join
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
 from common.models import TaskHistory
 from common.utils import append_uri_params, mkdir_p
 from ..models import Source, Media
@@ -33,7 +36,7 @@ class SourcesView(ListView):
     template_name = 'sync/sources.html'
     context_object_name = 'sources'
     paginate_by = settings.SOURCES_PER_PAGE
-    messages = {
+    messages: ClassVar[dict[str, str]] = {
         'source-deleted': _('Your selected source has been deleted.'),
         'source-refreshed': _('The source has been scheduled to be synced now.')
     }
@@ -95,12 +98,12 @@ class ValidateSourceView(FormView):
 
     template_name = 'sync/source-validate.html'
     form_class = ValidateSourceForm
-    errors = {
+    errors: ClassVar[dict[str, str]] = {
         'invalid_url': _('That URL does not match any supported formats.'),
     }
     source_types = youtube_long_source_types
     validation_urls = youtube_validation_urls
-    prepopulate_fields = {
+    prepopulate_fields: ClassVar[dict[str, tuple[str, ...]]] = {
         Val(YouTube_SourceType.CHANNEL): ('source_type', 'key', 'name', 'directory'),
         Val(YouTube_SourceType.CHANNEL_ID): ('source_type', 'key'),
         Val(YouTube_SourceType.PLAYLIST): ('source_type', 'key'),
@@ -172,7 +175,7 @@ class ValidateSourceView(FormView):
 class EditSourceMixin:
     model = Source
     form_class = SourceForm
-    errors = {
+    errors: ClassVar[dict[str, str]] = {
         'invalid_media_format': _('Invalid media format, the media format contains '
                                   'errors or is empty. Check the table at the end of '
                                   'this page for valid media name variables'),
@@ -264,7 +267,7 @@ class SourceView(DetailView):
 
     template_name = 'sync/source.html'
     model = Source
-    messages = {
+    messages: ClassVar[dict[str, str]] = {
         'source-created': _('Your new source has been created. If you have added a '
                             'very large source such as a channel with hundreds of '
                             'videos it can take several minutes or up to an hour '
@@ -286,8 +289,7 @@ class SourceView(DetailView):
         data['message'] = self.message
         data['errors'] = []
         for error in get_source_completed_tasks(self.object.pk, only_errors=True):
-            error_message = get_error_message(error)
-            setattr(error, 'error_message', error_message)
+            error.error_message = get_error_message(error)
             data['errors'].append(error)
         data['media'] = Media.objects.filter(source=self.object).order_by('-published').defer('metadata')
         return data
