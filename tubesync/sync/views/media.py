@@ -200,6 +200,7 @@ class MediaItemView(DetailView):
         data['combined_format_dict'] = {'id': str(combined_format)}
         data['audio_format_dict'] = {'id': str(audio_format)}
         data['video_format_dict'] = {'id': str(video_format)}
+        # ruff: ignore[SIM118]
         context_keys = { k for k in data.keys() if k.endswith('_format_dict') }
         for fmt in self.object.iter_formats():
             for k in context_keys:
