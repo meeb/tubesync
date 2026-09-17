@@ -1006,6 +1006,7 @@ async function verifySignature(
 ): Promise<void> {
   const sqv = await findCommand(["sqv"]);
   if (sqv) {
+    console.log(`Verifying with: ${sqv}`);
     await verifyWithSqv(
       sqv,
       keyPath,
@@ -1018,6 +1019,7 @@ async function verifySignature(
 
   const sq = await findCommand(["sq"]);
   if (sq) {
+    console.log(`Verifying with: ${sq}`);
     await verifyWithSq(
       sq,
       keyPath,
@@ -1041,6 +1043,7 @@ async function verifySignature(
     fail("Neither sq nor a working gpg executable was found");
   }
 
+  console.log(`Verifying with: ${gpg}`);
   await verifyWithGpg(
     gpg,
     gpgHome,
@@ -1085,6 +1088,7 @@ async function verifyAllManifests(
 
     const signaturePath = join(work, signatureAsset.name);
 
+    console.log(`Downloading: ${signatureAsset.browser_download_url}`);
     await download(
       signatureAsset.browser_download_url,
       signaturePath,
@@ -1128,6 +1132,7 @@ async function verifyAllManifests(
 
     const messagePath = join(work, messageAsset.name);
 
+    console.log(`Downloading: ${messageAsset.browser_download_url}`);
     await download(
       messageAsset.browser_download_url,
       messagePath,
@@ -1393,6 +1398,7 @@ async function main(): Promise<void> {
       ? `https://api.github.com/repos/${OWNER}/${REPOSITORY}/releases/latest`
       : `https://api.github.com/repos/${OWNER}/${REPOSITORY}/releases/tags/${encodeURIComponent(parsed.release)}`;
 
+  console.log(`Requesting ${releaseUrl}...`);
   const release = await githubJson<Release>(releaseUrl);
 
   if (release.draft) {
@@ -1438,9 +1444,11 @@ async function main(): Promise<void> {
      * optional and is appended only as an additional certificate source.
      * The verifier still requires TRUSTED_FINGERPRINT.
      */
+    console.log(`Writing embedded public key to: ${keyPath}`);
     await writeEmbeddedKey(keyPath);
 
     try {
+      console.log(`Requesting ${KEY_URL}...`);
       await download(
         KEY_URL,
         downloadedKeyPath,
@@ -1459,14 +1467,17 @@ async function main(): Promise<void> {
       );
     }
 
+    console.log(`Downloading: ${archive.browser_download_url}`);
     const archiveHashes = await download(
       archive.browser_download_url,
       archivePath,
       MAX_ARCHIVE_BYTES,
     );
 
+    console.log("Validating API digest...");
     validateApiDigest(archive, archiveHashes);
 
+    console.log("Verifying manifests...");
     await verifyAllManifests(
       release,
       work,
@@ -1476,6 +1487,7 @@ async function main(): Promise<void> {
     );
 
     if (parsed.installDir) {
+      console.log(`Installing into: ${parsed.installDir}`);
       const installedPath = await installBinary(
         archivePath,
         resolve(parsed.installDir),
@@ -1483,6 +1495,7 @@ async function main(): Promise<void> {
 
       const algorithms = ["sha256", "sha512"] as const;
 
+      console.log(`Calculating hashes for: ${installedPath}`);
       const entries = await Promise.all(
         algorithms.map(async (algorithm) => [
           algorithm,
