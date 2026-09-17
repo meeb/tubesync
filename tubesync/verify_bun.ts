@@ -378,9 +378,8 @@ async function runUnzipWithSupervisor(
   const stdoutPromise = new Response(child.stdout).text();
   const stderrPromise = new Response(child.stderr).text();
 
-  const supervisorExitCode = await waitForExit(child);
-
-  const [stdout, stderr] = await Promise.all([
+  const [supervisorExitCode, stdout, stderr] = await Promise.all([
+    child.exited,
     stdoutPromise,
     stderrPromise,
   ]);
@@ -1612,7 +1611,7 @@ async function main(): Promise<void> {
       ? `https://api.github.com/repos/${OWNER}/${REPOSITORY}/releases/latest`
       : `https://api.github.com/repos/${OWNER}/${REPOSITORY}/releases/tags/${encodeURIComponent(parsed.release)}`;
 
-  console.log(`Requesting ${releaseUrl}...`);
+  console.log(`Requesting: ${releaseUrl}`);
   const release = await githubJson<Release>(releaseUrl);
 
   if (release.draft) {
