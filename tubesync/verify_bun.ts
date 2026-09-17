@@ -348,7 +348,7 @@ async function runUnzipWithSupervisor(
   archivePath: string,
 ): Promise<void> {
   const child = Bun.spawn([
-    "/usr/bin/env"
+    "/usr/bin/env",
     "python3",
     supervisor,
     destination,
