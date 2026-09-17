@@ -74,6 +74,9 @@ jobs:
       - name: Make directories
         shell: bash
         run: sudo install -v -d -o "$(id -un)" /app/common
+      - name: Install `bun`
+        shell: bash
+        run: ./tubesync/install_bun.sh
       - name: Install `deno`
         shell: bash
         run: ./tubesync/install_deno.sh
