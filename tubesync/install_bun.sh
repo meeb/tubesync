@@ -27,9 +27,11 @@ download_bun() {
     local latest_version="${resolved_version}"
     [[ -n "${latest_version}" ]]
 
-    grep -Fe "${fn}$(uname -m).zip" 'SHASUMS256.txt.asc' | cut -c '67-' > 'file-name'
-    [[ -s 'file-name' ]] && fn="$(< 'file-name')" || fn='bun-linux-x64-baseline.zip'
-    rm -f 'file-name'
+    local uname_m="$(uname -m)"
+    case "${uname_m}" in
+        (x86_64) fn='bun-linux-x64-baseline.zip' ;;
+        (*) fn="bun-linux-${uname_m}.zip" ;;
+    esac
     bun_archive="${fn:-"${bun_archive}"}"
 
     url="${releases_url}/download/${latest_version}/${fn}"
@@ -53,7 +55,7 @@ download_bun() {
 
     [[ -z "${manifest_digest}" ]] || verify_digest "${manifest_digest}" 'SHASUMS256.txt.asc' || return 1
     [[ -z "${latest_digest}" ]] || verify_digest "${latest_digest}" "${fn}" || return 1
-    "${HERE}/shasum.py" -a sha256 'SHASUMS256.txt.asc'
+    grep -e '\.zip$' 'SHASUMS256.txt.asc' | "${HERE}/shasum.py" -a sha256 -
 }
 
 extract_bun() {
@@ -64,9 +66,10 @@ extract_bun() {
     fn="${1}"
 
     command -v unzip > /dev/null || install_unzip
-    unzip -u -o -d "${dest_dir}"/.bun "${fn}" &&
-        install -v -t "${dest_dir}" "${dest_dir}"/.bun/bun-linux-*/bun &&
-        rm -v -r "${dest_dir}"/.bun
+    local _staged="$(mktemp -u "${dest_dir}"/.bun.XXXXXXXX)"
+    unzip -u -o -d './.bun' "${fn}" &&
+        install -v -T ./.bun/bun-linux-*/bun "${_staged}" &&
+        mv -v -f -T "${_staged}" "${dest_dir}"/bun
 }
 
 install_unzip() {
@@ -85,7 +88,7 @@ record_bun_version() {
 }
 
 set -eu
-set -euxo pipefail
+set -euo pipefail
 
 work_dir="$(mktemp -d)"
 _cleanup() {
