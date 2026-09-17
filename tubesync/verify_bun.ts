@@ -378,6 +378,38 @@ async function runUnzipWithSupervisor(
   }
 }
 
+function waitForExit(
+  child: ReturnType<typeof spawn>,
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    child.once("error", reject);
+
+    child.once("exit", (code, signal) => {
+      if (signal) {
+        reject(new Error(`terminated by ${signal}`));
+      } else {
+        resolve(code ?? -1);
+      }
+    });
+  });
+}
+
+function processExit(
+  child: ReturnType<typeof spawn>,
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    child.once("error", reject);
+
+    child.once("exit", (code, signal) => {
+      if (signal) {
+        reject(new Error(`unzip terminated by ${signal}`));
+      } else {
+        resolve(code ?? -1);
+      }
+    });
+  });
+}
+
 
 function safeFileName(name: string): boolean {
   return (
