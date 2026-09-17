@@ -1031,12 +1031,12 @@ async function verifySignature(
   }
 
   const gpg = await findCommand([
-    "gpg",
     "gpg2",
-    "gnupg",
+    "gpg",
     "gnupg2",
-    "gpg.exe",
+    "gnupg",
     "gpg2.exe",
+    "gpg.exe",
   ]);
 
   if (!gpg) {
@@ -1197,6 +1197,7 @@ async function extractBinary(
     fail("The unzip executable is required for installation");
   }
 
+  console.log(`Listing files from: ${archivePath}`);
   const listing = await commandOutput(
     unzip,
     ["-Z1", archivePath],
@@ -1208,6 +1209,7 @@ async function extractBinary(
     }
   }
 
+  console.log(`Extracting into: ${extractionDirectory}`);
   await runCommand(unzip, [
     "-q",
     "-o",
@@ -1219,6 +1221,7 @@ async function extractBinary(
   const candidates: string[] = [];
 
   async function walk(directory: string): Promise<void> {
+    console.log(`Walking: ${directory}`);
     for (const entry of await readdir(directory, {
       withFileTypes: true,
     })) {
@@ -1229,6 +1232,7 @@ async function extractBinary(
       }
 
       if (entry.isDirectory()) {
+        console.log(`Descending into directory: ${entry.name}`);
         await walk(path);
       } else if (
         entry.isFile() &&
@@ -1448,7 +1452,7 @@ async function main(): Promise<void> {
     await writeEmbeddedKey(keyPath);
 
     try {
-      console.log(`Requesting ${KEY_URL}...`);
+      console.log(`Downloading: ${KEY_URL}`);
       await download(
         KEY_URL,
         downloadedKeyPath,
