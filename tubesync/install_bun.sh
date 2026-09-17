@@ -67,9 +67,12 @@ extract_bun() {
 
     command -v unzip > /dev/null || install_unzip
     local _staged="$(mktemp -u "${dest_dir}"/.bun.XXXXXXXX)"
+    _cleanup() {
+        rm -v -rf -- "${_staged}" "${work_dir}"
+    }
     unzip -u -o -d './.bun' "${fn}" &&
         install -v -T ./.bun/bun-linux-*/bun "${_staged}" &&
-        mv -v -f -T "${_staged}" "${dest_dir}"/bun
+        "${_staged}" run "${HERE}/verify_bun.ts" --install_dir "${dest_dir}" --release 'bun-v1.3.14'
 }
 
 install_unzip() {
