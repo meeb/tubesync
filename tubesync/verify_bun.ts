@@ -970,6 +970,8 @@ async function runCommand(
   const child = spawn(command, args, {
     shell: false,
     stdio: ["ignore", "pipe", "pipe"],
+    killSignal: "SIGINT",
+    timeout: 60000,
   });
 
   const stdoutPromise = streamText(child.stdout);
@@ -1420,7 +1422,7 @@ async function extractBinary(
   console.log(`Extracting into: ${extractionDirectory}`);
   //await runUnzipWithSupervisor(supervisor, extractionDirectory, archivePath);
   await runCommand(unzip, [
-    "-q",
+    "-u",
     "-o",
     "-d",
     extractionDirectory,
