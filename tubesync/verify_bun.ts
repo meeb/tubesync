@@ -1,6 +1,3 @@
-#!/usr/bin/env bun
-// corrections made by tcely
-
 import {
   chmod,
   copyFile,
@@ -93,7 +90,7 @@ function fail(message: string): never {
 function usage(): never {
   console.error(`
 Usage:
-  bun run verify.ts [options]
+  bun run verify_bun.ts [options]
 
 Options:
   --release <tag>        Release tag, or latest
