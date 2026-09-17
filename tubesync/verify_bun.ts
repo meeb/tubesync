@@ -373,6 +373,8 @@ async function runUnzipWithSupervisor(
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
+    timeout: 30000,
+    killSignal: "SIGINT",
   });
 
   const stdoutPromise = new Response(child.stdout).text();
