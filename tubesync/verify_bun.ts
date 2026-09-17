@@ -204,6 +204,22 @@ async function readProcFile(path: string): Promise<string> {
   }
 }
 
+function waitForExit(
+  child: ReturnType<typeof spawn>,
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    child.once("error", reject);
+
+    child.once("exit", (code, signal) => {
+      if (signal) {
+        reject(new Error(`terminated by ${signal}`));
+      } else {
+        resolve(code ?? -1);
+      }
+    });
+  });
+}
+
 async function runCommandDebug(
   command: string,
   args: string[],
@@ -362,7 +378,7 @@ async function runUnzipWithSupervisor(
   const stdoutPromise = new Response(child.stdout).text();
   const stderrPromise = new Response(child.stderr).text();
 
-  const supervisorExitCode = await child.exited;
+  const supervisorExitCode = await waitForExit(child);
 
   const [stdout, stderr] = await Promise.all([
     stdoutPromise,
@@ -376,38 +392,6 @@ async function runUnzipWithSupervisor(
   if (supervisorExitCode !== 0) {
     throw new Error(`unzip supervisor failed:\n${stderr || stdout}`);
   }
-}
-
-function waitForExit(
-  child: ReturnType<typeof spawn>,
-): Promise<number> {
-  return new Promise((resolve, reject) => {
-    child.once("error", reject);
-
-    child.once("exit", (code, signal) => {
-      if (signal) {
-        reject(new Error(`terminated by ${signal}`));
-      } else {
-        resolve(code ?? -1);
-      }
-    });
-  });
-}
-
-function processExit(
-  child: ReturnType<typeof spawn>,
-): Promise<number> {
-  return new Promise((resolve, reject) => {
-    child.once("error", reject);
-
-    child.once("exit", (code, signal) => {
-      if (signal) {
-        reject(new Error(`unzip terminated by ${signal}`));
-      } else {
-        resolve(code ?? -1);
-      }
-    });
-  });
 }
 
 
