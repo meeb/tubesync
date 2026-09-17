@@ -974,9 +974,11 @@ async function runCommand(
 
   const stdoutPromise = streamText(child.stdout);
   const stderrPromise = streamText(child.stderr);
-  const code = await processExit(child);
-  const stdout = await stdoutPromise;
-  const stderr = await stderrPromise;
+  const [code, stdout, stderr] = await Promise.all([
+    processExit(child),
+    stdoutPromise,
+    stderrPromise,
+  ]);
 
   if (code !== 0) {
     fail(`${command} failed:\n${stderr || stdout}`);
@@ -1416,16 +1418,14 @@ async function extractBinary(
   }
 
   console.log(`Extracting into: ${extractionDirectory}`);
-  await runUnzipWithSupervisor(supervisor, extractionDirectory, archivePath);
-  /*
+  //await runUnzipWithSupervisor(supervisor, extractionDirectory, archivePath);
   await runCommand(unzip, [
     "-q",
     "-o",
-    archivePath,
     "-d",
     extractionDirectory,
+    archivePath,
   ]);
-  */
 
   const candidates: string[] = [];
 
