@@ -191,6 +191,154 @@ function defaultAssetName(): string {
   return result;
 }
 
+
+async function readProcFile(path: string): Promise<string> {
+  try {
+    return await readFile(path, "utf8");
+  } catch (error) {
+    return `<unable to read ${path}: ${String(error)}>`;
+  }
+}
+
+async function runCommand(
+  command: string,
+  args: string[],
+  timeoutMs = 30_000,
+): Promise<void> {
+  console.error("[command]", {
+    command,
+    args,
+    cwd: process.cwd(),
+    pid: process.pid,
+    path: process.env.PATH,
+  });
+
+  const child = spawn(command, args, {
+    shell: false,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  console.error("[spawned]", { pid: child.pid });
+
+  let stdout = "";
+  let stderr = "";
+  let stdoutEnded = false;
+  let stderrEnded = false;
+  let exited = false;
+  let exitCode: number | null = null;
+  let exitSignal: NodeJS.Signals | null = null;
+
+  child.stdout?.on("data", (chunk: Buffer) => {
+    const text = chunk.toString("utf8");
+    stdout += text;
+    console.error("[stdout]", JSON.stringify(text));
+  });
+
+  child.stderr?.on("data", (chunk: Buffer) => {
+    const text = chunk.toString("utf8");
+    stderr += text;
+    console.error("[stderr]", JSON.stringify(text));
+  });
+
+  child.stdout?.once("end", () => {
+    stdoutEnded = true;
+    console.error("[stdout end]");
+  });
+
+  child.stderr?.once("end", () => {
+    stderrEnded = true;
+    console.error("[stderr end]");
+  });
+
+  child.once("error", (error) => {
+    console.error("[process error]", error);
+  });
+
+  child.once("exit", (code, signal) => {
+    exited = true;
+    exitCode = code;
+    exitSignal = signal;
+
+    console.error("[process exit]", {
+      code,
+      signal,
+      stdoutEnded,
+      stderrEnded,
+    });
+  });
+
+  child.once("close", (code, signal) => {
+    console.error("[process close]", {
+      code,
+      signal,
+      exited,
+      stdoutEnded,
+      stderrEnded,
+    });
+  });
+
+  const timeout = setTimeout(async () => {
+    console.error("[TIMEOUT]", {
+      pid: child.pid,
+      exited,
+      exitCode,
+      exitSignal,
+      stdoutEnded,
+      stderrEnded,
+    });
+
+    // Useful on Linux CI runners.
+    if (child.pid && process.platform === "linux") {
+      console.error(
+        "[proc status]\n" +
+          (await readProcFile(`/proc/${child.pid}/status`)),
+      );
+
+      console.error(
+        "[proc wchan]\n" +
+          (await readProcFile(`/proc/${child.pid}/wchan`)),
+      );
+
+      console.error(
+        "[proc stack]\n" +
+          (await readProcFile(`/proc/${child.pid}/stack`)),
+      );
+    }
+
+    child.kill("SIGTERM");
+
+    setTimeout(() => {
+      if (!exited) {
+        console.error("[FORCE KILL]");
+        child.kill("SIGKILL");
+      }
+    }, 2_000);
+  }, timeoutMs);
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      child.once("error", reject);
+
+      child.once("close", (code, signal) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              `${command} exited with code=${code}, signal=${signal}\n` +
+                `stdout:\n${stdout}\n` +
+                `stderr:\n${stderr}`,
+            ),
+          );
+        }
+      });
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+
 function safeFileName(name: string): boolean {
   return (
     name.length > 0 &&
@@ -758,7 +906,7 @@ async function processExit(
   });
 }
 
-async function runCommand(
+async function runCommandNormal(
   command: string,
   args: string[],
 ): Promise<void> {
@@ -1213,9 +1361,9 @@ async function extractBinary(
   await runCommand(unzip, [
     "-q",
     "-o",
-    archivePath,
     "-d",
     extractionDirectory,
+    archivePath,
   ]);
 
   const candidates: string[] = [];
