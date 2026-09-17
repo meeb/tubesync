@@ -1361,9 +1361,9 @@ async function extractBinary(
   await runCommand(unzip, [
     "-q",
     "-o",
+    archivePath,
     "-d",
     extractionDirectory,
-    archivePath,
   ]);
 
   const candidates: string[] = [];
