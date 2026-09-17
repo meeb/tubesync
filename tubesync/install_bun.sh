@@ -67,12 +67,10 @@ extract_bun() {
 
     command -v unzip > /dev/null || install_unzip
     local _staged="$(mktemp -u "${dest_dir}"/.bun.XXXXXXXX)"
-    _cleanup() {
-        rm -v -rf -- "${_staged}" "${work_dir}"
-    }
+    _cleanup_list+=("${_staged}")
     unzip -u -o -d './.bun' "${fn}" &&
         install -v -T ./.bun/bun-linux-*/bun "${_staged}" &&
-        "${_staged}" run "${HERE}/verify_bun.ts" --install_dir "${dest_dir}" --release 'bun-v1.3.14'
+        "${_staged}" run "${HERE}/verify_bun.ts" --install-dir "${dest_dir}" --release 'bun-v1.3.14'
 }
 
 install_unzip() {
@@ -90,12 +88,13 @@ record_bun_version() {
     printf -- "bun_version = '%s'\n" "${bun_version}" >> /app/common/third_party_versions.py
 }
 
-set -eu
 set -euo pipefail
 
+declare -a _cleanup_list
 work_dir="$(mktemp -d)"
+_cleanup_list+=("${work_dir}")
 _cleanup() {
-    rm -v -rf -- "${work_dir}"
+    rm -v -rf -- "${_cleanup_list[@]}"
 }
 trap '_cleanup' EXIT
 cd "${work_dir}"
