@@ -114,6 +114,7 @@ function parseArgs(args: string[]): {
   let asset: string | undefined;
   let out: string | undefined;
   let installDir: string | undefined;
+  let supervisor: string | undefined;
   let allowPrerelease = false;
 
   const seen = new Set<string>();
@@ -135,6 +136,7 @@ function parseArgs(args: string[]): {
       arg !== "--release" &&
       arg !== "--asset" &&
       arg !== "--out" &&
+      arg !== "--supervisor" &&
       arg !== "--install-dir"
     ) {
       fail(`Unknown argument: ${arg}`);
@@ -153,6 +155,7 @@ function parseArgs(args: string[]): {
     if (arg === "--out") out = value;
     else if (arg === "--asset") asset = value;
     else if (arg === "--install-dir") installDir = value;
+    else if (arg === "--supervisor") supervisor = value;
     else release = value;
   }
 
@@ -165,6 +168,7 @@ function parseArgs(args: string[]): {
     asset,
     out,
     installDir,
+    supervisor,
     allowPrerelease,
   };
 }
@@ -200,7 +204,7 @@ async function readProcFile(path: string): Promise<string> {
   }
 }
 
-async function runCommand(
+async function runCommandDebug(
   command: string,
   args: string[],
   timeoutMs = 30_000,
@@ -335,6 +339,42 @@ async function runCommand(
     });
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function runUnzipWithSupervisor(
+  supervisor: string,
+  destination: string,
+  archivePath: string,
+): Promise<void> {
+  const child = Bun.spawn([
+    "/usr/bin/env"
+    "python3",
+    supervisor,
+    destination,
+    archivePath,
+  ], {
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const stdoutPromise = new Response(child.stdout).text();
+  const stderrPromise = new Response(child.stderr).text();
+
+  const supervisorExitCode = await child.exited;
+
+  const [stdout, stderr] = await Promise.all([
+    stdoutPromise,
+    stderrPromise,
+  ]);
+
+  console.error("[supervisor stdout]", stdout);
+  console.error("[supervisor stderr]", stderr);
+  console.error("[supervisor exit]", supervisorExitCode);
+
+  if (supervisorExitCode !== 0) {
+    throw new Error(`unzip supervisor failed:\n${stderr || stdout}`);
   }
 }
 
@@ -906,7 +946,7 @@ async function processExit(
   });
 }
 
-async function runCommandNormal(
+async function runCommand(
   command: string,
   args: string[],
 ): Promise<void> {
@@ -1338,6 +1378,7 @@ function safeArchiveEntry(entry: string): boolean {
 async function extractBinary(
   archivePath: string,
   extractionDirectory: string,
+  supervisor: string,
 ): Promise<string> {
   const unzip = await findCommand(["unzip"]);
 
@@ -1358,6 +1399,8 @@ async function extractBinary(
   }
 
   console.log(`Extracting into: ${extractionDirectory}`);
+  await runUnzipWithSupervisor(supervisor, extractionDirectory, archivePath);
+  /*
   await runCommand(unzip, [
     "-q",
     "-o",
@@ -1365,6 +1408,7 @@ async function extractBinary(
     "-d",
     extractionDirectory,
   ]);
+  */
 
   const candidates: string[] = [];
 
@@ -1406,6 +1450,7 @@ async function extractBinary(
 async function installBinary(
   archivePath: string,
   installDirectory: string,
+  supervisor: string,
 ): Promise<string> {
   await mkdir(installDirectory, {
     recursive: true,
@@ -1420,6 +1465,7 @@ async function installBinary(
     const extractedPath = await extractBinary(
       archivePath,
       extractionDirectory,
+      supervisor,
     );
 
     const extractedInfo = await lstat(extractedPath);
@@ -1638,11 +1684,12 @@ async function main(): Promise<void> {
       archiveHashes,
     );
 
-    if (parsed.installDir) {
+    if (parsed.installDir && parsed.supervisor) {
       console.log(`Installing into: ${parsed.installDir}`);
       const installedPath = await installBinary(
         archivePath,
         resolve(parsed.installDir),
+        resolve(parsed.supervisor),
       );
 
       const algorithms = ["sha256", "sha512"] as const;
