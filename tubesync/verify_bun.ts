@@ -994,7 +994,8 @@ async function runCommand(
   command: string,
   args: string[],
 ): Promise<void> {
-  const stdout = await commandOutput(command, args);
+  // const stdout = await commandOutput(command, args);
+  await runCommandDebug(command, args);
 
   /*
   const child = spawn(command, args, {
