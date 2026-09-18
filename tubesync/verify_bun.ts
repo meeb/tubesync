@@ -271,6 +271,69 @@ async function githubJson<T>(url: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+// Byte Counting and Limit Enforcement
+function createByteCounter(maximumBytes: number) {
+  let bytes = 0;
+
+  return new Transform({
+    transform(chunk, encoding, callback) {
+      bytes += chunk.length;
+      if (bytes > maximumBytes) {
+        return callback(new Error(`Download exceeds ${maximumBytes} bytes`));
+      }
+      callback(null, chunk);
+    },
+
+    // Attach the final count to the stream object for retrieval later
+    flush(callback) {
+      this.totalBytes = bytes;
+      callback();
+    },
+  }) as Transform & { totalBytes: number };
+}
+
+function createHasher(...hashes: ReturnType<typeof createHash>[]) {
+  return new Transform({
+    transform(chunk, encoding, callback) {
+      for (const hash of hashes) {
+        hash.update(chunk);
+      }
+      callback(null, chunk);
+    },
+  });
+}
+
+async function downloadApproachA({
+  response,
+  sha256,
+  sha512,
+  destination,
+  maximumBytes,
+}: {
+  response: ReturnType<typeof fetch>;
+  sha256: ReturnType<typeof createHash>;
+  sha512: ReturnType<typeof createHash>;
+  destination: string;
+  maximumBytes: number;
+}): Promise<number> {
+  const byteCounter = createByteCounter(maximumBytes);
+  const hashers = createHasher(sha256, sha512);
+  const writer = createWriteStream(destination, { flags: "wx", mode: 0o600 });
+
+  try {
+    await pipeline(
+      Readable.fromWeb(response.body as any),
+      byteCounter,
+      writer,
+      hashers
+    );
+  } catch (err) {
+    fail(getErrorMessage(err));
+  }
+
+  return byteCounter.totalBytes;
+}
+
 async function downloadApproachB({
   response,
   sha256,
@@ -294,59 +357,18 @@ async function downloadApproachB({
         fail(`Download exceeds ${maximumBytes} bytes`);
       }
 
-      sha256.update(chunk);
-      sha512.update(chunk);
-
       const writeBuffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       if (!writer.write(writeBuffer)) {
         await new Promise((resolve) => writer.once("drain", resolve));
       }
+
+      const hashes = [sha256, sha512];
+      for (const h of hashes) {
+        h.update(chunk);
+      }
     }
   } finally {
     writer.end();
-  }
-
-  return bytes
-}
-
-async function downloadApproachA({
-  response,
-  sha256,
-  sha512,
-  destination,
-  maximumBytes,
-}: {
-  response: ReturnType<typeof fetch>;
-  sha256: ReturnType<typeof createHash>;
-  sha512: ReturnType<typeof createHash>;
-  destination: string;
-  maximumBytes: number;
-}): Promise<number> {
-  let bytes = 0;
-
-  const hashTracker = new Transform({
-    transform(chunk, encoding, callback) {
-      bytes += chunk.length;
-      if (bytes > maximumBytes) {
-        return callback(new Error(`Download exceeds ${maximumBytes} bytes`));
-      }
-
-      sha256.update(chunk);
-      sha512.update(chunk);
-      callback(null, chunk);
-    },
-  });
-
-  const writer = createWriteStream(destination, { flags: "wx", mode: 0o600 });
-
-  try {
-    await pipeline(
-      Readable.fromWeb(response.body as any),
-      hashTracker,
-      writer
-    );
-  } catch (err) {
-    fail(getErrorMessage(err));
   }
 
   return bytes;
