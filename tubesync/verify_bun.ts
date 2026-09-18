@@ -934,7 +934,7 @@ async function verifyWithGpg(
   await mkdir(home, { recursive: true, mode: 0o700 });
   const base = ["--batch", "--no-options", "--no-auto-key-retrieve", "--no-auto-key-locate", "--homedir", home];
 
-  const import_stdout = commandOutput(
+  const import_stdout = await commandOutput(
     command, [...base, "--import", keyPath]
   );
 
