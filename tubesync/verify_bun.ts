@@ -1,3 +1,7 @@
+import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+// constants unused?
+import { constants, createReadStream, createWriteStream } from "node:fs";
 import {
   chmod,
   copyFile, // unused?
@@ -12,10 +16,7 @@ import {
   unlink,
   writeFile,
 } from "node:fs/promises";
-// constants unused?
-import { constants, createWriteStream } from "node:fs";
-import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
 import {
   basename,
   dirname,
@@ -25,7 +26,7 @@ import {
   relative, // unused?
   resolve,
 } from "node:path";
-import { tmpdir } from "node:os";
+import { pipeline } from "node:stream/promises";
 
 const OWNER = "oven-sh";
 const REPOSITORY = "bun";
@@ -36,9 +37,9 @@ const GITHUB_AUTOMATIC_DIGEST_ROLLOUT = new Date("2025-06-05T00:00:00Z");
 const KEY_URL = "https://github.com/robobun.gpg";
 const TRUSTED_FINGERPRINT = "F3DCC08A8572C0749B3E18888EAB4D40A7B22B59";
 
-const MAX_KEY_BYTES = 1 << 20; // MiB
-const MAX_MANIFEST_BYTES = 64 << 20; // MiB
-const MAX_ARCHIVE_BYTES = 1 << 30; // GiB
+const MAX_KEY_BYTES = 1 << 20; // 1 MiB
+const MAX_MANIFEST_BYTES = 1 << 25; // 32 MiB
+const MAX_ARCHIVE_BYTES = 1 << 30; // 1 GiB
 
 const MAX_COMMAND_TIME = 60_000;
 
@@ -323,44 +324,69 @@ async function download(
   };
 }
 
-async function writeEmbeddedKey(path: string): Promise<void> {
-  await writeFile(path, TRUSTED_KEY, {
+async function writeEmbeddedKey(destination: string): Promise<void> {
+  await writeFile(destination, TRUSTED_KEY, {
     encoding: "utf8",
     mode: 0o600,
     flag: "wx",
   });
 }
 
-async function appendFile(destination: string, source: string): Promise<void> {
-  const content = await readFile(source);
-  await writeFile(destination, content, { flag: "a" });
+async function appendFile(
+  destination: string,
+  source: string,
+): Promise<void> {
+  await pipeline(
+    createReadStream(source),
+    createWriteStream(destination, { flags: 'a' })
+  );
 }
 
-async function hashFile(path: string, algorithm: "sha256" | "sha512"): Promise<string> {
-  const content = await readFile(path);
-  return createHash(algorithm).update(content).digest("hex");
+
+async function hashFile(
+  source: string,
+  algorithm: "sha256" | "sha512",
+): Promise<string> {
+  const hash = createHash(algorithm);
+  const sourceFile = await open(source, "r");
+
+  try {
+    for await (const chunk of sourceFile.createReadStream()) {
+      hash.update(chunk);
+    }
+  } finally {
+    await sourceFile.close().catch(() => {});
+  }
+
+  return hash.digest("hex");
 }
 
 async function syncFile(path: string): Promise<void> {
   try {
     const file = await open(path, "r+");
+
     try {
       await file.sync();
     } finally {
       await file.close();
     }
-  } catch {}
+  } catch {
+    // Best effort. Some platforms/filesystems do not support this reliably.
+  }
 }
 
 async function syncDirectory(path: string): Promise<void> {
   try {
     const directory = await open(path, "r");
+
     try {
       await directory.sync();
     } finally {
       await directory.close();
     }
-  } catch {}
+  } catch {
+    // Best effort, especially for Windows.
+  }
 }
 
 async function ensureAbsent(path: string): Promise<void> {
