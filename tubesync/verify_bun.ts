@@ -624,22 +624,42 @@ async function replaceDestination(stagedPath: string, destination: string): Prom
   }
 }
 
-function apiDigest(asset: Asset): { algorithm: "sha256" | "sha512"; digest: string } | undefined {
+function apiDigest(
+  asset: Asset,
+): {
+  algorithm: "sha256" | "sha512";
+  digest: string;
+} | undefined {
   if (!asset.digest) {
     const createdAtDate = new Date(asset.created_at);
+
     if (createdAtDate > GITHUB_AUTOMATIC_DIGEST_ROLLOUT) {
       fail("Digest is required after the feature was introduced.");
     }
+
     return undefined;
   }
 
-  const match = /^(sha256|sha512):([0-9a-fA-F]{64}|[0-9a-fA-F]{128})\$/.exec(asset.digest);
+  const match =
+    /^([^:]+):([0-9a-fA-F]+)$/.exec(asset.digest);
+
   if (!match) {
-    fail(`Unsupported API digest for ${asset.name}: ${asset.digest}`);
+    fail(
+      `Unsupported API digest for ${asset.name}: ${asset.digest}`,
+    );
   }
 
-  const algorithm = match[1] as "sha256" | "sha512";
+  const algorithm = match[1].toLowerCase() as "sha256" | "sha512";
   const digest = match[2].toLowerCase();
+
+  const expectedLength = algorithm === "sha256" ? 64 : 128;
+
+  if (expectedLength !== digest.length) {
+    fail(
+      `Invalid ${algorithm} API digest length for ` +
+        `${asset.name}: ${asset.digest}`,
+    );
+  }
 
   return { algorithm, digest };
 }
