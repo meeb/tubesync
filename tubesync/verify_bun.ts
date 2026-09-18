@@ -811,7 +811,11 @@ async function processExit(child: ReturnType<typeof spawn>): Promise<number> {
     child.once("error", (error) => {
       if (!settled) { settled = true; reject(error); }
     });
+    // exit is unreliable for whatever reason
     child.once("exit", (code) => {
+      if (!settled) { settled = true; resolveExit(code ?? -1); }
+    });
+    child.once("close", (code) => {
       if (!settled) { settled = true; resolveExit(code ?? -1); }
     });
   });
