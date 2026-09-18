@@ -851,7 +851,7 @@ async function runChild(
 }
 
 async function commandOutput(command: string, args: string[]): Promise<string> {
-  const [code, stdout, stderr] = runChild(
+  const [stderr, stdout, code] = await runChild(
     command, args, {
     killSignal: "SIGINT",
     timeout: MAX_COMMAND_TIME,
@@ -867,7 +867,7 @@ async function commandOutput(command: string, args: string[]): Promise<string> {
 async function findCommand(candidates: string[]): Promise<string | undefined> {
   for (const candidate of candidates) {
     try {
-      const [code, stdout, stderr] = runChild(
+      const [stderr, stdout, code] = await runChild(
         candidate, ["--help"], {
           stdio: ["ignore", "ignore", "ignore"],
       });
@@ -891,7 +891,7 @@ async function verifyWithSqv(
     args.push(`--signature-file=${signaturePath}`, messagePath);
   }
 
-  const [code, stdout, stderr] = runChild(
+  const [stderr, stdout, code] = await runChild(
     command, args,
   );
 
@@ -914,7 +914,7 @@ async function verifyWithSq(
     args.push("--signature-file", signaturePath, messagePath);
   }
 
-  const [code, stdout, stderr] = runChild(
+  const [stderr, stdout, code] = await runChild(
     command, args,
   );
 
@@ -953,7 +953,7 @@ async function verifyWithGpg(
   const stderrPromise = streamText(child.stderr);
   const statusPromise = streamText(child.stdio[3] as any);
 
-  const [code, stdout, stderr, status] = await Promise.all([
+  const [stderr, stdout, status, code] = await Promise.all([
     stderrPromise,
     stdoutPromise,
     statusPromise,
