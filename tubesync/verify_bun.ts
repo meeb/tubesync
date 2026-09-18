@@ -675,7 +675,7 @@ function apiDigest(
     }
 
     // Generate a recognition sentinel for this odd case
-    return { "sha256", "F".repeat(64) };
+    return { algorithm: "sha256", digest: "F".repeat(64) };
   }
 
   const match =
