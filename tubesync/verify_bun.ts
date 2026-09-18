@@ -322,7 +322,7 @@ function createByteCounter(maximumBytes: number) {
   }) as Transform & { totalBytes: number };
 }
 
-function createHasher(...hashes: ReturnType<typeof createHash>[]) {
+function createHashUpdatingTransform(hashes: ReturnType<typeof createHash>[]): Transform {
   return new Transform({
     transform(chunk, encoding, callback) {
       for (const hash of hashes) {
@@ -390,20 +390,18 @@ function createNullWriter(): Writable {
 
 async function downloadApproachA({
   response,
-  sha256,
-  sha512,
+  hashes,
   destination,
   maximumBytes,
 }: {
   response: ReturnType<typeof fetch>;
-  sha256: ReturnType<typeof createHash>;
-  sha512: ReturnType<typeof createHash>;
+  hashes: ReturnType<typeof createHash>[];
   destination: string;
   maximumBytes: number;
 }): Promise<number> {
   const byteCounter = createByteCounter(maximumBytes);
   const fileWriter = createFileWritingTransform(destination);
-  const hashers = createHasher(sha256, sha512);
+  const hashesUpdater = createHashUpdatingTransform(hashes);
   const nullWriter = createNullWriter();
 
   try {
@@ -413,7 +411,7 @@ async function downloadApproachA({
       ),
       byteCounter,
       fileWriter,
-      hashers,
+      hashesUpdater,
       nullWriter, // writes actually happen in fileWriter
     );
   } catch (err) {
@@ -425,14 +423,12 @@ async function downloadApproachA({
 
 async function downloadApproachB({
   response,
-  sha256,
-  sha512,
+  hashes,
   destination,
   maximumBytes,
 }: {
   response: ReturnType<typeof fetch>;
-  sha256: ReturnType<typeof createHash>;
-  sha512: ReturnType<typeof createHash>;
+  hashes: ReturnType<typeof createHash>[];
   destination: string;
   maximumBytes: number;
 }): Promise<number> {
@@ -451,9 +447,8 @@ async function downloadApproachB({
         await new Promise((resolve) => writer.once("drain", resolve));
       }
 
-      const hashes = [sha256, sha512];
-      for (const h of hashes) {
-        h.update(chunk);
+      for (const hash of hashes) {
+        hash.update(chunk);
       }
     }
   } finally {
@@ -492,19 +487,19 @@ async function download(
 
   const sha256 = createHash("sha256");
   const sha512 = createHash("sha512");
+  const hashes = [sha256, sha512];
 
   const bytes = await downloadApproachA({
     response,
-    sha256,
-    sha512,
+    hashes,
     destination,
     maximumBytes,
   });
 
   return {
     bytes,
-    sha256: sha256.digest("hex"),
-    sha512: sha512.digest("hex"),
+    sha256: createDigest("sha256", sha256.digest("hex")),
+    sha512: createDigest("sha512", sha512.digest("hex")),
   };
 }
 
