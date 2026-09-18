@@ -805,18 +805,6 @@ async function streamText(stream: NodeJS.ReadableStream | null): Promise<string>
   return result;
 }
 
-async function processExitOld(child: ReturnType<typeof spawn>): Promise<number> {
-  return await new Promise<number>((resolveExit, reject) => {
-    let settled = false;
-    child.once("error", (error) => {
-      if (!settled) { settled = true; reject(error); }
-    });
-    // exit is unreliable with unzip
-    child.once("close", (code) => {
-      if (!settled) { settled = true; resolveExit(code ?? -1); }
-    });
-  });
-}
 function processExit(child: ReturnType<typeof spawn>): Promise<number> {
   return new Promise<number>((resolve, reject) => {
     child.once("error", reject);
@@ -827,39 +815,62 @@ function processExit(child: ReturnType<typeof spawn>): Promise<number> {
   });
 }
 
+async function runChild(
+  command: string,
+  args: string[],
+  options: Parameters<typeof spawn>[2] = {},
+) {
+  const child = spawn(command, args, {
+    ...options,
+    shell: false,
+    stdio: options.stdio ?? ["ignore", "pipe", "pipe"],
+    timeout: max(10_000, min(options.timeout ?? 0, MAX_COMMAND_TIME)),
+  });
+
+  const timeout_term = setTimeout(() => {
+    child.kill("SIGTERM");
+  }, 1_000 + MAX_COMMAND_TIME);
+
+  const timeout_kill = setTimeout(() => {
+    child.kill("SIGKILL");
+  }, 5_000 + MAX_COMMAND_TIME);
+
+  try {
+    const stdoutPromise = streamText(child.stdout);
+    const stderrPromise = streamText(child.stderr);
+    const exitPromise = processExit(child);
+    return await Promise.all([
+      stderrPromise,
+      stdoutPromise,
+      exitPromise,
+    ]);
+  } finally {
+    clearTimeout(timeout_kill);
+    clearTimeout(timeout_term);
+  }
+}
 
 async function commandOutput(command: string, args: string[]): Promise<string> {
-  const child = spawn(command, args, {
-    shell: false,
-    stdio: ["ignore", "pipe", "pipe"],
+  const [code, stdout, stderr] = runChild(
+    command, args, {
     killSignal: "SIGINT",
     timeout: MAX_COMMAND_TIME,
   });
 
-  const stdoutPromise = streamText(child.stdout);
-  const stderrPromise = streamText(child.stderr);
-  const exitPromise = processExit(child);
-
-  const [code, stdout, stderr] = await Promise.all([
-    exitPromise,
-    stdoutPromise,
-    stderrPromise,
-  ]);
-
   if (code !== 0) {
     fail(`${command} failed:\n${stderr || stdout}`);
   }
+
   return stdout;
 }
 
 async function findCommand(candidates: string[]): Promise<string | undefined> {
   for (const candidate of candidates) {
     try {
-      const child = spawn(candidate, ["--help"], {
-        shell: false,
-        stdio: ["ignore", "ignore", "ignore"],
+      const [code, stdout, stderr] = runChild(
+        candidate, ["--help"], {
+          stdio: ["ignore", "ignore", "ignore"],
       });
-      const code = await processExit(child);
       if (code === 0) return candidate;
     } catch {}
   }
@@ -880,10 +891,9 @@ async function verifyWithSqv(
     args.push(`--signature-file=${signaturePath}`, messagePath);
   }
 
-  const child = spawn(command, args, { shell: false, stdio: ["ignore", "pipe", "pipe"] });
-  const stdoutPromise = streamText(child.stdout);
-  const stderrPromise = streamText(child.stderr);
-  const [code, stdout, stderr] = await Promise.all([processExit(child), stdoutPromise, stderrPromise]);
+  const [code, stdout, stderr] = runChild(
+    command, args,
+  );
 
   if (code !== 0 || stdout.trimEnd() !== TRUSTED_FINGERPRINT) {
     fail(`sqv rejected the signature:\n${stderr || stdout}`);
@@ -904,10 +914,9 @@ async function verifyWithSq(
     args.push("--signature-file", signaturePath, messagePath);
   }
 
-  const child = spawn(command, args, { shell: false, stdio: ["ignore", "pipe", "pipe"] });
-  const stdoutPromise = streamText(child.stdout);
-  const stderrPromise = streamText(child.stderr);
-  const [code, stdout, stderr] = await Promise.all([processExit(child), stdoutPromise, stderrPromise]);
+  const [code, stdout, stderr] = runChild(
+    command, args,
+  );
 
   if (code !== 0) {
     fail(`sq rejected the signature:\n${stderr || stdout}`);
@@ -925,7 +934,9 @@ async function verifyWithGpg(
   await mkdir(home, { recursive: true, mode: 0o700 });
   const base = ["--batch", "--no-options", "--no-auto-key-retrieve", "--no-auto-key-locate", "--homedir", home];
 
-  await commandOutput(command, [...base, "--import", keyPath]);
+  const import_stdout = commandOutput(
+    command, [...base, "--import", keyPath]
+  );
 
   const args = cleartext
     ? [...base, "--status-fd", "3", "--output", messagePath, "--decrypt", signaturePath]
@@ -935,6 +946,7 @@ async function verifyWithGpg(
     shell: false,
     stdio: ["ignore", "pipe", "pipe", "pipe"],
     env: { ...process.env, GNUPGHOME: home },
+    timeout: MAX_COMMAND_TIME,
   });
 
   const stdoutPromise = streamText(child.stdout);
@@ -942,10 +954,10 @@ async function verifyWithGpg(
   const statusPromise = streamText(child.stdio[3] as any);
 
   const [code, stdout, stderr, status] = await Promise.all([
-    processExit(child),
-    stdoutPromise,
     stderrPromise,
+    stdoutPromise,
     statusPromise,
+    processExit(child),
   ]);
 
   if (code !== 0) {
