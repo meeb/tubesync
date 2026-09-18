@@ -1,5 +1,6 @@
 import {
   chmod,
+  copyFile, // unused?
   lstat,
   mkdir,
   mkdtemp,
@@ -11,14 +12,17 @@ import {
   unlink,
   writeFile,
 } from "node:fs/promises";
-import { createWriteStream } from "node:fs";
+// constants unused?
+import { constants, createWriteStream } from "node:fs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   basename,
   dirname,
+  isAbsolute, // unused?
   join,
   normalize,
+  relative, // unused?
   resolve,
 } from "node:path";
 import { tmpdir } from "node:os";
@@ -26,9 +30,10 @@ import { tmpdir } from "node:os";
 const OWNER = "oven-sh";
 const REPOSITORY = "bun";
 const GITHUB_API_VERSION = "2026-03-10";
+// The rollout date when GitHub began automatically generating asset digest records
 const GITHUB_AUTOMATIC_DIGEST_ROLLOUT = new Date("2025-06-05T00:00:00Z");
 
-const KEY_URL = "https://github.com";
+const KEY_URL = "https://github.com/robobun.gpg";
 const TRUSTED_FINGERPRINT = "F3DCC08A8572C0749B3E18888EAB4D40A7B22B59";
 
 const MAX_KEY_BYTES = 1 << 20; // MiB
@@ -49,7 +54,9 @@ eAQYFgoAIBYhBPPcwIqFcsB0mz4YiI6rTUCnsitZBQJj0ZAWAhsMAAoJEI6rTUCn
 sitZvhAA/j4SQxOCLheRG86A2181WAP4qLS1qxSw+fCf28DgiPfbAQCL0kcel+M9
 qbRIlMnwn6TwlQgN9w1qqlSnA9CbKXT9Aw==
 =dGV6
------END PGP PUBLIC KEY BLOCK-----`;
+-----END PGP PUBLIC KEY BLOCK-----
+
+`;
 
 const USER_AGENT = "bun-verify/1";
 
