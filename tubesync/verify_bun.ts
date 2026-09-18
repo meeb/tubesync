@@ -1158,8 +1158,8 @@ async function main(): Promise<void> {
         ] as const),
       );
       // const binHashes = Object.fromEntries(entries) as Record<(typeof algorithms)[number], string>;
-      const binHashes = Object.fromEntries(entries)
-        as Record<(typeof algorithms)[number], string>;
+      const binHashes = Object.fromEntries(entries) as Record<
+          (typeof algorithms)[number], string>;
 
       console.log(`Installed: ${installedPath}`);
       console.group("Binary Digests");
