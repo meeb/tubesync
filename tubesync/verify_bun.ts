@@ -412,6 +412,53 @@ async function runUnzipWithSupervisor(
   }
 }
 
+async function commandOutputDebug(
+  command: string,
+  args: string[],
+): Promise<string> {
+  console.log(`[Diagnostic] Spawning: ${command} ${args.join(" ")}`);
+  
+  const child = spawn(command, args, {
+    shell: false,
+    stdio: ["ignore", "pipe", "pipe"],
+    killSignal: "SIGINT",
+    timeout: 10000, // 10 seconds is plenty for testing this proof
+  });
+
+  let stdoutBytesReceived = 0;
+  let stderrBytesReceived = 0;
+
+  // Track stream activity closely
+  child.stdout.on("data", (chunk) => {
+    stdoutBytesReceived += chunk.length;
+    console.log(`[Diagnostic] stdout pipe received chunk: ${chunk.length} bytes (Total: ${stdoutBytesReceived})`);
+  });
+
+  child.stderr.on("data", (chunk) => {
+    stderrBytesReceived += chunk.length;
+    console.log(`[Diagnostic] stderr pipe received chunk: ${chunk.length} bytes (Total: ${stderrBytesReceived})`);
+  });
+
+  console.log("[Diagnostic] Registering stream text consumption promises...");
+  const stdoutPromise = streamText(child.stdout);
+  const stderrPromise = streamText(child.stderr);
+
+  console.log("[Diagnostic] Waiting exclusively for processExit to resolve...");
+  const code = await processExit(child);
+  console.log(`[Diagnostic] processExit resolved! Code: ${code}. Total bytes buffered: stdout=${stdoutBytesReceived}, stderr=${stderrBytesReceived}`);
+
+  console.log("[Diagnostic] Now awaiting the streamText wrappers...");
+  const stdout = await stdoutPromise;
+  const stderr = await stderrPromise;
+  console.log("[Diagnostic] All promises settled cleanly.");
+
+  if (code !== 0) {
+    fail(`${command} failed:\n${stderr || stdout}`);
+  }
+
+  return stdout;
+}
+
 
 function safeFileName(name: string): boolean {
   return (
@@ -995,7 +1042,8 @@ async function runCommand(
   args: string[],
 ): Promise<void> {
   // const stdout = await commandOutput(command, args);
-  await runCommandDebug(command, args);
+  // await runCommandDebug(command, args);
+  const stdout = await commandOutputDebug(command, args);
 
   /*
   const child = spawn(command, args, {
