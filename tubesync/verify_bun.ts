@@ -98,7 +98,7 @@ type DownloadHashes = {
 
 type ManifestRecord = {
   algorithm: Algorithm;
-  digest: string;
+  checksum: string;
   filename: string;
 };
 
@@ -653,7 +653,7 @@ function apiDigest(
   asset: Asset,
 ): {
   algorithm: Algorithm;
-  digest: string;
+  checksum: string;
 } | undefined {
   // Guard against assets completely missing a digest
   if (!asset.digest) {
@@ -670,7 +670,7 @@ function apiDigest(
     }
 
     // Generate a recognition sentinel for this odd case
-    return { algorithm: "sha256", digest: "F".repeat(64) };
+    return { algorithm: "sha512" as Algorithm, checksum: "F".repeat(128) };
   }
 
   const match =
@@ -682,28 +682,28 @@ function apiDigest(
     );
   }
 
-  const algorithm = match[1].toLowerCase() as "sha256" | "sha512";
-  const digest = match[2].toLowerCase();
+  const algorithm = match[1].toLowerCase() as Algorithm;
+  const checksum = match[2].toLowerCase();
 
-  if (digest.length !== getExpectedAlgorithmLength(algorithm)) {
+  if (checksum.length !== getExpectedAlgorithmLength(algorithm)) {
     fail(
-      `Invalid ${algorithm} digest length for ` +
+      `Invalid ${algorithm} checksum length for ` +
         `${asset.name}: ${asset.digest}`,
     );
   }
 
-  return { algorithm, digest };
+  return { algorithm, checksum };
 }
 
 function validateApiDigest(asset: Asset, local: DownloadHashes): void {
   const apiResult = apiDigest(asset);
   if (!apiResult) return;
 
-  const expected = createDigest(apiResult.algorithm, apiResult.digest);
+  const expected = createDigest(apiResult.algorithm, apiResult.checksum);
   if (expected !== local[apiResult.algorithm]) {
     fail(
       `${asset.name} failed GitHub API digest validation:\n` +
-        `expected: ${apiResult.digest}\n` +
+        `expected: ${expected}\n` +
         `actual:   ${local[apiResult.algorithm]}`,
     );
   }
@@ -713,60 +713,71 @@ function parseManifest(text: string, expectedFile: string): ManifestRecord[] {
   const records: ManifestRecord[] = [];
 
   for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.replace(/\r\$/, "");
+    const line = rawLine.replace(/\r$/, "");
     if (line === "" || line.startsWith("#")) continue;
 
-    let digest: string;
+    let algorithm: Algorithm;
+    let checksum: string;
     let filename: string;
 
-    const tagged = /^([^ \r\n]+) \(([^)\r\n]+)\) = ([0-9a-fA-F]+)\$/.exec(line);
+    const tagged = /^([^ \r\n]+) \(([^)\r\n]+)\) = ([0-9a-fA-F]+)$/.exec(line);
 
     if (tagged) {
       const label = tagged[1];
       filename = tagged[2];
-      digest = tagged[3].toLowerCase();
+      checksum = tagged[3].toLowerCase();
 
-      if (
-        (label === "SHA256" && digest.length !== 64) ||
-        (label === "SHA512" && digest.length !== 128)
-      ) {
-        fail(`Checksum label disagrees with digest length: ${JSON.stringify(line)}`);
+      if (checksum.length !== getExpectedAlgorithmLength(label.toLowerCase())) {
+        fail(`Algorithm label disagrees with checksum length: ${JSON.stringify(line)}`);
       }
+
+      algorithm = label.toLowerCase();
     } else {
-      const untagged = /^([^ ]+) [ *](.*)\$/.exec(line);
+      const untagged = /^([^ ]+) [ *](.*)$/.exec(line);
       if (!untagged) {
         fail(`Malformed checksum line: ${JSON.stringify(line)}`);
       }
 
-      const possibleDigest = untagged[1];
+      checksum = untagged[1].toLowerCase();
       filename = untagged[2];
-
-      if (!/^[0-9a-fA-F]+\$/.test(possibleDigest)) {
-        fail(`Malformed checksum line: ${JSON.stringify(line)}`);
-      }
-
-      if (possibleDigest.length !== 64 && possibleDigest.length !== 128) {
-        fail(`Unsupported digest length: ${JSON.stringify(line)}`);
-      }
-
-      digest = possibleDigest.toLowerCase();
-    }
-
-    if (!safeFileName(filename)) {
-      fail(`Unsafe manifest filename: ${filename}`);
     }
 
     if (filename !== expectedFile) continue;
+    if (!safeFileName(filename)) {
+      fail(`Unsafe manifest filename: ${filename}`);
+    }
+    if (!/^[0-9a-f]+$/.test(checksum)) {
+      fail(`Malformed checksum line: ${JSON.stringify(line)}`);
+    }
+
+    const candidateAlgorithms = Object.entries(
+      expectedLengths
+    ).filter(
+      ([, expectedLength]) => expectedLength === checksum.length
+    ).map(
+      ([algorithm]) => algorithm
+    );
+
+    if (0 === candidateAlgorithms.length) {
+      fail(`Unsupported checksum length: ${JSON.stringify(line)}`);
+    } else if (!algorithm && 1 < candidateAlgorithms.length) {
+      fail(
+          `Ambiguous checksum length ${checksum.length}; ` +
+          `possible algorithms: ${candidateAlgorithms.join(", ")}`
+      );
+    } else if (!algorithm) {
+      [algorithm] = candidateAlgorithms;
+    }
 
     records.push({
       filename,
-      digest,
-      algorithm: digest.length === 64 ? "sha256" : "sha512",
+      checksum,
+      algorithm,
     });
   }
 
-  if (records.length === 0) {
-    fail(`No checksum for ${expectedFile} was found`);
+  if (0 === records.length) {
+    fail(`No digest for ${expectedFile} was found`);
   }
 
   return records;
@@ -774,10 +785,11 @@ function parseManifest(text: string, expectedFile: string): ManifestRecord[] {
 
 function validateManifestDigests(records: ManifestRecord[], local: DownloadHashes): void {
   for (const record of records) {
-    if (local[record.algorithm] !== record.digest) {
+    const expected = createDigest(record.algorithm, record.checksum);
+    if (expected !== local[record.algorithm]) {
       fail(
-        `Signed ${record.algorithm} digest mismatch:\n` +
-          `expected: ${record.digest}\n` +
+        `${record.algorithm} checksum mismatch:\n` +
+          `expected: ${expected}\n` +
           `actual:   ${local[record.algorithm]}`,
       );
     }
