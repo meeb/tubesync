@@ -165,7 +165,13 @@ function parseArgs(args: string[]): {
     fail("--out and --install-dir cannot be used together");
   }
 
-  return { release, asset, out, installDir, allowPrerelease };
+  return {
+    release,
+    asset,
+    out,
+    installDir,
+    allowPrerelease,
+  };
 }
 
 function defaultAssetName(): string {
@@ -180,8 +186,12 @@ function defaultAssetName(): string {
 
   const result = assets[`${process.platform}:${process.arch}`];
   if (!result) {
-    fail(`No default Bun archive is known for ${process.platform}/${process.arch}`);
+    fail(
+      "No default Bun archive is known for " +
+        `${process.platform}/${process.arch}`,
+    );
   }
+
   return result;
 }
 
@@ -200,9 +210,11 @@ function safeFileName(name: string): boolean {
 function isGitHubDownloadUrl(value: string): boolean {
   try {
     const url = new URL(value);
+
     return (
       url.protocol === "https:" &&
-      (url.hostname === "github.com" || url.hostname.endsWith(".githubusercontent.com"))
+      (url.hostname === "github.com" ||
+        url.hostname.endsWith(".githubusercontent.com"))
     );
   } catch {
     return false;
@@ -212,14 +224,21 @@ function isGitHubDownloadUrl(value: string): boolean {
 function isGitHubApiUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.hostname === "://github.com";
+
+    return (
+      url.protocol === "https:" &&
+      url.hostname === "api.github.com"
+    );
   } catch {
     return false;
   }
 }
 
 function githubApiHeaders(): Record<string, string> {
-  const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
+  const token =
+    process.env.GH_TOKEN ??
+    process.env.GITHUB_TOKEN;
+
   return {
     accept: "application/vnd.github+json",
     "user-agent": USER_AGENT,
@@ -256,14 +275,19 @@ async function download(
 
   const response = await fetch(url, {
     redirect: "follow",
-    headers: { "user-agent": USER_AGENT },
+    headers: {
+      "user-agent": USER_AGENT,
+    },
   });
 
   if (!response.ok || !response.body) {
     fail(`Download failed (${response.status}): ${url}`);
   }
 
-  if (response.url !== KEY_URL && !isGitHubDownloadUrl(response.url)) {
+  if (
+    response.url !== KEY_URL &&
+    !isGitHubDownloadUrl(response.url)
+  ) {
     fail(`Refusing redirected download URL: ${response.url}`);
   }
 
@@ -277,11 +301,12 @@ async function download(
     for await (const chunk of response.body as any) {
       bytes += chunk.length;
       if (bytes > maximumBytes) {
-        throw new Error(`Download exceeds ${maximumBytes} bytes`);
+        fail(`Download exceeds ${maximumBytes} bytes`);
       }
+
       sha256.update(chunk);
       sha512.update(chunk);
-      
+
       const writeBuffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       if (!writer.write(writeBuffer)) {
         await new Promise((resolve) => writer.once("drain", resolve));
