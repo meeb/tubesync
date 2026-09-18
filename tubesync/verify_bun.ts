@@ -805,21 +805,28 @@ async function streamText(stream: NodeJS.ReadableStream | null): Promise<string>
   return result;
 }
 
-async function processExit(child: ReturnType<typeof spawn>): Promise<number> {
+async function processExitOld(child: ReturnType<typeof spawn>): Promise<number> {
   return await new Promise<number>((resolveExit, reject) => {
     let settled = false;
     child.once("error", (error) => {
       if (!settled) { settled = true; reject(error); }
     });
-    // exit is unreliable for whatever reason
-    child.once("exit", (code) => {
-      if (!settled) { settled = true; resolveExit(code ?? -1); }
-    });
+    // exit is unreliable with unzip
     child.once("close", (code) => {
       if (!settled) { settled = true; resolveExit(code ?? -1); }
     });
   });
 }
+function processExit(child: ReturnType<typeof spawn>): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    child.once("error", reject);
+
+    child.once("close", (code) => {
+      resolve(code ?? -1);
+    });
+  });
+}
+
 
 async function commandOutput(command: string, args: string[]): Promise<string> {
   const child = spawn(command, args, {
