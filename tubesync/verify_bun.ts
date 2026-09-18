@@ -1094,7 +1094,7 @@ async function extractBinary(archivePath: string, extractionDirectory: string): 
 
   await walk(extractionDirectory);
   if (candidates.length !== 1) fail(`Expected exactly one extracted Bun executable; found ${candidates.length}`);
-  return candidates;
+  return candidates[0]!;
 }
 
 async function installBinary(archivePath: string, installDirectory: string): Promise<string> {
