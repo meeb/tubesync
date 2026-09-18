@@ -26,7 +26,7 @@ import {
   relative, // unused?
   resolve,
 } from "node:path";
-import { Transform, Readable } from "node:stream";
+import { Readable, Transform, Writable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 const OWNER = "oven-sh";
@@ -303,6 +303,61 @@ function createHasher(...hashes: ReturnType<typeof createHash>[]) {
   });
 }
 
+function createFileWritingTransform(destination: string): Transform {
+  const writer = createWriteStream(destination, {
+    flags: "wx",
+    mode: 0o600,
+  });
+
+  let fileTransform: Transform;
+
+  fileTransform = new Transform({
+    transform(chunk, _encoding, callback) {
+      // Write to the archive first. Only forward the chunk after the
+      // file write has completed.
+      writer.write(chunk, (error) => {
+        if (error) {
+          callback(error);
+        } else {
+          callback(null, chunk);
+        }
+      });
+    },
+
+    flush(callback) {
+      writer.end((error) => {
+        callback(error ?? undefined);
+      });
+    },
+
+    destroy(error, callback) {
+      if (error) {
+        writer.destroy(error);
+      } else {
+        writer.destroy();
+      }
+
+      callback(error);
+    },
+  });
+
+  // Errors emitted directly by the underlying WriteStream must reach
+  // the pipeline.
+  writer.on("error", (error) => {
+    fileTransform.destroy(error);
+  });
+
+  return fileTransform;
+}
+
+function createNullWriter(): Writable {
+  return new Writable({
+    write(_chunk, _encoding, callback) {
+      callback();
+    },
+  });
+}
+
 async function downloadApproachA({
   response,
   sha256,
@@ -317,15 +372,19 @@ async function downloadApproachA({
   maximumBytes: number;
 }): Promise<number> {
   const byteCounter = createByteCounter(maximumBytes);
+  const fileWriter = createFileWritingTransform(destination);
   const hashers = createHasher(sha256, sha512);
-  const writer = createWriteStream(destination, { flags: "wx", mode: 0o600 });
+  const nullWriter = createNullWriter();
 
   try {
     await pipeline(
-      Readable.fromWeb(response.body as any),
+      Readable.fromWeb(
+        response.body as ReadableStream<Uint8Array>,
+      ),
       byteCounter,
-      writer,
-      hashers
+      fileWriter,
+      hashers,
+      nullWriter, // writes actually happen in fileWriter
     );
   } catch (err) {
     fail(getErrorMessage(err));
