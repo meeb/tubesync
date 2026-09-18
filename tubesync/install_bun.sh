@@ -70,7 +70,7 @@ extract_bun() {
     _cleanup_list+=("${_staged}")
     unzip -u -o -d './.bun' "${fn}" &&
         install -v -T ./.bun/bun-linux-*/bun "${_staged}" &&
-        "${_staged}" run "${HERE}/verify_bun.ts" --supervisor "${HERE}/run-unzip.py" --install-dir "${dest_dir}" --release 'bun-v1.3.14'
+        "${_staged}" run "${HERE}/verify_bun.ts" --install-dir "${dest_dir}" --release 'bun-v1.3.14'
 }
 
 install_unzip() {
