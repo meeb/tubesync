@@ -1050,30 +1050,39 @@ async function publishArchive(
 
 async function main(): Promise<void> {
   const parsed = parseArgs(process.argv.slice(2));
+
   const assetName = parsed.asset ?? defaultAssetName();
+  if (!safeFileName(assetName)) {
+    fail(`Unsafe archive name: ${assetName}`);
+  }
+  const outputPath = resolve(
+    parsed.out ?? join(process.cwd(), assetName),
+  );
 
-  if (!safeFileName(assetName)) fail(`Unsafe archive name: ${assetName}`);
-  const outputPath = resolve(parsed.out ?? join(process.cwd(), assetName));
-
-  const releaseUrl = parsed.release === "latest"
-    ? `https://github.com{OWNER}/${REPOSITORY}/releases/latest`
-    : `https://github.com{OWNER}/${REPOSITORY}/releases/tags/${encodeURIComponent(parsed.release)}`;
+  const releasesUrl = `https://api.github.com/repos/${OWNER}/${REPOSITORY}/releases`
+  const releaseUrl =
+    "latest" === parsed.release
+      ? `${releasesUrl}/latest`
+      : `${releasesUrl}/tags/${encodeURIComponent(parsed.release)}`;
 
   console.log(`Requesting: ${releaseUrl}`);
   const release = await githubJson<Release>(releaseUrl);
-
   if (release.draft) fail("Refusing to use a draft release");
   if (release.prerelease && !parsed.allowPrerelease) {
     fail("Release is a prerelease; use --allow-prerelease");
   }
 
-  const archive = release.assets.find((asset) => asset.name === assetName);
+  const archive = release.assets.find(
+    (asset) => asset.name === assetName,
+  );
   if (!archive) fail(`Archive asset not found: ${assetName}`);
   if (!isGitHubDownloadUrl(archive.browser_download_url)) {
     fail(`Unexpected archive URL: ${archive.browser_download_url}`);
   }
 
-  const work = await mkdtemp(join(tmpdir(), "bun-verify-"));
+  const work = await mkdtemp(
+    join(tmpdir(), "bun-verify-"),
+  );
   await chmod(work, 0o700);
 
   const archivePath = join(work, archive.name);
@@ -1081,40 +1090,76 @@ async function main(): Promise<void> {
   const downloadedKeyPath = join(work, "downloaded-key.asc");
 
   try {
+    /*
+     * The embedded key is always written first. The downloaded key is
+     * optional and is appended only as an additional certificate source.
+     * The verifier still requires TRUSTED_FINGERPRINT.
+     */
     console.log(`Writing embedded public key to: ${keyPath}`);
     await writeEmbeddedKey(keyPath);
 
     try {
       console.log(`Downloading: ${KEY_URL}`);
-      await download(KEY_URL, downloadedKeyPath, MAX_KEY_BYTES);
+      // await download(KEY_URL, downloadedKeyPath, MAX_KEY_BYTES);
+      await download(
+        KEY_URL,
+        downloadedKeyPath,
+        MAX_KEY_BYTES,
+      );
       await appendFile(keyPath, downloadedKeyPath);
     } catch (error) {
       console.error(
-        `Warning: could not download published key; using embedded key only: ` +
-        `${error instanceof Error ? error.message : String(error)}`
+        "Warning: could not download published key; " +
+        `using embedded key only: ${getErrorMessage(error)}`,
       );
     }
 
     console.log(`Downloading: ${archive.browser_download_url}`);
-    const archiveHashes = await download(archive.browser_download_url, archivePath, MAX_ARCHIVE_BYTES);
+    // const archiveHashes = await download(archive.browser_download_url, archivePath, MAX_ARCHIVE_BYTES);
+    const archiveHashes = await download(
+      archive.browser_download_url,
+      archivePath,
+      MAX_ARCHIVE_BYTES,
+    );
 
     console.log("Validating API digest...");
     validateApiDigest(archive, archiveHashes);
 
     console.log("Verifying manifests...");
-    await verifyAllManifests(release, work, keyPath, archive.name, archiveHashes);
+    // await verifyAllManifests(release, work, keyPath, archive.name, archiveHashes);
+    await verifyAllManifests(
+      release,
+      work,
+      keyPath,
+      archive.name,
+      archiveHashes,
+    );
 
     if (parsed.installDir) {
       console.log(`Installing into: ${parsed.installDir}`);
-      const installedPath = await installBinary(archivePath, resolve(parsed.installDir));
+      // const installedPath = await installBinary(archivePath, resolve(parsed.installDir));
+      const installedPath = await installBinary(
+        archivePath,
+        resolve(parsed.installDir),
+      );
 
       const algorithms = ["sha256", "sha512"] as const;
       console.log(`Calculating hashes for: ${installedPath}`);
       
+      /*
       const entries = await Promise.all(
         algorithms.map(async (algo) => [algo, await hashFile(installedPath, algo)] as const)
       );
-      const binHashes = Object.fromEntries(entries) as Record<(typeof algorithms)[number], string>;
+      */
+      const entries = await Promise.all(
+        algorithms.map(async (algorithm) => [
+          algorithm,
+          await hashFile(installedPath, algorithm),
+        ] as const),
+      );
+      // const binHashes = Object.fromEntries(entries) as Record<(typeof algorithms)[number], string>;
+      const binHashes = Object.fromEntries(entries)
+        as Record<(typeof algorithms)[number], string>;
 
       console.log(`Installed: ${installedPath}`);
       console.group("Binary Digests");
@@ -1126,7 +1171,13 @@ async function main(): Promise<void> {
       console.log(`SHA-512: ${archiveHashes.sha512}`);
       console.groupEnd();
     } else {
-      const publishedPath = await publishArchive(archivePath, outputPath, archiveHashes.sha512);
+      // const publishedPath = await publishArchive(archivePath, outputPath, archiveHashes.sha512);
+      const publishedPath = await publishArchive(
+        archivePath,
+        outputPath,
+        archiveHashes.sha512,
+      );
+
       console.log(`Verified archive: ${publishedPath}`);
       console.group("Digests");
       console.log(`SHA-256: ${archiveHashes.sha256}`);
@@ -1134,12 +1185,12 @@ async function main(): Promise<void> {
       console.groupEnd();
     }
   } finally {
-    await rm(work, { recursive: true, force: true });
+    await rm(work, { force: true, recursive: true });
   }
 }
 
 main().catch((error) => {
-  console.error(`bun-verify: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`bun-verify: ${getErrorMessage(error)}`);
   process.exitCode = 1;
 });
 
