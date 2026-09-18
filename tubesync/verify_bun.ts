@@ -31,6 +31,8 @@ import { pipeline } from "node:stream/promises";
 const OWNER = "oven-sh";
 const REPOSITORY = "bun";
 const GITHUB_API_VERSION = "2026-03-10";
+// The rollout date when GitHub began automatically generating asset digest records
+const GITHUB_AUTOMATIC_DIGEST_ROLLOUT = new Date("2025-06-05T00:00:00Z");
 
 const KEY_URL = "https://github.com/robobun.gpg";
 const TRUSTED_FINGERPRINT =
@@ -39,6 +41,8 @@ const TRUSTED_FINGERPRINT =
 const MAX_KEY_BYTES = 1 << 20; // MiB
 const MAX_MANIFEST_BYTES = 64 << 20; // MiB
 const MAX_ARCHIVE_BYTES = 1 << 30; // GiB
+
+const MAX_COMMAND_TIME = 60_000;
 
 const TRUSTED_KEY = `-----BEGIN PGP PUBLIC KEY BLOCK-----
 
@@ -60,12 +64,15 @@ const USER_AGENT = "bun-verify/1";
 
 type Asset = {
   name: string;
+  created_at: string;
+  updated_at: string;
   browser_download_url: string;
   digest?: string | null;
 };
 
 type Release = {
   tag_name: string;
+  created_at: string;
   draft: boolean;
   prerelease: boolean;
   assets: Asset[];
@@ -223,7 +230,7 @@ function waitForExit(
 async function runCommandDebug(
   command: string,
   args: string[],
-  timeoutMs = 30_000,
+  timeoutMs = MAX_COMMAND_TIME,
 ): Promise<void> {
   console.error("[command]", {
     command,
@@ -319,13 +326,20 @@ async function runCommandDebug(
           (await readProcFile(`/proc/${child.pid}/wchan`)),
       );
 
+      /*
       console.error(
         "[proc stack]\n" +
           (await readProcFile(`/proc/${child.pid}/stack`)),
       );
+      */
     }
 
-    child.kill("SIGTERM");
+    setTimeout(() => {
+      if (!exited) {
+        child.kill("SIGTERM");
+      }
+    }, 1_000);
+    child.kill("SIGINT");
 
     setTimeout(() => {
       if (!exited) {
@@ -373,9 +387,12 @@ async function runUnzipWithSupervisor(
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
-    timeout: 30000,
+    timeout: MAX_COMMAND_TIME,
     killSignal: "SIGINT",
   });
+  setTimeout(() => {
+      child.kill("SIGINT");
+  }, MAX_COMMAND_TIME);
 
   const stdoutPromise = new Response(child.stdout).text();
   const stderrPromise = new Response(child.stderr).text();
@@ -749,7 +766,18 @@ async function replaceDestination(
 function apiDigest(
   asset: Asset,
 ): { algorithm: "sha256" | "sha512"; digest: string } | undefined {
-  if (!asset.digest) return undefined;
+  // Guard against assets completely missing a digest
+  if (!asset.digest) {
+    const createdAtDate = new Date(asset.created_at);
+
+    // Strict enforcement: Error if created AFTER automatic generation went live
+    if (createdAtDate > GITHUB_AUTOMATIC_DIGEST_ROLLOUT) {
+      fail("Digest is required after the feature was introduced.");
+    }
+
+    // Gracefully skip verification for older, legacy API payloads
+    return undefined;
+  }
 
   const match =
     /^(sha256|sha512):([0-9a-fA-F]{64}|[0-9a-fA-F]{128})$/.exec(
@@ -928,9 +956,8 @@ async function findCommand(
 async function streamText(
   stream: NodeJS.ReadableStream | null,
 ): Promise<string> {
-  if (!stream) return "";
-
   let result = "";
+  if (!stream) return result;
 
   for await (const chunk of stream) {
     result += Buffer.isBuffer(chunk)
@@ -967,15 +994,19 @@ async function runCommand(
   command: string,
   args: string[],
 ): Promise<void> {
+  const stdout = await commandOutput(command, args);
+
+  /*
   const child = spawn(command, args, {
     shell: false,
     stdio: ["ignore", "pipe", "pipe"],
     killSignal: "SIGINT",
-    timeout: 60000,
+    timeout: MAX_COMMAND_TIME,
   });
 
   const stdoutPromise = streamText(child.stdout);
   const stderrPromise = streamText(child.stderr);
+
   const [code, stdout, stderr] = await Promise.all([
     processExit(child),
     stdoutPromise,
@@ -985,6 +1016,7 @@ async function runCommand(
   if (code !== 0) {
     fail(`${command} failed:\n${stderr || stdout}`);
   }
+  */
 }
 
 async function commandOutput(
@@ -999,6 +1031,8 @@ async function commandOutput(
     const child = spawn(command, args, {
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
+      killSignal: "SIGINT",
+      timeout: MAX_COMMAND_TIME,
     });
 
     const stdoutPromise = streamText(child.stdout);
