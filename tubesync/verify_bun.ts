@@ -62,6 +62,18 @@ qbRIlMnwn6TwlQgN9w1qqlSnA9CbKXT9Aw==
 
 const USER_AGENT = "bun-verify/1";
 
+const expectedLengths = {
+  sha256: 64,
+  sha512: 128,
+} as const;
+
+type Algorithm = keyof typeof expectedLengths;
+
+type Digest<A extends Algorithm = Algorithm> =
+  `${A}:${string}` & {
+    readonly __digestBrand: unique symbol;
+  };
+
 type Asset = {
   name: string;
   created_at: string;
@@ -80,15 +92,35 @@ type Release = {
 
 type DownloadHashes = {
   bytes: number;
-  sha256: string;
-  sha512: string;
+  sha256: Digest<"sha256">;
+  sha512: Digest<"sha512">;
 };
 
 type ManifestRecord = {
-  algorithm: "sha256" | "sha512";
+  algorithm: Algorithm;
   digest: string;
   filename: string;
 };
+
+function getExpectedAlgorithmLength(algorithm: Algorithm): number {
+  return expectedLengths[algorithm];
+}
+
+function createDigest<A extends Algorithm>(
+  algorithm: A,
+  hex: string,
+): Digest<A> {
+  const expectedLength = ;
+
+  if (
+    getExpectedAlgorithmLength(algorithm) !== hex.length ||
+    !/^[0-9a-fA-F]+$/i.test(hex)
+  ) {
+    throw new Error(`Invalid ${algorithm} checksum`);
+  }
+
+  return `${algorithm}:${hex}` as Digest<A>;
+}
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -627,17 +659,25 @@ async function replaceDestination(stagedPath: string, destination: string): Prom
 function apiDigest(
   asset: Asset,
 ): {
-  algorithm: "sha256" | "sha512";
+  algorithm: Algorithm;
   digest: string;
 } | undefined {
+  // Guard against assets completely missing a digest
   if (!asset.digest) {
+    // Strict enforcement: Error if created AFTER automatic generation went live
     const createdAtDate = new Date(asset.created_at);
-
     if (createdAtDate > GITHUB_AUTOMATIC_DIGEST_ROLLOUT) {
       fail("Digest is required after the feature was introduced.");
     }
 
-    return undefined;
+    // Gracefully skip verification for older legacy assets
+    const updatedAtDate = new Date(asset.updated_at);
+    if (updatedAtDate < GITHUB_AUTOMATIC_DIGEST_ROLLOUT) {
+      return undefined;
+    }
+
+    // Generate a recognition sentinel for this odd case
+    return {"sha256", "F".repeat(64)}
   }
 
   const match =
@@ -652,11 +692,9 @@ function apiDigest(
   const algorithm = match[1].toLowerCase() as "sha256" | "sha512";
   const digest = match[2].toLowerCase();
 
-  const expectedLength = algorithm === "sha256" ? 64 : 128;
-
-  if (expectedLength !== digest.length) {
+  if (digest.length !== getExpectedAlgorithmLength(algorithm)) {
     fail(
-      `Invalid ${algorithm} API digest length for ` +
+      `Invalid ${algorithm} digest length for ` +
         `${asset.name}: ${asset.digest}`,
     );
   }
@@ -665,14 +703,15 @@ function apiDigest(
 }
 
 function validateApiDigest(asset: Asset, local: DownloadHashes): void {
-  const expected = apiDigest(asset);
-  if (!expected) return;
+  const apiResult = apiDigest(asset);
+  if (!apiResult) return;
 
-  if (local[expected.algorithm] !== expected.digest) {
+  const expected = createDigest(apiResult.algorithm, apiResult.digest);
+  if (expected !== local[apiResult.algorithm]) {
     fail(
       `${asset.name} failed GitHub API digest validation:\n` +
-        `expected: ${expected.digest}\n` +
-        `actual:   ${local[expected.algorithm]}`,
+        `expected: ${apiResult.digest}\n` +
+        `actual:   ${local[apiResult.algorithm]}`,
     );
   }
 }
