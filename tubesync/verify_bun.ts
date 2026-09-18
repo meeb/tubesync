@@ -824,7 +824,7 @@ async function runChild(
     ...options,
     shell: false,
     stdio: options.stdio ?? ["ignore", "pipe", "pipe"],
-    timeout: max(10_000, min(options.timeout ?? 0, MAX_COMMAND_TIME)),
+    timeout: Math.max(10_000, Math.min(options.timeout ?? 0, MAX_COMMAND_TIME)),
   });
 
   const timeout_term = setTimeout(() => {
