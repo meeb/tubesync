@@ -106,22 +106,6 @@ function getExpectedAlgorithmLength(algorithm: Algorithm): number {
   return expectedLengths[algorithm];
 }
 
-function createDigest<A extends Algorithm>(
-  algorithm: A,
-  hex: string,
-): Digest<A> {
-  const expectedLength = ;
-
-  if (
-    getExpectedAlgorithmLength(algorithm) !== hex.length ||
-    !/^[0-9a-fA-F]+$/i.test(hex)
-  ) {
-    throw new Error(`Invalid ${algorithm} checksum`);
-  }
-
-  return `${algorithm}:${hex}` as Digest<A>;
-}
-
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
@@ -129,6 +113,20 @@ function getErrorMessage(err: unknown): string {
 
 function fail(message: string): never {
   throw new Error(message);
+}
+
+function createDigest<A extends Algorithm>(
+  algorithm: A,
+  checksum: string,
+): Digest<A> {
+  const hexOnly = /^[0-9a-fA-F]+$/i.test(checksum);
+  const expectedLength = getExpectedAlgorithmLength(algorithm);
+
+  if (hexOnly && expectedLength === checksum.length) {
+    return `${algorithm}:${checksum}` as Digest<A>;
+  } else {
+    fail(`Invalid ${algorithm} checksum`);
+  }
 }
 
 function usage(): never {
