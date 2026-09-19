@@ -893,7 +893,7 @@ async function verifyWithSqv(
   if (cleartext) {
     args.push("--output", messagePath, "--message", signaturePath);
   } else {
-    args.push(`--signature-file=${signaturePath}`, messagePath);
+    args.push("--signature-file", signaturePath, messagePath);
   }
 
   const [stderr, stdout, code] = await runChild(
@@ -912,9 +912,9 @@ async function verifyWithSq(
   messagePath: string,
   cleartext: boolean,
 ): Promise<void> {
-  const args = ["--batch", "verify", "--signatures", "1", "--signer-file", keyPath, "--trust-root", TRUSTED_FINGERPRINT];
+  const args = ["verify", "--no-cert-store", "--signatures", "1", "--keyring", keyPath, "--trust-root", TRUSTED_FINGERPRINT];
   if (cleartext) {
-    args.push("--cleartext", "--output", messagePath, signaturePath);
+    args.push("--message", "--output", messagePath, signaturePath);
   } else {
     args.push("--signature-file", signaturePath, messagePath);
   }
@@ -995,7 +995,7 @@ async function verifySignature(
   const sqv = await findCommand(["sqv"]);
   if (sqv) {
     const sqv_help = await commandOutput("sqv", ["--help"]);
-    if (sqv_help.includes("--output")) {
+    if (sqv_help.includes("--message")) {
       console.log(`Verifying with: ${sqv}`);
       await verifyWithSqv(sqv, keyPath, signaturePath, messagePath, cleartext);
       return;
@@ -1004,8 +1004,8 @@ async function verifySignature(
 
   const sq = await findCommand(["sq"]);
   if (sq) {
-    const sq_help = await commandOutput("sq", ["--help"]);
-    if (sq_help.includes("--batch")) {
+    const sq_help = await commandOutput("sq", ["help", "verify"]);
+    if (sq_help.includes("--no-cert-store")) {
       console.log(`Verifying with: ${sq}`);
       await verifyWithSq(sq, keyPath, signaturePath, messagePath, cleartext);
       return;
@@ -1133,6 +1133,7 @@ async function installBinary(archivePath: string, installDirectory: string): Pro
     const extractedPath = await extractBinary(archivePath, extractionDirectory);
     const extractedInfo = await lstat(extractedPath);
     if (!extractedInfo.isFile()) fail("Extracted Bun executable is not a regular file");
+    console.log(`Hashing: ${extractedPath}`);
     const extractedSha512 = await hashFile(extractedPath, "sha512");
 
     await chmod(extractedPath, 0o755);
@@ -1143,6 +1144,7 @@ async function installBinary(archivePath: string, installDirectory: string): Pro
     await ensureAbsent(stagingPath);
 
     try {
+      console.log(`Staging at: ${stagingPath}`);
       await moveOrCopyToStage(extractedPath, stagingPath);
       const stagedSha512 = await hashFile(stagingPath, "sha512");
 
