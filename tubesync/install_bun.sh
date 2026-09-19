@@ -77,6 +77,7 @@ extract_bun() {
                 "${_staged}" run "${HERE}/verify_bun.ts" --install-dir "${dest_dir}" --release 'bun-v1.3.14' &&
                     break || sleep "${_attempt}"
             done ;
+            [[ -x "${dest_dir}/bun" ]]
         }
 }
 
