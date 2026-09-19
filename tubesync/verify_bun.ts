@@ -838,6 +838,10 @@ async function runChild(
     console.error("[TIMEOUT] Sending the child SIGKILL");
     child.kill("SIGKILL");
     child.unref();
+    fail(
+      "A spawned command exceeded its time limit: " +
+      `PID=${child.pid} CMD=${child.spawnfile} ${child.spawnargs.join(" ")}`
+    );
   }, 6_000 + MAX_COMMAND_TIME);
 
   try {
