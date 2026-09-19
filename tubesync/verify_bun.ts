@@ -820,20 +820,25 @@ async function runChild(
   args: string[],
   options: Parameters<typeof spawn>[2] = {},
 ) {
+  const signal = AbortSignal.timeout(10_000 + MAX_COMMAND_TIME);
   const child = spawn(command, args, {
     ...options,
     shell: false,
+    signal: signal,
     stdio: options.stdio ?? ["ignore", "pipe", "pipe"],
     timeout: Math.max(10_000, Math.min(options.timeout ?? 0, MAX_COMMAND_TIME)),
   });
 
   const timeout_term = setTimeout(() => {
+    console.error("[TIMEOUT] Sending the child SIGTERM");
     child.kill("SIGTERM");
   }, 1_000 + MAX_COMMAND_TIME);
 
   const timeout_kill = setTimeout(() => {
+    console.error("[TIMEOUT] Sending the child SIGKILL");
     child.kill("SIGKILL");
-  }, 5_000 + MAX_COMMAND_TIME);
+    signal.abort("TIMEOUT: SIGKILL");
+  }, 6_000 + MAX_COMMAND_TIME);
 
   try {
     const stdoutPromise = streamText(child.stdout);
