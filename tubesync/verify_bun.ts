@@ -932,14 +932,12 @@ async function runChild(
   });
 
   const timeout_term = setTimeout(() => {
-    captureMonitor("timeout before SIGTERM");
     console.error("[TIMEOUT] Sending the child SIGTERM PID=" + child.pid);
     child.kill("SIGTERM");
     process.exitCode = 124;
   }, 1_000 + MAX_COMMAND_TIME);
 
   const timeout_kill = setTimeout(() => {
-    captureMonitor("timeout before SIGKILL");
     console.error("[TIMEOUT] Sending the child SIGKILL PID=" + child.pid);
     child.kill("SIGKILL");
     child.unref();
