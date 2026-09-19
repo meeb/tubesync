@@ -62,12 +62,12 @@ qbRIlMnwn6TwlQgN9w1qqlSnA9CbKXT9Aw==
 
 const USER_AGENT = "bun-verify/1";
 
-const expectedLengths = {
+const expectedAlgorithmLengths = {
   sha256: 64,
   sha512: 128,
 } as const;
 
-type Algorithm = keyof typeof expectedLengths;
+type Algorithm = keyof typeof expectedAlgorithmLengths;
 
 type Digest<A extends Algorithm = Algorithm> =
   `${A}:${string}` & {
@@ -103,7 +103,7 @@ type ManifestRecord = {
 };
 
 function getExpectedAlgorithmLength(algorithm: Algorithm): number {
-  return expectedLengths[algorithm];
+  return expectedAlgorithmLengths[algorithm];
 }
 
 function getErrorMessage(err: unknown): string {
@@ -751,7 +751,7 @@ function parseManifest(text: string, expectedFile: string): ManifestRecord[] {
     }
 
     const candidateAlgorithms = Object.entries(
-      expectedLengths
+      expectedAlgorithmLengths
     ).filter(
       ([, expectedLength]) => expectedLength === checksum.length
     ).map(
@@ -1302,6 +1302,9 @@ async function main(): Promise<void> {
       archiveHashes,
     );
 
+    const algorithms = Object.keys(
+      expectedAlgorithmLengths
+    ) as Array<Algorithm>;
     if (parsed.installDir) {
       console.log(`Installing into: ${parsed.installDir}`);
       // const installedPath = await installBinary(archivePath, resolve(parsed.installDir));
@@ -1310,7 +1313,6 @@ async function main(): Promise<void> {
         resolve(parsed.installDir),
       );
 
-      const algorithms = Object.keys(expectedLengths) as Array<Algorithm>;
       console.log(`Calculating hashes for: ${installedPath}`);
       
       /*
@@ -1330,12 +1332,10 @@ async function main(): Promise<void> {
 
       console.log(`Installed: ${installedPath}`);
       console.group("Binary Digests");
-      console.log(`SHA-256: ${binHashes.sha256}`);
-      console.log(`SHA-512: ${binHashes.sha512}`);
+      for (const a of algorithms) console.log(binHashes[a]);
       console.groupEnd();
       console.group("Archive Digests");
-      console.log(`SHA-256: ${archiveHashes.sha256}`);
-      console.log(`SHA-512: ${archiveHashes.sha512}`);
+      for (const a of algorithms) console.log(archiveHashes[a]);
       console.groupEnd();
     } else {
       // const publishedPath = await publishArchive(archivePath, outputPath, archiveHashes.sha512);
@@ -1347,8 +1347,7 @@ async function main(): Promise<void> {
 
       console.log(`Verified archive: ${publishedPath}`);
       console.group("Digests");
-      console.log(`SHA-256: ${archiveHashes.sha256}`);
-      console.log(`SHA-512: ${archiveHashes.sha512}`);
+      for (const a of algorithms) console.log(archiveHashes[a]);
       console.groupEnd();
     }
   } finally {
