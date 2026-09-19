@@ -202,15 +202,13 @@ async function logLatestProcessState(label = "latest") {
 
     return result;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-
     console.error(JSON.stringify({
       event: "process-monitor-error",
       query: "/latest",
       label,
       time: new Date().toISOString(),
       durationMs: Math.round(performance.now() - started),
-      error: message,
+      error: getErrorMessage(error),
     }));
 
     return null;
@@ -953,8 +951,6 @@ async function runChild(
     const stderrPromise = streamText(child.stderr);
     const exitPromise = processExit(child);
 
-    await logLatestProcessState();
-
     return await Promise.all([
       stderrPromise,
       stdoutPromise,
@@ -967,6 +963,7 @@ async function runChild(
 }
 
 async function commandOutput(command: string, args: string[]): Promise<string> {
+  await logLatestProcessState();
   const [stderr, stdout, code] = await runChild(
     command, args, {
     killSignal: "SIGINT",
