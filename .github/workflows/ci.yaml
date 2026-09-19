@@ -96,6 +96,7 @@ jobs:
           printf '%s\n' '' '-------- END: verify_bun.ts + sqv' '' ;
           sudo apt-get purge -y sqv
           sq --help
+          sq help verify
           printf '%s\n' '' '++++++++ START: verify_bun.ts + sq' '' ;
           bun run ./tubesync/verify_bun.ts --install-dir /usr/local/bin
           printf '%s\n' '' '-------- END: verify_bun.ts + sq' '' ;
