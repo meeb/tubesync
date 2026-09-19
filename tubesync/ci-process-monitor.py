@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 SOCKET_NAME = "\0ci-process-monitor"
 POLL_INTERVAL = 0.25
-KEEP_SAMPLES = 2400  # 10 minutes at 250 ms
+KEEP_SAMPLES = 4800  # 20 minutes at 250 ms
 
 db = sqlite3.connect(":memory:", check_same_thread=False)
 db.execute("""
@@ -157,7 +157,7 @@ class Handler(BaseHTTPRequestHandler):
                     SELECT ts, load1, load5, load15, processes
                     FROM samples
                     ORDER BY id DESC
-                    LIMIT 200
+                    LIMIT 280
                 """).fetchall()
 
             self.send_json({
