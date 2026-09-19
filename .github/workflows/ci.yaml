@@ -79,12 +79,14 @@ jobs:
         shell: bash
         run: |
           declare -p PATH
-          PATH+=:/usr/local/bin
-          declare -p PATH
-          printf '%s\n' ’' '++++++++ START: install_bun.sh + gpg'  ''
+          printf '%s\n' ’' '++++++++ START: install_bun.sh + gpg'  '' ;
+
           ./tubesync/install_bun.sh
-          printf '%s\n' ’' '-------- END: install_bun.sh + gpg'  ''
+
+          printf '%s\n' ’' '-------- END: install_bun.sh + gpg'  '' ;
+
           hash -r
+          command -v bun
           bun --revision
           sudo apt-get update &&
             sudo apt-get install --no-install-recommends -y sequoia-sq{,v}
