@@ -1005,9 +1005,19 @@ async function verifySignature(
   const sq = await findCommand(["sq"]);
   if (sq) {
     const sq_help = await commandOutput("sq", ["help", "verify"]);
-    if (sq_help.includes("--no-cert-store")) {
+    if (sq_help.includes("--message")) {
       console.log(`Verifying with: ${sq}`);
       await verifyWithSq(sq, keyPath, signaturePath, messagePath, cleartext);
+      return;
+    } else if (cleartext) {
+      // Ubuntu LTS uses an older version without --message
+      console.log(`Verifying with: ${sq}`);
+      await commandOutput("sq", [
+        "verify", "--no-cert-store",
+        "--keyring", keyPath,
+        "--trust-root", TRUSTED_FINGERPRINT,
+        "--output", messagePath, signaturePath,
+      ]);
       return;
     }
   }
