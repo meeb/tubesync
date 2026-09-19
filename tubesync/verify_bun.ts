@@ -602,7 +602,7 @@ async function moveOrCopyToStage(source: string, destination: string): Promise<v
 
 function isRenameReplacementFailure(error: any): boolean {
   return (
-    process.platform === "win32" &&
+    "win32" === process.platform &&
     ["EEXIST", "EPERM", "ENOTEMPTY", "EBUSY"].includes(error?.code)
   );
 }
@@ -613,7 +613,7 @@ async function replaceDestination(stagedPath: string, destination: string): Prom
     await syncDirectory(dirname(destination));
     return;
   } catch (error: any) {
-    if (error?.code !== "EEXIST" && !isRenameReplacementFailure(error)) {
+    if (!isRenameReplacementFailure(error)) {
       throw error;
     }
   }
@@ -1133,6 +1133,7 @@ async function installBinary(archivePath: string, installDirectory: string): Pro
     const extractedPath = await extractBinary(archivePath, extractionDirectory);
     const extractedInfo = await lstat(extractedPath);
     if (!extractedInfo.isFile()) fail("Extracted Bun executable is not a regular file");
+    const extractedSha512 = await hashFile(extractedPath, "sha512");
 
     await chmod(extractedPath, 0o755);
     const finalName = process.platform === "win32" ? "bun.exe" : "bun";
@@ -1144,9 +1145,8 @@ async function installBinary(archivePath: string, installDirectory: string): Pro
     try {
       await moveOrCopyToStage(extractedPath, stagingPath);
       const stagedSha512 = await hashFile(stagingPath, "sha512");
-      const extractedSha512 = await hashFile(stagingPath, "sha512");
 
-      if (stagedSha512 !== extractedSha512) fail("Staged executable failed SHA-512 verification");
+      if (extractedSha512 !== stagedSha512) fail("Staged executable failed SHA-512 verification");
 
       await chmod(stagingPath, 0o755);
       await replaceDestination(stagingPath, finalPath);
@@ -1163,7 +1163,7 @@ async function installBinary(archivePath: string, installDirectory: string): Pro
 async function publishArchive(
   archivePath: string,
   outputPath: string,
-  expectedSha512: string,
+  expectedSha512: Digest<"sha512">,
 ): Promise<string> {
   const archiveFile = basename(archivePath);
   const outputInfo = await lstat(outputPath).catch(
@@ -1184,9 +1184,10 @@ async function publishArchive(
 
   try {
     await moveOrCopyToStage(archivePath, stagePath);
-    const stagedSha512 = await hashFile(stagePath, "sha512");
+    const stagedChecksum = await hashFile(stagePath, "sha512");
+    const stagedSha512 = createDigest("sha512", stagedChecksum);
 
-    if (stagedSha512 !== expectedSha512) {
+    if (expectedSha512 !== stagedSha512) {
       fail(
         `Staged archive failed SHA-512 verification:\n` +
         `expected: ${expectedSha512}\n` +
@@ -1197,9 +1198,8 @@ async function publishArchive(
     await syncFile(stagePath);
     await replaceDestination(stagePath, outputPath);
     return outputPath;
-  } catch (error) {
+  } finally {
     await unlink(stagePath).catch(() => {});
-    throw error;
   }
 }
 
@@ -1298,7 +1298,7 @@ async function main(): Promise<void> {
         resolve(parsed.installDir),
       );
 
-      const algorithms = ["sha256", "sha512"] as const;
+      const algorithms = keyof expectedLengths;
       console.log(`Calculating hashes for: ${installedPath}`);
       
       /*
@@ -1306,14 +1306,14 @@ async function main(): Promise<void> {
         algorithms.map(async (algo) => [algo, await hashFile(installedPath, algo)] as const)
       );
       */
-      const entries = await Promise.all(
+      const digests = await Promise.all(
         algorithms.map(async (algorithm) => [
           algorithm,
-          await hashFile(installedPath, algorithm),
+          createDigest(algorithm, await hashFile(installedPath, algorithm)),
         ] as const),
       );
       // const binHashes = Object.fromEntries(entries) as Record<(typeof algorithms)[number], string>;
-      const binHashes = Object.fromEntries(entries) as Record<
+      const binHashes = Object.fromEntries(digests) as Record<
           (typeof algorithms)[number], string>;
 
       console.log(`Installed: ${installedPath}`);
