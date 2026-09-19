@@ -86,9 +86,11 @@ jobs:
             sudo apt-get install --no-install-recommends -y sq sqv
           printf '%s\n' '' '' '====== SQV ======' ;
           sqv --help
+          sqv --version
           printf '%s\n' '' '' '====== SQ ======' ;
           sq --help
           sq help verify
+          sq version
           printf '%s\n' '' '' '====== BUN ======' ;
           bun --revision
 
