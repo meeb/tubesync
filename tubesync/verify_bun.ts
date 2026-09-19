@@ -992,8 +992,8 @@ async function verifySignature(
   cleartext: boolean,
   gpgHome: string,
 ): Promise<void> {
-  const sqv = await findCommand(["sqv"]);
-  if (sqv) {
+  const sqv = await commandOutput("sqv", ["--help"]);
+  if (sqv && sqv.includes("--output")) {
     console.log(`Verifying with: ${sqv}`);
     await verifyWithSqv(sqv, keyPath, signaturePath, messagePath, cleartext);
     return;
