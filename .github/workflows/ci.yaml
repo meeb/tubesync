@@ -82,7 +82,7 @@ jobs:
           cat -vn "$0"
           declare -p PATH
           set -x
-          printf '%s\n' '' '++++++++ START: install_bun.sh + gpg' "" ;
+          printf '%s\n' '' '++++++++ START: install_bun.sh + gpg' '' ;
 
           ./tubesync/install_bun.sh
 
@@ -92,7 +92,7 @@ jobs:
           command -v bun
           bun --revision
           sudo apt-get update &&
-            sudo apt-get install --no-install-recommends -y sequoia-sq{,v}
+            sudo apt-get install --no-install-recommends -y sq{,v}
           printf '%s\n' "" '++++++++ START: verify_bun.ts + sqv' "" ;
           bun run ./tubesync/verify_bun.ts
           printf '%s\n' "" '-------- END: verify_bun.ts + sqv' "" ;
