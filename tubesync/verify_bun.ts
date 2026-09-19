@@ -837,7 +837,7 @@ async function runChild(
   const timeout_kill = setTimeout(() => {
     console.error("[TIMEOUT] Sending the child SIGKILL");
     child.kill("SIGKILL");
-    signal.abort("TIMEOUT: SIGKILL");
+    child.unref();
   }, 6_000 + MAX_COMMAND_TIME);
 
   try {
