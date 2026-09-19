@@ -992,11 +992,14 @@ async function verifySignature(
   cleartext: boolean,
   gpgHome: string,
 ): Promise<void> {
-  const sqv = await commandOutput("sqv", ["--help"]);
-  if (sqv && sqv.includes("--output")) {
-    console.log(`Verifying with: ${sqv}`);
-    await verifyWithSqv(sqv, keyPath, signaturePath, messagePath, cleartext);
-    return;
+  const sqv = await findCommand(["sqv"]);
+  if (sqv) {
+    const sqv_help = await commandOutput("sqv", ["--help"]);
+    if (sqv_help.includes("--output")) {
+      console.log(`Verifying with: ${sqv}`);
+      await verifyWithSqv(sqv, keyPath, signaturePath, messagePath, cleartext);
+      return;
+    }
   }
 
   const sq = await findCommand(["sq"]);
