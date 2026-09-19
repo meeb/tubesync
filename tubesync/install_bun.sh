@@ -2,6 +2,7 @@
 
 # requires:
 # - curl
+# - gpg
 # - python3
 # - unzip
 
@@ -70,7 +71,13 @@ extract_bun() {
     _cleanup_list+=("${_staged}")
     unzip -u -o -d './.bun' "${fn}" &&
         install -v -T ./.bun/bun-linux-*/bun "${_staged}" &&
-        "${_staged}" run "${HERE}/verify_bun.ts" --install-dir "${dest_dir}" --release 'bun-v1.3.14'
+        { # bun spawning unzip hangs for an unknown reason fairly often
+            local _attempt ; for _attempt in {1..5} ; do
+                "${_staged}" run "${HERE}/verify_bun.ts" --install-dir "${dest_dir}" --release 'bun-v1.3.14' &&
+                    break ||
+                    sleep "${_attempt}"
+            done ;
+        }
 }
 
 install_unzip() {
