@@ -963,7 +963,6 @@ async function runChild(
   } finally {
     clearTimeout(timeout_kill);
     clearTimeout(timeout_term);
-    await captureMonitor("after runChild");
   }
 }
 
@@ -973,6 +972,7 @@ async function commandOutput(command: string, args: string[]): Promise<string> {
     killSignal: "SIGINT",
     timeout: MAX_COMMAND_TIME,
   });
+  await captureMonitor("after runChild");
 
   if (code !== 0) {
     fail(`${command} failed:\n${stderr || stdout}`);
