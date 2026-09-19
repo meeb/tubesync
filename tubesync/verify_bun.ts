@@ -1004,9 +1004,12 @@ async function verifySignature(
 
   const sq = await findCommand(["sq"]);
   if (sq) {
-    console.log(`Verifying with: ${sq}`);
-    await verifyWithSq(sq, keyPath, signaturePath, messagePath, cleartext);
-    return;
+    const sq_help = await commandOutput("sq", ["--help"]);
+    if (sq_help.includes("--batch")) {
+      console.log(`Verifying with: ${sq}`);
+      await verifyWithSq(sq, keyPath, signaturePath, messagePath, cleartext);
+      return;
+    }
   }
 
   const gpg = await findCommand(["gpg2", "gpg", "gnupg2", "gnupg", "gpg2.exe", "gpg.exe"]);
