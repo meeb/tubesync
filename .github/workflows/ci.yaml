@@ -79,19 +79,15 @@ jobs:
         shell: bash
         run: |
           printf '%s\n' '' '++++++++ START: install_bun.sh + gpg' '' ;
-          # bun spawning unzip hangs for an unknown reason fairly often
-          for _attempt in {1..5}; do
-            ./tubesync/install_bun.sh && break || sleep "${_attempt}"
-          done; unset -v _attempt ;
+          ./tubesync/install_bun.sh
           printf '%s\n' '' '-------- END: install_bun.sh + gpg' '' ;
 
           sudo apt-get update &&
             sudo apt-get install --no-install-recommends -y sq sqv
           printf '%s\n' '' '' '====== SQV ======' ;
-          sqv --version
           sqv --help
           printf '%s\n' '' '' '====== SQ ======' ;
-          sq --version
+          sq --help
           sq help verify
           printf '%s\n' '' '' '====== BUN ======' ;
           bun --revision
