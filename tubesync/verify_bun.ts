@@ -1298,7 +1298,7 @@ async function main(): Promise<void> {
         resolve(parsed.installDir),
       );
 
-      const algorithms = keyof expectedLengths;
+      const algorithms = Object.keys(expectedLengths) as Array<Algorithm>;
       console.log(`Calculating hashes for: ${installedPath}`);
       
       /*
