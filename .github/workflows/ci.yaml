@@ -78,12 +78,14 @@ jobs:
       - name: Install `bun`
         shell: bash
         run: |
+          cat -vn "$0"
           declare -p PATH
-          printf '%s\n' ’' '++++++++ START: install_bun.sh + gpg'  '' ;
+          set -x
+          printf '%s\n' "" '++++++++ START: install_bun.sh + gpg'  "" ;
 
           ./tubesync/install_bun.sh
 
-          printf '%s\n' ’' '-------- END: install_bun.sh + gpg'  '' ;
+          printf '%s\n' "" '-------- END: install_bun.sh + gpg'  "" ;
 
           hash -r
           command -v bun
