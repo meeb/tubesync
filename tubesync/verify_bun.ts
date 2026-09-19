@@ -1098,12 +1098,10 @@ async function extractBinary(archivePath: string, extractionDirectory: string): 
 
   const candidates: string[] = [];
   async function walk(directory: string): Promise<void> {
-    console.log(`Walking: ${directory}`);
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name);
       if (entry.isSymbolicLink()) fail(`Archive extraction produced a symbolic link: ${path}`);
       if (entry.isDirectory()) {
-        console.log(`Descending into directory: ${entry.name}`);
         await walk(path);
       } else if (entry.isFile() && (entry.name === "bun" || entry.name === "bun.exe")) {
         candidates.push(path);
@@ -1112,7 +1110,7 @@ async function extractBinary(archivePath: string, extractionDirectory: string): 
   }
 
   await walk(extractionDirectory);
-  if (candidates.length !== 1) fail(`Expected exactly one extracted Bun executable; found ${candidates.length}`);
+  if (1 !== candidates.length) fail(`Expected exactly one extracted Bun executable; found ${candidates.length}`);
   return candidates[0]!;
 }
 
