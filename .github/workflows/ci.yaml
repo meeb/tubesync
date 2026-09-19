@@ -81,7 +81,7 @@ jobs:
           printf '%s\n' '' '++++++++ START: install_bun.sh + gpg' '' ;
           # bun spawning unzip hangs for an unknown reason fairly often
           for _attempt in {1..5}; do
-            ./tubesync/install_bun.sh && break || :
+            ./tubesync/install_bun.sh && break || sleep "${_attempt}"
           done; unset -v _attempt ;
           printf '%s\n' '' '-------- END: install_bun.sh + gpg' '' ;
 
