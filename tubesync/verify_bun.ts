@@ -115,6 +115,108 @@ function fail(message: string): never {
   throw new Error(message);
 }
 
+const MONITOR_SOCKET = "\0ci-process-monitor";
+
+async function monitor(path: string) {
+  const response = await fetch(`http://monitor${path}`, {
+    unix: MONITOR_SOCKET,
+    signal: AbortSignal.timeout(2_000),
+    headers: {
+      "Cache-Control": "no-cache",
+    },
+  });
+
+  if (!response.ok) {
+    fail(`monitor request failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+type MonitorResult = {
+  ok: boolean;
+  data?: unknown;
+  error?: string;
+};
+
+async function queryMonitor(path: string): Promise<MonitorResult> {
+  try {
+    const response = await fetch(`http://monitor${path}`, {
+      unix: MONITOR_SOCKET,
+      signal: AbortSignal.timeout(2_000),
+      headers: {
+        "Cache-Control": "no-cache",
+      },
+    });
+
+    const body = await response.text();
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: `monitor HTTP ${response.status}: ${body}`,
+      };
+    }
+
+    return {
+      ok: true,
+      data: JSON.parse(body),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: getErrorMessage(error),
+    };
+  }
+}
+
+async function captureMonitor(label: string) {
+  const result = await queryMonitor("/recent");
+
+  const record = {
+    event: "process-monitor",
+    label,
+    time: new Date().toISOString(),
+    result,
+  };
+
+  console.error(JSON.stringify(record));
+
+  return result;
+}
+
+async function logLatestProcessState(label = "latest") {
+  const started = performance.now();
+
+  try {
+    const result = await queryMonitor("/latest");
+
+    console.error(JSON.stringify({
+      event: "process-monitor",
+      query: "/latest",
+      label,
+      time: new Date().toISOString(),
+      durationMs: Math.round(performance.now() - started),
+      result,
+    }));
+
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    console.error(JSON.stringify({
+      event: "process-monitor-error",
+      query: "/latest",
+      label,
+      time: new Date().toISOString(),
+      durationMs: Math.round(performance.now() - started),
+      error: message,
+    }));
+
+    return null;
+  }
+}
+
 function createDigest<A extends Algorithm>(
   algorithm: A,
   checksum: string,
@@ -830,14 +932,18 @@ async function runChild(
   });
 
   const timeout_term = setTimeout(() => {
-    console.error("[TIMEOUT] Sending the child SIGTERM");
+    await captureMonitor("timeout before SIGTERM");
+    console.error("[TIMEOUT] Sending the child SIGTERM PID=" + child.pid);
     child.kill("SIGTERM");
+    process.exitCode = 124;
   }, 1_000 + MAX_COMMAND_TIME);
 
   const timeout_kill = setTimeout(() => {
-    console.error("[TIMEOUT] Sending the child SIGKILL");
+    await captureMonitor("timeout before SIGKILL");
+    console.error("[TIMEOUT] Sending the child SIGKILL PID=" + child.pid);
     child.kill("SIGKILL");
     child.unref();
+    process.exitCode = 137;
     fail(
       "A spawned command exceeded its time limit: " +
       `PID=${child.pid} CMD=${child.spawnfile} ${child.spawnargs.join(" ")}`
@@ -848,6 +954,9 @@ async function runChild(
     const stdoutPromise = streamText(child.stdout);
     const stderrPromise = streamText(child.stderr);
     const exitPromise = processExit(child);
+
+    await logLatestProcessState();
+
     return await Promise.all([
       stderrPromise,
       stdoutPromise,
@@ -856,6 +965,7 @@ async function runChild(
   } finally {
     clearTimeout(timeout_kill);
     clearTimeout(timeout_term);
+    await captureMonitor("after runChild");
   }
 }
 
