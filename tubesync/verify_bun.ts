@@ -913,7 +913,7 @@ on_int() {
   forward_signal INT
 }
 
-set -x
+builtin command sleep 1
 sync
 
 trap on_term TERM
@@ -927,8 +927,6 @@ status=$?
 trap - TERM INT
 
 sync
-builtin command sleep 1
-
 exit "$status"
 `;
 
