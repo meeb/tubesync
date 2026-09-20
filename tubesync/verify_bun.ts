@@ -115,106 +115,6 @@ function fail(message: string): never {
   throw new Error(message);
 }
 
-const MONITOR_SOCKET = "\0ci-process-monitor";
-
-async function monitor(path: string) {
-  const response = await fetch(`http://monitor${path}`, {
-    unix: MONITOR_SOCKET,
-    signal: AbortSignal.timeout(2_000),
-    headers: {
-      "Cache-Control": "no-cache",
-    },
-  });
-
-  if (!response.ok) {
-    fail(`monitor request failed: ${response.status}`);
-  }
-
-  return response.json();
-}
-
-type MonitorResult = {
-  ok: boolean;
-  data?: unknown;
-  error?: string;
-};
-
-async function queryMonitor(path: string): Promise<MonitorResult> {
-  try {
-    const response = await fetch(`http://monitor${path}`, {
-      unix: MONITOR_SOCKET,
-      signal: AbortSignal.timeout(2_000),
-      headers: {
-        "Cache-Control": "no-cache",
-      },
-    });
-
-    const body = await response.text();
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        error: `monitor HTTP ${response.status}: ${body}`,
-      };
-    }
-
-    return {
-      ok: true,
-      data: JSON.parse(body),
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      error: getErrorMessage(error),
-    };
-  }
-}
-
-async function captureMonitor(label: string) {
-  const result = await queryMonitor("/recent");
-
-  const record = {
-    event: "process-monitor",
-    label,
-    time: new Date().toISOString(),
-    result,
-  };
-
-  console.error(JSON.stringify(record));
-
-  return result;
-}
-
-async function logLatestProcessState(label = "latest") {
-  const started = performance.now();
-
-  try {
-    const result = await queryMonitor("/latest");
-
-    console.error(JSON.stringify({
-      event: "process-monitor",
-      query: "/latest",
-      label,
-      time: new Date().toISOString(),
-      durationMs: Math.round(performance.now() - started),
-      result,
-    }));
-
-    return result;
-  } catch (error) {
-    console.error(JSON.stringify({
-      event: "process-monitor-error",
-      query: "/latest",
-      label,
-      time: new Date().toISOString(),
-      durationMs: Math.round(performance.now() - started),
-      error: getErrorMessage(error),
-    }));
-
-    return null;
-  }
-}
-
 function createDigest<A extends Algorithm>(
   algorithm: A,
   checksum: string,
@@ -920,31 +820,21 @@ async function runChild(
   args: string[],
   options: Parameters<typeof spawn>[2] = {},
 ) {
-  const signal = AbortSignal.timeout(10_000 + MAX_COMMAND_TIME);
+  const timeout = Math.max(10_000, Math.min(options.timeout ?? 0, MAX_COMMAND_TIME));
+  const signal = AbortSignal.timeout(5_000 + 1_000 + timeout);
   const child = spawn(command, args, {
     ...options,
     shell: false,
     signal: signal,
     stdio: options.stdio ?? ["ignore", "pipe", "pipe"],
-    timeout: Math.max(10_000, Math.min(options.timeout ?? 0, MAX_COMMAND_TIME)),
+    timeout: timeout,
   });
 
   const timeout_term = setTimeout(() => {
-    console.error("[TIMEOUT] Sending the child SIGTERM PID=" + child.pid);
+    console.error(`[TIMEOUT] Sending the child (PID=${child.pid}) SIGTERM`);
     child.kill("SIGTERM");
     process.exitCode = 124;
   }, 1_000 + MAX_COMMAND_TIME);
-
-  const timeout_kill = setTimeout(() => {
-    console.error("[TIMEOUT] Sending the child SIGKILL PID=" + child.pid);
-    child.kill("SIGKILL");
-    child.unref();
-    process.exitCode = 137;
-    fail(
-      "A spawned command exceeded its time limit: " +
-      `PID=${child.pid} CMD=${child.spawnfile} ${child.spawnargs.join(" ")}`
-    );
-  }, 6_000 + MAX_COMMAND_TIME);
 
   try {
     const stdoutPromise = streamText(child.stdout);
@@ -956,20 +846,28 @@ async function runChild(
       stdoutPromise,
       exitPromise,
     ]);
+  } catch (error) {
+    if (signal.aborted) {
+      console.error(
+        "A spawned command was aborted: " +
+        `PID=${child.pid} CMD=${child.spawnfile} ARGS=${child.spawnargs.join(" ")}`
+      );
+      child.kill("SIGKILL");
+      child.unref();
+      process.exitCode = 137;
+    }
+    throw error;
   } finally {
-    clearTimeout(timeout_kill);
     clearTimeout(timeout_term);
   }
 }
 
 async function commandOutput(command: string, args: string[]): Promise<string> {
-  await logLatestProcessState();
   const [stderr, stdout, code] = await runChild(
     command, args, {
     killSignal: "SIGINT",
     timeout: MAX_COMMAND_TIME,
   });
-  await captureMonitor("after runChild");
 
   if (code !== 0) {
     fail(`${command} failed:\n${stderr || stdout}`);
@@ -1268,7 +1166,7 @@ async function extractBinary(archivePath: string, extractionDirectory: string): 
   }
 
   console.log(`Extracting into: ${extractionDirectory}`);
-  await unzipOutput(["-u", "-o", "-d", extractionDirectory, archivePath]);
+  await unzipOutput(["-q", "-o", "-d", extractionDirectory, archivePath]);
 
   const candidates: string[] = [];
   async function walk(directory: string): Promise<void> {
