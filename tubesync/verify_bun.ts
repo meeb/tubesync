@@ -913,12 +913,13 @@ on_int() {
   forward_signal INT
 }
 
+set -x
 sync
 
 trap on_term TERM
 trap on_int INT
 
-builtin command unzip "$@" &
+builtin command unzip </dev/null "$@" &
 child_pid=$!
 builtin wait "$child_pid"
 status=$?
@@ -937,7 +938,7 @@ exit "$status"
     "-c",
     "--",
     bashUnzipSupervisor,
-    "bash",
+    "unzip",
     ...args,
   ]);
 }
