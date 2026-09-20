@@ -78,7 +78,6 @@ jobs:
       - name: Install `bun`
         shell: bash
         run: |
-          sudo python3 ./tubesync/ci-process-monitor.py &
           printf '%s\n' '' '++++++++ START: install_bun.sh + gpg' '' ;
           ./tubesync/install_bun.sh
           printf '%s\n' '' '-------- END: install_bun.sh + gpg' '' ;
