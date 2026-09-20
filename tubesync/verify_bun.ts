@@ -1,10 +1,8 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-// constants unused?
-import { constants, createReadStream, createWriteStream } from "node:fs";
+import { createReadStream, createWriteStream } from "node:fs";
 import {
   chmod,
-  copyFile, // unused?
   lstat,
   mkdir,
   mkdtemp,
@@ -20,10 +18,8 @@ import { tmpdir } from "node:os";
 import {
   basename,
   dirname,
-  isAbsolute, // unused?
   join,
   normalize,
-  relative, // unused?
   resolve,
 } from "node:path";
 import { Readable, Transform, Writable } from "node:stream";
