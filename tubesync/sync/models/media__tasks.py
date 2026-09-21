@@ -1,7 +1,11 @@
 import os
+import subprocess
 from collections import defaultdict
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from shutil import copyfile
+from tempfile import TemporaryDirectory
+from urllib.parse import urlparse, urlunparse
+
 from common.logger import log
 from common.errors import (
     NoMetadataException,
@@ -126,6 +130,116 @@ def download_finished(self, format_str, container, downloaded_filepath=None):
             self.downloaded_video_codec = None
             self.downloaded_fps = None
             self.downloaded_hdr = False
+
+
+def download_thumbnails(self):
+    # Format serialization functions mapped inside the registry
+    def _format_as_string(urls, headers, rows) -> str:
+        return '\n'.join(urls)
+
+    FORMATTER_MAP = {
+        'string': _format_as_string,
+    }
+
+    def get_youtube_thumbnails(video_id: str, output_format: str = 'string') -> str:
+        """
+            Generates and processes YouTube thumbnail URLs using urlunparse.
+            Defaults to raw 'string' output, but can be extended.
+        """
+        scheme = 'https'
+        hostname = 'i.ytimg.com'
+        base_names = (
+            'maxresdefault', 'sddefault', 'hqdefault', '1', '2', '3',
+            'oardefault', 'oar1', 'oar2', 'oar3',
+        )
+
+        urls = []
+        for name in base_names:
+            # Construct full clean URLs directly using urlunparse tuples
+            # Tuple format: (scheme, netloc, path, params, query, fragment)
+            jpg = urlunparse((scheme, hostname, f'/vi/{video_id}/{name}.jpg', '', '', ''))
+            webp = urlunparse((scheme, hostname, f'/vi_webp/{video_id}/{name}.webp', '', '', ''))
+
+            urls.extend((jpg, webp))
+
+        headers = ('Scheme', 'Hostname', 'Path', 'Filename')
+        rows = []
+        for url in urls:
+            parsed = urlparse(url)
+            rows.append((
+                parsed.scheme,
+                parsed.hostname,
+                parsed.path,
+                PurePosixPath(parsed.path).name,
+            ))
+
+        fmt = output_format.lower().strip()
+        if fmt not in FORMATTER_MAP:
+            raise ValueError(f'Unsupported format "{output_format}".')
+
+        return FORMATTER_MAP[fmt](urls, headers, rows)
+
+    def export_urls_to_temp_file(video_id: str) -> str:
+        """Writes URLs.txt using the default 'string' configuration."""
+
+        prefix = f'i.ytimg.com-thumbnails-[{video_id}]-'
+        with TemporaryDirectory(prefix=prefix, delete=False) as temp_dir:
+            file_path = Path(temp_dir) / 'URLs.txt'
+            with open(file_path, 'w') as f:
+                f.write(get_youtube_thumbnails(video_id))
+                f.write('\n')
+
+        return file_path
+
+    def download_thumbnails_parallel(video_id: str, max_connections: int = 2) -> tuple[os.DirEntry,...]:
+        """
+            Executes high-performance parallel downloads via curl.
+            Attempts all URLs, but strictly skips writing files for any 404 responses.
+        """
+
+        file_path = Path(export_urls_to_temp_file(video_id))
+        temp_dir = file_path.parent
+
+        curl_command = (
+            'curl',
+            '--parallel', '--parallel-immediate',
+            '--parallel-max-host', str(max_connections),
+            '--remote-time', '--remote-name-all',
+            '--fail', '--verbose',
+            '--show-error', '--show-headers',
+            '--dump-header', 'curl.header.log.txt',
+            '--stderr', 'curl.stderr.log.txt',
+            '--url', f'@{file_path.name}',
+        )
+
+        try:
+            subprocess.run(
+                curl_command,
+                cwd=str(temp_dir),
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            downloaded_files = tuple(
+                e for e in os.scandir(temp_dir)
+                if (e.path := Path(e.path)).suffix in ('.jpg', '.webp') and e.is_file() and 0 < e.stat().st_size
+            )
+
+            log.debug(f'Parallel download pass completed. Successfully stored {len(downloaded_files)} valid files.')
+  
+            return downloaded_files
+
+        except FileNotFoundError:
+            raise RuntimeError("Missing dependencies: 'curl' executable was not found on your system environment PATH.")
+
+    entries = download_thumbnails_parallel(self.key, 4)
+    thumb_path = None
+    for e in entries:
+        if not thumb_path or ('.jpg' == e.path.suffix and e.stat().st_size > thumb_path.stat().st_size):
+            thumb_path = e
+
+    return thumb_path.path
 
 
 def failed_format(self, format_str, /, *, cause=None, exc=None):
