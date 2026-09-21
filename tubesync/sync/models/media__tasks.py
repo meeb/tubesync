@@ -1,21 +1,28 @@
 import os
 import subprocess
 from collections import defaultdict
+from io import BytesIO
 from pathlib import Path, PurePosixPath
 from shutil import copyfile
 from tempfile import TemporaryDirectory
 from urllib.parse import urlparse, urlunparse
 
-from common.logger import log
+from PIL import Image
+
+from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+
 from common.errors import (
     NoMetadataException,
 )
+from common.logger import log
 from common.utils import multi_key_sort
-from django.conf import settings
-from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
 from ..choices import Val, SourceResolution
-from ..utils import filter_response, write_text_file
+from ..utils import (
+    filter_response, resize_image_to_height, write_text_file
+)
 
 
 def copy_thumbnail(self):
@@ -132,7 +139,7 @@ def download_finished(self, format_str, container, downloaded_filepath=None):
             self.downloaded_hdr = False
 
 
-def download_thumbnails(self):
+def download_thumbnails(self) -> Path | None:
     # Format serialization functions mapped inside the registry
     def _format_as_string(urls, headers, rows) -> str:
         return '\n'.join(urls)
@@ -234,10 +241,44 @@ def download_thumbnails(self):
             raise RuntimeError("Missing dependencies: 'curl' executable was not found on your system environment PATH.")
 
     entries = download_thumbnails_parallel(self.key, 4)
+    width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
+    height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
+    saved_size = (0, 0)
     thumb_path = None
     for e in entries:
-        if not thumb_path or ('.jpg' == e.path.suffix and e.stat().st_size > thumb_path.stat().st_size):
-            thumb_path = e
+        if not ('.jpg' == e.path.suffix or 'maxresdefault' == e.path.stem):
+            # accept: maxres webp, or any jpg thumbnails
+            continue
+        image_file = BytesIO()
+        with Image.open(e.path) as img:
+            if img.size < saved_size:
+                continue
+            if 'RGB' != img.mode:
+                img = img.convert('RGB')
+            if (img.width > width) and (img.height > height):
+                log.debug(f'Resizing {img.width}x{img.height} thumbnail to '
+                          f'{width}x{height}: {e.path.name}')
+                img = resize_image_to_height(img, width, height)
+            img.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
+            saved_size = img.size
+        image_file.seek(0)
+        if self.thumb_file_exists:
+            self.thumb.delete(save=False)
+        self.thumb.save(
+            'thumb',
+            SimpleUploadedFile(
+                'thumb',
+                image_file.read(),
+                'image/jpeg',
+            ),
+            save=True,
+        )
+        image_file = None
+        thumb_path = e
+
+    copy_thumbnail(self)
+    if thumb_path is None:
+        return
 
     return thumb_path.path
 
