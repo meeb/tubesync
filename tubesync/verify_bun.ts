@@ -967,7 +967,12 @@ async function verifyWithSq(
   messagePath: string,
   cleartext: boolean,
 ): Promise<void> {
-  const args = ["verify", "--no-cert-store", "--signatures", "1", "--keyring", keyPath, "--trust-root", TRUSTED_FINGERPRINT];
+  const args = [
+    "--cli-version", "1.2.0", "--batch", "--home", "none",
+    "--cert-store", "none", "--key-store", "none",
+    "--overwrite", "--keyring", keyPath,
+    "verify", "--signatures", "1", "--signer", TRUSTED_FINGERPRINT,
+  ];
   if (cleartext) {
     args.push("--message", "--output", messagePath, signaturePath);
   } else {
@@ -1064,13 +1069,24 @@ async function verifySignature(
       console.log(`Verifying with: ${sq}`);
       await verifyWithSq(sq, keyPath, signaturePath, messagePath, cleartext);
       return;
-    } else if (cleartext) {
-      // Ubuntu LTS uses an older version without --message
+    } else if (cleartext && sq_help.includes("--no-cert-store")) {
+      // Ubuntu LTS 24 uses an older version without --message
       console.log(`Verifying with: ${sq}`);
       await commandOutput("sq", [
-        "verify", "--no-cert-store",
+        "verify", "--cert-store", "none",
         "--keyring", keyPath,
-        "--trust-root", TRUSTED_FINGERPRINT,
+        "--signatures", "1", "--force",
+        "--signer-cert", TRUSTED_FINGERPRINT,
+        "--output", messagePath, signaturePath,
+      ]);
+      return;
+    } else if (cleartext) {
+      // Debian 12 & Ubuntu LTS 22 are much older than that
+      console.log(`Verifying with: ${sq}`);
+      await commandOutput("sq", [
+        "--force", "verify",
+        "--signer-cert", keyPath,
+        "--signatures", "1",
         "--output", messagePath, signaturePath,
       ]);
       return;
