@@ -342,6 +342,10 @@ def parse_media_format(format_dict):
         'asr': format_dict.get('asr', 0),
         'is_60fps': fps > 50,
         'is_hdr': 'HDR' in format_dict.get('format', '').upper(),
+        # yt-dlp appends "(original)" / "(default)" to format_note for videos
+        # that publish more than one audio track
+        'is_original': '(original)' in format_dict.get('format_note', ''),
+        'is_default': '(default)' in format_dict.get('format_note', ''),
         'is_hls': is_hls,
         'is_dash': is_dash,
     }

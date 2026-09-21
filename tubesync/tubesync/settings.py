@@ -11,7 +11,7 @@ CONFIG_BASE_DIR = BASE_DIR
 DOWNLOADS_BASE_DIR = BASE_DIR
 
 
-VERSION = '0.18.3'
+VERSION = '0.18.4'
 DEBUG = 'true' == getenv('TUBESYNC_DEBUG').strip().lower()
 ALLOWED_HOSTS = []
 # This is not ever meant to be a public web interface so this isn't too critical
@@ -387,7 +387,7 @@ YOUTUBE_DEFAULTS = {
     },
     'postprocessor_args': {
         'videoremuxer+ffmpeg': ['-bsf:v', 'setts=pts=DTS'],
-        'merger+ffmpeg': ['-fflags', '+genpts'],
+        'merger+ffmpeg': ['-bsf', 'setts=ts=TS-STARTPTS'],
     },
     'js_runtimes': {
         'deno': {'path': None,},

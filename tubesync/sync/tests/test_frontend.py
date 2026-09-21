@@ -118,7 +118,7 @@ class FrontEndTestCase(TestCase):
         c = Client()
         response = c.get('/source-validate')
         self.assertEqual(response.status_code, 200)
-        for (source_type, tests) in test_sources.items():
+        for tests in test_sources.values():
             for test, urls in tests.items():
                 for url in urls:
                     data = {'source_url': url}
@@ -185,6 +185,7 @@ class FrontEndTestCase(TestCase):
             'source_acodec': 'OPUS',
             'prefer_60fps': False,
             'prefer_hdr': False,
+            'audio_track': 'o',
             'fallback': 'f',
             'sponsorblock_categories': data_categories,
             'sub_langs': 'en',
@@ -193,8 +194,7 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         url_parts = urlsplit(response.url)
         url_path = str(url_parts.path).strip()
-        if url_path.startswith('/'):
-            url_path = url_path[1:]
+        url_path = url_path.removeprefix('/')
         path_parts = url_path.split('/')
         self.assertEqual(path_parts[0], 'source')
         source_uuid = path_parts[1]
@@ -246,6 +246,7 @@ class FrontEndTestCase(TestCase):
             'source_acodec': Val(YouTube_AudioCodec.OPUS),
             'prefer_60fps': False,
             'prefer_hdr': False,
+            'audio_track': 'o',
             'fallback': Val(Fallback.FAIL),
             'sponsorblock_categories': data_categories,
             'sub_langs': 'en',
@@ -254,8 +255,7 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         url_parts = urlsplit(response.url)
         url_path = str(url_parts.path).strip()
-        if url_path.startswith('/'):
-            url_path = url_path[1:]
+        url_path = url_path.removeprefix('/')
         path_parts = url_path.split('/')
         self.assertEqual(path_parts[0], 'source')
         source_uuid = path_parts[1]
@@ -283,6 +283,7 @@ class FrontEndTestCase(TestCase):
             'source_acodec': Val(YouTube_AudioCodec.OPUS),
             'prefer_60fps': False,
             'prefer_hdr': False,
+            'audio_track': 'o',
             'fallback': Val(Fallback.FAIL),
             'sponsorblock_categories': data_categories,
             'sub_langs': 'en',
@@ -291,8 +292,7 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         url_parts = urlsplit(response.url)
         url_path = str(url_parts.path).strip()
-        if url_path.startswith('/'):
-            url_path = url_path[1:]
+        url_path = url_path.removeprefix('/')
         path_parts = url_path.split('/')
         self.assertEqual(path_parts[0], 'source')
         source_uuid = path_parts[1]
@@ -349,7 +349,7 @@ class FrontEndTestCase(TestCase):
         # Add some media
         test_minimal_metadata = all_test_metadata['minimal']
         before_dt = timezone.now()
-        past_date = timezone.make_aware(datetime(year=2000, month=1, day=1))
+        past_date = timezone.make_aware(datetime(year=2000, month=1, day=1))  # noqa: DTZ001
         test_media1 = Media.objects.create(
             key='mediakey1',
             source=test_source,

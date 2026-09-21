@@ -2,10 +2,11 @@ import logging
 from django.test import TestCase
 from sync.models import Source, Media
 from sync.choices import (
-    Val, Fallback, SourceResolution,
+    Val, AudioTrack, Fallback, SourceResolution,
     YouTube_AudioCodec, YouTube_VideoCodec,
     YouTube_SourceType,
 )
+from sync.utils import parse_media_format
 
 from .fixtures import all_test_metadata
 
@@ -312,6 +313,96 @@ class FormatMatchingTestCase(TestCase):
             match_type, format_code = self.media.get_best_audio_format()
             self.assertEqual(format_code, expected_format_code)
             self.assertEqual(match_type, expected_match_type)
+
+    def test_parse_media_format_original_default_flags(self):
+        original = parse_media_format({
+            'format_id': 'a', 'format_note': 'English original, medium (original)',
+            'vcodec': 'none', 'acodec': 'opus',
+        })
+        default = parse_media_format({
+            'format_id': 'b', 'format_note': 'Spanish (Spain) (default), medium (default)',
+            'vcodec': 'none', 'acodec': 'opus',
+        })
+        plain = parse_media_format({
+            'format_id': 'c', 'format_note': 'medium',
+            'vcodec': 'none', 'acodec': 'opus',
+        })
+        self.assertEqual((original['is_original'], original['is_default']), (True, False))
+        self.assertEqual((default['is_original'], default['is_default']), (False, True))
+        self.assertEqual((plain['is_original'], plain['is_default']), (False, False))
+
+    def test_audio_track_preference_audio_only(self):
+        self.source.fallback = Val(Fallback.FAIL)
+        self.source.source_resolution = Val(SourceResolution.AUDIO)
+        self.media.metadata = all_test_metadata['multi_audio']
+        self.media.save()
+        expected_matches = {
+            # (acodec, audio_track): (match_type, code)
+            (Val(YouTube_AudioCodec.OPUS), Val(AudioTrack.ORIGINAL)): (True, '251-en'),
+            (Val(YouTube_AudioCodec.OPUS), Val(AudioTrack.DEFAULT)): (True, '251-es'),
+            (Val(YouTube_AudioCodec.MP4A), Val(AudioTrack.ORIGINAL)): (True, '140-en'),
+            (Val(YouTube_AudioCodec.MP4A), Val(AudioTrack.DEFAULT)): (True, '140-es'),
+        }
+        for params, expected in expected_matches.items():
+            acodec, audio_track = params
+            self.source.source_acodec = acodec
+            self.source.audio_track = audio_track
+            self.assertEqual(self.media.get_best_audio_format(), expected,
+                             msg=f'{acodec} / {audio_track}')
+
+    def test_audio_track_preference_combined(self):
+        self.source.fallback = Val(Fallback.FAIL)
+        self.source.source_vcodec = Val(YouTube_VideoCodec.AVC1)
+        self.source.source_acodec = Val(YouTube_AudioCodec.MP4A)
+        self.source.prefer_60fps = False
+        self.source.prefer_hdr = False
+        self.media.metadata = all_test_metadata['multi_audio']
+        self.media.save()
+        expected_matches = {
+            # (resolution, audio_track): (match_type, code)
+            ('360p', Val(AudioTrack.ORIGINAL)): (True, '18-en'),
+            ('360p', Val(AudioTrack.DEFAULT)): (True, '18-es'),
+            ('720p', Val(AudioTrack.ORIGINAL)): (True, '22-en'),
+            ('720p', Val(AudioTrack.DEFAULT)): (True, '22-es'),
+        }
+        for params, expected in expected_matches.items():
+            resolution, audio_track = params
+            self.source.source_resolution = resolution
+            self.source.audio_track = audio_track
+            self.assertEqual(self.media.get_best_combined_format(), expected,
+                             msg=f'{resolution} / {audio_track}')
+
+    def test_audio_track_preference_split_video_plus_audio(self):
+        self.source.fallback = Val(Fallback.NEXT_BEST_RESOLUTION)
+        self.source.source_resolution = Val(SourceResolution.VIDEO_1080P)
+        self.source.source_vcodec = Val(YouTube_VideoCodec.VP9)
+        self.source.source_acodec = Val(YouTube_AudioCodec.OPUS)
+        self.media.metadata = all_test_metadata['multi_audio']
+        self.media.save()
+        self.source.audio_track = Val(AudioTrack.ORIGINAL)
+        self.assertEqual(self.media.get_format_str(), '248+251-en')
+        self.source.audio_track = Val(AudioTrack.DEFAULT)
+        self.assertEqual(self.media.get_format_str(), '248+251-es')
+
+    def test_audio_track_preference_no_marker_is_noop(self):
+        # 'boring' metadata carries no (original)/(default) markers, so the
+        # preference must not change what gets matched
+        self.source.fallback = Val(Fallback.FAIL)
+        self.media.metadata = all_test_metadata['boring']
+        self.media.save()
+        for prefer in (Val(AudioTrack.ORIGINAL), Val(AudioTrack.DEFAULT)):
+            self.source.audio_track = prefer
+            self.source.source_resolution = Val(SourceResolution.AUDIO)
+            self.source.source_acodec = Val(YouTube_AudioCodec.OPUS)
+            self.assertEqual(self.media.get_best_audio_format(), (True, '251'), msg=prefer)
+            self.source.source_acodec = Val(YouTube_AudioCodec.MP4A)
+            self.assertEqual(self.media.get_best_audio_format(), (True, '140'), msg=prefer)
+            self.source.source_resolution = Val(SourceResolution.VIDEO_720P)
+            self.source.source_vcodec = Val(YouTube_VideoCodec.AVC1)
+            self.source.source_acodec = Val(YouTube_AudioCodec.MP4A)
+            self.source.prefer_60fps = False
+            self.source.prefer_hdr = False
+            self.assertEqual(self.media.get_best_combined_format(), (True, '22'), msg=prefer)
 
     def test_video_exact_format_matching(self):
         self.source.fallback = Val(Fallback.FAIL)
