@@ -666,11 +666,13 @@ def index_source(source_id):
                 vn_fmt=_('Downloading metadata for: "{}": {}'),
                 vn_args=(media.key, media.name,),
             )
-            selected_thumbnail = media.download_thumbnails()
-            if selected_thumbnail is not None:
-                selected_thumbnail = Path(selected_thumbnail)
-                log.info(f'Selected a thumbnail: {selected_thumbnail.name}')
-                rmtree(selected_thumbnail.parent, True)
+            TaskHistory.schedule(
+                download_media_thumbnails,
+                str(media.pk),
+                remove_duplicates=True,
+                vn_fmt=_('Downloading thumbnails for: "{}": {}'),
+                vn_args=(media.key, media.name,),
+            )
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
     # Update any remaining items in the batches
@@ -967,7 +969,7 @@ def download_media_metadata(media_id):
         metadata_lock.acquired = False
 
 
-@db_task(delay=10, priority=90, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.NET))
+@db_task(delay=10, priority=80, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.NET))
 def download_media_image(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
@@ -1002,6 +1004,8 @@ def download_media_image(media_id, url):
     image_file = BytesIO()
     i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
     image_file.seek(0)
+    if media.thumb_file_exists:
+        media.thumb.delete(save=False)
     media.thumb.save(
         'thumb',
         SimpleUploadedFile(
@@ -1035,6 +1039,7 @@ def on_complete_download_media_image(signal_name, task_obj, exception_obj=None, 
     # clear False/True from the results storage
     if result is False or result is True:
         huey.result(preserve=False, id=task_obj.id)
+
 
 @db_task(delay=60, priority=70, timeout=max(0, settings.MAX_RUN_TIME-600), context=True, queue=Val(TaskQueue.LIMIT))
 def download_media_file(media_id, override=False, *, task=None):
@@ -1130,6 +1135,22 @@ def download_media_file(media_id, override=False, *, task=None):
             schedule_media_servers_update()
         finally:
             watchdog_result.revoke()
+
+
+@db_task(priority=90, retries=5, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.NET))
+def download_media_thumbnails(media_id):
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist as e:
+        # Task triggered but the media no longer exists, do nothing
+        raise CancelExecution(_('no such media'), retry=False) from e
+    if media.thumb_file_exists:
+        raise CancelExecution(_('thumbnail exists already'), retry=False)
+    selected_thumbnail = media.download_thumbnails()
+    if selected_thumbnail is not None:
+        selected_thumbnail = Path(selected_thumbnail)
+        log.info(f'Selected thumbnail file {selected_thumbnail.name} for: {media.key}')
+        rmtree(selected_thumbnail.parent, True)
 
 
 @db_task(delay=30, expires=210, priority=100, queue=Val(TaskQueue.NET))
