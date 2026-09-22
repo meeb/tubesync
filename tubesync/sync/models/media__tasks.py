@@ -210,7 +210,9 @@ def download_thumbnails(self) -> Path | None:
         curl_command = (
             'curl',
             '--parallel', '--parallel-immediate',
-            '--parallel-max-host', str(max_connections),
+            # curl is too old for this option
+            # '--parallel-max-host', str(max_connections),
+            '--parallel-max', str(max_connections),
             '--remote-time', '--remote-name-all',
             '--fail', '--verbose',
             '--show-error', '--show-headers',
@@ -240,7 +242,7 @@ def download_thumbnails(self) -> Path | None:
         except FileNotFoundError:
             raise RuntimeError("Missing dependencies: 'curl' executable was not found on your system environment PATH.")
 
-    paths = download_thumbnails_parallel(self.key, 4)
+    paths = download_thumbnails_parallel(self.key)
     width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
     height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
     saved_size = (0, 0)
