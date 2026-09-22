@@ -669,7 +669,7 @@ def index_source(source_id):
             selected_thumbnail = media.download_thumbnails()
             if selected_thumbnail is not None:
                 selected_thumbnail = Path(selected_thumbnail)
-                log.info(f'Selected a thumbnail: {selected_thumbnail.nsme}')
+                log.info(f'Selected a thumbnail: {selected_thumbnail.name}')
                 rmtree(selected_thumbnail.parent, True)
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
