@@ -149,9 +149,9 @@ def download_thumbnails(self) -> Path | None:
         'string': _format_as_string,
     }
 
-    def get_youtube_thumbnails(video_id: str, output_format: str = 'string') -> str:
+    def make_youtube_thumbnail_urls(video_id: str, output_format: str = 'string') -> str:
         """
-            Generates and processes YouTube thumbnail URLs using urlunparse.
+            Generates YouTube thumbnail URLs using urlunparse.
             Defaults to raw 'string' output, but can be extended.
         """
         scheme = 'https'
@@ -188,13 +188,13 @@ def download_thumbnails(self) -> Path | None:
         return FORMATTER_MAP[fmt](urls, headers, rows)
 
     def export_urls_to_temp_file(video_id: str) -> str:
-        """Writes URLs.txt using the default 'string' configuration."""
+        """Writes URLs.txt using the 'string' format."""
 
         prefix = f'i.ytimg.com-thumbnails-[{video_id}]-'
         with TemporaryDirectory(prefix=prefix, delete=False) as temp_dir:
             file_path = Path(temp_dir) / 'URLs.txt'
             with open(file_path, 'w') as f:
-                f.write(get_youtube_thumbnails(video_id))
+                f.write(make_youtube_thumbnail_urls(video_id=video_id, output_format='string'))
                 f.write('\n')
 
         return file_path
@@ -206,12 +206,10 @@ def download_thumbnails(self) -> Path | None:
         """
 
         file_path = Path(export_urls_to_temp_file(video_id))
-        temp_dir = file_path.parent
-
         curl_command = (
             'curl',
             '--parallel', '--parallel-immediate',
-            # curl is too old for this option
+            # Debian 13 curl is too old for this option
             # '--parallel-max-host', str(max_connections),
             '--parallel-max', str(max_connections),
             '--remote-time', '--remote-name-all',
@@ -224,23 +222,23 @@ def download_thumbnails(self) -> Path | None:
         try:
             subprocess.run(
                 curl_command,
-                cwd=str(temp_dir),
+                cwd=str(file_path.parent),
                 check=False,
                 capture_output=True,
                 text=True,
             )
 
             downloaded_files = tuple(
-                e_path for e in os.scandir(temp_dir)
+                e_path for e in os.scandir(file_path.parent)
                 if (e_path := Path(e.path)).suffix in ('.jpg', '.webp') and e.is_file() and 0 < e.stat().st_size
             )
 
-            log.debug(f'Parallel download pass completed. Successfully stored {len(downloaded_files)} valid files.')
+            log.debug(f'Parallel download pass completed. Successfully stored {len(downloaded_files)} valid files for: {video_id}')
   
             return downloaded_files
 
         except FileNotFoundError:
-            raise RuntimeError("Missing dependencies: 'curl' executable was not found on your system environment PATH.")
+            raise RuntimeError('Missing dependencies: "curl" executable was not found on your system environment PATH.')
 
     paths = download_thumbnails_parallel(self.key)
     if not paths:
@@ -254,7 +252,7 @@ def download_thumbnails(self) -> Path | None:
     try:
         for e_path in paths:
             if not (chosen_filename == e_path.name or '.jpg' == e_path.suffix or 'maxresdefault' == e_path.stem):
-                # accept: maxres webp, or any jpg thumbnails
+                # accept: maxres webp, the filename from self.thumbnail, or any jpg thumbnails
                 continue
             image_file = BytesIO()
             with Image.open(e_path) as img:
