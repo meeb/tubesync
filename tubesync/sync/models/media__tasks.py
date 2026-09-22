@@ -214,8 +214,7 @@ def download_thumbnails(self) -> Path | None:
             # '--parallel-max-host', str(max_connections),
             '--parallel-max', str(max_connections),
             '--remote-time', '--remote-name-all',
-            '--fail', '--verbose',
-            '--show-error', '--show-headers',
+            '--fail', '--verbose', '--show-error',
             '--dump-header', 'curl.header.log.txt',
             '--stderr', 'curl.stderr.log.txt',
             '--url', f'@{file_path.name}',
@@ -255,6 +254,7 @@ def download_thumbnails(self) -> Path | None:
         with Image.open(e_path) as img:
             if img.size < saved_size:
                 continue
+            saved_size = img.size
             if 'RGB' != img.mode:
                 img = img.convert('RGB')
             if (img.width > width) and (img.height > height):
@@ -262,7 +262,6 @@ def download_thumbnails(self) -> Path | None:
                           f'{width}x{height}: {e_path.name}')
                 img = resize_image_to_height(img, width, height)
             img.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
-            saved_size = img.size
         image_file.seek(0)
         if self.thumb_file_exists:
             self.thumb.delete(save=False)
