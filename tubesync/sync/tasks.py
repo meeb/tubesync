@@ -652,19 +652,6 @@ def index_source(source_id):
         else:
             # log the new media instances
             log.info(f'Indexed new media: {source} / {media}')
-            log.info(f'Scheduling tasks to download thumbnail for: {media.key}')
-            thumbnail_fmt = 'https://i.ytimg.com/vi/{}/{}default.jpg'
-            for num, prefix in enumerate(reversed(('hq', 'sd', 'maxres',))):
-                thumbnail_url = thumbnail_fmt.format(
-                    media.key,
-                    prefix,
-                )
-                download_media_image(
-                    str(media.pk),
-                    thumbnail_url,
-                    priority=10+(5*num),
-                    delay=max(0, 65-(30*num)),
-                )
             priority = download_media_metadata.settings.get('default_priority', 50)
             if source.download_media:
                 priority += 5
@@ -679,6 +666,11 @@ def index_source(source_id):
                 vn_fmt=_('Downloading metadata for: "{}": {}'),
                 vn_args=(media.key, media.name,),
             )
+            selected_thumbnail = media.download_thumbnails()
+            if selected_thumbnail is not None:
+                selected_thumbnail = Path(selected_thumbnail)
+                log.info(f'Selected a thumbnail: {selected_thumbnail.nsme}')
+                rmtree(selected_thumbnail.parent, True)
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
     # Update any remaining items in the batches
