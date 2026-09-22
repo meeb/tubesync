@@ -3,7 +3,7 @@ import subprocess
 from collections import defaultdict
 from io import BytesIO
 from pathlib import Path, PurePosixPath
-from shutil import copyfile
+from shutil import copyfile, rmtree
 from tempfile import TemporaryDirectory
 from urllib.parse import urlparse, urlunparse
 
@@ -19,6 +19,7 @@ from common.errors import (
 )
 from common.logger import log
 from common.utils import multi_key_sort
+from common.yt_dlp import retry_django_db
 from ..choices import Val, SourceResolution
 from ..utils import (
     filter_response, resize_image_to_height, write_text_file
@@ -242,40 +243,48 @@ def download_thumbnails(self) -> Path | None:
             raise RuntimeError("Missing dependencies: 'curl' executable was not found on your system environment PATH.")
 
     paths = download_thumbnails_parallel(self.key)
+    if not paths:
+        return
+
     width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
     height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
     saved_size = (0, 0)
     thumb_path = None
-    for e_path in paths:
-        if not ('.jpg' == e_path.suffix or 'maxresdefault' == e_path.stem):
-            # accept: maxres webp, or any jpg thumbnails
-            continue
-        image_file = BytesIO()
-        with Image.open(e_path) as img:
-            if img.size < saved_size:
+    try:
+        for e_path in paths:
+            if not ('.jpg' == e_path.suffix or 'maxresdefault' == e_path.stem):
+                # accept: maxres webp, or any jpg thumbnails
                 continue
-            saved_size = img.size
-            if 'RGB' != img.mode:
-                img = img.convert('RGB')
-            if (img.width > width) and (img.height > height):
-                log.debug(f'Resizing {img.width}x{img.height} thumbnail to '
-                          f'{width}x{height}: {e_path.name}')
-                img = resize_image_to_height(img, width, height)
-            img.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
-        image_file.seek(0)
-        if self.thumb_file_exists:
-            self.thumb.delete(save=False)
-        self.thumb.save(
-            'thumb',
-            SimpleUploadedFile(
+            image_file = BytesIO()
+            with Image.open(e_path) as img:
+                if img.size < saved_size:
+                    continue
+                saved_size = img.size
+                if 'RGB' != img.mode:
+                    img = img.convert('RGB')
+                if (img.width > width) and (img.height > height):
+                    log.debug(f'Resizing {img.width}x{img.height} thumbnail to '
+                              f'{width}x{height}: {e_path.name}')
+                    img = resize_image_to_height(img, width, height)
+                img.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
+            image_file.seek(0)
+            if self.thumb_file_exists:
+                self.thumb.delete(save=False)
+            retry_django_db(5)(self.thumb.save)(
                 'thumb',
-                image_file.read(),
-                'image/jpeg',
-            ),
-            save=True,
-        )
-        image_file = None
-        thumb_path = e_path
+                SimpleUploadedFile(
+                    'thumb',
+                    image_file.read(),
+                    'image/jpeg',
+                ),
+                save=True,
+            )
+            image_file = None
+            thumb_path = e_path
+    except:
+        temp_dir = (next(iter(paths))).parent
+        rmtree(temp_dir, True)
+        raise
 
     copy_thumbnail(self)
     if thumb_path is None:
