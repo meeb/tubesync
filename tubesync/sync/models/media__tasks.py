@@ -198,7 +198,7 @@ def download_thumbnails(self) -> Path | None:
 
         return file_path
 
-    def download_thumbnails_parallel(video_id: str, max_connections: int = 2) -> tuple[os.DirEntry,...]:
+    def download_thumbnails_parallel(video_id: str, max_connections: int = 2) -> tuple[Path,...]:
         """
             Executes high-performance parallel downloads via curl.
             Attempts all URLs, but strictly skips writing files for any 404 responses.
@@ -229,8 +229,8 @@ def download_thumbnails(self) -> Path | None:
             )
 
             downloaded_files = tuple(
-                e for e in os.scandir(temp_dir)
-                if (e.path := Path(e.path)).suffix in ('.jpg', '.webp') and e.is_file() and 0 < e.stat().st_size
+                e_path for e in os.scandir(temp_dir)
+                if (e_path := Path(e.path)).suffix in ('.jpg', '.webp') and e.is_file() and 0 < e.stat().st_size
             )
 
             log.debug(f'Parallel download pass completed. Successfully stored {len(downloaded_files)} valid files.')
@@ -240,24 +240,24 @@ def download_thumbnails(self) -> Path | None:
         except FileNotFoundError:
             raise RuntimeError("Missing dependencies: 'curl' executable was not found on your system environment PATH.")
 
-    entries = download_thumbnails_parallel(self.key, 4)
+    paths = download_thumbnails_parallel(self.key, 4)
     width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
     height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
     saved_size = (0, 0)
     thumb_path = None
-    for e in entries:
-        if not ('.jpg' == e.path.suffix or 'maxresdefault' == e.path.stem):
+    for e_path in paths:
+        if not ('.jpg' == e_path.suffix or 'maxresdefault' == e_path.stem):
             # accept: maxres webp, or any jpg thumbnails
             continue
         image_file = BytesIO()
-        with Image.open(e.path) as img:
+        with Image.open(e_path) as img:
             if img.size < saved_size:
                 continue
             if 'RGB' != img.mode:
                 img = img.convert('RGB')
             if (img.width > width) and (img.height > height):
                 log.debug(f'Resizing {img.width}x{img.height} thumbnail to '
-                          f'{width}x{height}: {e.path.name}')
+                          f'{width}x{height}: {e_path.name}')
                 img = resize_image_to_height(img, width, height)
             img.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
             saved_size = img.size
@@ -274,13 +274,13 @@ def download_thumbnails(self) -> Path | None:
             save=True,
         )
         image_file = None
-        thumb_path = e
+        thumb_path = e_path
 
     copy_thumbnail(self)
     if thumb_path is None:
         return
 
-    return thumb_path.path
+    return thumb_path
 
 
 def failed_format(self, format_str, /, *, cause=None, exc=None):
