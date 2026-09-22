@@ -246,13 +246,14 @@ def download_thumbnails(self) -> Path | None:
     if not paths:
         return
 
+    chosen_filename = PurePosixPath(self.thumbnail).name
     width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
     height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
     saved_size = (0, 0)
     thumb_path = None
     try:
         for e_path in paths:
-            if not ('.jpg' == e_path.suffix or 'maxresdefault' == e_path.stem):
+            if not (chosen_filename == e_path.name or '.jpg' == e_path.suffix or 'maxresdefault' == e_path.stem):
                 # accept: maxres webp, or any jpg thumbnails
                 continue
             image_file = BytesIO()
@@ -281,6 +282,8 @@ def download_thumbnails(self) -> Path | None:
             )
             image_file = None
             thumb_path = e_path
+            if chosen_filename == e_path.name:
+                break
     except:
         temp_dir = (next(iter(paths))).parent
         rmtree(temp_dir, True)
