@@ -1018,15 +1018,8 @@ def download_media_image(media_id, url):
     i = image_file = None
     log.info(f'Saved thumbnail for: {media} from: {url}')
     # After media is downloaded, copy the updated thumbnail.
-    copy_thumbnail = (
-        media.downloaded and
-        media.source.copy_thumbnails and
-        media.thumb_file_exists
-    )
-    if copy_thumbnail:
-        log.info(f'Copying media thumbnail from: {media.thumb.path} '
-                 f'to: {media.thumbpath}')
-        copyfile(media.thumb.path, media.thumbpath)
+    if media.downloaded and media.thumb_file_exists:
+        media.copy_thumbnail()
     return True
 
 @huey_signal(huey_signals.SIGNAL_COMPLETE, queue=Val(TaskQueue.NET))
