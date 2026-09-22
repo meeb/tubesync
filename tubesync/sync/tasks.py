@@ -14,7 +14,7 @@ from collections import deque as queue
 from io import BytesIO
 from pathlib import Path
 from datetime import timedelta
-from shutil import copyfile, rmtree
+from shutil import rmtree
 from django import db
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
