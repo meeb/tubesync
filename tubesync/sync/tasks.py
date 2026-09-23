@@ -788,6 +788,13 @@ def delete_media(media_id):
             f'media:{media.uuid}',
             queue=Val(TaskQueue.DB),
         ):
+            # remove thumbnail from storage
+            if media.thumb_file_exists:
+                # copy it before its gone
+                if media.media_file_exists:
+                    media.copy_thumbnail()
+                media.thumb.delete(save=False)
+            # intentionally not removing downloaded file here
             media.delete()
 
 
@@ -1379,36 +1386,61 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
         log.warning(f'Task delete_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         # this task can run after a source was deleted
-    if source:
+    else:
         source_lock = huey_lock_task(
             f'source:{source.uuid}',
             queue=Val(TaskQueue.FS),
         )
+        if source_lock.acquired:
+            raise CancelExecution(_('already locked'), retry=True)
         source_lock.acquired = True
-    mqs = Media.objects.all().defer(
-        'metadata',
-    ).filter(
-        source=source or source_id,
-    )
-    # no delay for these tasks
-    delete_media.map({
-        str(media.pk)
-        for media in qs_gen(mqs)
-    })
-    with atomic(durable=True):
-        mqs.update(manual_skip=True, skip=True)
-        log.info(f'Deleting media for source: {source_name}')
-        mqs.delete()
-    # Remove the directory, if the user requested that
+        update_model(
+            source,
+            key = source.key + '/deleted',
+            name = f'[Deleting] {source.name}',
+        )
     directory_path = Path(source_directory)
     remove = (
         (source and source.delete_removed_media) or
         (directory_path / '.to_be_removed').is_file()
     )
-    if source:
+    mqs = Media.objects.all().defer(
+        'metadata',
+    ).filter(
+        source=source or source_id,
+    )
+
+    for media in qs_gen(mqs):
+        # remove thumbnail from storage
+        if media.thumb_file_exists:
+            # copy it before its gone
+            if media.media_file_exists:
+                media.copy_thumbnail()
+            media.thumb.delete(save=False)
+        # if requested, remove download from storage
+        if remove and media.media_file_exists:
+            media.media_file.delete(save=False)
+        # no delay for these tasks
+        delete_media(str(media.pk))
+
+    try:
         with atomic(durable=True):
-            source.delete()
-        source_lock.acquired = False
+            mqs.update(manual_skip=True, skip=True)
+            log.info(f'Deleting media for source: {source_name}')
+            mqs.delete()
+        if source:
+            try:
+                source = Source.objects.get(uuid=source.uuid)
+            except Source.DoesNotExist:
+                source = False
+            else:
+                with atomic(durable=True):
+                    source.delete()
+                    source = False
+    finally:
+        if source is not None:
+            source_lock.acquired = False
+    # Remove the directory, if the user requested that
     if remove:
         log.info(f'Deleting directory for: {source_name}: {directory_path}')
         rmtree(directory_path, True)
