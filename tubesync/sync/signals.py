@@ -260,7 +260,7 @@ def media_post_save(sender, instance, created, **kwargs):
 @receiver(pre_delete, sender=Media)
 def media_pre_delete(sender, instance, **kwargs):
     # Remove thumbnail file for deleted media
-    if instance.thumb:
+    if instance.thumb_file_exists:
         instance.thumb.delete(save=False)
     # Save the metadata site & thumbnail URL to the metadata column
     existing_metadata = instance.loaded_metadata
