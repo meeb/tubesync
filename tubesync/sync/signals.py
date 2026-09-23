@@ -352,7 +352,7 @@ def media_post_delete(sender, instance, **kwargs):
     created = False
     create_for_indexing_task = (
         not (
-            #not instance.downloaded and
+            instance.source.key.endswith('/deleted') or
             instance.skip and
             instance.manual_skip
         )
