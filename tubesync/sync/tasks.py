@@ -14,7 +14,7 @@ from collections import deque as queue
 from io import BytesIO
 from pathlib import Path
 from datetime import timedelta
-from shutil import copyfile, rmtree
+from shutil import rmtree
 from django import db
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -45,7 +45,6 @@ from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
 
 atomic = db.transaction.atomic
-db_vendor = db.connection.vendor
 register_huey_signals()
 
 
@@ -128,11 +127,9 @@ def update_task_status(task, status):
     else:
         task.verbose_name = f'[{status}] {task._verbose_name}'
     try:
-        task.save(update_fields={'verbose_name'})
+        retry_django_db(3)(task.save)(update_fields={'verbose_name'})
     except db.DatabaseError as e:
-        if 'Save with update_fields did not affect any rows.' == str(e):
-            pass
-        else:
+        if 'Save with update_fields did not affect any rows.' != str(e):
             raise
     return True
 
@@ -207,7 +204,7 @@ def cleanup_completed_tasks():
 def save_model(instance):
     with atomic(durable=False):
         instance.save()
-    if 'sqlite' != db_vendor:
+    if 'sqlite' != db.connection.vendor:
         return
 
     # work around for SQLite and its many
@@ -917,7 +914,7 @@ def download_media_metadata(media_id):
                     log.debug(number(parts))
                     media.published = published_datetime
                     media.manual_skip = True
-                    media.save()
+                    save_model(media)
                     raise_exception = False
             except (ValueError, IndexError, OverflowError):
                 log.exception('could not assign published_datetime')
@@ -964,7 +961,7 @@ def download_media_metadata(media_id):
 
     # Don't filter media here, the post_save signal will handle that
     try:
-        media.save()
+        save_model(media)
     # ruff: ignore[TRY203]
     except Exception:
         raise
@@ -1010,27 +1007,22 @@ def download_media_image(media_id, url):
     image_file = BytesIO()
     i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
     image_file.seek(0)
-    media.thumb.save(
+    thumbnail_bytes = image_file.read()
+    i = image_file = None
+    retry_django_db(3)(media.thumb.save)(
         'thumb',
         SimpleUploadedFile(
             'thumb',
-            image_file.read(),
+            thumbnail_bytes,
             'image/jpeg',
         ),
         save=True
     )
-    i = image_file = None
+    thumbnail_bytes = None
     log.info(f'Saved thumbnail for: {media} from: {url}')
     # After media is downloaded, copy the updated thumbnail.
-    copy_thumbnail = (
-        media.downloaded and
-        media.source.copy_thumbnails and
-        media.thumb_file_exists
-    )
-    if copy_thumbnail:
-        log.info(f'Copying media thumbnail from: {media.thumb.path} '
-                 f'to: {media.thumbpath}')
-        copyfile(media.thumb.path, media.thumbpath)
+    if media.downloaded and media.thumb_file_exists:
+        media.copy_thumbnail()
     return True
 
 @huey_signal(huey_signals.SIGNAL_COMPLETE, queue=Val(TaskQueue.NET))
@@ -1124,7 +1116,7 @@ def download_media_file(media_id, override=False, *, task=None):
 
             # Media has been downloaded successfully
             media.download_finished(format_str, container, filepath)
-            media.save()
+            save_model(media)
             media.rename_files()
             media.copy_thumbnail()
             media.write_nfo_file()
@@ -1138,6 +1130,17 @@ def download_media_file(media_id, override=False, *, task=None):
             schedule_media_servers_update()
         finally:
             watchdog_result.revoke()
+            try:
+                task = TaskHistory.objects.get(task_id=watchdog_result.id)
+            except TaskHistory.DoesNotExist:
+                pass
+            else:
+                if watchdog_result.is_revoked():
+                    default_verbose_name = f'{task.name}: {task.task_id}'
+                    update_model(
+                        task,
+                        verbose_name=f'[revoked] {task.verbose_name or default_verbose_name}',
+                    )
 
 
 @db_task(delay=30, expires=210, priority=100, queue=Val(TaskQueue.NET))
@@ -1234,7 +1237,7 @@ def refresh_formats(media_id):
             raise exc
         # the metadata has already been saved, trigger the post_save signal
         log.info(f'Saving refreshed formats for "{media.key}": {msg}')
-        media.save()
+        save_model(media)
 
 
 @db_task(delay=300, priority=80, retries=5, retry_delay=600, queue=Val(TaskQueue.FS))
