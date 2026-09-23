@@ -1379,6 +1379,12 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
         log.warning(f'Task delete_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         # this task can run after a source was deleted
+    if source:
+        source_lock = huey_lock_task(
+            f'source:{source.uuid}',
+            queue=Val(TaskQueue.FS),
+        )
+        source_lock.acquired = True
     mqs = Media.objects.all().defer(
         'metadata',
     ).filter(
@@ -1402,6 +1408,7 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
     if source:
         with atomic(durable=True):
             source.delete()
+        source_lock.acquired = False
     if remove:
         log.info(f'Deleting directory for: {source_name}: {directory_path}')
         rmtree(directory_path, True)
