@@ -148,9 +148,8 @@ def source_pre_delete(sender, instance, **kwargs):
     instance.deactivate()
 
     # Fetch the media source
-    sqs = Source.objects.filter(filter_text=str(source.pk))
-    if sqs.count():
-        media_source = sqs[0]
+    media_source = Source.objects.filter(filter_text=str(source.pk)).first()
+    if media_source:
         # Schedule deletion of media
         on_commit(partial(
             TaskHistory.schedule,
@@ -352,9 +351,14 @@ def media_post_delete(sender, instance, **kwargs):
     created = False
     create_for_indexing_task = (
         not (
-            instance.source.key.endswith('/deleted') or
-            instance.skip and
-            instance.manual_skip
+            (
+                instance.source and
+                instance.source.key.endswith('/deleted')
+            ) or
+            (
+                instance.skip and
+                instance.manual_skip
+            )
         )
     )
     if create_for_indexing_task:
@@ -391,7 +395,7 @@ def media_post_delete(sender, instance, **kwargs):
             key=skipped_media.key,
         )
         try:
-            if instance_qs.count():
+            if instance_qs.exists():
                 with atomic(durable=False):
                     # clear the link to a media instance
                     Metadata.objects.filter(media=skipped_media).update(media=None)
