@@ -506,10 +506,10 @@ def refresh_formats(self):
 
     # select and save our best thumbnail url
     try:
-        thumbnail = [ thumb.get('url') for thumb in multi_key_sort(
+        thumbnail = next(thumb.get('url') for thumb in multi_key_sort(
             thumbnails,
             [('preference', True,)],
-        ) if thumb.get('url', '').endswith('.jpg') ][0]
+        ) if thumb.get('url', '').endswith('.jpg'))
     except IndexError:
         pass
     else:
