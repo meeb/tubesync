@@ -376,6 +376,9 @@ YOUTUBE_DEFAULTS = {
         'youtubepot-bgutilhttp': {
             'base_url': ['http://127.0.0.1:4416'],
         },
+        'youtubepot-bgutilscript': {
+            'server_home': ['/app/bgutil-ytdlp-pot-provider/server'],
+        },
     },
     'postprocessor_args': {
         'videoremuxer+ffmpeg': ['-bsf:v', 'setts=pts=DTS'],
@@ -383,6 +386,7 @@ YOUTUBE_DEFAULTS = {
     },
     'js_runtimes': {
         'deno': {'path': None,},
+        'node': {'path': '/usr/bin',},
         'quickjs': {'path': None,},
     },
 }
