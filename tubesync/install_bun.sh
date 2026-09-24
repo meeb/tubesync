@@ -72,7 +72,13 @@ extract_bun() {
     unzip -u -o -d './.bun' "${fn}" &&
         install -v -T ./.bun/bun-linux-*/bun "${_staged}" &&
         { # bun spawning unzip hangs for an unknown reason fairly often
+            local _force=1 ; 
             local _attempt ; for _attempt in {1..5} ; do
+                if [[ 1 < "${_attempt}" ]]; then
+                    _force=0
+                fi
+                INSTALL_BUN_FORCE_ERROR="${_force}" \
+                INSTALL_BUN_ATTEMPT="${_attempt}" \
                 "${_staged}" run "${HERE}/verify_bun.ts" --release 'bun-v1.3.14' --asset "${fn}" --install-dir "${dest_dir}" &&
                     break || sleep "${_attempt}"
             done ;
