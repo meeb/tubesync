@@ -81,12 +81,11 @@ def download_checklist(self, skip_checks=False):
         return False
     max_cap_age = media.source.download_cap_date
     published = media.published
-    if max_cap_age and published:
-        if published <= max_cap_age:
-            log.warn(f'Download task triggered media: {media} (UUID: {media.pk}) but '
-                     f'the source has a download cap and the media is now too old, '
-                     f'not downloading')
-            return False
+    if max_cap_age and published and published <= max_cap_age:
+        log.warn(f'Download task triggered media: {media} (UUID: {media.pk}) but '
+                 f'the source has a download cap and the media is now too old, '
+                 f'not downloading')
+        return False
     return True
 
 
