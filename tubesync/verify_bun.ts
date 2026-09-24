@@ -909,8 +909,18 @@ on_int() {
   forward_signal INT
 }
 
+read_archive() {
+  local _arg
+  for _arg in "$@" ; do
+    if [[ -f "$_arg" ]]; then
+      cat "$_arg" >/dev/null
+    fi
+  done
+}
+
 builtin command sleep 1
 sync
+read_archive "$@"
 
 trap on_term TERM
 trap on_int INT
@@ -923,6 +933,7 @@ status=$?
 trap - TERM INT
 
 sync
+builtin command sleep 1
 exit "$status"
 `;
 
