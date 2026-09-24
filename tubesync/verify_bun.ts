@@ -933,7 +933,7 @@ trap - TERM INT
 
 read_archive "$@"
 builtin command sleep $(( 1 + INSTALL_BUN_ATTEMPT ))
-if $(( 0 + INSTALL_BUN_FORCE_ERROR )); then
+if [[ 0 < $(( 0 + INSTALL_BUN_FORCE_ERROR )) ]]; then
   exit 1
 fi
 exit "$status"
