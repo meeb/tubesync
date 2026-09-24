@@ -913,27 +913,26 @@ read_archive() {
   local _arg
   for _arg in "$@" ; do
     if [[ -f "$_arg" ]]; then
-      cat "$_arg" >/dev/null
+      builtin command time --verbose cat "$_arg"
     fi
   done
-}
+} >/dev/null
 
 builtin command sleep 1
 sync
-read_archive "$@"
 
 trap on_term TERM
 trap on_int INT
 
-builtin command unzip </dev/null "$@" &
+builtin command time --verbose unzip </dev/null "$@" &
 child_pid=$!
 builtin wait "$child_pid"
 status=$?
 
 trap - TERM INT
 
-sync
-builtin command sleep 1
+read_archive "$@"
+builtin command sleep $(( 1 + INSTALL_BUN_ATTEMPT ))
 exit "$status"
 `;
 
