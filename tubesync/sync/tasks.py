@@ -1160,7 +1160,13 @@ def download_media_thumbnails(media_id):
     if selected_thumbnail is not None:
         selected_thumbnail = Path(selected_thumbnail)
         log.info(f'Selected thumbnail file {selected_thumbnail.name} for: {media.key}')
-        rmtree(selected_thumbnail.parent, True)
+        try:
+            temp_dir = selected_thumbnail.resolve(strict=True).parent
+        except FileNotFoundError:
+            pass
+        else:
+            if '-thumbnails-' in temp_dir.name:
+                rmtree(temp_dir, True)
 
 
 @db_task(delay=30, expires=210, priority=100, queue=Val(TaskQueue.NET))

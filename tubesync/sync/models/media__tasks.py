@@ -1,7 +1,7 @@
+import io
 import os
 import subprocess
 from collections import defaultdict
-from io import BytesIO
 from pathlib import Path, PurePosixPath
 from shutil import copyfile, rmtree
 from tempfile import TemporaryDirectory
@@ -18,7 +18,7 @@ from common.errors import (
     NoMetadataException,
 )
 from common.logger import log
-from common.utils import multi_key_sort
+from common.utils import getenv, multi_key_sort
 from common.yt_dlp import retry_django_db
 from ..choices import Val, SourceResolution
 from ..utils import (
@@ -140,53 +140,189 @@ def download_finished(self, format_str, container, downloaded_filepath=None):
             self.downloaded_hdr = False
 
 
-def download_thumbnails(self) -> Path | None:
+def make_youtube_thumbnail_urls(video_id: str, output_format: str = 'string') -> str | tuple[dict[str, str], ...]:
+    """
+        Generates YouTube thumbnail URLs using urlunparse.
+        Defaults to raw 'string' output, but can be extended.
+    """
+
     # Format serialization functions mapped inside the registry
     def _format_as_string(urls, headers, rows) -> str:
         return '\n'.join(urls)
 
+    def _format_as_dicts(urls, headers, rows) -> tuple[dict[str, str], ...]:
+        return tuple({'url': urls[i], 'filename': rows[i][3]} for i in range(len(urls)))
+
     FORMATTER_MAP = {
         'string': _format_as_string,
+        'dicts': _format_as_dicts,
     }
 
-    def make_youtube_thumbnail_urls(video_id: str, output_format: str = 'string') -> str:
+    scheme = 'https'
+    hostname = 'i.ytimg.com'
+    base_names = (
+        'maxresdefault', 'sddefault', 'hqdefault', '1', '2', '3',
+        'oardefault', 'oar1', 'oar2', 'oar3',
+    )
+
+    urls = []
+    for name in base_names:
+        # Construct full clean URLs directly using urlunparse tuples
+        # Tuple format: (scheme, netloc, path, params, query, fragment)
+        jpg = urlunparse((scheme, hostname, f'/vi/{video_id}/{name}.jpg', '', '', ''))
+        webp = urlunparse((scheme, hostname, f'/vi_webp/{video_id}/{name}.webp', '', '', ''))
+
+        urls.extend((jpg, webp))
+
+    headers = ('Scheme', 'Hostname', 'Path', 'Filename')
+    rows = []
+    for url in urls:
+        parsed = urlparse(url)
+        rows.append((
+            parsed.scheme,
+            parsed.hostname,
+            parsed.path,
+            PurePosixPath(parsed.path).name,
+        ))
+
+    fmt = output_format.lower().strip()
+    if fmt not in FORMATTER_MAP:
+        raise ValueError(f'Unsupported format "{output_format}".')
+
+    return FORMATTER_MAP[fmt](urls, headers, rows)
+
+
+def download_thumbnails_pycurl(self) -> Path | None:
+    import pycurl
+
+    def download_thumbnails_parallel(video_id: str, max_connections: int = 2) -> dict[str, io.BytesIO]:
         """
-            Generates YouTube thumbnail URLs using urlunparse.
-            Defaults to raw 'string' output, but can be extended.
+            Executes high-performance parallel downloads via pycurl completely in memory.
+            Returns a dictionary mapping filenames to populated BytesIO buffers.
         """
-        scheme = 'https'
-        hostname = 'i.ytimg.com'
-        base_names = (
-            'maxresdefault', 'sddefault', 'hqdefault', '1', '2', '3',
-            'oardefault', 'oar1', 'oar2', 'oar3',
+        url_targets = make_youtube_thumbnail_urls(video_id=video_id, output_format='dicts')
+
+        downloaded_buffers = {}
+
+        # This is a quick and dirty attempt to support proxies.
+        env_proxy = getenv('https_proxy') or getenv('http_proxy') or getenv('all_proxy')
+        no_proxy_setting = getenv('no_proxy')
+
+        with pycurl.CurlMulti() as multi:
+            multi.setopt(pycurl.M_PIPELINING, pycurl.PIPE_NOTHING)
+            multi.setopt(pycurl.M_MAX_HOST_CONNECTIONS, max_connections)
+
+            connections = {}
+
+            for target in url_targets:
+                c = pycurl.Curl()
+                c.setopt(c.URL, target['url'])
+                c.setopt(c.FOLLOWLOCATION, True)
+                c.setopt(c.FAILONERROR, True)
+
+                buffer = io.BytesIO()
+                c.setopt(c.WRITEDATA, buffer)
+
+                if env_proxy:
+                    c.setopt(pycurl.PROXY, env_proxy)
+                if no_proxy_setting:
+                    c.setopt(pycurl.NOPROXY, no_proxy_setting)
+
+                multi.add_handle(c)
+                connections[c] = {'filename': target['filename'], 'buffer': buffer}
+                c = buffer = None
+
+            num_handles = 1
+            while 0 < num_handles:
+                ret, num_handles = multi.perform()
+                if ret != pycurl.E_CALL_MULTI_PERFORM:
+                    multi.select(1.0)
+
+            num_q = 1
+            while 0 < num_q:
+                # err_list never used
+                # ruff: ignore[RUF059]
+                num_q, ok_list, err_list = multi.info_read()
+                for curl in ok_list:
+                    info = connections[curl]
+                    buf = info['buffer']
+                    buf.seek(0, io.SEEK_END)
+                    if 0 < buf.tell():
+                        buf.seek(0, io.SEEK_SET)
+                        downloaded_buffers[info['filename']] = buf
+
+            for curl in connections:
+                curl.close()
+
+        log.debug(f'Parallel download pass completed. Successfully stored {len(downloaded_buffers)} valid buffers for: {video_id}')
+        return downloaded_buffers
+
+    downloaded_data = download_thumbnails_parallel(self.key)
+    if not downloaded_data:
+        return
+
+    chosen_filename = PurePosixPath(self.thumbnail).name
+    width = getattr(settings, 'MEDIA_THUMBNAIL_WIDTH', 430)
+    height = getattr(settings, 'MEDIA_THUMBNAIL_HEIGHT', 240)
+    saved_size = (0, 0)
+    thumb_path = None
+
+    for filename, buffer in downloaded_data.items():
+        filename_path = Path(filename)
+
+        # accept: maxres webp, the filename from self.thumbnail, or any jpg thumbnails
+        if not (
+            chosen_filename == filename_path.name or
+            '.jpg' == filename_path.suffix or
+            'maxresdefault' == filename_path.stem
+        ):
+            continue
+
+        image_file = io.BytesIO()
+        with Image.open(buffer) as img:
+            if img.size < saved_size:
+                continue
+            saved_size = img.size
+            if 'RGB' != img.mode:
+                img = img.convert('RGB')
+            if (img.width > width) and (img.height > height):
+                log.debug(f'Resizing {img.width}x{img.height} thumbnail to '
+                          f'{width}x{height}: {filename_path.name}')
+                img = resize_image_to_height(img, width, height)
+            img.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
+
+        img = None
+        image_file.seek(0, io.SEEK_SET)
+        thumbnail_bytes = image_file.read()
+        image_file = None
+
+        if self.thumb_file_exists:
+            self.thumb.delete(save=False)
+
+        retry_django_db(5)(self.thumb.save)(
+            'thumb',
+            SimpleUploadedFile(
+                'thumb',
+                thumbnail_bytes,
+                'image/jpeg',
+            ),
+            save=True,
         )
 
-        urls = []
-        for name in base_names:
-            # Construct full clean URLs directly using urlunparse tuples
-            # Tuple format: (scheme, netloc, path, params, query, fragment)
-            jpg = urlunparse((scheme, hostname, f'/vi/{video_id}/{name}.jpg', '', '', ''))
-            webp = urlunparse((scheme, hostname, f'/vi_webp/{video_id}/{name}.webp', '', '', ''))
+        thumbnail_bytes = None
+        thumb_path = filename_path
+        if chosen_filename == filename_path.name:
+            break
 
-            urls.extend((jpg, webp))
+    copy_thumbnail(self)
 
-        headers = ('Scheme', 'Hostname', 'Path', 'Filename')
-        rows = []
-        for url in urls:
-            parsed = urlparse(url)
-            rows.append((
-                parsed.scheme,
-                parsed.hostname,
-                parsed.path,
-                PurePosixPath(parsed.path).name,
-            ))
+    if thumb_path is None:
+        return
 
-        fmt = output_format.lower().strip()
-        if fmt not in FORMATTER_MAP:
-            raise ValueError(f'Unsupported format "{output_format}".')
+    return thumb_path
 
-        return FORMATTER_MAP[fmt](urls, headers, rows)
 
+def download_thumbnails(self) -> Path | None:
     def export_urls_to_temp_file(video_id: str) -> str:
         """Writes URLs.txt using the 'string' format."""
 
@@ -234,7 +370,7 @@ def download_thumbnails(self) -> Path | None:
             )
 
             log.debug(f'Parallel download pass completed. Successfully stored {len(downloaded_files)} valid files for: {video_id}')
-  
+
             return downloaded_files
 
         except FileNotFoundError:
@@ -251,10 +387,15 @@ def download_thumbnails(self) -> Path | None:
     thumb_path = None
     try:
         for e_path in paths:
-            if not (chosen_filename == e_path.name or '.jpg' == e_path.suffix or 'maxresdefault' == e_path.stem):
-                # accept: maxres webp, the filename from self.thumbnail, or any jpg thumbnails
+            # accept: maxres webp, the filename from self.thumbnail, or any jpg thumbnails
+            if not (
+                chosen_filename == e_path.name or
+                '.jpg' == e_path.suffix or
+                'maxresdefault' == e_path.stem
+            ):
                 continue
-            image_file = BytesIO()
+
+            image_file = io.BytesIO()
             with Image.open(e_path) as img:
                 if img.size < saved_size:
                     continue
@@ -266,19 +407,26 @@ def download_thumbnails(self) -> Path | None:
                               f'{width}x{height}: {e_path.name}')
                     img = resize_image_to_height(img, width, height)
                 img.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
-            image_file.seek(0)
+
+            img = None
+            image_file.seek(0, io.SEEK_SET)
+            thumbnail_bytes = image_file.read()
+            image_file = None
+
             if self.thumb_file_exists:
                 self.thumb.delete(save=False)
+
             retry_django_db(5)(self.thumb.save)(
                 'thumb',
                 SimpleUploadedFile(
                     'thumb',
-                    image_file.read(),
+                    thumbnail_bytes,
                     'image/jpeg',
                 ),
                 save=True,
             )
-            image_file = None
+
+            thumbnail_bytes = None
             thumb_path = e_path
             if chosen_filename == e_path.name:
                 break
@@ -288,6 +436,7 @@ def download_thumbnails(self) -> Path | None:
         raise
 
     copy_thumbnail(self)
+
     if thumb_path is None:
         return
 
