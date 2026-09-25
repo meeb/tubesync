@@ -441,6 +441,8 @@ class MediaContent(DetailView):
 
             if filepth.exists():
                 # return file
+                # FileResponse is responsible for closing
+                # ruff: ignore[SIM115]
                 response = FileResponse(open(filepth,'rb'))
                 return response
             else:
