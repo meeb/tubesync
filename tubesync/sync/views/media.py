@@ -347,6 +347,8 @@ class MediaSkipView(FormView, SingleObjectMixin):
         if self.object.media_file_exists:
             # Delete all files which contains filename
             filepath = self.object.media_file.path
+            # fileext never used
+            # ruff: ignore[RUF059]
             barefilepath, fileext = os.path.splitext(filepath)
             # Delete the media file itself
             delete_file(self.object.media_file.path)
