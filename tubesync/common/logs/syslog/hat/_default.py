@@ -490,7 +490,7 @@ else:
                     raise ValueError(f'Specify a valid comm_type from this list: {list(haystack)}') from e
 
             if not isinstance(comm_type, common.CommType):
-                raise ValueError('Invalid comm_type argument')
+                raise TypeError('Invalid comm_type argument')
 
         def _parent_class_name(self):
             return hat_syslog_handler_SyslogHandler.__name__
