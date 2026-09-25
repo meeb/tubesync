@@ -97,7 +97,9 @@ class ProgressHookStatus(BaseStatus):
         'error',
     ))
 
-    def __init__(self, *args, status=None, info_dict={}, filename=None, **kwargs):
+    def __init__(self, *args, status=None, info_dict=None, filename=None, **kwargs):
+        if info_dict is None:
+            info_dict = dict()
         super().__init__(self.status_dict)
         self.filename = filename
         self.info = info_dict
@@ -117,7 +119,9 @@ class PPHookStatus(BaseStatus):
         'finished',
     ))
 
-    def __init__(self, *args, status=None, postprocessor=None, info_dict={}, filename=None, **kwargs):
+    def __init__(self, *args, status=None, postprocessor=None, info_dict=None, filename=None, **kwargs):
+        if info_dict is None:
+            info_dict = dict()
         super().__init__(self.status_dict)
         self.filename = filename
         self.info = info_dict
