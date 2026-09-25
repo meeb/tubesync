@@ -1,25 +1,20 @@
 import { spawn } from "node:child_process";
-import { stat } from "node:fs/promises";
+import { stat, readFile } from "node:fs/promises";
 
-const archivePath = Bun.argv[Bun.argv.length - 1];
+const archivePath = Bun.argv.at(-1);
 
 if (!archivePath) {
-  console.error("usage: bun run ./reproduction.ts /path/to/bun-linux-aarch64.zip");
+  console.error("usage: bun run reproduction.ts /path/to/archive.zip");
   process.exit(2);
 }
 
 await stat(archivePath);
-
 console.error("archive:", archivePath);
 
-const child = spawn(
-  "unzip",
-  ["-Z1", archivePath],
-  {
-    shell: false,
-    stdio: ["ignore", "pipe", "pipe"],
-  },
-);
+const child = spawn("unzip", ["-Z1", archivePath], {
+  shell: false,
+  stdio: ["ignore", "pipe", "pipe"],
+});
 
 let stdout = "";
 let stderr = "";
@@ -43,7 +38,7 @@ child.once("error", error => {
   console.error("error:", error);
 });
 
-const timeout_timer = setTimeout(() => {
+const timeout_timer = setTimeout(async () => {
   const pid = child.pid;
 
   console.error("TIMEOUT:", {
@@ -54,24 +49,30 @@ const timeout_timer = setTimeout(() => {
     stdoutLength: stdout.length,
     stderrLength: stderr.length,
   });
+
   console.log("output:", {
     stdout: JSON.stringify(stdout),
     stderr: JSON.stringify(stderr),
   });
 
-  if (undefined !== pid) {
+  if (pid !== undefined) {
     for (const file of ["status", "stat", "wchan"]) {
       try {
-        const contents = readFileSync(`/proc/${pid}/${file}`, "utf8");
         console.error(`/proc/${pid}/${file}:`);
-        console.error(contents);
-      } catch {
-        console.error(`/proc/${pid}/${file}: unavailable`);
+        console.error(await readFile(`/proc/${pid}/${file}`, "utf8"));
+      } catch (error) {
+        console.error(`/proc/${pid}/${file}: unavailable`, String(error));
       }
     }
-  }
 
-  child.kill("SIGTERM");
+    child.kill("SIGTERM");
+
+    setTimeout(() => {
+      if (!child.killed && child.exitCode === null) {
+        child.kill("SIGKILL");
+      }
+    }, 2_000);
+  }
 
   process.exitCode = 124;
 }, 15_000);
@@ -83,6 +84,7 @@ child.once("exit", (code, signal) => {
 
 child.once("close", (code, signal) => {
   clearTimeout(timeout_timer);
+
   console.error("close:", {
     code,
     signal,
