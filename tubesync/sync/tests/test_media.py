@@ -14,6 +14,7 @@ from sync.choices import (
 
 from .fixtures import all_test_metadata
 metadata = all_test_metadata['boring']
+# ruff: file-ignore[DTZ001]
 
 
 class MediaTestCase(TestCase):
