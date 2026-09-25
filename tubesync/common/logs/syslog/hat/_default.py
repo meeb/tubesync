@@ -348,6 +348,7 @@ else:
             """Initializes the wrapper and neutralizes conflicting parent process states."""
             super().__init__(host, port, common.CommType.UDP, queue_size, reconnect_delay, *args, **kwargs)
 
+            self._MAX_DROPPED_COUNT = 1_000_000
             state = self._get_parent_attr('__state')
 
             if state:
@@ -476,23 +477,29 @@ else:
 
         def _determine_comm_type(self, comm_type):
             """Maps and cross-checks string connection descriptions to Enumeration definitions."""
+            if isinstance(comm_type, common.CommType):
+                return comm_type
+
             if isinstance(comm_type, str):
-                needle = comm_type
+                def vary(value: str) -> set[str]:
+                    folded = value.casefold()
+                    lowered = value.lower()
+                    return {
+                        value, value.upper(),
+                        folded, folded.upper(),
+                        lowered, lowered.upper(),
+                    }
+
                 haystack = frozenset(common.CommType.__members__)
-                vary = lambda x: {
-                    x, x.upper(),
-                    x.casefold(), x.casefold().upper(),
-                    x.lower(), x.lower().upper(),
-                }
+                needles = vary(comm_type)
+                matched_elements = tuple(haystack.intersection(needles))
+
                 try:
-                    matched_elements = tuple(haystack.intersection(vary(needle)))
-                    member = matched_elements[0]
-                    return common.CommType[member]
+                    return common.CommType[matched_elements[0]]
                 except (IndexError, KeyError) as e:
                     raise ValueError(f'Specify a valid comm_type from this list: {list(haystack)}') from e
 
-            if not isinstance(comm_type, common.CommType):
-                raise TypeError('Invalid comm_type argument')
+            raise ValueError('Invalid comm_type argument')
 
         def _parent_class_name(self):
             return hat_syslog_handler_SyslogHandler.__name__
@@ -538,7 +545,7 @@ else:
                 # ACQUIRE LOCK ON MAIN THREAD BEFORE INCREMENTING COUNTER SLICES
                 with state.cv:
                     dropped_count = state.dropped[-1]
-                    if 1_000_000 < dropped_count:
+                    if self._MAX_DROPPED_COUNT < dropped_count:
                         state.dropped.append(1)
                     else:
                         state.dropped[-1] = 1 + dropped_count
