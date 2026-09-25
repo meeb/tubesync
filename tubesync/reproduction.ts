@@ -62,9 +62,10 @@ const timeout_timer = setTimeout(() => {
   if (undefined !== pid) {
     for (const file of ["status", "stat", "wchan"]) {
       try {
+        const contents = readFileSync(`/proc/${pid}/${file}`, "utf8");
         console.error(`/proc/${pid}/${file}:`);
-        console.error(await readFile(`/proc/${pid}/${file}`, "utf8"));
-      } catch (error) {
+        console.error(contents);
+      } catch {
         console.error(`/proc/${pid}/${file}: unavailable`);
       }
     }
