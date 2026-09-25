@@ -247,6 +247,7 @@ def yt_dlp_postprocessor_hook(event):
             media.new_metadata.save()
         except Media.DoesNotExist:
             pass
+        # ruff: ignore[BLE001]
         except Exception as e:
             log.exception(e)
     if 'finished' == event['status']:
