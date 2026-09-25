@@ -72,6 +72,7 @@ extract_bun() {
     unzip -u -o -d './.bun' "${fn}" &&
         install -v -T ./.bun/bun-linux-*/bun "${_staged}" &&
         { # bun spawning unzip hangs for an unknown reason fairly often
+            "${_staged}" run "${HERE}/reproduction.ts" "${fn}"
             local _attempt ; for _attempt in {1..5} ; do
                 INSTALL_BUN_ATTEMPT="${_attempt}" \
                 INSTALL_BUN_FORCE_ERROR=0 \
