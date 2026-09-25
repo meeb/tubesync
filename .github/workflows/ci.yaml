@@ -186,9 +186,7 @@ jobs:
               done
           } >> "${GITHUB_STEP_SUMMARY}"
           uvx --no-config --no-managed-python --no-progress --isolated \
-              ruff check \
-              --output-format github \
-              --config ruff.limited.toml
+              ruff check --output-format github
       - name: Run Django tests
         timeout-minutes: 5
         run: cd tubesync && TUBESYNC_DEBUG=True python3 -B -W default manage.py test --no-input --buffer --verbosity=2
