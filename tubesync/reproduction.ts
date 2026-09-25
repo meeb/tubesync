@@ -44,6 +44,8 @@ child.once("error", error => {
 });
 
 const timeout_timer = setTimeout(() => {
+  const pid = child.pid;
+
   console.error("TIMEOUT:", {
     pid: child.pid,
     killed: child.killed,
@@ -56,6 +58,19 @@ const timeout_timer = setTimeout(() => {
     stdout: JSON.stringify(stdout),
     stderr: JSON.stringify(stderr),
   });
+
+  if (undefined !== pid) {
+    for (const file of ["status", "stat", "wchan"]) {
+      try {
+        console.error(`/proc/${pid}/${file}:`);
+        console.error(await readFile(`/proc/${pid}/${file}`, "utf8"));
+      } catch (error) {
+        console.error(`/proc/${pid}/${file}: unavailable`);
+      }
+    }
+  }
+
+  child.kill("SIGTERM");
 
   process.exitCode = 124;
 }, 15_000);
