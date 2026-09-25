@@ -79,15 +79,18 @@ def source_pre_save(sender, instance, **kwargs):
                         target = new_dirpath / entry_path.name
                         if not target.exists():
                             entry_path = entry_path.rename(target)
+                    # ruff: ignore[BLE001]
                     except Exception as e:
                         log.exception(e)
                 try:
                     existed.rmdir()
+                # ruff: ignore[BLE001]
                 except Exception as e:
                     log.exception(e)
             elif existed:
                 try:
                     existed = existed.rename(new_dirpath / ('.existed-' + new_dirpath.name))
+                # ruff: ignore[BLE001]
                 except Exception as e:
                     log.exception(e)
 
