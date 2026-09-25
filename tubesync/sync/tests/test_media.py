@@ -47,7 +47,7 @@ class MediaTestCase(TestCase):
         )
         # Fix a created datetime for predictable testing
         self.media.created = datetime(year=2020, month=1, day=1, hour=1,
-                                      minute=1, second=1)
+                                      minute=1, second=1, tzinfo=timezone.UTC)
 
     def test_nfo(self):
         expected_tree = ElementTree.fromstring(all_test_metadata['expected_nfo'])
@@ -98,7 +98,8 @@ class MediaFilterTestCase(TestCase):
         )
         # Fix a created datetime for predictable testing
         self.media.created = datetime(
-            year=2020, month=1, day=1, hour=1, minute=1, second=1
+            year=2020, month=1, day=1, hour=1, minute=1, second=1,
+            tzinfo=timezone.UTC,
         )
 
     def test_filter_unpublished_skip(self):
