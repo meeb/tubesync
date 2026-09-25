@@ -222,6 +222,7 @@ async function unzipOutput(args: string[]): Promise<string> {
   // It also slows itself down to attempt to work around a bun bug.
   const bashUnzipSupervisor = `
 child_pid=
+file_path=
 
 sync() { builtin command sync || : ; } 2>/dev/null
 
@@ -245,13 +246,16 @@ read_archive() {
   local _arg
   for _arg in "$@" ; do
     if [[ -f "$_arg" ]]; then
-      builtin command time --verbose cat "$_arg"
+      builtin command time --verbose mv "$_arg" "$_arg".tmp.zip
+      builtin command time --verbose cp "$_arg".tmp.zip "$_arg"
+      file_path="$_arg"
     fi
   done
 } >/dev/null
 
-builtin command sleep 1
 sync
+builtin command sleep 1
+read_archive "$@"
 
 trap on_term TERM
 trap on_int INT
@@ -263,7 +267,7 @@ status=$?
 
 trap - TERM INT
 
-read_archive "$@"
+builtin command time --verbose cksum -a sha256 "$file_path" 1>&2
 builtin command sleep $(( 1 + INSTALL_BUN_ATTEMPT ))
 if [[ 0 < $(( 0 + INSTALL_BUN_FORCE_ERROR )) ]]; then
   exit 1
