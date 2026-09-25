@@ -33,6 +33,7 @@ class MockSyslogServer:
         s = None
         try:
             s = socket.create_connection((self.host, self.port), timeout=0.1)
+        # ruff: ignore[BLE001,S110]
         except Exception:
             pass
         finally:
@@ -57,6 +58,7 @@ class MockSyslogServer:
                         if not data:
                             break
                         self.received_messages.append(data.decode('utf-8'))
+            # ruff: ignore[BLE001]
             except Exception:
                 break
 
