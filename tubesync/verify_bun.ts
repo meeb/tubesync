@@ -885,58 +885,6 @@ async function findCommand(candidates: string[]): Promise<string | undefined> {
   return undefined;
 }
 
-async function unzipOutput(args: string[]): Promise<string> {
-  // This attempts to sync the filesystems before and after unzip.
-  // It also slows itself down to attempt to work around a bun bug.
-  const bashUnzipSupervisor = `
-child_pid=
-
-sync() { builtin command sync || : ; } 2>/dev/null
-
-forward_signal() {
-  local signal="$1"
-
-  if [[ -n "$child_pid" ]]; then
-    builtin kill -s "$signal" -- "$child_pid" || :
-  fi
-} 2>/dev/null
-
-on_term() {
-  forward_signal TERM
-}
-
-on_int() {
-  forward_signal INT
-}
-
-builtin command sleep 1
-sync
-
-trap on_term TERM
-trap on_int INT
-
-builtin command unzip </dev/null "$@" &
-child_pid=$!
-builtin wait "$child_pid"
-status=$?
-
-trap - TERM INT
-
-sync
-exit "$status"
-`;
-
-  return await commandOutput("bash", [
-    "--noprofile",
-    "--norc",
-    "-c",
-    "--",
-    bashUnzipSupervisor,
-    "unzip",
-    ...args,
-  ]);
-}
-
 async function verifyWithSqv(
   command: string,
   keyPath: string,
@@ -1179,14 +1127,14 @@ async function extractBinary(archivePath: string, extractionDirectory: string): 
   }
 
   console.log(`Listing files from: ${archivePath}`);
-  const listing = await unzipOutput(["-Z1", archivePath]);
+  const listing = await commandOutput(unzip, ["-Z1", archivePath]);
 
   for (const entry of listing.split(/\r?\n/).filter(Boolean)) {
     if (!safeArchiveEntry(entry)) fail(`Archive contains a traversal path: ${entry}`);
   }
 
   console.log(`Extracting into: ${extractionDirectory}`);
-  await unzipOutput(["-q", "-o", "-d", extractionDirectory, archivePath]);
+  await commandOutput(unzip, ["-q", "-o", "-d", extractionDirectory, archivePath]);
 
   const candidates: string[] = [];
   async function walk(directory: string): Promise<void> {
