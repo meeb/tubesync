@@ -1377,6 +1377,17 @@ async function main(): Promise<void> {
       expectedAlgorithmLengths
     ) as Array<Algorithm>;
     if (parsed.installDir) {
+      // Verify the filesystem wrote the bytes we streamed accurately.
+      const archiveChecksum = await hashFile(archivePath, "sha512");
+      const archiveSha512 = createDigest("sha512", archiveChecksum);
+      if (archiveHashes.sha512 !== archiveSha512) {
+        fail(
+          `Saved archive failed SHA-512 verification:\n` +
+          `expected: ${archiveHashes.sha512}\n` +
+          `actual: ${archiveSha512}`
+        );
+      }
+
       console.log(`Installing into: ${parsed.installDir}`);
       // const installedPath = await installBinary(archivePath, resolve(parsed.installDir));
       const installedPath = await installBinary(
