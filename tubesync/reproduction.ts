@@ -43,22 +43,7 @@ child.once("error", error => {
   console.error("error:", error);
 });
 
-child.once("exit", (code, signal) => {
-  console.error("exit:", { code, signal });
-});
-
-child.once("close", (code, signal) => {
-  console.error("close:", {
-    code,
-    signal,
-    stdoutLength: stdout.length,
-    stderrLength: stderr.length,
-    stdout: JSON.stringify(stdout),
-    stderr: JSON.stringify(stderr),
-  });
-});
-
-setTimeout(() => {
+const timeout_timer = setTimeout(() => {
   console.error("TIMEOUT:", {
     pid: child.pid,
     killed: child.killed,
@@ -74,3 +59,20 @@ setTimeout(() => {
 
   process.exitCode = 124;
 }, 15_000);
+
+child.once("exit", (code, signal) => {
+  clearTimeout(timeout_timer);
+  console.error("exit:", { code, signal });
+});
+
+child.once("close", (code, signal) => {
+  clearTimeout(timeout_timer);
+  console.error("close:", {
+    code,
+    signal,
+    stdoutLength: stdout.length,
+    stderrLength: stderr.length,
+    stdout: JSON.stringify(stdout),
+    stderr: JSON.stringify(stderr),
+  });
+});
