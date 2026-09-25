@@ -158,6 +158,7 @@ def yt_dlp_progress_hook(event):
         percent = None
         try:
             percent = int(float(percent_str.rstrip('%')))
+        # ruff: ignore[S110]
         except:
             pass
         if fragment_index >= 0 and fragment_count > 0:
