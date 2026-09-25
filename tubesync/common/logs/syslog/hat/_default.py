@@ -177,6 +177,7 @@ else:
                 s = factory(state, ctx)
             except KeyError:
                 raise NotImplementedError(f'Unsupported comm_type: {state.comm_type}')
+            # ruff: ignore[BLE001]
             except Exception:
                 if s is not None:
                     with contextlib.suppress(Exception):
@@ -287,6 +288,7 @@ else:
                         # String binary processing failure: Drop item immediately and preserve connection state
                         logger.exception('Dropping un-encodable Unicode log message string')
                         _item_completed(retry_queue, state.queue, item)
+                    # ruff: ignore[BLE001]
                     except Exception:
                         # On socket break, tear down this loop context cleanly.
                         # The current message remains cleanly preserved at index 0 of retry_queue.
