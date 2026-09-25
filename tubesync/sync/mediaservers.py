@@ -149,6 +149,7 @@ class PlexMediaServer(MediaServer):
                                   f'{response.status_code}.' + check_token)
         try:
             parsed_response = ElementTree.fromstring(response.content)
+        # ruff: ignore[BLE001]
         except Exception as e:
             raise ValidationError(f'Your Plex Media Server returned unexpected data, '
                                   f'expected valid XML but parsing it as XML caused '
@@ -161,6 +162,7 @@ class PlexMediaServer(MediaServer):
                     library_id = d.attrib['key']
                     library_name = d.attrib['title']
                     remote_libraries[library_id] = library_name
+        # ruff: ignore[BLE001]
         except Exception as e:
             raise ValidationError(f'Your Plex Media Server returned unexpected data, '
                                   f'the XML it returned could not be parsed and the '
@@ -271,6 +273,7 @@ class JellyfinMediaServer(MediaServer):
             data = response.json()
             if 'Items' not in data:
                 raise ValidationError('Jellyfin Media Server returned unexpected data.')
+        # ruff: ignore[BLE001]
         except Exception as e:
             raise ValidationError(f'Connection error: {e}')
 
@@ -281,6 +284,7 @@ class JellyfinMediaServer(MediaServer):
                 library_id = d['Id']
                 library_name = d['Name']
                 remote_libraries[library_id] = library_name
+        # ruff: ignore[BLE001]
         except Exception as e:
             raise ValidationError(f'Jellyfin Media Server returned unexpected data, '
                                   f'the JSON it returned could not be parsed and the '
