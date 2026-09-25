@@ -885,71 +885,6 @@ async function findCommand(candidates: string[]): Promise<string | undefined> {
   return undefined;
 }
 
-async function unzipOutput(args: string[]): Promise<string> {
-  // This attempts to sync the filesystems before and after unzip.
-  // It also slows itself down to attempt to work around a bun bug.
-  const bashUnzipSupervisor = `
-child_pid=
-
-sync() { builtin command sync || : ; } 2>/dev/null
-
-forward_signal() {
-  local signal="$1"
-
-  if [[ -n "$child_pid" ]]; then
-    builtin kill -s "$signal" -- "$child_pid" || :
-  fi
-} 2>/dev/null
-
-on_term() {
-  forward_signal TERM
-}
-
-on_int() {
-  forward_signal INT
-}
-
-read_archive() {
-  local _arg
-  for _arg in "$@" ; do
-    if [[ -f "$_arg" ]]; then
-      builtin command time --verbose cat "$_arg"
-    fi
-  done
-} >/dev/null
-
-builtin command sleep 1
-sync
-
-trap on_term TERM
-trap on_int INT
-
-builtin command time --verbose unzip </dev/null "$@" &
-child_pid=$!
-builtin wait "$child_pid"
-status=$?
-
-trap - TERM INT
-
-read_archive "$@"
-builtin command sleep $(( 1 + INSTALL_BUN_ATTEMPT ))
-if [[ 0 < $(( 0 + INSTALL_BUN_FORCE_ERROR )) ]]; then
-  exit 1
-fi
-exit "$status"
-`;
-
-  return await commandOutput("bash", [
-    "--noprofile",
-    "--norc",
-    "-c",
-    "--",
-    bashUnzipSupervisor,
-    "unzip",
-    ...args,
-  ]);
-}
-
 async function verifyWithSqv(
   command: string,
   keyPath: string,
@@ -1192,14 +1127,14 @@ async function extractBinary(archivePath: string, extractionDirectory: string): 
   }
 
   console.log(`Listing files from: ${archivePath}`);
-  const listing = await unzipOutput(["-Z1", archivePath]);
+  const listing = await commandOutput(unzip, ["-Z1", archivePath]);
 
   for (const entry of listing.split(/\r?\n/).filter(Boolean)) {
     if (!safeArchiveEntry(entry)) fail(`Archive contains a traversal path: ${entry}`);
   }
 
   console.log(`Extracting into: ${extractionDirectory}`);
-  await unzipOutput(["-q", "-o", "-d", extractionDirectory, archivePath]);
+  await commandOutput(unzip, ["-q", "-o", "-d", extractionDirectory, archivePath]);
 
   const candidates: string[] = [];
   async function walk(directory: string): Promise<void> {
@@ -1224,6 +1159,9 @@ async function installBinary(archivePath: string, installDirectory: string): Pro
   const extractionDirectory = await mkdtemp(join(dirname(archivePath), "bun-extract-"));
 
   try {
+    const archiveChecksum = await hashFile(archivePath, "sha512");
+    const archiveSha512 = createDigest("sha512", archiveChecksum);
+
     const extractedPath = await extractBinary(archivePath, extractionDirectory);
     const extractedInfo = await lstat(extractedPath);
     if (!extractedInfo.isFile()) fail("Extracted Bun executable is not a regular file");
@@ -1390,6 +1328,16 @@ async function main(): Promise<void> {
       expectedAlgorithmLengths
     ) as Array<Algorithm>;
     if (parsed.installDir) {
+      const archiveChecksum = await hashFile(archivePath, "sha512");
+      const archiveSha512 = createDigest("sha512", archiveChecksum);
+      if (archiveHashes.sha512 !== archiveSha512) {
+        fail(
+          `Saved archive failed SHA-512 verification:\n` +
+          `expected: ${archiveHashes.sha512}\n` +
+          `actual: ${archiveSha512}`
+        );
+      }
+
       console.log(`Installing into: ${parsed.installDir}`);
       // const installedPath = await installBinary(archivePath, resolve(parsed.installDir));
       const installedPath = await installBinary(
