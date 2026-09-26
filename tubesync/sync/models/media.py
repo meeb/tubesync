@@ -584,7 +584,6 @@ class Media(models.Model):
             'uploader': self.uploader,
         }
 
-
     @property
     def has_metadata(self):
         result = self.metadata is not None
@@ -593,13 +592,11 @@ class Media(models.Model):
         value = self.get_metadata_first_value(('id', 'display_id', 'channel_id', 'uploader_id',))
         return value is not None
 
-
     def metadata_clear(self, /, *, save=False):
         self.metadata = None
         setattr(self, '_cached_metadata_dict', None)
         if save:
             self.save()
-
 
     def metadata_dumps(self, arg_dict=None):
         fallback = dict()
@@ -613,11 +610,9 @@ class Media(models.Model):
             cls=JSONEncoder,
         )
 
-
     def metadata_loads(self, arg_str='{}'):
         data = json.loads(arg_str) or self.loaded_metadata
         return data
-
 
     @atomic(durable=False)
     def ingest_metadata(self, data):
@@ -638,7 +633,6 @@ class Media(models.Model):
         setattr(self, '_cached_metadata_dict', None)
         return md.ingest_metadata(data)
 
-
     def save_to_metadata(self, key, value, /):
         data = self.loaded_metadata
         using_new_metadata = self.get_metadata_first_value(
@@ -655,7 +649,6 @@ class Media(models.Model):
             self.metadata = self.metadata_dumps(arg_dict=migrated)
             self.save()
         log.debug(f'Saved to metadata: {self.key} / {self.uuid}: {key=}: {value}')
-
 
     @property
     def reduce_data(self):
@@ -705,7 +698,6 @@ class Media(models.Model):
                     return filtered_data
             return data
 
-
     @property
     def loaded_metadata(self):
         cached = getattr(self, '_cached_metadata_dict', None)
@@ -729,7 +721,6 @@ class Media(models.Model):
         # ruff: ignore[BLE001]
         except Exception:
             return {}
-
 
     @property
     def url(self):
@@ -1049,10 +1040,12 @@ class Media(models.Model):
         if task:
             # Avoid the circular import `ImportError` from using this at the top of the file.
             from ..tasks import get_media_download_task
+
             def running(arg_task, /):
                 if hasattr(arg_task, 'locked_by_pid_running'):
                     return arg_task.locked_by_pid_running()
                 return get_media_download_task(str(self.pk))
+
             if running(task):
                 return Val(MediaState.DOWNLOADING)
             elif task.has_error():
@@ -1244,4 +1237,3 @@ Media.failed_format = failed_format
 Media.refresh_formats = refresh_formats
 Media.wait_for_premiere = wait_for_premiere
 Media.write_nfo_file = write_nfo_file
-

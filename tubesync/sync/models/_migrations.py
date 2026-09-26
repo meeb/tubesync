@@ -18,4 +18,3 @@ def get_media_thumb_path(instance, filename):
     filename = f'{fileid}.jpg'
     prefix = fileid[:2]
     return Path('thumbs') / prefix / filename
-

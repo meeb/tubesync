@@ -11,6 +11,7 @@ def use_tables(apps, schema_editor):
     for media in qs_gen(qs):
         media.save_to_metadata('migrated', True)
 
+
 def restore_metadata_column(apps, schema_editor):
     #Media = apps.get_model('sync', 'Media')
     qs = Media.objects.filter(metadata__isnull=False)
@@ -23,7 +24,6 @@ def restore_metadata_column(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('sync', '0031_squashed_metadata_metadataformat'),
     ]
@@ -34,4 +34,3 @@ class Migration(migrations.Migration):
             reverse_code=restore_metadata_column,
         ),
     ]
-

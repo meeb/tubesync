@@ -13,6 +13,7 @@ from unittest.mock import patch, MagicMock
 # Ensure shasum.py is in the same directory
 import shasum
 
+
 class TestShasum(unittest.TestCase):
     def setUp(self):
         # Create a fresh playground for each test
@@ -201,6 +202,7 @@ class TestShasum(unittest.TestCase):
     def test_file_modified_mocked(self):
         """Safety: Use mocking to simulate a file change during hashing."""
         from itertools import cycle
+
         # 1. SETUP PHASE (Uses real filesystem)
         name = "mock_test.bin"
         data = b"A" * 1024
@@ -491,6 +493,7 @@ class TestShasum(unittest.TestCase):
 
         # We want Path().resolve() to work for abs_cwd, but fail for target_path
         original_resolve = Path.resolve
+
         def side_effect(self_obj, *args, **kwargs):
             # If resolving 'test.txt', throw the error
             if "test.txt" in str(self_obj):
@@ -559,4 +562,3 @@ if __name__ == "__main__":
     else:
         print("\n\033[1;31mFAILURE: Check logic errors above.\033[0m\n")
         sys.exit(1)
-

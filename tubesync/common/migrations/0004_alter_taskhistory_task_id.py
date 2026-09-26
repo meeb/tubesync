@@ -43,7 +43,6 @@ def remove_duplicated_rows(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('common', '0003_taskhistory_remove_duplicates'),
     ]
@@ -59,4 +58,3 @@ class Migration(migrations.Migration):
             field=models.CharField(max_length=40, unique=True),
         ),
     ]
-

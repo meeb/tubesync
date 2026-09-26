@@ -24,5 +24,7 @@ def retry_django_db(max_retries=15, *, callback_func=None, **settings):
                         retry.error = e
                         continue
                     raise
+
         return wrapper
+
     return decorator

@@ -79,7 +79,6 @@ class SqliteStorage(huey_SqliteStorage):
 
 
 class Huey(huey_Huey):
-
     # do not use __len__ (pending_count) for bool
     def __bool__(self):
         return (self._registry._registry or self._registry._periodic_tasks)
@@ -125,6 +124,7 @@ class Huey(huey_Huey):
             t.revoke_id = f'r:{t.id}'
             try:
                 from common.models import TaskHistory
+
                 th = TaskHistory.objects.get(task_id=previous_id)
             # ruff: ignore[S110]
             except:
@@ -158,6 +158,8 @@ class SqliteHuey(Huey):
 def CancelExecution_init(self, *args, retry=None, **kwargs):
     self.retry = retry
     super(CancelExecution, self).__init__(*args, **kwargs)
+
+
 CancelExecution.__init__ = CancelExecution_init
 
 
@@ -176,12 +178,14 @@ def h_q_dict(q, /):
 def h_q_tuple(q, /):
     if isinstance(q, str):
         from django_huey import get_queue
+
         q = get_queue(q)
     return (
         q.name,
         list(q._registry._registry.keys()),
         h_q_dict(q),
     )
+
 
 def start_consumer(queue_name):
     assert isinstance(queue_name, str), type(queue_name)
@@ -203,6 +207,7 @@ def start_consumer(queue_name):
             stdout=-1, stderr=-1, start_new_session=True,
         )
 
+
 def h_q_reset_maint_func(queue, /, exception=None, status=None):
         if status is None:
             return
@@ -219,9 +224,11 @@ def h_q_reset_maint_func(queue, /, exception=None, status=None):
 
 # Configuration convenience helpers
 
+
 def h_q_reset_tasks(q, /, *, maint_func=None):
     if isinstance(q, str):
         from django_huey import get_queue
+
         q = get_queue(q)
     # revoke to prevent pending tasks from executing
     for t in q._registry._registry.values():
@@ -230,6 +237,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     q.storage.flush_schedule()
     # clear pending tasks
     q.storage.flush_queue()
+
     # run the maintenance function
     def default_maint_func(queue, /, exception=None, status=None):
         if status is None:
@@ -242,6 +250,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
             )
             return
         return True
+
     maint_result = None
     if maint_func is None:
         maint_func = default_maint_func
@@ -308,6 +317,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=No
         ),
     )
 
+
 # Signal handlers shared between queues
 
 def on_executing_remove_duplicates(signal_name, task_obj, exception_obj=None, /, *, huey=None):
@@ -321,6 +331,7 @@ def on_executing_remove_duplicates(signal_name, task_obj, exception_obj=None, /,
     assert signals.SIGNAL_EXECUTING == signal_name
 
     from common.models import TaskHistory
+
     try:
         th = TaskHistory.objects.get(task_id=str(task_obj.id))
     except TaskHistory.DoesNotExist:
@@ -353,6 +364,7 @@ def on_executing_remove_duplicates(signal_name, task_obj, exception_obj=None, /,
     for task_id in waiting_id_generator(queue=huey, task_obj=task_obj):
         huey.revoke_by_id(task_id, revoke_once=True)
 
+
 def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     if signals.SIGNAL_INTERRUPTED != signal_name:
         return
@@ -361,7 +373,9 @@ def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     assert hasattr(huey, 'enqueue') and callable(huey.enqueue)
     huey.enqueue(task_obj)
 
+
 storage_key_prefix = 'task_history:'
+
 
 def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     signal_time = time.monotonic()
@@ -474,11 +488,14 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     th.elapsed = history['elapsed']
     th.save()
 
+
 # Registration of shared signal handlers
+
 
 def register_huey_signals():
     from django import db
     from django_huey import DJANGO_HUEY, get_queue, pre_execute, post_execute, signal
+
     def close_db(task, task_value=None, exception=None, /, *, huey=None):
         assert huey is not None
         assert hasattr(huey, 'immediate')
@@ -569,6 +586,7 @@ class AttemptsTask(Task):
     A Task base class that relies entirely on Task for defaults.
     Resolves algorithms using string keys mapped onto the BackoffAlgorithm base class.
     """
+
     backoff_base_class = BackoffAlgorithm
 
     def __init__(self, *args, backoff_class=None, **kwargs):
@@ -611,4 +629,3 @@ class AttemptsTask(Task):
         else:
             self._custom_attempt_counter = 1 + current_state
         self._retry_delay = value
-

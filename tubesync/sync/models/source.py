@@ -527,7 +527,6 @@ class Source(db.models.Model):
                 break
         return avatar_url, banner_url, thumbnail_url
 
-
     def directory_exists(self):
         return (os.path.isdir(self.directory_path) and
                 os.access(self.directory_path, os.W_OK))
@@ -676,4 +675,3 @@ class Source(db.models.Model):
                     entries.extend(reversed(streams[: allowed_streams]))
 
         return entries
-

@@ -158,8 +158,6 @@ jobs:
       - name: Check with ruff
         continue-on-error: false
         run: |
-          target_version='py312'
-          ignore_csv_list='C408,C409,C410,E701,E722,E731,I001,UP017,UP018'
           cd tubesync
           # output formats:
           # "full" | "concise" | "grouped" |
@@ -179,11 +177,7 @@ jobs:
               echo ''
               echo '```'
               uvx --no-config --no-managed-python --no-progress --isolated \
-                  ruff check --exit-zero \
-                  --target-version "${target_version}" \
-                  --output-format "${fmt}" \
-                  --extend-select 'E4,E7,E9,F,RUF100' \
-                  --ignore "${ignore_csv_list}"
+                  ruff check --exit-zero --output-format "${fmt}"
               echo ''
               echo '```'
               echo ''
@@ -191,12 +185,15 @@ jobs:
               echo ''
               done
           } >> "${GITHUB_STEP_SUMMARY}"
+          check_retcode=0
           uvx --no-config --no-managed-python --no-progress --isolated \
-              ruff check \
-              --target-version "${target_version}" \
-              --output-format github \
-              --select 'C4,E4,E7,E9,F' \
-              --ignore "${ignore_csv_list}"
+              ruff check --output-format github &&
+          { uvx --no-config --no-managed-python --no-progress --isolated \
+              ruff format --check || check_retcode=$? ; true ; }
+          case "${check_retcode:-0}" in
+              (0|1) exit 0 ;;
+              (*) exit "${check_retcode:-2}" ;;
+          esac
       - name: Run Django tests
         timeout-minutes: 5
         run: cd tubesync && TUBESYNC_DEBUG=True python3 -B -W default manage.py test --no-input --buffer --verbosity=2

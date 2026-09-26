@@ -55,4 +55,3 @@ class Migration(migrations.Migration):
             unique_together={('media', 'site', 'key'), ('source', 'site', 'key')},
         ),
     ]
-

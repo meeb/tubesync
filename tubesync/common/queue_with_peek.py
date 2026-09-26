@@ -5,10 +5,12 @@ import queue
 import sys
 import threading
 from dataclasses import dataclass
+from types import TracebackType
 from typing import Any, Protocol, TypeVar
 
 
 T = TypeVar('T')
+
 
 # =====================================================================
 # ISOLATED PURE-PYTHON BASE EXTRACTION & VERIFICATION
@@ -36,6 +38,7 @@ def _get_pure_python_simple_queue() -> Any:
 
     isolated_globals: dict[str, Any] = {}
     compiled_code = compile(source_code, queue_source_path, 'exec')
+    # ruff: ignore[S102]
     exec(compiled_code, isolated_globals)
 
     if '_PySimpleQueue' in isolated_globals:
@@ -49,6 +52,7 @@ def _get_pure_python_simple_queue() -> Any:
         raise AttributeError('Extracted SimpleQueue is missing expected internal structures.')
 
     return extracted_class
+
 
 # Initialize default safe states upfront
 _PureSimpleQueue = queue.SimpleQueue
@@ -68,6 +72,7 @@ else:
 @dataclass(frozen=True)
 class QueueContextConfig:
     """Immutable type configuration container for queue context execution blocks."""
+
     block: bool = True
     timeout: float | None = None
 
@@ -128,7 +133,7 @@ class PurePythonPeekQueue(_PureSimpleQueue[T]):
         self._lock.acquire()
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
         """Exits the execution context block, releasing locks and restoring balances."""
         try:
             self._lock.release()
@@ -337,14 +342,14 @@ class AsyncPeekableQueue(asyncio.Queue[T]):
                 item = await asyncio.wait_for(super().get(), timeout=self._timeout)
 
             self._peeked.append(item)
-        except (asyncio.TimeoutError, TimeoutError):
+        # ruff: ignore[UP041]
+        except (TimeoutError, asyncio.TimeoutError):
             raise asyncio.QueueEmpty
 
         return self
 
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
         """Exits the async context block without modifying structural tokens."""
-        pass
 
     async def get(self) -> T:
         """Removes and returns an item, exhausting the peek cache first."""

@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Any, Dict
+from typing import Any
 from django import forms
 from django.db import connection, models
 from django.utils.translation import gettext_lazy as _
@@ -24,6 +24,7 @@ CommaSepChoice = namedtuple(
     ),
 )
 
+
 # this is a form field!
 class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
     template_name = 'widgets/checkbox_select.html'
@@ -31,7 +32,7 @@ class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
     # perhaps set the 'selected' attribute too?
     # checked_attribute = {'checked': True, 'selected': True}
 
-    def get_context(self, name: str, value: Any, attrs) -> Dict[str, Any]:
+    def get_context(self, name: str, value: Any, attrs) -> dict[str, Any]:
         data = value
         select_all = False
         if isinstance(data, CommaSepChoice):
@@ -52,18 +53,18 @@ class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
 
 # this is a database field!
 class CommaSepChoiceField(models.CharField):
-    '''
-    Implements comma-separated storage of lists
-    '''
+    """
+        Implements comma-separated storage of lists
+    """
 
     form_class = forms.MultipleChoiceField
     widget = CustomCheckboxSelectMultiple
     from common.logger import log
 
-    def __init__(self, *args, separator=",", possible_choices=(("","")), all_choice="", all_label="All", allow_all=False, **kwargs):
+    def __init__(self, *args, separator=',', possible_choices=(('',''),), all_choice='', all_label='All', allow_all=False, **kwargs):
         kwargs.setdefault('max_length', 128)
         self.separator = str(separator)
-        self.possible_choices = possible_choices or kwargs.get('choices')
+        self.possible_choices = kwargs.get('choices') if possible_choices is None else possible_choices
         self.selected_choices = list()
         self.allow_all = allow_all
         self.all_label = all_label
@@ -72,11 +73,10 @@ class CommaSepChoiceField(models.CharField):
         super().__init__(*args, **kwargs)
         self.validators.clear()
 
-
     # Override these functions to prevent unwanted behaviors
     def to_python(self, value):
         saved_value = None
-        arg_was_none = True if value is None else False
+        arg_was_none = value is None
         if isinstance(value, CommaSepChoice):
             return value.selected_choices
         if isinstance(value, list) and len(value) > 0 and value[0].startswith('CommaSepChoice('):
@@ -86,6 +86,7 @@ class CommaSepChoiceField(models.CharField):
             r = value.replace('CommaSepChoice(', 'dict(', 1)
             try:
                 o = eval(r)
+            # ruff: ignore[BLE001,S110]
             except Exception:
                 pass
             else:
@@ -99,7 +100,6 @@ class CommaSepChoiceField(models.CharField):
 
     def get_internal_type(self):
         return super().get_internal_type()
-
 
     # standard functions for this class
     def deconstruct(self):
@@ -145,9 +145,10 @@ class CommaSepChoiceField(models.CharField):
         # })
 
     def from_db_value(self, value, expression, connection):
-        '''
-        Create a data structure to be used in Python code.
-        '''
+        """
+            Create a data structure to be used in Python code.
+        """
+
         # possibly not useful?
         if isinstance(value, CommaSepChoice):
             value = value.selected_choices
@@ -162,9 +163,10 @@ class CommaSepChoiceField(models.CharField):
         return CommaSepChoice(**args_dict)
 
     def get_prep_value(self, value):
-        '''
-        Create a value to be stored in the database.
-        '''
+        """
+            Create a value to be stored in the database.
+        """
+
         data = value
         if not isinstance(data, CommaSepChoice):
             # The data was lost; we can regenerate it.
@@ -177,11 +179,10 @@ class CommaSepChoiceField(models.CharField):
         value = data.selected_choices
         s_value = super().get_prep_value(value)
         if set(s_value) != set(value):
-            self.log.warn(f'CommaSepChoiceField:get_prep_value: values did not match. '
-                          f'CommaSepChoiceField({value}) versus CharField({s_value})')
+            self.log.warning(f'CommaSepChoiceField:get_prep_value: values did not match. '
+                             f'CommaSepChoiceField({value}) versus CharField({s_value})')
         return self.__class__._tuple___str__(data)
 
-    
     # extra functions not used by any parent classes
     @staticmethod
     def _tuple___str__(data):
@@ -213,12 +214,10 @@ class CommaSepChoiceField(models.CharField):
         if self.allow_all:
             choice_list.append((self.all_choice, _(self.all_label)))
 
-        for choice in self.possible_choices:
-            choice_list.append(choice)
+        choice_list.extend(self.possible_choices)
 
         return choice_list
 
 
 CommaSepChoice.__str__ = CommaSepChoiceField._tuple___str__
 CommaSepChoice.expand_choices = property(fget=CommaSepChoiceField._tuple_expand_choices)
-

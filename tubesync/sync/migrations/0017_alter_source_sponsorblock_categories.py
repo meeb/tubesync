@@ -5,7 +5,6 @@ import sync.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('sync', '0016_auto_20230214_2052'),
     ]

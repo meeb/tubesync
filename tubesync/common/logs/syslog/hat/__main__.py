@@ -10,6 +10,7 @@ from ._default import handler
 
 class MockSyslogServer:
     """Stands up an isolated local background socket server to harvest transport streams."""
+
     def __init__(self, host='127.0.0.1', port=0):
         self.host = host
         self.port = port
@@ -20,45 +21,34 @@ class MockSyslogServer:
         self.port = self.sock.getsockname()[1]
 
         self.received_messages = []
-        self.running = threading.Event()
+        self.shutdown = threading.Event()
         self._thread = None
 
     def start(self):
-        self.running.set()
+        self.shutdown.clear()
         self._thread = threading.Thread(target=self._listen_loop, daemon=True)
         self._thread.start()
 
     def stop(self):
-        self.running.clear()
-        s = None
-        try:
-            s = socket.create_connection((self.host, self.port), timeout=0.1)
-        except Exception:
-            pass
-        finally:
-            if s is not None:
-                s.close()
+        self.shutdown.set()
+
+        # Wake up the blocking accept() call.
+        with contextlib.suppress(OSError, TypeError, ValueError):
+            socket.create_connection((self.host, self.port), timeout=0.1).close()
+
         if self._thread:
             self._thread.join(timeout=1.0)
         self.sock.close()
 
     def _listen_loop(self):
         self.sock.listen(1)
-        while self.running.is_set():
-            try:
+        while not self.shutdown.is_set():
+            with contextlib.suppress(OSError):
                 conn, _ = self.sock.accept()
-                if not self.running.is_set():
-                    conn.close()
-                    break
-
                 with conn:
-                    while self.running.is_set():
-                        data = conn.recv(4096)
-                        if not data:
-                            break
+                    while (data := conn.recv(4096)) and not self.shutdown.is_set():
                         self.received_messages.append(data.decode('utf-8'))
-            except Exception:
-                break
+
 
 class TestSyslogHandlerIntegration(unittest.TestCase):
     def setUp(self):

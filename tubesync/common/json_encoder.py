@@ -23,4 +23,3 @@ def json_serial(obj):
     if isinstance(obj, LazyList):
         return list(obj)
     raise TypeError(f'Type {type(obj)} is not json_serial()-able')
-
