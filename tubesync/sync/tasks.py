@@ -14,7 +14,7 @@ from collections import deque as queue
 from io import BytesIO
 from pathlib import Path
 from datetime import timedelta
-from shutil import copyfile, rmtree
+from shutil import rmtree
 from django import db
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -128,11 +128,9 @@ def update_task_status(task, status):
     else:
         task.verbose_name = f'[{status}] {task._verbose_name}'
     try:
-        task.save(update_fields={'verbose_name'})
+        retry_django_db(3)(task.save)(update_fields={'verbose_name'})
     except db.DatabaseError as e:
-        if 'Save with update_fields did not affect any rows.' == str(e):
-            pass
-        else:
+        if 'Save with update_fields did not affect any rows.' != str(e):
             raise
     return True
 
@@ -671,19 +669,6 @@ def index_source(source_id):
         else:
             # log the new media instances
             log.info(f'Indexed new media: {source} / {media}')
-            log.info(f'Scheduling tasks to download thumbnail for: {media.key}')
-            thumbnail_fmt = 'https://i.ytimg.com/vi/{}/{}default.jpg'
-            for num, prefix in enumerate(reversed(('hq', 'sd', 'maxres',))):
-                thumbnail_url = thumbnail_fmt.format(
-                    media.key,
-                    prefix,
-                )
-                download_media_image(
-                    str(media.pk),
-                    thumbnail_url,
-                    priority=10+(5*num),
-                    delay=max(0, 65-(30*num)),
-                )
             priority = download_media_metadata.settings.get('default_priority', 50)
             if source.download_media:
                 priority += 5
@@ -696,6 +681,13 @@ def index_source(source_id):
                 priority=priority,
                 remove_duplicates=True,
                 vn_fmt=_('Downloading metadata for: "{}": {}'),
+                vn_args=(media.key, media.name,),
+            )
+            TaskHistory.schedule(
+                download_media_thumbnails,
+                str(media.pk),
+                remove_duplicates=True,
+                vn_fmt=_('Downloading thumbnails for: "{}": {}'),
                 vn_args=(media.key, media.name,),
             )
     # Reset task.verbose_name to the saved value
@@ -810,6 +802,13 @@ def delete_media(media_id):
             f'media:{media.uuid}',
             queue=Val(TaskQueue.DB),
         ):
+            # remove thumbnail from storage
+            if media.thumb_file_exists:
+                # copy it before its gone
+                if media.media_file_exists:
+                    media.copy_thumbnail()
+                media.thumb.delete(save=False)
+            # intentionally not removing downloaded file here
             media.delete()
 
 
@@ -936,7 +935,7 @@ def download_media_metadata(media_id):
                     log.debug(number(parts))
                     media.published = published_datetime
                     media.manual_skip = True
-                    media.save()
+                    save_model(media)
                     raise_exception = False
             except (ValueError, IndexError, OverflowError):
                 log.exception('could not assign published_datetime')
@@ -983,7 +982,7 @@ def download_media_metadata(media_id):
 
     # Don't filter media here, the post_save signal will handle that
     try:
-        media.save()
+        save_model(media)
     # ruff: ignore[TRY203]
     except Exception:
         raise
@@ -994,7 +993,7 @@ def download_media_metadata(media_id):
         metadata_lock.acquired = False
 
 
-@db_task(delay=10, priority=90, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.NET))
+@db_task(delay=10, priority=80, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.NET))
 def download_media_image(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
@@ -1029,27 +1028,24 @@ def download_media_image(media_id, url):
     image_file = BytesIO()
     i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
     image_file.seek(0)
-    media.thumb.save(
+    thumbnail_bytes = image_file.read()
+    i = image_file = None
+    if media.thumb_file_exists:
+        media.thumb.delete(save=False)
+    retry_django_db(3)(media.thumb.save)(
         'thumb',
         SimpleUploadedFile(
             'thumb',
-            image_file.read(),
+            thumbnail_bytes,
             'image/jpeg',
         ),
         save=True
     )
-    i = image_file = None
+    thumbnail_bytes = None
     log.info(f'Saved thumbnail for: {media} from: {url}')
     # After media is downloaded, copy the updated thumbnail.
-    copy_thumbnail = (
-        media.downloaded and
-        media.source.copy_thumbnails and
-        media.thumb_file_exists
-    )
-    if copy_thumbnail:
-        log.info(f'Copying media thumbnail from: {media.thumb.path} '
-                 f'to: {media.thumbpath}')
-        copyfile(media.thumb.path, media.thumbpath)
+    if media.downloaded and media.thumb_file_exists:
+        media.copy_thumbnail()
     return True
 
 @huey_signal(huey_signals.SIGNAL_COMPLETE, queue=Val(TaskQueue.NET))
@@ -1062,6 +1058,7 @@ def on_complete_download_media_image(signal_name, task_obj, exception_obj=None, 
     # clear False/True from the results storage
     if result is False or result is True:
         huey.result(preserve=False, id=task_obj.id)
+
 
 @db_task(delay=60, priority=70, timeout=max(0, settings.MAX_RUN_TIME-600), context=True, queue=Val(TaskQueue.LIMIT))
 def download_media_file(media_id, override=False, *, task=None):
@@ -1143,7 +1140,7 @@ def download_media_file(media_id, override=False, *, task=None):
 
             # Media has been downloaded successfully
             media.download_finished(format_str, container, filepath)
-            media.save()
+            save_model(media)
             media.rename_files()
             media.copy_thumbnail()
             media.write_nfo_file()
@@ -1157,6 +1154,39 @@ def download_media_file(media_id, override=False, *, task=None):
             schedule_media_servers_update()
         finally:
             watchdog_result.revoke()
+            try:
+                task = TaskHistory.objects.get(task_id=watchdog_result.id)
+            except TaskHistory.DoesNotExist:
+                pass
+            else:
+                if watchdog_result.is_revoked():
+                    default_verbose_name = f'{task.name}: {task.task_id}'
+                    update_model(
+                        task,
+                        verbose_name=f'[revoked] {task.verbose_name or default_verbose_name}',
+                    )
+
+
+@db_task(priority=90, retries=5, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.NET))
+def download_media_thumbnails(media_id):
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist as e:
+        # Task triggered but the media no longer exists, do nothing
+        raise CancelExecution(_('no such media'), retry=False) from e
+    if media.thumb_file_exists:
+        raise CancelExecution(_('thumbnail exists already'), retry=False)
+    selected_thumbnail = media.download_thumbnails()
+    if selected_thumbnail is not None:
+        selected_thumbnail = Path(selected_thumbnail)
+        log.info(f'Selected thumbnail file {selected_thumbnail.name} for: {media.key}')
+        try:
+            temp_dir = selected_thumbnail.resolve(strict=True).parent
+        except FileNotFoundError:
+            pass
+        else:
+            if '-thumbnails-' in temp_dir.name:
+                rmtree(temp_dir, True)
 
 
 @db_task(delay=30, expires=210, priority=100, queue=Val(TaskQueue.NET))
@@ -1253,7 +1283,7 @@ def refresh_formats(media_id):
             raise exc
         # the metadata has already been saved, trigger the post_save signal
         log.info(f'Saving refreshed formats for "{media.key}": {msg}')
-        media.save()
+        save_model(media)
 
 
 @db_task(delay=300, priority=80, retries=5, retry_delay=600, queue=Val(TaskQueue.FS))
@@ -1395,29 +1425,61 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
         log.warning(f'Task delete_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         # this task can run after a source was deleted
-    mqs = Media.objects.all().defer(
-        'metadata',
-    ).filter(
-        source=source or source_id,
-    )
-    # no delay for these tasks
-    delete_media.map({
-        str(media.pk)
-        for media in qs_gen(mqs)
-    })
-    with atomic(durable=True):
-        mqs.update(manual_skip=True, skip=True)
-        log.info(f'Deleting media for source: {source_name}')
-        mqs.delete()
-    # Remove the directory, if the user requested that
+    else:
+        source_lock = huey_lock_task(
+            f'source:{source.uuid}',
+            queue=Val(TaskQueue.FS),
+        )
+        if source_lock.acquired:
+            raise CancelExecution(_('already locked'), retry=True)
+        source_lock.acquired = True
+        update_model(
+            source,
+            key = source.key + '/deleted',
+            name = f'[Deleting] {source.name}',
+        )
     directory_path = Path(source_directory)
     remove = (
         (source and source.delete_removed_media) or
         (directory_path / '.to_be_removed').is_file()
     )
-    if source:
+    mqs = Media.objects.all().defer(
+        'metadata',
+    ).filter(
+        source=source or source_id,
+    )
+
+    for media in qs_gen(mqs):
+        # remove thumbnail from storage
+        if media.thumb_file_exists:
+            # copy it before its gone
+            if media.media_file_exists:
+                media.copy_thumbnail()
+            media.thumb.delete(save=False)
+        # if requested, remove download from storage
+        if remove and media.media_file_exists:
+            media.media_file.delete(save=False)
+        # no delay for these tasks
+        delete_media(str(media.pk))
+
+    try:
         with atomic(durable=True):
-            source.delete()
+            mqs.update(manual_skip=True, skip=True)
+            log.info(f'Deleting media for source: {source_name}')
+            mqs.delete()
+        if source:
+            try:
+                source = Source.objects.get(uuid=source.uuid)
+            except Source.DoesNotExist:
+                source = False
+            else:
+                with atomic(durable=True):
+                    source.delete()
+                    source = False
+    finally:
+        if source is not None:
+            source_lock.acquired = False
+    # Remove the directory, if the user requested that
     if remove:
         log.info(f'Deleting directory for: {source_name}: {directory_path}')
         rmtree(directory_path, True)
