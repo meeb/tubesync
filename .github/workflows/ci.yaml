@@ -185,8 +185,15 @@ jobs:
               echo ''
               done
           } >> "${GITHUB_STEP_SUMMARY}"
+          check_retcode=0
           uvx --no-config --no-managed-python --no-progress --isolated \
-              ruff check --output-format github
+              ruff check --output-format github &&
+          { uvx --no-config --no-managed-python --no-progress --isolated \
+              ruff format --check || check_retcode=$? ; true ; }
+          case "${check_retcode:-0}" in
+              (0|1) exit 0 ;;
+              (*) exit "${check_retcode:-2}" ;;
+          esac
       - name: Run Django tests
         timeout-minutes: 5
         run: cd tubesync && TUBESYNC_DEBUG=True python3 -B -W default manage.py test --no-input --buffer --verbosity=2
