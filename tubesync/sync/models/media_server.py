@@ -17,7 +17,7 @@ class MediaServer(db.models.Model):
         Val(MediaServerType.JELLYFIN): '<i class="fas fa-server"></i>',
         Val(MediaServerType.PLEX): '<i class="fas fa-server"></i>',
     }
-    HANDLERS: ClassVar[dict[str, MediaServerBase]]  = MediaServerType.handlers_dict()
+    HANDLERS: ClassVar[dict[str, type[MediaServerBase]]]  = MediaServerType.handlers_dict()
 
     server_type = db.models.CharField(
         _('server type'),
