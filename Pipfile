@@ -10,6 +10,7 @@ pycodestyle = "*"
 [packages]
 django = "~=6.0.0"
 django-huey = "*"
+django-tasks-db = "*"
 django-sass-processor = {extras = ["management-command"], version = "*"}
 pillow = "*"
 whitenoise = "*"
