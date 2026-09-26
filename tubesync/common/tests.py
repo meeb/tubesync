@@ -44,22 +44,14 @@ class CommonStaticTestCase(TestCase):
         self.assertEqual(response.content.decode(), settings.ROBOTS)
 
     def test_favicon(self):
-        url_sep = '/'
-        # save the separator
         root = Path(settings.STATIC_ROOT)
-        root_sep = ''
-        if (p := getattr(root, 'parser', None)):
-            root_sep = p.sep
-        elif (f := getattr(root, '_flavour', None)):
-            root_sep = f.sep
-        if not root_sep:
-            root_sep = url_sep
 
         # /favicon.ico should be a redirect to the real icon somewhere in STATIC_FILES
         response = self.client.get('/favicon.ico')
         self.assertEqual(response.status_code, 302)
         # Given tests run with DEBUG=False calls to files in /static/ will fail, check
         # the file exists on disk in common/static/ manually
+        url_sep = '/'
         url = response.url.removeprefix(url_sep)
         url_parts = url.split(url_sep)
         if url_parts[0] == root.name:
@@ -67,7 +59,7 @@ class CommonStaticTestCase(TestCase):
             root = root.parent
         root /= 'common'
         root /= 'static'
-        favicon_real_path = root.joinpath(root_sep.join(url_parts))
+        favicon_real_path = root.joinpath(*url_parts)
         self.assertTrue(favicon_real_path.exists())
 
 
