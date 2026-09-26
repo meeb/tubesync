@@ -37,6 +37,7 @@ __all__ = ['default_formatter', 'default_handler', 'handler']
 if not handler:
     # Create only enough for tests to fail instead of creating hard to diagnose errors
     from ..std import default_handler as std_default_handler, handler
+
     class MockSyslogHandler(handler):
         def __init__(self, host, port, comm_type, queue_size, reconnect_delay, *args, **kwargs):
             self.host = host
@@ -49,6 +50,7 @@ if not handler:
             kwargs['address'] = std_default_handler.address
             kwargs['facility'] = std_default_handler.facility
             super().__init__(*args, **kwargs)
+
     handler = MockSyslogHandler
     default_handler = handler('127.0.0.1', 6514, 'UDP', 1024, 5)
 else:
@@ -57,7 +59,6 @@ else:
         common.CommType.TLS: lambda state, ctx: _create_tcp_socket(state, ctx),
         common.CommType.UDP: lambda state, ctx: _create_udp_socket(state),
     }
-
 
     @dataclass
     class _ReconnectionState:
@@ -68,13 +69,12 @@ else:
         success: int = 10
         failure: int = 5
 
-
     @dataclass(frozen=True)
     class RetryItem:
         """Encapsulates a structured syslog entry in the retry transport pipeline."""
+
         synthetic: bool
         msg: common.Msg
-
 
     @dataclass
     class ThreadScoreboard:
@@ -84,7 +84,6 @@ else:
         initialized: tuple[float, int] | None = None
         previous_start: tuple[float, int] | None = None
 
-
     def _create_tcp_socket(state, ctx=None):
         """Establishes an optimized TCP or wrapped TLS stream transport connection."""
         s = socket.create_connection((state.host, state.port), timeout=5.0)
@@ -93,13 +92,11 @@ else:
             s = ctx.wrap_socket(s)
         return s
 
-
     def _create_udp_socket(state):
         """Establishes an un-bonded UDP datagram socket connection endpoint."""
         s = socket.socket(type=socket.SOCK_DGRAM)
         s.connect((state.host, state.port))
         return s
-
 
     def _get_exponential_delay(remaining, total, base_delay):
         """
@@ -111,7 +108,6 @@ else:
         multiplier = 0.1 * (50.0 ** ratio)
 
         return base_delay * multiplier
-
 
     def _item_completed(retry_queue, core_queue, item, reconnect=None):
         """
@@ -127,7 +123,6 @@ else:
         # when there was a working endpoint before the failure.
         if reconnect is not None:
             reconnect.budget = min(reconnect.cap, 1 + reconnect.budget)
-
 
     def _logging_handler_thread(state, shutdown=None, logger=logger):
         """
@@ -329,7 +324,6 @@ else:
             if shutdown is not None and callable(shutdown):
                 shutdown()
 
-
     class SyslogHandler(hat_syslog_handler_SyslogHandler):
         """
         A process-safe wrapper for hat.syslog.handler.SyslogHandler.
@@ -446,6 +440,7 @@ else:
                 cb_closing = self._closing
                 cb_closed = self.__state.closed
                 cb_handler_close = super(hat_syslog_handler_SyslogHandler, self).close
+
                 def shutdown_cb():
                     cb_closing.set()
                     cb_closed.set()
@@ -481,6 +476,7 @@ else:
                 return comm_type
 
             if isinstance(comm_type, str):
+
                 def vary(value: str) -> set[str]:
                     folded = value.casefold()
                     lowered = value.lower()
@@ -599,7 +595,6 @@ else:
             # dependencies while completely avoiding the parent class thread-joins.
             # =====================================================================
             super(hat_syslog_handler_SyslogHandler, self).close()
-
 
     handler = SyslogHandler
     default_handler = handler(

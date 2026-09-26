@@ -18,7 +18,6 @@ class MediaServerError(Exception):
 
 
 class MediaServer:
-
     TIMEOUT = 0
     HELP = ''
     default_headers: ClassVar[dict[str, str]] = {'User-Agent': 'TubeSync'}
@@ -75,7 +74,6 @@ class MediaServer:
 
 
 class PlexMediaServer(MediaServer):
-
     TIMEOUT = 5
 
     HELP = _('<p>To connect your TubeSync sevrer to your Plex Media Server you will '

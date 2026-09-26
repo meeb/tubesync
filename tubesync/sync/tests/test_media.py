@@ -13,12 +13,12 @@ from sync.choices import (
 )
 
 from .fixtures import all_test_metadata
+
 metadata = all_test_metadata['boring']
 # ruff: file-ignore[DTZ001]
 
 
 class MediaTestCase(TestCase):
-
     def setUp(self):
         # Disable general logging for test case
         logging.disable(logging.CRITICAL)
@@ -65,7 +65,6 @@ class MediaTestCase(TestCase):
 
 
 class MediaFilterTestCase(TestCase):
-
     def setUp(self):
         # Disable general logging for test case
         # logging.disable(logging.CRITICAL)

@@ -24,7 +24,6 @@ class MaterializeDefaultFieldsMiddleware:
 
 
 class BasicAuthMiddleware(BaseBasicAuthMiddleware):
-
     def process_request(self, request):
         bypass_uris = getattr(settings, 'BASICAUTH_ALWAYS_ALLOW_URIS', [])
         if request.path in bypass_uris:

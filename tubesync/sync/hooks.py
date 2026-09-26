@@ -89,6 +89,7 @@ class BaseStatus:
             task.verbose_name = f'{self.task_status} {self.task_verbose_name}'
             task.save()
 
+
 class ProgressHookStatus(BaseStatus):
     status_dict = progress_hook['status']
     valid = frozenset((
@@ -111,6 +112,7 @@ class ProgressHookStatus(BaseStatus):
             return 0
         return 1 + self.download_progress
 
+
 class PPHookStatus(BaseStatus):
     status_dict = postprocessor_hook['status']
     valid = frozenset((
@@ -128,6 +130,7 @@ class PPHookStatus(BaseStatus):
         self.media_name = None
         self.name = postprocessor
         self.status = status
+
 
 def yt_dlp_progress_hook(event):
     if not ProgressHookStatus.valid_status(event['status']):
@@ -193,6 +196,7 @@ def yt_dlp_progress_hook(event):
 
         status.cleanup()
 
+
 def yt_dlp_postprocessor_hook(event):
     if not PPHookStatus.valid_status(event['status']):
         log.warning(f'[youtube-dl] unknown postprocessor event: {event!s}')
@@ -240,6 +244,7 @@ def yt_dlp_postprocessor_hook(event):
         files_to_merge = event['info_dict'].get('__files_to_merge') or list()
         log.info(f'[{event["postprocessor"]}] Files to merge: {files_to_merge}')
         from .models import Media
+
         try:
             media = Media.objects.get(pk=status.media_uuid)
             media.new_metadata.value['requested_formats'] = event['info_dict'].get('requested_formats')

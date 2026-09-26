@@ -31,6 +31,6 @@ class Migration(migrations.Migration):
                     ('hook', 'Hook/Greetings'),
                 ],
                 verbose_name='removed categories',
-            ),         
+            ),
         ),
     ]

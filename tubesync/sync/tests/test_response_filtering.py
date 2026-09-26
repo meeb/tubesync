@@ -90,5 +90,3 @@ class ResponseFilteringTestCase(TestCase):
                     if 'url' in key:
                         url_keys.append((lang_code, caption['ext'], caption[key],))
         self.assertEqual(0, len(url_keys), msg=str(url_keys))
-
-

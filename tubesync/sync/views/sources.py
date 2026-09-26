@@ -264,7 +264,6 @@ class AddSourceView(EditSourceMixin, CreateView):
 
 
 class SourceView(DetailView):
-
     template_name = 'sync/source.html'
     model = Source
     messages: ClassVar[dict[str, str]] = {
@@ -296,7 +295,6 @@ class SourceView(DetailView):
 
 
 class UpdateSourceView(EditSourceMixin, UpdateView):
-
     template_name = 'sync/source-update.html'
 
     def get_initial(self):

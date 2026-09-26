@@ -7,7 +7,6 @@ from .errors import DatabaseConnectionError
 
 
 class ErrorPageTestCase(TestCase):
-
     @prevent_request_warnings
     def test_error_403(self):
         c = Client()
@@ -28,7 +27,6 @@ class ErrorPageTestCase(TestCase):
 
 
 class HealthcheckTestCase(TestCase):
-
     def test_healthcheck(self):
         c = Client()
         response = c.get('/healthcheck')
@@ -37,7 +35,6 @@ class HealthcheckTestCase(TestCase):
 
 
 class CommonStaticTestCase(TestCase):
-
     def test_robots(self):
         response = self.client.get('/robots.txt')
         self.assertEqual(response.status_code, 200)
@@ -64,7 +61,6 @@ class CommonStaticTestCase(TestCase):
 
 
 class UtilsTestCase(TestCase):
-
     def test_parse_database_connection_string(self):
         database_dict = parse_database_connection_string(
             'postgresql://tubesync:password@localhost:5432/tubesync')

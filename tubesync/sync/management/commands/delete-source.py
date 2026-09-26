@@ -8,7 +8,6 @@ from sync.tasks import schedule_media_servers_update
 
 
 class Command(BaseCommand):
-
     help = 'Deletes a source by UUID'
 
     def add_arguments(self, parser):

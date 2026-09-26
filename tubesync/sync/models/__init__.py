@@ -23,4 +23,3 @@ __all__ = [
     'media_file_storage', 'MediaServer', 'Source',
     'Media', 'Metadata', 'MetadataFormat',
 ]
-

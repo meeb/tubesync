@@ -51,6 +51,7 @@ class MediaView(ListView):
             return str(arg).strip().lower() in (
                 'enable', 'enabled', 'on', 'true', 'yes', '1',
             )
+
         def post_or_get(request, /, key, default=None):
             return request.POST.get(key) or request.GET.get(key) or default
 
@@ -436,7 +437,6 @@ class MediaContent(DetailView):
                 pth = pth[1]
             else:
                 pth = pth[0]
-
 
             # build final path
             filepth = pathlib.Path(str(settings.DOWNLOAD_ROOT) + pth)

@@ -28,6 +28,7 @@ def validYoutubeID(arg, /):
         raise ValueError('not a channel or playlist ID') from e
     return arg_str
 
+
 _filename = 'tvshow.nfo'
 class Command(BaseCommand):
 
@@ -96,4 +97,3 @@ class Command(BaseCommand):
             log.info(
                 f'Wrote a new "{self.filename}" file for: {source}',
             )
-

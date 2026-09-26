@@ -71,4 +71,3 @@ class RemoveSpecificLogFilter(logging.Filter):
 __all__ = [
     'RemoveSpecificLogFilter',
 ]
-

@@ -24,6 +24,7 @@ CommaSepChoice = namedtuple(
     ),
 )
 
+
 # this is a form field!
 class CustomCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
     template_name = 'widgets/checkbox_select.html'
@@ -72,7 +73,6 @@ class CommaSepChoiceField(models.CharField):
         super().__init__(*args, **kwargs)
         self.validators.clear()
 
-
     # Override these functions to prevent unwanted behaviors
     def to_python(self, value):
         saved_value = None
@@ -100,7 +100,6 @@ class CommaSepChoiceField(models.CharField):
 
     def get_internal_type(self):
         return super().get_internal_type()
-
 
     # standard functions for this class
     def deconstruct(self):
@@ -184,7 +183,6 @@ class CommaSepChoiceField(models.CharField):
                              f'CommaSepChoiceField({value}) versus CharField({s_value})')
         return self.__class__._tuple___str__(data)
 
-
     # extra functions not used by any parent classes
     @staticmethod
     def _tuple___str__(data):
@@ -223,4 +221,3 @@ class CommaSepChoiceField(models.CharField):
 
 CommaSepChoice.__str__ = CommaSepChoiceField._tuple___str__
 CommaSepChoice.expand_choices = property(fget=CommaSepChoiceField._tuple_expand_choices)
-

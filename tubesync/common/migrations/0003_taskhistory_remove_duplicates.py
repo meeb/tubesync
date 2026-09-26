@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('common', '0002_taskhistory_elapsed_taskhistory_scheduled_at_and_more'),
     ]
@@ -16,4 +15,3 @@ class Migration(migrations.Migration):
             field=models.BooleanField(default=bool),
         ),
     ]
-

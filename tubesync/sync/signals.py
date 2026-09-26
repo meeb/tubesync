@@ -427,4 +427,3 @@ def media_post_delete(sender, instance, **kwargs):
                 log.debug(f'Deleting metadata for "{skipped_media.key}": {skipped_media.pk}')
                 # delete the old metadata
                 instance_qs.delete()
-

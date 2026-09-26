@@ -98,7 +98,6 @@ class Metadata(db.models.Model):
         help_text=_('JSON metadata object'),
     )
 
-
     def __str__(self):
         template = '"{}" from {} at: {}'
         return template.format(
@@ -165,4 +164,3 @@ class Metadata(db.models.Model):
         self.ingest_formats(formats)
 
         return self.with_formats
-

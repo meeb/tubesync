@@ -425,6 +425,7 @@ try:
     from .local_settings import *
 except ImportError as e:
     import sys
+
     sys.stderr.write(f'Unable to import local_settings: {e}\n')
     sys.exit(1)
 

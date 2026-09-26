@@ -1,6 +1,7 @@
 import logging
 from django.conf import settings
 from .logs import app_logger, default_handler
+
 ##from .logs.syslog.std import default_handler as syslog_default_handler
 from .logs.syslog.hat import (
     default_handler as hat_syslog_default_handler,
@@ -42,4 +43,3 @@ if (
         except ValueError:
             _level, _msg = logging.INFO, next(iter(_spec))
         app_logger.log(_level, _msg)
-

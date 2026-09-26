@@ -4,6 +4,7 @@ from django import db
 from django.utils.translation import gettext_lazy as _
 from .metadata import Metadata
 
+
 class MetadataFormat(db.models.Model):
     '''
         A format from the Metadata for an indexed `Media` item.
@@ -63,7 +64,6 @@ class MetadataFormat(db.models.Model):
         default=dict,
         help_text=_('JSON metadata format object'),
     )
-
 
     def __str__(self):
         template = '#{:n} "{}" from {}: {}'

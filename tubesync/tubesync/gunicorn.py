@@ -8,6 +8,7 @@ def get_bind():
     port = os.getenv('LISTEN_PORT', '8080')
     return f'{host}:{port}'
 
+
 def get_num_workers():
     keys = ('GUNICORN_WORKERS', 'WEB_CONCURRENCY')
     # Sane max workers to allow to be spawned

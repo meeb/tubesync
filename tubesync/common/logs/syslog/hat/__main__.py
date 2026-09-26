@@ -10,6 +10,7 @@ from ._default import handler
 
 class MockSyslogServer:
     """Stands up an isolated local background socket server to harvest transport streams."""
+
     def __init__(self, host='127.0.0.1', port=0):
         self.host = host
         self.port = port

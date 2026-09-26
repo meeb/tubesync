@@ -11,6 +11,7 @@ from typing import Any, Protocol, TypeVar
 
 T = TypeVar('T')
 
+
 # =====================================================================
 # ISOLATED PURE-PYTHON BASE EXTRACTION & VERIFICATION
 # =====================================================================
@@ -52,6 +53,7 @@ def _get_pure_python_simple_queue() -> Any:
 
     return extracted_class
 
+
 # Initialize default safe states upfront
 _PureSimpleQueue = queue.SimpleQueue
 _HAS_PURE_BASE = False
@@ -70,6 +72,7 @@ else:
 @dataclass(frozen=True)
 class QueueContextConfig:
     """Immutable type configuration container for queue context execution blocks."""
+
     block: bool = True
     timeout: float | None = None
 

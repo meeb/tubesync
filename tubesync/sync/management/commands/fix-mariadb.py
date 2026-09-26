@@ -17,8 +17,10 @@ new_tables = {
 }
 sql_statements = db.connection.ops.prepare_sql_script
 
+
 def _(arg_str):
     return str(gettext_lazy(arg_str))
+
 
 def SQLTable(arg_table):
     assert isinstance(arg_table, str), type(arg_table)
@@ -33,12 +35,14 @@ def SQLTable(arg_table):
         raise ValueError(_('Invalid table name'))
     return str(arg_table)
 
+
 def _mk_wrapper():
     return TextIOWrapper(
         BytesIO(),
         line_buffering=True,
         write_through=True,
     )
+
 
 def check_migration_status(migration_str, /, *, needle=None):
     if needle is None:
@@ -63,6 +67,7 @@ def check_migration_status(migration_str, /, *, needle=None):
         stdout_lines,
     )
 
+
 def db_columns(table_str, /):
     columns = list()
     db_gtd = db.connection.introspection.get_table_description
@@ -72,7 +77,6 @@ def db_columns(table_str, /):
 
 
 class Command(BaseCommand):
-
     help = _('Fixes MariaDB database issues')
     output_transaction = True
     requires_migrations_checks = False
@@ -137,7 +141,6 @@ class Command(BaseCommand):
         quote_name = schema.quote_name
 
         log.info('Start')
-
 
         if options['uuid_columns']:
             if 'uuid' != db.connection.data_types.get('UUIDField', ''):
@@ -216,7 +219,6 @@ class Command(BaseCommand):
                 )
                 schema.execute(add_fk, None)
 
-
         if table_names:
             # Check that the migration is at an appropriate step
             # ruff: disable[RUF059]
@@ -253,7 +255,6 @@ class Command(BaseCommand):
             with db.connection.schema_editor(collect_sql=False) as schema_editor:
                 for sql in schema.collected_sql:
                     schema_editor.execute(sql, None)
-
 
         # All done
         log.info('Done')

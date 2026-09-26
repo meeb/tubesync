@@ -265,7 +265,7 @@ def parse_database_connection_string(database_connection_string):
         'OPTIONS': backend_options.get(driver),
     }
     db_dict.update(db_overrides.get(driver))
-    
+
     return db_dict
 
 
@@ -470,4 +470,3 @@ def django_queryset_generator(query_set, /, *,
         gc.collect()
         if collecting:
             gc.enable()
-

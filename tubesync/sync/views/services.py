@@ -7,6 +7,7 @@ from django.views.generic import ListView
 @dataclass(frozen=True)
 class ServiceStatus:
     """Strongly typed representation of an s6 service state."""
+
     name: str
     is_running: bool
     is_wanted_up: bool

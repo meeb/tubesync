@@ -12,4 +12,3 @@ def _nfo_element(nfo, label, text, /, *, attrs=None, tail='\n', char=' ', indent
     element.text = text
     element.tail = tail + (char * indent)
     return element
-
