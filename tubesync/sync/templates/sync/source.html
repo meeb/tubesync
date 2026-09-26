@@ -119,6 +119,10 @@
         <td class="hide-on-small-only">Prefer HDR?</td>
         <td><span class="hide-on-med-and-up">Prefer HDR?<br></span><strong>{% if source.prefer_hdr %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
       </tr>
+      <tr title="Which audio track to download when a video has more than one">
+        <td class="hide-on-small-only">Audio track</td>
+        <td><span class="hide-on-med-and-up">Audio track<br></span><strong>{{ source.get_audio_track_display }}</strong></td>
+      </tr>
       <tr title="Output file extension">
         <td class="hide-on-small-only">Output extension</td>
         <td><span class="hide-on-med-and-up">Output extension<br></span><strong>{{ source.extension }}</strong></td>

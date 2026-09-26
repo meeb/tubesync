@@ -4,10 +4,10 @@ from django.db.backends.utils import CursorWrapper
 
 
 def patch_ensure_connection():
-    for name, config in settings.DATABASES.items():
+    for config in settings.DATABASES.values():
 
-        # Don't patch for PostgreSQL, it doesn't need it and can cause issues
-        if config['ENGINE'] == 'django.db.backends.postgresql':
+        # Only patch for MariaDB/MySQL
+        if 'django.db.backends.mysql' != config['ENGINE']:
             continue
 
         module = importlib.import_module(config['ENGINE'] + '.base')

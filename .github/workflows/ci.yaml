@@ -66,7 +66,8 @@ jobs:
           repository_name: ejs
 
   scripts:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 20
     env:
       GITHUB_API_KEY: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -74,6 +75,37 @@ jobs:
       - name: Make directories
         shell: bash
         run: sudo install -v -d -o "$(id -un)" /app/common
+      - name: Install `bun`
+        shell: bash
+        run: |
+          printf '%s\n' '' '++++++++ START: install_bun.sh + gpg' '' ;
+          ./tubesync/install_bun.sh
+          printf '%s\n' '' '-------- END: install_bun.sh + gpg' '' ;
+
+          sudo apt-get update &&
+            sudo apt-get install --no-install-recommends -y sq sqv
+          printf '%s\n' '' '' '====== SQV ======' ;
+          # sqv --help
+          sqv --version
+          printf '%s\n' '' '' '====== SQ ======' ;
+          # sq --help
+          # sq help verify
+          sq version
+          printf '%s\n' '' '' '====== BUN ======' ;
+          bun --revision
+
+          printf '%s\n' '' '++++++++ START: verify_bun.ts + sqv' '' ;
+          bun run ./tubesync/verify_bun.ts
+          printf '%s\n' '' '-------- END: verify_bun.ts + sqv' '' ;
+
+          sudo apt-get purge -y sqv
+
+          printf '%s\n' '' '++++++++ START: verify_bun.ts + sq' '' ;
+          bun run ./tubesync/verify_bun.ts --install-dir /usr/local/bin
+          printf '%s\n' '' '-------- END: verify_bun.ts + sq' '' ;
+
+          printf '%s\n' '' '' '====== BUN ======' ;
+          bun --revision
       - name: Install `deno`
         shell: bash
         run: ./tubesync/install_deno.sh
@@ -83,7 +115,7 @@ jobs:
 
   test:
     if: ${{ !cancelled() && ( 'pull_request' != github.event_name || (! github.event.pull_request.draft) ) }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -172,7 +204,7 @@ jobs:
   containerise:
     if: ${{ !cancelled() && 'success' == needs.info.result }}
     needs: ['info']
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     concurrency:
       group: ${{ github.repository }}-${{ github.workflow }}

@@ -11,7 +11,7 @@ CONFIG_BASE_DIR = BASE_DIR
 DOWNLOADS_BASE_DIR = BASE_DIR
 
 
-VERSION = '0.18.3'
+VERSION = '0.18.4'
 DEBUG = 'true' == getenv('TUBESYNC_DEBUG').strip().lower()
 ALLOWED_HOSTS = []
 # This is not ever meant to be a public web interface so this isn't too critical
@@ -376,12 +376,17 @@ YOUTUBE_DEFAULTS = {
         'youtubepot-bgutilhttp': {
             'base_url': ['http://127.0.0.1:4416'],
         },
+        'youtubepot-bgutilscript': {
+            'server_home': ['/app/bgutil-ytdlp-pot-provider/server'],
+        },
     },
     'postprocessor_args': {
         'videoremuxer+ffmpeg': ['-bsf:v', 'setts=pts=DTS'],
+        'merger+ffmpeg': ['-bsf', 'setts=ts=TS-STARTPTS'],
     },
     'js_runtimes': {
         'deno': {'path': None,},
+        'node': {'path': '/usr/bin',},
         'quickjs': {'path': None,},
     },
 }
