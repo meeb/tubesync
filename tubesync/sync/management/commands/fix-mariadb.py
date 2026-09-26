@@ -141,8 +141,9 @@ class Command(BaseCommand):
 
         if options['uuid_columns']:
             if 'uuid' != db.connection.data_types.get('UUIDField', ''):
+                msg = _('The {:s} database server does not support UUID columns.')
                 raise CommandError(
-                    _('The %s database server does not support UUID columns.') % _(display_name),
+                    msg.format(_(display_name)),
                 )
             uuid_column_type_str = 'uuid(36)'
             both_tables = (
