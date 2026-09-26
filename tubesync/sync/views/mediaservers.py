@@ -54,7 +54,7 @@ class AddMediaServerView(FormView):
     template_name = 'sync/mediaserver-add.html'
     server_types: ClassVar[dict[str, str]] = MediaServerType.long_types()
     server_type_names: ClassVar[dict[str, str]] = dict(MediaServerType.choices)
-    forms: ClassVar[dict[str, Form]] = MediaServerType.forms_dict()
+    forms: ClassVar[dict[str, type[Form]]] = MediaServerType.forms_dict()
 
     def __init__(self, *args, **kwargs):
         self.server_type = None
@@ -172,7 +172,7 @@ class UpdateMediaServerView(FormView, SingleObjectMixin):
 
     template_name = 'sync/mediaserver-update.html'
     model = MediaServer
-    forms: ClassVar[dict[str, Form]] = MediaServerType.forms_dict()
+    forms: ClassVar[dict[str, type[Form]]] = MediaServerType.forms_dict()
 
     def __init__(self, *args, **kwargs):
         self.object = None
