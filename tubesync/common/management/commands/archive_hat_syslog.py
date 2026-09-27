@@ -47,7 +47,10 @@ class Command(BaseCommand):
         if not destination_path.exists():
             raise CommandError(f'Destination path is not a valid directory or does not exist: {destination_path}')
 
-        blocked_bytes: tuple[int, ...] = (39, 34, 0, 42, 63, 58, 60, 62, 124, 96, 59)
+        blocked_bytes: tuple[int, ...] = (
+            # NUL  "    '    *    :    ;    <    >    ?    `    |
+            0,     34,  39,  42,  58,  59,  60,  62,  63,  96,  124,
+        )
 
         # Create the unique temporary directory INSIDE the specified arbitrary destination path
         temp_dir: str = tempfile.mkdtemp(prefix='tmp_', dir=destination_path)
