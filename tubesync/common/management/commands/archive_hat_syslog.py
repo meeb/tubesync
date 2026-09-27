@@ -121,11 +121,11 @@ class Command(BaseCommand):
 
             # Discover and save all associated indexes for deferred execution AFTER insertion
             cursor.execute(f"SELECT sql FROM old.sqlite_schema WHERE type='index' AND tbl_name='{table_name}' AND sql IS NOT NULL;")
-            index_sqls: list[str] = [row.__getitem__(0) for row in cursor.fetchall()]
+            index_sqls: list[str] = [row[0] for row in cursor.fetchall()]
 
             # Gather the rest of the column names cleanly, filtering out rowid metadata structures
             cursor.execute(f"PRAGMA old.table_info('{table_name}');")
-            cols = [row.__getitem__(1) for row in cursor.fetchall() if row.__getitem__(1) != 'rowid']
+            cols = [row[1] for row in cursor.fetchall() if row[1] != 'rowid']
             col_string = ', '.join(cols)
 
             # Lock down the exact starting rowid boundary for our target subset
@@ -137,13 +137,13 @@ class Command(BaseCommand):
                 )
             ''')
             boundary_res = cursor.fetchone()
-            if boundary_res is None or boundary_res.__getitem__(0) is None:
+            if boundary_res is None or boundary_res[0] is None:
                 conn.close()
                 self._cleanup_temp_file(target_path)
                 raise CommandError(f"Source table '{table_name}' is empty.")
 
-            start_rowid: int = boundary_res.__getitem__(0)
-            max_rowid: int = boundary_res.__getitem__(1)
+            start_rowid: int = boundary_res[0]
+            max_rowid: int = boundary_res[1]
 
             # Create a temporary staging table by attaching a specialized in-memory database
             cursor.execute("ATTACH DATABASE ':memory:' AS mem;")
@@ -233,12 +233,12 @@ class Command(BaseCommand):
         table_name, create_schema_sql = table_info
 
         src_cursor.execute(f"SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='{table_name}' AND sql IS NOT NULL")
-        index_sqls: list[str] = [row.__getitem__(0) for row in src_cursor.fetchall()]
+        index_sqls: list[str] = [row[0] for row in src_cursor.fetchall()]
 
         src_cursor.execute(f'SELECT MAX(rowid) FROM {table_name}')
         res = src_cursor.fetchone()
 
-        if res is None or (max_rowid := res.__getitem__(0)) is None:
+        if res is None or (max_rowid := res[0]) is None:
             src_conn.close()
             self._cleanup_temp_dir(temp_dir)
             raise CommandError(f"Source table '{table_name}' is empty.")
@@ -264,13 +264,13 @@ class Command(BaseCommand):
 
                 if rows:
                     mem_cursor.execute(f'SELECT COUNT(*) FROM {staging_table}')
-                    pre_count: int = mem_cursor.fetchone().__getitem__(0)
+                    pre_count: int = mem_cursor.fetchone()[0]
 
-                    placeholders: str = ','.join(['?'] * len(rows.__getitem__(0)))
+                    placeholders: str = ','.join(['?'] * len(rows[0]))
                     mem_cursor.executemany(f'INSERT INTO {staging_table} VALUES ({placeholders})', rows)
 
                     mem_cursor.execute(f'SELECT COUNT(*) FROM {staging_table}')
-                    post_count: int = mem_cursor.fetchone().__getitem__(0)
+                    post_count: int = mem_cursor.fetchone()[0]
 
                     inserted_in_batch: int = post_count - pre_count
                     if not (inserted_in_batch == len(rows)):
@@ -291,7 +291,7 @@ class Command(BaseCommand):
             mem_cursor.execute(create_schema_sql)
 
             mem_cursor.execute(f"SELECT name FROM pragma_table_info('{table_name}')")
-            col_list: str = ','.join([row.__getitem__(0) for row in mem_cursor.fetchall()])
+            col_list: str = ','.join([row[0] for row in mem_cursor.fetchall()])
 
             mem_cursor.execute(f'INSERT INTO {table_name} (rowid, {col_list}) SELECT rowid, {col_list} FROM {staging_table}')
             mem_cursor.execute(f'DROP TABLE {staging_table}')
