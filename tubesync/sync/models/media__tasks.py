@@ -510,15 +510,15 @@ def refresh_formats(self):
             thumbnails,
             [('preference', True,)],
         ) if thumb.get('url', '').endswith('.jpg'))
-    except IndexError:
+    except StopIteration:
         pass
     else:
         field = self.get_metadata_field('thumbnail')
         self.save_to_metadata(field, thumbnail)
         fmt_dict['j'] = ', and '
-        fmt_dict['s'] = '; '
         fmt_dict['t'] = 'thumbnail' + fmt_dict['j'] + fmt_dict['t']
-        fmt_dict['j'] = ', '
+        fmt_dict['j'] = ''
+        fmt_dict['s'] = '; '
 
     field = self.get_metadata_field('formats')
     self.save_to_metadata(field, response.get(field, []))
