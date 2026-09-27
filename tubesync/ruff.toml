@@ -1,8 +1,13 @@
 target-version = "py312"
 
 [format]
-quote-style = "single"
 docstring-code-format = false
+indent-style = "space"
+line-ending = "lf"
+quote-style = "single"
+exclude = [
+    "**/migrations/0*.py",
+]
 
 [lint]
 ignore = [
@@ -20,6 +25,11 @@ ignore = [
 
 [lint.isort]
 known-first-party = ["common", "sync", "tubesync"]
+
+[lint.isort.sections]
+"django" = ["django"]
+"hat" = ["hat"]
+"huey" = ["huey"]
 
 [per-file-target-version]
 "shasum.py" = "py310"
