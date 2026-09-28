@@ -15,6 +15,37 @@ class Command(BaseCommand):
     batch_sleep: float = 0.05
 
     def add_arguments(self, parser):
+        def valid_destination_path(arg: str) -> str:
+            try:
+                arg_path = Path(arg)
+                resolved = arg_path.resolve(strict=True)
+            except FileNotFoundError:
+                parent_path = arg_path.parent.resolve(strict=True)
+                if not parent_path.is_dir():
+                    raise ValueError(f'not a directory: {parent_path}')
+                (parent_path / arg_path.name).mkdir()
+                resolved = arg_path.resolve(strict=True)
+            if resolved.is_dir() and not resolved.is_symlink():
+                return str(resolved)
+            raise ValueError(f'not a directory: {resolved}')
+
+        def valid_limit(arg: str) -> int:
+            arg_int = int(arg)
+            if not (200 <= arg_int <= 10_000_000):
+                raise ValueError('Must be between 200 and 10,000,000.')
+            return arg_int
+
+        def valid_source_db_path(arg: str) -> str:
+            try:
+                arg_path = Path(arg)
+                resolved = arg_path.resolve(strict=True)
+            except (FileNotFoundError, OSError):
+                raise
+            else:
+                if resolved.is_file() and not resolved.is_symlink():
+                    return str(resolved)
+            raise ValueError('not an existing database file')
+
         parser.add_argument(
             '--stopped',
             action='store_true',
@@ -29,11 +60,11 @@ class Command(BaseCommand):
             help='Optimize the database after all the rows were added (Only applies to --stopped)',
         )
 
-        parser.add_argument('source_db_path', type=str, help='Path to the source SQLite database file')
+        parser.add_argument('source_db_path', type=valid_source_db_path, help='Path to the source SQLite database file')
 
-        parser.add_argument('destination_path', type=str, help='Arbitrary destination directory path for the new directory')
+        parser.add_argument('destination_path', type=valid_destination_path, help='Arbitrary destination directory path for the new directory')
 
-        parser.add_argument('limit', type=int, help='The maximum number of rows to copy from the source table')
+        parser.add_argument('limit', type=valid_limit, help='The maximum number of rows to copy from the source table')
 
     def handle(self, *args, **options):
         row_limit: int = options['limit']
@@ -43,12 +74,18 @@ class Command(BaseCommand):
         source_path: Path = Path(options['source_db_path'])
         try:
             source_path = source_path.resolve(strict=True)
-        except (FileNotFoundError, OSError) as e:
-            raise CommandError(f'Source database file not found or inaccessible at: {source_path}. Error: {e}')
+            if not source_path.is_file():
+                raise ValueError('not a file')
+        except (FileNotFoundError, OSError, ValueError) as e:
+            raise CommandError(f'Source database file not found or inaccessible at: {source_path}') from e
 
-        destination_path: Path = Path(options['destination_path']).resolve(strict=False)
-        if not destination_path.is_dir():
-            raise CommandError(f'Destination path is not a valid directory or does not exist: {destination_path}')
+        destination_path: Path = Path(options['destination_path'])
+        try:
+            destination_path = destination_path.resolve(strict=True)
+            if not destination_path.is_dir():
+                raise ValueError('not a directory')
+        except (FileNotFoundError, OSError, ValueError) as e:
+            raise CommandError(f'Destination path is not a valid directory or does not exist: {destination_path}') from e
 
         # fmt: off
         blocked_bytes: set[int] = {
@@ -60,21 +97,26 @@ class Command(BaseCommand):
         # Create the unique temporary directory INSIDE the specified arbitrary destination path
         temp_dir: str = tempfile.mkdtemp(prefix='tmp_', dir=destination_path)
         target_path: Path = Path(temp_dir) / source_path.name
+        with contextlib.ExitStack() as stack:
+            stack.callback(self._cleanup_temp_dir, temp_dir)
 
-        resolved_target: str = str(target_path.resolve(strict=False))
-        if any(b in blocked_bytes for b in resolved_target.encode('utf-8')):
-            self._cleanup_temp_dir(temp_dir)
-            raise CommandError('Operation aborted! Resolved target path contains invalid filesystem or quote bytes.')
+            resolved_target: str = str(target_path.resolve(strict=False))
+            if any(b in blocked_bytes for b in resolved_target.encode('utf-8')):
+                raise CommandError('Operation aborted! Resolved target path contains invalid filesystem or quote bytes.')
 
-        self.stdout.write(self.style.SUCCESS(f'Created temp directory: {temp_dir}'))
-        self.stdout.write(f'Target database file: {target_path}')
+            self.stdout.write(self.style.SUCCESS(f'Created temp directory: {temp_dir}'))
+            self.stdout.write(f'Target database file: {target_path}')
 
-        if options['stopped']:
-            self.stdout.write('Service stopped flag detected. Executing attached legacy migration pathway...')
-            self._handle_stopped(source_path, target_path, temp_dir, row_limit, options['vacuum'])
-        else:
-            self.stdout.write('Service active. Executing un-locked in-memory streaming loop pipeline...')
-            self._handle_live(source_path, target_path, temp_dir, row_limit)
+            if options['stopped']:
+                self.stdout.write('Service stopped flag detected. Executing attached legacy migration pathway...')
+                self._handle_stopped(source_path, target_path, temp_dir, row_limit, options['vacuum'])
+            else:
+                self.stdout.write('Service active. Executing un-locked in-memory streaming loop pipeline...')
+                self._handle_live(source_path, target_path, temp_dir, row_limit)
+
+            if target_path.is_file():
+                # cancel the removal of temp_dir
+                stack.pop_all()
 
     def _cleanup_temp_file(self, path: Path | str) -> None:
         path = Path(path)
@@ -84,27 +126,37 @@ class Command(BaseCommand):
 
     def _cleanup_temp_dir(self, directory: Path | str) -> None:
         directory = Path(directory)
-        with contextlib.suppress(OSError):
-            for p in directory.iterdir():
-                if p.is_dir():
-                    self._cleanup_temp_dir(p)
-                elif p.is_symlink():
+        for p in directory.iterdir():
+            if p.is_dir():
+                self._cleanup_temp_dir(p)
+            elif p.is_symlink():
+                with contextlib.suppress(OSError):
                     # symbolic links may not "exist"
                     p.unlink()
-                else:
-                    self._cleanup_temp_file(p)
+            else:
+                self._cleanup_temp_file(p)
+        with contextlib.suppress(OSError):
             directory.rmdir()
 
     def _handle_stopped(self, source_path: Path, target_path: Path, temp_dir: str, row_limit: int, run_vacuum: bool) -> None:
         """Legacy configuration pathway optimized for an explicitly stopped service context."""
-        conn = None
-        try:
+        keep_target_path = False
+        with contextlib.ExitStack() as stack:
+            @stack.callback
+            def cleanup_target_path():
+                if not keep_target_path:
+                    self._cleanup_temp_file(target_path)
+
             # Establish connection to the new target database file
             conn = sqlite3.connect(target_path, isolation_level=None)
+            stack.enter_context(contextlib.closing(conn))
+            stack.enter_context(conn)
             cursor = conn.cursor()
 
             # Set auto_vacuum on the completely blank disk database file
+            begin_immediate(cursor)
             cursor.execute('PRAGMA auto_vacuum = FULL;')
+            conn.commit()
 
             # Attach the old source database strictly as read-only using URI mode
             cursor.execute(f"ATTACH DATABASE 'file:{source_path}?mode=ro' AS old;")
@@ -115,8 +167,6 @@ class Command(BaseCommand):
             )
             table_info = cursor.fetchone()
             if table_info is None:
-                conn.close()
-                self._cleanup_temp_file(target_path)
                 raise CommandError('Source database does not contain any user tables.')
 
             table_name: str
@@ -142,8 +192,6 @@ class Command(BaseCommand):
             ''')
             boundary_res = cursor.fetchone()
             if boundary_res is None or boundary_res[0] is None:
-                conn.close()
-                self._cleanup_temp_file(target_path)
                 raise CommandError(f"Source table '{table_name}' is empty.")
 
             start_rowid: int = boundary_res[0]
@@ -157,7 +205,9 @@ class Command(BaseCommand):
             cursor.execute(modified_sql)
 
             # Re-create the actual clean table layout matching the original structure exactly inside the main disk file
+            begin_immediate(cursor)
             cursor.execute(create_schema_sql)
+            conn.commit()
 
             # Step forward chronologically from the lowest bounded rowid up to the maximum rowid
             self.stdout.write(f"Streaming {row_limit:,} log records chronologically from '{table_name}' in batches of {self.batch_size}...")
@@ -175,11 +225,13 @@ class Command(BaseCommand):
                 ''', (current_chunk_start, current_chunk_end))
 
                 # Batch Step 2: Flush from the attached RAM database directly into the clean main disk table
+                begin_immediate(cursor)
                 cursor.execute(f'''
                     INSERT INTO main.{table_name} (rowid, {col_string})
                     SELECT rowid, {col_string} FROM mem.{staging_table}
                     ORDER BY rowid ASC
                 ''')
+                conn.commit()
 
                 # Batch Step 3: Clear the memory staging table completely for the next iteration pass
                 cursor.execute(f'DELETE FROM mem.{staging_table}')
@@ -196,70 +248,63 @@ class Command(BaseCommand):
             # Performance Win: Rebuild all indexes in a single sequential pass now that clean data is loaded
             if index_sqls:
                 self.stdout.write('Rebuilding index structures...')
+                begin_immediate(cursor)
                 for index_sql in index_sqls:
                     cursor.execute(index_sql)
+                conn.commit()
 
-            conn.commit()
+            keep_target_path = True
             if run_vacuum:
                 self.stdout.write('Optimizing database structure...')
                 cursor.execute('VACUUM;')
-            conn.close()
-            conn = None
 
             self.stdout.write(self.style.SUCCESS(f'Successfully archived database to: {target_path}'))
 
-        except sqlite3.Error as e:
-            raise CommandError(f'SQLite error occurred during migration: {e}')
-        finally:
-            if conn:
-                conn.close()
-                self._cleanup_temp_file(target_path)
-            if not target_path.exists():
-                self._cleanup_temp_dir(temp_dir)
-
     def _handle_live(self, source_path: Path, target_path: Path, temp_dir: str, rows_limit: int) -> None:
         """Safe execution path optimized for a live, un-locked running hat-syslog-server environment."""
-        src_conn = sqlite3.connect(source_path, isolation_level=None)
-        src_cursor = src_conn.cursor()
+        with contextlib.ExitStack() as stack:
+            src_conn = stack.enter_context(
+                contextlib.closing(sqlite3.connect(source_path, isolation_level=None))
+            )
+            src_cursor = stack.enter_context(read_only_cursor(src_conn))
 
-        calculated_kib: int = (max(rows_limit, self.batch_size) * self.avg_row_size_bytes) // 1024
-        src_cursor.execute(f'PRAGMA cache_size = -{calculated_kib}')
+            calculated_kib: int = (max(rows_limit, self.batch_size) * self.avg_row_size_bytes) // 1024
+            src_cursor.execute(f'PRAGMA cache_size = -{calculated_kib}')
 
-        src_cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-        table_info = src_cursor.fetchone()
-        if table_info is None:
-            src_conn.close()
-            self._cleanup_temp_dir(temp_dir)
-            raise CommandError('Source database does not contain any user tables.')
+            src_cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+            table_info = src_cursor.fetchone()
+            if table_info is None:
+                raise CommandError('Source database does not contain any user tables.')
 
-        table_name: str
-        create_schema_sql: str
-        table_name, create_schema_sql = table_info
+            table_name: str
+            create_schema_sql: str
+            table_name, create_schema_sql = table_info
 
-        src_cursor.execute(f"SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='{table_name}' AND sql IS NOT NULL")
-        index_sqls: list[str] = [row[0] for row in src_cursor.fetchall()]
+            src_cursor.execute(f"SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='{table_name}' AND sql IS NOT NULL")
+            index_sqls: list[str] = [row[0] for row in src_cursor.fetchall()]
 
-        src_cursor.execute(f'SELECT MAX(rowid) FROM {table_name}')
-        res = src_cursor.fetchone()
+            src_cursor.execute(f'SELECT MAX(rowid) FROM {table_name}')
+            res = src_cursor.fetchone()
 
-        if res is None or (max_rowid := res[0]) is None:
-            src_conn.close()
-            self._cleanup_temp_dir(temp_dir)
-            raise CommandError(f"Source table '{table_name}' is empty.")
+            if res is None or (max_rowid := res[0]) is None:
+                raise CommandError(f"Source table '{table_name}' is empty.")
 
-        min_needed_rowid: int = 1 + max_rowid - rows_limit
+            min_needed_rowid: int = 1 + max_rowid - rows_limit
 
-        mem_conn = sqlite3.connect(':memory:', isolation_level=None)
-        mem_cursor = mem_conn.cursor()
+            mem_conn = stack.enter_context(
+                contextlib.closing(sqlite3.connect(':memory:', isolation_level=None))
+            )
+            mem_cursor = stack.enter_context(
+                contextlib.closing(mem_conn.cursor())
+            )
 
-        staging_table: str = 'tmp_staging_log_table'
-        modified_schema_sql: str = create_schema_sql.replace(table_name, staging_table, 1).replace('(', '(rowid INTEGER PRIMARY KEY,', 1)
-        mem_cursor.execute(modified_schema_sql)
+            staging_table: str = 'tmp_staging_log_table'
+            modified_schema_sql: str = create_schema_sql.replace(table_name, staging_table, 1).replace('(', '(rowid INTEGER PRIMARY KEY,', 1)
+            mem_cursor.execute(modified_schema_sql)
 
-        current_start_rowid: int = min_needed_rowid
-        total_copied: int = 0
+            current_start_rowid: int = min_needed_rowid
+            total_copied: int = 0
 
-        try:
             while current_start_rowid <= max_rowid:
                 current_end_rowid: int = min(current_start_rowid + self.batch_size - 1, max_rowid)
 
@@ -278,9 +323,6 @@ class Command(BaseCommand):
 
                     inserted_in_batch: int = post_count - pre_count
                     if not (inserted_in_batch == len(rows)):
-                        src_conn.close()
-                        mem_conn.close()
-                        self._cleanup_temp_dir(temp_dir)
                         raise CommandError(f'Data insertion mismatch! Expected {len(rows)} inserts, but only {inserted_in_batch} committed.')
 
                     total_copied += inserted_in_batch
@@ -288,11 +330,8 @@ class Command(BaseCommand):
                 current_start_rowid += self.batch_size
                 time.sleep(self.batch_sleep)
 
-        finally:
-            src_conn.close()
-
-        if 0 < total_copied:
-            mem_cursor.execute(create_schema_sql)
+            if 0 < total_copied:
+                mem_cursor.execute(create_schema_sql)
 
             mem_cursor.execute(f"SELECT name FROM pragma_table_info('{table_name}')")
             col_list: str = ','.join([row[0] for row in mem_cursor.fetchall()])
@@ -303,11 +342,47 @@ class Command(BaseCommand):
             for index_sql in index_sqls:
                 mem_cursor.execute(index_sql)
 
-        if 0 < total_copied:
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            mem_cursor.execute(f"VACUUM main INTO '{str(target_path.resolve(strict=False))}'")
-            self.stdout.write(self.style.SUCCESS(f'Successfully streamed database archive to: {target_path}'))
-        else:
-            self.stdout.write('No rows matched within the live boundaries; target archive empty.')
+            if 0 < total_copied:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                mem_cursor.execute(f"VACUUM main INTO '{str(target_path.resolve(strict=False))}'")
+                self.stdout.write(self.style.SUCCESS(f'Successfully streamed database archive to: {target_path}'))
+            else:
+                self.stdout.write('No rows matched within the live boundaries; target archive empty.')
 
-        mem_conn.close()
+
+def begin_immediate(cursor):
+    # Explicitly start the immediate lock transaction
+    cursor.execute('BEGIN IMMEDIATE;')
+
+    # Set the tracking flag to match our manual statement
+    cursor.connection.in_transaction = True
+
+@contextlib.contextmanager
+def read_only_cursor(conn):
+    # Capture the connection's starting isolation state
+    prev_isolation = conn.isolation_level
+
+    # If in autocommit mode, switch to immediate
+    if conn.isolation_level is None:
+        conn.isolation_level = "IMMEDIATE"
+
+    cursor = conn.cursor()
+    try:
+        # Force read-only safety at the engine level
+        cursor.execute("PRAGMA query_only = ON")
+
+        begin_immediate(cursor)
+
+        yield cursor
+
+    finally:
+        # Safely roll back using the cursor's parent connection reference
+        with contextlib.suppress(sqlite3.OperationalError):
+            cursor.connection.rollback()
+
+        # Clean up database state configurations
+        with contextlib.suppress(sqlite3.OperationalError):
+            cursor.execute("PRAGMA query_only = OFF")
+
+        cursor.close()
+        conn.isolation_level = prev_isolation
