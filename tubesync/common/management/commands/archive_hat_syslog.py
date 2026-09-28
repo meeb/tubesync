@@ -264,14 +264,19 @@ class Command(BaseCommand):
         """Safe execution path optimized for a live, un-locked running hat-syslog-server environment."""
         with contextlib.ExitStack() as stack:
             src_conn = stack.enter_context(
-                contextlib.closing(sqlite3.connect(source_path, isolation_level=None))
+                contextlib.closing(sqlite3.connect(':memory:', isolation_level=None))
             )
-            src_cursor = stack.enter_context(read_only_cursor(src_conn))
+            src_cursor = stack.enter_context(
+                contextlib.closing(src_conn.cursor())
+            )
 
             calculated_kib: int = (max(rows_limit, self.batch_size) * self.avg_row_size_bytes) // 1024
             src_cursor.execute(f'PRAGMA cache_size = -{calculated_kib}')
 
-            src_cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+            # Attach the old source database strictly as read-only using URI mode
+            src_cursor.execute(f"ATTACH DATABASE 'file:{source_path}?mode=ro' AS old;")
+
+            src_cursor.execute("SELECT name, sql FROM old.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
             table_info = src_cursor.fetchone()
             if table_info is None:
                 raise CommandError('Source database does not contain any user tables.')
@@ -280,10 +285,10 @@ class Command(BaseCommand):
             create_schema_sql: str
             table_name, create_schema_sql = table_info
 
-            src_cursor.execute(f"SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='{table_name}' AND sql IS NOT NULL")
+            src_cursor.execute(f"SELECT sql FROM old.sqlite_master WHERE type='index' AND tbl_name='{table_name}' AND sql IS NOT NULL")
             index_sqls: list[str] = [row[0] for row in src_cursor.fetchall()]
 
-            src_cursor.execute(f'SELECT MAX(rowid) FROM {table_name}')
+            src_cursor.execute(f'SELECT MAX(rowid) FROM old.{table_name}')
             res = src_cursor.fetchone()
 
             if res is None or (max_rowid := res[0]) is None:
@@ -308,7 +313,7 @@ class Command(BaseCommand):
             while current_start_rowid <= max_rowid:
                 current_end_rowid: int = min(current_start_rowid + self.batch_size - 1, max_rowid)
 
-                src_cursor.execute(f'SELECT rowid, * FROM {table_name} WHERE rowid BETWEEN ? AND ?', (current_start_rowid, current_end_rowid))
+                src_cursor.execute(f'SELECT rowid, * FROM old.{table_name} WHERE rowid BETWEEN ? AND ?', (current_start_rowid, current_end_rowid))
                 rows = src_cursor.fetchall()
 
                 if rows:
@@ -329,6 +334,9 @@ class Command(BaseCommand):
 
                 current_start_rowid += self.batch_size
                 time.sleep(self.batch_sleep)
+
+            # Success: Drop the source database link as early as possible
+            src_cursor.execute('DETACH DATABASE old;')
 
             if 0 < total_copied:
                 mem_cursor.execute(create_schema_sql)
@@ -356,33 +364,3 @@ def begin_immediate(cursor):
 
     # Set the tracking flag to match our manual statement
     cursor.connection.in_transaction = True
-
-@contextlib.contextmanager
-def read_only_cursor(conn):
-    # Capture the connection's starting isolation state
-    prev_isolation = conn.isolation_level
-
-    # If in autocommit mode, switch to immediate
-    if conn.isolation_level is None:
-        conn.isolation_level = "IMMEDIATE"
-
-    cursor = conn.cursor()
-    try:
-        # Force read-only safety at the engine level
-        cursor.execute("PRAGMA query_only = ON")
-
-        begin_immediate(cursor)
-
-        yield cursor
-
-    finally:
-        # Safely roll back using the cursor's parent connection reference
-        with contextlib.suppress(sqlite3.OperationalError):
-            cursor.connection.rollback()
-
-        # Clean up database state configurations
-        with contextlib.suppress(sqlite3.OperationalError):
-            cursor.execute("PRAGMA query_only = OFF")
-
-        cursor.close()
-        conn.isolation_level = prev_isolation
