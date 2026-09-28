@@ -154,9 +154,7 @@ class Command(BaseCommand):
             cursor = conn.cursor()
 
             # Set auto_vacuum on the completely blank disk database file
-            begin_immediate(cursor)
             cursor.execute('PRAGMA auto_vacuum = FULL;')
-            conn.commit()
 
             # Attach the old source database strictly as read-only using URI mode
             cursor.execute(f"ATTACH DATABASE 'file:{source_path}?mode=ro' AS old;")
@@ -205,9 +203,7 @@ class Command(BaseCommand):
             cursor.execute(modified_sql)
 
             # Re-create the actual clean table layout matching the original structure exactly inside the main disk file
-            begin_immediate(cursor)
             cursor.execute(create_schema_sql)
-            conn.commit()
 
             # Step forward chronologically from the lowest bounded rowid up to the maximum rowid
             self.stdout.write(f"Streaming {row_limit:,} log records chronologically from '{table_name}' in batches of {self.batch_size}...")
@@ -215,6 +211,9 @@ class Command(BaseCommand):
             current_chunk_start: int = start_rowid
             while current_chunk_start <= max_rowid:
                 current_chunk_end: int = min(current_chunk_start + self.batch_size - 1, max_rowid)
+
+                cursor.execute(f'SELECT COUNT(*) FROM main.{table_name}')
+                pre_count: int = cursor.fetchone()[0]
 
                 # Batch Step 1: Read a chronological chunk from the source directly into attached RAM database
                 cursor.execute(f'''
@@ -224,17 +223,25 @@ class Command(BaseCommand):
                     ORDER BY rowid ASC
                 ''', (current_chunk_start, current_chunk_end))
 
+                cursor.execute(f'SELECT COUNT(*) FROM mem.{staging_table}')
+                staged_count: int = cursor.fetchone()[0]
+
                 # Batch Step 2: Flush from the attached RAM database directly into the clean main disk table
-                begin_immediate(cursor)
                 cursor.execute(f'''
                     INSERT INTO main.{table_name} (rowid, {col_string})
                     SELECT rowid, {col_string} FROM mem.{staging_table}
                     ORDER BY rowid ASC
                 ''')
-                conn.commit()
 
                 # Batch Step 3: Clear the memory staging table completely for the next iteration pass
                 cursor.execute(f'DELETE FROM mem.{staging_table}')
+
+                cursor.execute(f'SELECT COUNT(*) FROM main.{table_name}')
+                post_count: int = cursor.fetchone()[0]
+
+                inserted_in_batch: int = post_count - pre_count
+                if not (inserted_in_batch == staged_count):
+                    raise CommandError(f'Data insertion mismatch! Expected {staged_count} inserts, but only {inserted_in_batch} committed.')
 
                 current_chunk_start += self.batch_size
 
@@ -248,10 +255,8 @@ class Command(BaseCommand):
             # Performance Win: Rebuild all indexes in a single sequential pass now that clean data is loaded
             if index_sqls:
                 self.stdout.write('Rebuilding index structures...')
-                begin_immediate(cursor)
                 for index_sql in index_sqls:
                     cursor.execute(index_sql)
-                conn.commit()
 
             keep_target_path = True
             if run_vacuum:
@@ -356,11 +361,3 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f'Successfully streamed database archive to: {target_path}'))
             else:
                 self.stdout.write('No rows matched within the live boundaries; target archive empty.')
-
-
-def begin_immediate(cursor):
-    # Explicitly start the immediate lock transaction
-    cursor.execute('BEGIN IMMEDIATE;')
-
-    # Set the tracking flag to match our manual statement
-    cursor.connection.in_transaction = True
