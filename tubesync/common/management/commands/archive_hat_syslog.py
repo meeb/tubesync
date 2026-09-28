@@ -3,9 +3,20 @@ import sqlite3
 import tempfile
 import time
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
+
+
+@dataclass(frozen=True, slots=True)
+class OldDBData:
+    table_name: str = str()
+    create_schema_sql: str = str()
+    index_sqls: tuple[str, ...] = tuple()
+    cols: tuple[str, ...] = tuple()
+    start_rowid: int = int()
+    max_rowid: int = int()
 
 
 class Command(BaseCommand):
@@ -138,6 +149,51 @@ class Command(BaseCommand):
         with contextlib.suppress(OSError):
             directory.rmdir()
 
+    def _old_database_info(self, cursor: sqlite3.Cursor, source_path: Path, row_limit: int) -> OldDBData:
+        results = dict()
+
+        # Attach the old source database strictly as read-only using URI mode
+        cursor.execute(f"ATTACH DATABASE 'file:{source_path}?mode=ro' AS old;")
+
+        # Dynamically discover the active logging table name from the attached schema
+        cursor.execute(
+            "SELECT name, sql FROM old.sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%';"
+        )
+        table_info = cursor.fetchone()
+        if table_info is None:
+            raise CommandError('Source database does not contain any user tables.')
+
+        table_name: str
+        create_schema_sql: str
+        table_name, create_schema_sql = table_info
+        results['table_name'] = str(table_name)
+        results['create_schema_sql'] = str(create_schema_sql)
+
+        # Discover and save all associated indexes for deferred execution AFTER insertion
+        cursor.execute(f"SELECT sql FROM old.sqlite_schema WHERE type='index' AND tbl_name='{table_name}' AND sql IS NOT NULL;")
+        results['index_sqls'] = tuple(row[0] for row in cursor.fetchall())
+
+        # Gather the rest of the column names cleanly, filtering out rowid metadata structures
+        cursor.execute(f"PRAGMA old.table_info('{table_name}');")
+        results['cols'] = tuple(row[1] for row in cursor.fetchall() if row[1] != 'rowid')
+
+        # Lock down the exact starting rowid boundary for our target subset
+        cursor.execute(f'''
+            SELECT MIN(rowid), MAX(rowid) FROM (
+                SELECT rowid FROM old.{table_name}
+                ORDER BY rowid DESC
+                LIMIT {row_limit}
+            );
+        ''')
+        boundary_res = cursor.fetchone()
+        if boundary_res is None or boundary_res[0] is None:
+            raise CommandError(f"Source table '{table_name}' is empty.")
+
+        results['start_rowid'] = int(boundary_res[0])
+        results['max_rowid'] = int(boundary_res[1])
+
+        return OldDBData(**results)
+        
     def _handle_stopped(self, source_path: Path, target_path: Path, temp_dir: str, row_limit: int, run_vacuum: bool) -> None:
         """Legacy configuration pathway optimized for an explicitly stopped service context."""
         keep_target_path = False
@@ -156,87 +212,54 @@ class Command(BaseCommand):
             # Set auto_vacuum on the completely blank disk database file
             cursor.execute('PRAGMA auto_vacuum = FULL;')
 
-            # Attach the old source database strictly as read-only using URI mode
-            cursor.execute(f"ATTACH DATABASE 'file:{source_path}?mode=ro' AS old;")
-
-            # Dynamically discover the active logging table name from the attached schema
-            cursor.execute(
-                "SELECT name, sql FROM old.sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-            )
-            table_info = cursor.fetchone()
-            if table_info is None:
-                raise CommandError('Source database does not contain any user tables.')
-
-            table_name: str
-            create_schema_sql: str
-            table_name, create_schema_sql = table_info
-
-            # Discover and save all associated indexes for deferred execution AFTER insertion
-            cursor.execute(f"SELECT sql FROM old.sqlite_schema WHERE type='index' AND tbl_name='{table_name}' AND sql IS NOT NULL;")
-            index_sqls: list[str] = [row[0] for row in cursor.fetchall()]
-
-            # Gather the rest of the column names cleanly, filtering out rowid metadata structures
-            cursor.execute(f"PRAGMA old.table_info('{table_name}');")
-            cols = [row[1] for row in cursor.fetchall() if row[1] != 'rowid']
-            col_string = ', '.join(cols)
-
-            # Lock down the exact starting rowid boundary for our target subset
-            cursor.execute(f'''
-                SELECT MIN(rowid), MAX(rowid) FROM (
-                    SELECT rowid FROM old.{table_name}
-                    ORDER BY rowid DESC
-                    LIMIT {row_limit}
-                )
-            ''')
-            boundary_res = cursor.fetchone()
-            if boundary_res is None or boundary_res[0] is None:
-                raise CommandError(f"Source table '{table_name}' is empty.")
-
-            start_rowid: int = boundary_res[0]
-            max_rowid: int = boundary_res[1]
+            # Attach and interrogate the read-only source database file
+            old_info = self._old_database_info(cursor, source_path, row_limit)
+            col_string: str = ', '.join(old_info.cols)
 
             # Create a temporary staging table by attaching a specialized in-memory database
             cursor.execute("ATTACH DATABASE ':memory:' AS mem;")
 
             staging_table: str = 'tmp_staging_log_table'
-            modified_sql = create_schema_sql.replace(table_name, f'mem.{staging_table}', 1).replace('(', '(rowid INTEGER PRIMARY KEY, ', 1)
+            modified_sql = old_info.create_schema_sql.replace(
+                old_info.table_name, f'mem.{staging_table}', 1
+            ).replace('(', '(rowid INTEGER PRIMARY KEY, ', 1)
             cursor.execute(modified_sql)
 
             # Re-create the actual clean table layout matching the original structure exactly inside the main disk file
-            cursor.execute(create_schema_sql)
+            cursor.execute(old_info.create_schema_sql)
 
             # Step forward chronologically from the lowest bounded rowid up to the maximum rowid
-            self.stdout.write(f"Streaming {row_limit:,} log records chronologically from '{table_name}' in batches of {self.batch_size}...")
+            self.stdout.write(f"Streaming {row_limit:,} log records chronologically from '{old_info.table_name}' in batches of {self.batch_size}...")
 
-            current_chunk_start: int = start_rowid
-            while current_chunk_start <= max_rowid:
-                current_chunk_end: int = min(current_chunk_start + self.batch_size - 1, max_rowid)
+            current_chunk_start: int = old_info.start_rowid
+            while current_chunk_start <= old_info.max_rowid:
+                current_chunk_end: int = min(current_chunk_start + self.batch_size - 1, old_info.max_rowid)
 
-                cursor.execute(f'SELECT COUNT(*) FROM main.{table_name}')
+                cursor.execute(f'SELECT COUNT(*) FROM main.{old_info.table_name};')
                 pre_count: int = cursor.fetchone()[0]
 
                 # Batch Step 1: Read a chronological chunk from the source directly into attached RAM database
                 cursor.execute(f'''
                     INSERT INTO mem.{staging_table} (rowid, {col_string})
-                    SELECT rowid, {col_string} FROM old.{table_name}
+                    SELECT rowid, {col_string} FROM old.{old_info.table_name}
                     WHERE rowid BETWEEN ? AND ?
-                    ORDER BY rowid ASC
+                    ORDER BY rowid ASC;
                 ''', (current_chunk_start, current_chunk_end))
 
-                cursor.execute(f'SELECT COUNT(*) FROM mem.{staging_table}')
+                cursor.execute(f'SELECT COUNT(*) FROM mem.{staging_table};')
                 staged_count: int = cursor.fetchone()[0]
 
                 # Batch Step 2: Flush from the attached RAM database directly into the clean main disk table
                 cursor.execute(f'''
-                    INSERT INTO main.{table_name} (rowid, {col_string})
+                    INSERT INTO main.{old_info.table_name} (rowid, {col_string})
                     SELECT rowid, {col_string} FROM mem.{staging_table}
-                    ORDER BY rowid ASC
+                    ORDER BY rowid ASC;
                 ''')
 
                 # Batch Step 3: Clear the memory staging table completely for the next iteration pass
-                cursor.execute(f'DELETE FROM mem.{staging_table}')
+                cursor.execute(f'DELETE FROM mem.{staging_table};')
 
-                cursor.execute(f'SELECT COUNT(*) FROM main.{table_name}')
+                cursor.execute(f'SELECT COUNT(*) FROM main.{old_info.table_name};')
                 post_count: int = cursor.fetchone()[0]
 
                 inserted_in_batch: int = post_count - pre_count
@@ -245,17 +268,17 @@ class Command(BaseCommand):
 
                 current_chunk_start += self.batch_size
 
-            # Success: Close files handles and drop the source database link as early as possible
+            # Success: Detach the source database file as early as possible
             cursor.execute('DETACH DATABASE old;')
 
             # Securely drop and detach the memory container from the operational workspace
-            cursor.execute(f'DROP TABLE mem.{staging_table}')
+            cursor.execute(f'DROP TABLE mem.{staging_table};')
             cursor.execute('DETACH DATABASE mem;')
 
             # Performance Win: Rebuild all indexes in a single sequential pass now that clean data is loaded
-            if index_sqls:
+            if old_info.index_sqls:
                 self.stdout.write('Rebuilding index structures...')
-                for index_sql in index_sqls:
+                for index_sql in old_info.index_sqls:
                     cursor.execute(index_sql)
 
             keep_target_path = True
@@ -278,28 +301,9 @@ class Command(BaseCommand):
             calculated_kib: int = (max(rows_limit, self.batch_size) * self.avg_row_size_bytes) // 1024
             src_cursor.execute(f'PRAGMA cache_size = -{calculated_kib}')
 
-            # Attach the old source database strictly as read-only using URI mode
-            src_cursor.execute(f"ATTACH DATABASE 'file:{source_path}?mode=ro' AS old;")
-
-            src_cursor.execute("SELECT name, sql FROM old.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-            table_info = src_cursor.fetchone()
-            if table_info is None:
-                raise CommandError('Source database does not contain any user tables.')
-
-            table_name: str
-            create_schema_sql: str
-            table_name, create_schema_sql = table_info
-
-            src_cursor.execute(f"SELECT sql FROM old.sqlite_master WHERE type='index' AND tbl_name='{table_name}' AND sql IS NOT NULL")
-            index_sqls: list[str] = [row[0] for row in src_cursor.fetchall()]
-
-            src_cursor.execute(f'SELECT MAX(rowid) FROM old.{table_name}')
-            res = src_cursor.fetchone()
-
-            if res is None or (max_rowid := res[0]) is None:
-                raise CommandError(f"Source table '{table_name}' is empty.")
-
-            min_needed_rowid: int = 1 + max_rowid - rows_limit
+            # Attach and interrogate the read-only source database file
+            old_info = self._old_database_info(src_cursor, source_path, rows_limit)
+            col_string: str = ', '.join(old_info.cols)
 
             mem_conn = stack.enter_context(
                 contextlib.closing(sqlite3.connect(':memory:', isolation_level=None))
@@ -309,26 +313,28 @@ class Command(BaseCommand):
             )
 
             staging_table: str = 'tmp_staging_log_table'
-            modified_schema_sql: str = create_schema_sql.replace(table_name, staging_table, 1).replace('(', '(rowid INTEGER PRIMARY KEY,', 1)
+            modified_schema_sql: str = old_info.create_schema_sql.replace(
+                old_info.table_name, staging_table, 1
+            ).replace('(', '(rowid INTEGER PRIMARY KEY,', 1)
             mem_cursor.execute(modified_schema_sql)
 
-            current_start_rowid: int = min_needed_rowid
+            current_start_rowid: int = old_info.start_rowid
             total_copied: int = 0
 
-            while current_start_rowid <= max_rowid:
-                current_end_rowid: int = min(current_start_rowid + self.batch_size - 1, max_rowid)
+            while current_start_rowid <= old_info.max_rowid:
+                current_end_rowid: int = min(current_start_rowid + self.batch_size - 1, old_info.max_rowid)
 
-                src_cursor.execute(f'SELECT rowid, * FROM old.{table_name} WHERE rowid BETWEEN ? AND ?', (current_start_rowid, current_end_rowid))
+                src_cursor.execute(f'SELECT rowid, * FROM old.{old_info.table_name} WHERE rowid BETWEEN ? AND ?;', (current_start_rowid, current_end_rowid))
                 rows = src_cursor.fetchall()
 
                 if rows:
-                    mem_cursor.execute(f'SELECT COUNT(*) FROM {staging_table}')
+                    mem_cursor.execute(f'SELECT COUNT(*) FROM {staging_table};')
                     pre_count: int = mem_cursor.fetchone()[0]
 
                     placeholders: str = ','.join(['?'] * len(rows[0]))
-                    mem_cursor.executemany(f'INSERT INTO {staging_table} VALUES ({placeholders})', rows)
+                    mem_cursor.executemany(f'INSERT INTO {staging_table} VALUES ({placeholders});', rows)
 
-                    mem_cursor.execute(f'SELECT COUNT(*) FROM {staging_table}')
+                    mem_cursor.execute(f'SELECT COUNT(*) FROM {staging_table};')
                     post_count: int = mem_cursor.fetchone()[0]
 
                     inserted_in_batch: int = post_count - pre_count
@@ -340,24 +346,21 @@ class Command(BaseCommand):
                 current_start_rowid += self.batch_size
                 time.sleep(self.batch_sleep)
 
-            # Success: Drop the source database link as early as possible
+            # Success: Detach the source database file as early as possible
             src_cursor.execute('DETACH DATABASE old;')
 
             if 0 < total_copied:
-                mem_cursor.execute(create_schema_sql)
+                mem_cursor.execute(old_info.create_schema_sql)
 
-            mem_cursor.execute(f"SELECT name FROM pragma_table_info('{table_name}')")
-            col_list: str = ','.join([row[0] for row in mem_cursor.fetchall()])
+            mem_cursor.execute(f'INSERT INTO {old_info.table_name} (rowid, {col_string}) SELECT rowid, {col_string} FROM {staging_table};')
+            mem_cursor.execute(f'DROP TABLE {staging_table};')
 
-            mem_cursor.execute(f'INSERT INTO {table_name} (rowid, {col_list}) SELECT rowid, {col_list} FROM {staging_table}')
-            mem_cursor.execute(f'DROP TABLE {staging_table}')
-
-            for index_sql in index_sqls:
+            for index_sql in old_info.index_sqls:
                 mem_cursor.execute(index_sql)
 
             if 0 < total_copied:
                 target_path.parent.mkdir(parents=True, exist_ok=True)
-                mem_cursor.execute(f"VACUUM main INTO '{str(target_path.resolve(strict=False))}'")
+                mem_cursor.execute(f"VACUUM main INTO '{str(target_path.resolve(strict=False))}';")
                 self.stdout.write(self.style.SUCCESS(f'Successfully streamed database archive to: {target_path}'))
             else:
                 self.stdout.write('No rows matched within the live boundaries; target archive empty.')
