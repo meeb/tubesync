@@ -1,7 +1,10 @@
+import contextlib
 import sqlite3
 import tempfile
 import time
+
 from pathlib import Path
+
 from django.core.management.base import BaseCommand, CommandError
 
 
@@ -76,14 +79,12 @@ class Command(BaseCommand):
     def _cleanup_temp_file(self, path: Path | str) -> None:
         path = Path(path)
         if path.exists():
-            try:
+            with contextlib.suppress(OSError):
                 path.unlink()
-            except OSError:
-                pass
 
     def _cleanup_temp_dir(self, directory: Path | str) -> None:
         directory = Path(directory)
-        try:
+        with contextlib.suppress(OSError):
             for p in directory.iterdir():
                 if p.is_dir():
                     self._cleanup_temp_dir(p)
@@ -93,8 +94,6 @@ class Command(BaseCommand):
                 else:
                     self._cleanup_temp_file(p)
             directory.rmdir()
-        except OSError:
-            pass
 
     def _handle_stopped(self, source_path: Path, target_path: Path, temp_dir: str, row_limit: int, run_vacuum: bool) -> None:
         """Legacy configuration pathway optimized for an explicitly stopped service context."""
