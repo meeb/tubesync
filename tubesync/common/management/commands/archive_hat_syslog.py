@@ -47,7 +47,7 @@ class Command(BaseCommand):
             raise CommandError(f'Source database file not found or inaccessible at: {source_path}. Error: {e}')
 
         destination_path: Path = Path(options['destination_path']).resolve(strict=False)
-        if not destination_path.exists():
+        if not destination_path.is_dir():
             raise CommandError(f'Destination path is not a valid directory or does not exist: {destination_path}')
 
         # fmt: off
