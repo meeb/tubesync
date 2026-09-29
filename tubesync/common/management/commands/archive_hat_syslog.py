@@ -212,6 +212,11 @@ class Command(BaseCommand):
             # Set auto_vacuum on the completely blank disk database file
             cursor.execute('PRAGMA auto_vacuum = FULL;')
 
+            # This should comfortably fit a few batches
+            calculated_kib: int = 4 * self.batch_size
+            if 2000 < calculated_kib:
+                cursor.execute(f'PRAGMA cache_size = -{calculated_kib};')
+
             # Attach and interrogate the read-only source database file
             old_info = self._old_database_info(cursor, source_path, row_limit)
             col_string: str = ', '.join(old_info.cols)
@@ -286,9 +291,9 @@ class Command(BaseCommand):
                 self.stdout.write('Optimizing database structure...')
                 cursor.execute('VACUUM;')
 
-            self.stdout.write(self.style.SUCCESS(f'Successfully archived database to: {target_path}'))
+        self.stdout.write(self.style.SUCCESS(f'Successfully archived database to: {target_path}'))
 
-    def _handle_live(self, source_path: Path, target_path: Path, temp_dir: str, rows_limit: int) -> None:
+    def _handle_live(self, source_path: Path, target_path: Path, temp_dir: str, row_limit: int) -> None:
         """Safe execution path optimized for a live, un-locked running hat-syslog-server environment."""
         with contextlib.ExitStack() as stack:
             src_conn = stack.enter_context(
@@ -298,11 +303,11 @@ class Command(BaseCommand):
                 contextlib.closing(src_conn.cursor())
             )
 
-            calculated_kib: int = (max(rows_limit, self.batch_size) * self.avg_row_size_bytes) // 1024
+            calculated_kib: int = max(8000, (max(row_limit, self.batch_size) * self.avg_row_size_bytes) // 1024)
             src_cursor.execute(f'PRAGMA cache_size = -{calculated_kib}')
 
             # Attach and interrogate the read-only source database file
-            old_info = self._old_database_info(src_cursor, source_path, rows_limit)
+            old_info = self._old_database_info(src_cursor, source_path, row_limit)
             col_string: str = ', '.join(old_info.cols)
 
             mem_conn = stack.enter_context(
