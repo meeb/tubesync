@@ -365,7 +365,7 @@ class Command(BaseCommand):
 
             if 0 < total_copied:
                 target_path.parent.mkdir(parents=True, exist_ok=True)
-                mem_cursor.execute(f"VACUUM main INTO '{str(target_path.resolve(strict=False))}';")
+                mem_cursor.execute(f"VACUUM main INTO '{target_path.resolve(strict=False)!s}';")
                 self.stdout.write(self.style.SUCCESS(f'Successfully streamed database archive to: {target_path}'))
             else:
                 self.stdout.write('No rows matched within the live boundaries; target archive empty.')
