@@ -186,15 +186,21 @@ jobs:
               done
           } >> "${GITHUB_STEP_SUMMARY}"
           check_retcode=0
+          format_retcode=0
           uvx --no-config --no-managed-python --no-progress --isolated \
               ruff check --output-format github &&
           { uvx --no-config --no-managed-python --no-progress --isolated \
-              ruff format --output-format github --check || check_retcode=$? ; true ; }
+              ruff format --output-format github --check || format_retcode=$? ; true ; }
+          check_retcode=$?
           uvx --no-config --no-managed-python --no-progress --isolated \
               ruff format --output-format github --diff || true
           case "${check_retcode:-0}" in
+              (0) true ;;
+              (*) exit "${check_retcode:-1}" ;; 
+          esac
+          case "${format_retcode:-0}" in
               (0|1) exit 0 ;;
-              (*) exit "${check_retcode:-2}" ;;
+              (*) exit "${format_retcode:-2}" ;;
           esac
       - name: Run Django tests
         timeout-minutes: 5
