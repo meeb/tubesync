@@ -4,10 +4,12 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-autopep8 = "*"
+django-stubs = "*"
+mypy = "*"
+ruff = "*"
 
 [packages]
-django = "~=5.2.5"
+django = "~=6.0.0"
 django-huey = "*"
 django-sass-processor = {extras = ["management-command"], version = "*"}
 pillow = "*"
@@ -24,5 +26,8 @@ yt-dlp = {extras = ["default", "curl-cffi"], version = "*"}
 emoji = "*"
 brotli = "*"
 html5lib = "*"
-bgutil-ytdlp-pot-provider = "~=1.2.2"
+bgutil-ytdlp-pot-provider = "==2.0.0"
+yt-dlp-remote-cipher = "*"
 babi = "*"
+hat-syslog = "==0.7.28"
+hat-juggler = "!=0.7.4"

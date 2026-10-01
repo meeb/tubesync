@@ -1,6 +1,7 @@
 from django import VERSION as DJANGO_VERSION
 from pathlib import Path
 from common.huey import sqlite_tasks
+from common.logs import level_from_environment, syslog
 from common.utils import getenv
 from sync.choices import TaskQueue
 
@@ -10,10 +11,11 @@ CONFIG_BASE_DIR = BASE_DIR
 DOWNLOADS_BASE_DIR = BASE_DIR
 
 
-VERSION = '0.15.13'
-SECRET_KEY = ''
+VERSION = '0.18.4'
 DEBUG = 'true' == getenv('TUBESYNC_DEBUG').strip().lower()
 ALLOWED_HOSTS = []
+# This is not ever meant to be a public web interface so this isn't too critical
+SECRET_KEY = getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret')
 
 
 INSTALLED_APPS = [
@@ -52,7 +54,7 @@ FORCE_SCRIPT_NAME = None
 DJANGO_HUEY = {
     'default': TaskQueue.LIMIT.value,
     'queues': dict(),
-    'verbose': None if DEBUG else False,
+    'verbose': True if DEBUG else None,
 }
 for queue_name in TaskQueue.values:
     queues = DJANGO_HUEY['queues']
@@ -69,7 +71,169 @@ for django_huey_queue in DJANGO_HUEY['queues'].values():
         filepath.parent.mkdir(exist_ok=True, parents=True)
     consumer = django_huey_queue.get('consumer')
     if consumer:
-        consumer['verbose'] = DJANGO_HUEY.get('verbose', False)
+        consumer['verbose'] = DJANGO_HUEY.get('verbose', None)
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'drop_huey_scheduler_checking_periodic_tasks': {
+            '()': 'common.logs.RemoveSpecificLogFilter',
+            'func_name': 'enqueue_periodic_tasks',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Checking periodic tasks',
+        },
+        'drop_huey_scheduler_sleep': {
+            '()': 'common.logs.RemoveSpecificLogFilter',
+            'func_name': 'sleep_for_interval',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Sleeping for ',
+        },
+        'drop_huey_scheduler_checking_worker_health': {
+            '()': 'common.logs.RemoveSpecificLogFilter',
+            'func_name': 'check_worker_health',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Checking worker health.',
+        },
+        'drop_huey_scheduler_scheduler_is_up': {
+            '()': 'common.logs.RemoveSpecificLogFilter',
+            'func_name': 'check_worker_health',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Scheduler is up and running.',
+        },
+        'drop_huey_scheduler_workers_are_up': {
+            '()': 'common.logs.RemoveSpecificLogFilter',
+            'func_name': 'check_worker_health',
+            'level': 'DEBUG',
+            'msg_starts_with': 'Workers are up and running.',
+        },
+    },
+    'formatters': {
+        'default': {},
+        'syslog': {
+            'format': '%(asctime)s %(name)s: %(message)s',
+            'datefmt': '%b %e %H:%M:%S',
+        },
+        'common': {
+            'format':  '%(asctime)s [%(name)s/%(levelname)s] %(message)s',
+            'datefmt': None,
+        },
+        'consumer_simple': {
+            'format': '%(asctime)s %(message)s',
+            'datefmt': '%H:%M:%S',
+        },
+        'worker_process': {
+            'format': '[%(asctime)s] %(levelname)s:%(name)s:%(process)d:%(message)s',
+            'datefmt': None,
+        },
+        'worker_thread': {
+            'format': '[%(asctime)s] %(levelname)s:%(name)s:%(process)d:%(threadName)s:%(message)s',
+            'datefmt': None,
+        },
+    },
+    'handlers': {
+        'hat_syslog': {
+            'class': syslog.hat.handler,
+            'host': '127.0.0.1',
+            'port': 6514,
+            'comm_type': 'TCP',
+            'level': 'DEBUG',
+            'formatter': 'default',
+        },
+        'hat_syslog_worker_process': {
+            'class': syslog.hat.handler,
+            'host': '127.0.0.1',
+            'port': 6514,
+            'comm_type': 'TCP',
+            'level': 'DEBUG',
+            'formatter': 'worker_process',
+        },
+        'hat_syslog_worker_thread': {
+            'class': syslog.hat.handler,
+            'host': '127.0.0.1',
+            'port': 6514,
+            'comm_type': 'TCP',
+            'level': 'DEBUG',
+            'formatter': 'worker_thread',
+        },
+        'stderr': {
+            'class': 'logging.StreamHandler',
+            'level': 'DEBUG' if DEBUG else level_from_environment('TUBESYNC_LOG_LEVEL', 'INFO'),
+            'formatter': 'common',
+        },
+        'stderr_worker_process': {
+            'class': 'logging.StreamHandler',
+            'level': 'INFO' if DEBUG else 'WARNING',
+            'formatter': 'worker_process',
+        },
+        'stderr_worker_thread': {
+            'class': 'logging.StreamHandler',
+            'level': 'INFO' if DEBUG else 'WARNING',
+            'formatter': 'worker_thread',
+        },
+        'syslog': {
+            'class': syslog.std.handler,
+            'address': syslog.std.default_handler.address,
+            'facility': syslog.std.default_handler.facility,
+            'level': 'DEBUG',
+            'formatter': 'syslog',
+        },
+    },
+    'root': {
+        'handlers': ['hat_syslog', 'stderr'],
+        'level': 'DEBUG',
+    },
+    'loggers': {
+        'common.logs.syslog.hat': {
+            'handlers': ['syslog'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'django_huey.management.commands.djangohuey': {
+            'handlers': ['syslog'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'hat.syslog.handler': {
+            'handlers': ['syslog'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'huey': {
+            'handlers': ['hat_syslog_worker_thread', 'stderr_worker_thread'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'huey.consumer.Scheduler': {
+            'filters': [
+                'drop_huey_scheduler_checking_periodic_tasks',
+                'drop_huey_scheduler_sleep',
+            ],
+            'propagate': True,
+        },
+        'huey.consumer.worker.process': {
+            'filters': [
+                'drop_huey_scheduler_checking_worker_health',
+                'drop_huey_scheduler_scheduler_is_up',
+                'drop_huey_scheduler_workers_are_up',
+            ],
+            'handlers': ['hat_syslog_worker_process', 'stderr_worker_process'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'huey.consumer.worker.thread': {
+            'filters': [
+                'drop_huey_scheduler_checking_worker_health',
+                'drop_huey_scheduler_scheduler_is_up',
+                'drop_huey_scheduler_workers_are_up',
+            ],
+            'handlers': ['hat_syslog_worker_thread', 'stderr_worker_thread'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
 
 
 TEMPLATES = [
@@ -163,9 +327,7 @@ HEALTHCHECK_FIREWALL = True
 HEALTHCHECK_ALLOWED_IPS = ('127.0.0.1',)
 
 
-MAX_ATTEMPTS = 15                           # Number of times tasks will be retried
 MAX_RUN_TIME = 12*(60*60)                   # Maximum amount of time in seconds a task can run
-BACKGROUND_TASK_PRIORITY_ORDERING = 'ASC'   # Use 'niceness' task priority ordering
 COMPLETED_TASKS_DAYS_TO_KEEP = 7            # Number of days to keep completed tasks
 MAX_ENTRIES_PROCESSING = 0                  # Number of videos to process on source refresh (0 for no limit)
 
@@ -208,15 +370,23 @@ YOUTUBE_DEFAULTS = {
     'max_sleep_interval': (60)*5,
     'sleep_interval': 0.25,
     'extractor_args': {
+        'youtube': {
+            'raise_incomplete_data': ['true'],
+        },
         'youtubepot-bgutilhttp': {
             'base_url': ['http://127.0.0.1:4416'],
+        },
+        'youtubepot-bgutilscript': {
+            'server_home': ['/app/bgutil-ytdlp-pot-provider/server'],
         },
     },
     'postprocessor_args': {
         'videoremuxer+ffmpeg': ['-bsf:v', 'setts=pts=DTS'],
+        'merger+ffmpeg': ['-bsf', 'setts=ts=TS-STARTPTS'],
     },
     'js_runtimes': {
         'deno': {'path': None,},
+        'node': {'path': '/usr/bin',},
         'quickjs': {'path': None,},
     },
 }
@@ -224,11 +394,24 @@ COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 YOUTUBE_INFO_SLEEP_REQUESTS = 1
 
 
-MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'
-
-
 RENAME_ALL_SOURCES = True
 RENAME_SOURCES = list()
+
+
+# When True, admin bulk actions on Media queue a `save_media` task for each
+# changed item so flags are re-evaluated without waiting for the next source
+# edit or indexing run
+SAVE_MEDIA_AFTER_BULK_ACTION = False
+
+
+# An example for changing the ordering for audio tracks.
+#ENGLISH_LANGUAGE_CODE_ORDER = (
+#    'en-orig',
+#    'en-US', 'en-CA', 'en-PH', 'en-IE',
+#    'en-GB', 'en-AU', 'en-NZ', 'en-ZA', 'en-IN',
+#    'en-SG', 'en-HK', 'en-MY',
+#    'en', 'eng',
+#)
 
 
 # WARNING WARNING WARNING
@@ -239,9 +422,10 @@ RENAME_SOURCES = list()
 # You have been warned!
 
 try:
-    from .local_settings import * # noqa
+    from .local_settings import *
 except ImportError as e:
     import sys
+
     sys.stderr.write(f'Unable to import local_settings: {e}\n')
     sys.exit(1)
 
@@ -254,15 +438,55 @@ except:
     MAX_RUN_TIME = 3600
 
 # Tasks scheduled with `background_task` need a chance to finish
-if MAX_RUN_TIME < 600:
-    MAX_RUN_TIME = 600
+MAX_RUN_TIME = max(600, MAX_RUN_TIME)
 
 DOWNLOAD_MEDIA_DELAY = 1 + round(MAX_RUN_TIME / 100)
 
-BACKGROUND_TASK_RUN_ASYNC = False
-BACKGROUND_TASK_ASYNC_THREADS = 1
-# MAX_BACKGROUND_TASK_ASYNC_THREADS = 1
+
+MEDIA_FORMATSTR_DEFAULT = '{yyyy_mm_dd}_{source}_{title}_{key}_{format}.{ext}'
 
 
-from .dbutils import patch_ensure_connection # noqa
-patch_ensure_connection()
+DEFAULT_ENGLISH_LCO = (
+    'en-orig',  # 1. Original Audio (YouTube Priority)
+    'en-US',    # 2. American English (Base)
+    'en-CA',    # 3. Canadian English (North American Family)
+    'en-PH',    # 4. Philippine English (American-aligned)
+    'en-IE',    # 5. Irish English (Rhotic/North Atlantic)
+    'en-GB',    # 6. British English (Primary Commonwealth)
+    'en-AU',    # 7. Australian English (Commonwealth)
+    'en-NZ',    # 8. New Zealand English (Commonwealth)
+    'en-ZA',    # 9. South African English (Commonwealth)
+    'en-IN',    # 10. Indian English (Commonwealth)
+    'en-SG',    # 11. Singapore English (Commonwealth)
+    'en-HK',    # 12. Hong Kong English (Commonwealth)
+    'en-MY',    # 13. Malaysia English (Commonwealth)
+    'en-JM',    # 14. Jamaica
+    'en-BZ',    # 15. Belize
+    'en-TT',    # 16. Trinidad and Tobago
+    'en-MT',    # 17. Malta
+    'en-ZW',    # 18. Zimbabwe
+    'en-KE',    # 19. Kenya
+    'en-NG',    # 20. Nigeria
+    'en-BW',    # 21. Botswana
+    'en-GM',    # 22. Gambia
+    'en-GH',    # 23. Ghana
+    'en',       # 24. Standard 2-letter fallback (ISO 639-1)
+    'en-021',   # 25. Northern America (Direct US/CA alignment)
+    'en-019',   # 26. Americas (Hemispheric North/South alignment)
+    'en-013',   # 27. Central America (Strong US influence)
+    'en-029',   # 28. Caribbean (Mix of US/UK influence)
+    'en-419',   # 29. Latin America & Caribbean
+    'en-150',   # 30. Europe (General European English)
+    'en-053',   # 31. Australia and New Zealand (Commonwealth Pacific)
+    'en-009',   # 32. Oceania
+    'en-035',   # 33. South-eastern Asia (Commonwealth Asia)
+    'en-142',   # 34. Asia
+    'en-030',   # 35. Eastern Asia
+    'en-002',   # 36. Africa
+    'en-011',   # 37. Western Africa
+    'en-001',   # 38. World (International English)
+    'eng',      # 39. Standard 3-letter fallback (ISO 639-2)
+)
+
+if 'patch_ensure_connection' in locals() and callable(patch_ensure_connection):
+    patch_ensure_connection()

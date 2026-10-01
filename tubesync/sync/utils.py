@@ -1,10 +1,10 @@
+import math
 import os
 import re
-import math
+import requests
 from copy import deepcopy
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-import requests
 from PIL import Image
 from common.utils import list_of_dictionaries
 from django.conf import settings
@@ -81,10 +81,8 @@ def resize_image_to_height(image, width, height):
     '''
     image = image.convert('RGB')
     ratio = image.width / image.height
-    scaled_width = math.ceil(height * ratio)
-    if scaled_width < width:
-        # Width too small, stretch it
-        scaled_width = width
+    # When scaled width is too small, stretch it
+    scaled_width = max(width, math.ceil(height * ratio))
     image = image.resize((scaled_width, height), Image.LANCZOS)
     if scaled_width > width:
         # Width too large, crop it
@@ -166,8 +164,9 @@ def _url_keys(arg_dict, filter_func):
     return result
 
 
+# ruff: disable[SIM118]
 # expects a dictionary where the value at key is a:
-# list of dictionaries 
+# list of dictionaries
 def _drop_url_keys(arg_dict, key, filter_func):
     def _del_url_keys(_arg_dict):
         for url_key, remove in _url_keys(_arg_dict, filter_func).items():
@@ -242,14 +241,43 @@ def filter_response(arg_dict, copy_arg=False):
             )
         )
 
+    def condense_exts(arg_dict, key):
+        mapped, result_list = list_of_dictionaries(arg_dict[key], extract_exts)
+        if mapped:
+            acc = dict(names=set(), exts=dict())
+            for t in result_list:
+                reduce_ext(t, acc)
+            # promote for the shared name case, otherwise keep everything
+            if 1 == len(acc['names']):
+                acc['exts'] = sorted(e for s in acc['exts'].values() for e in s)
+                arg_dict[key] = [acc]
+            elif acc['names']:
+                arg_dict[key] = [acc]
+
+    def extract_exts(arg_dict):
+        ext = arg_dict.get('ext')
+        name = arg_dict.get('name')
+        return (name, ext)
+
+    def reduce_ext(t, results):
+        name, ext = t
+        if not name:
+            return
+        results['names'].add(name)
+        exts = results['exts'].get(name, set())
+        results['exts'][name] = exts
+        if ext:
+            exts.add(ext)
+
     for key in ('subtitles', 'requested_subtitles', 'automatic_captions',):
         if key in response_dict.keys():
             lang_codes = response_dict[key]
             if isinstance(lang_codes, dict):
                 for lang_code in lang_codes.keys():
                     _drop_url_keys(lang_codes, lang_code, drop_subtitles_url)
+                    condense_exts(lang_codes, lang_code)
     # end of subtitles cleanup }}}
- 
+
     # beginning of heatmap cleanup {{{
     for key in ('heatmap',):
         if key in response_dict.keys():
@@ -257,6 +285,9 @@ def filter_response(arg_dict, copy_arg=False):
     # end of heatmap cleanup }}}
 
     return response_dict
+
+
+# ruff: enable[SIM118]
 
 
 def parse_media_format(format_dict):
@@ -284,12 +315,9 @@ def parse_media_format(format_dict):
     except (ValueError, TypeError):
         width = 0
     format_full = format_dict.get('format_note', '').strip().upper()
-    format_str = format_full[:-2] if format_full.endswith('60') else format_full
-    format_str = format_str.strip()
-    format_str = format_str[:-3] if format_str.endswith('HDR') else format_str
-    format_str = format_str.strip()
-    format_str = format_str[:-2] if format_str.endswith('60') else format_str
-    format_str = format_str.strip()
+    format_str = format_full.removesuffix('60').strip()
+    format_str = format_str.removesuffix('HDR').strip()
+    format_str = format_str.removesuffix('60').strip()
     is_hls = True
     is_dash = False
     if 'DASH' in format_str:
@@ -316,6 +344,10 @@ def parse_media_format(format_dict):
         'asr': format_dict.get('asr', 0),
         'is_60fps': fps > 50,
         'is_hdr': 'HDR' in format_dict.get('format', '').upper(),
+        # yt-dlp appends "(original)" / "(default)" to format_note for videos
+        # that publish more than one audio track
+        'is_original': '(original)' in format_dict.get('format_note', ''),
+        'is_default': '(default)' in format_dict.get('format_note', ''),
         'is_hls': is_hls,
         'is_dash': is_dash,
     }

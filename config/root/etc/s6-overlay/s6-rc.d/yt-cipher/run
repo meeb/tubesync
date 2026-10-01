@@ -1,0 +1,34 @@
+#!/command/with-contenv bash
+
+install_jq() {
+    apt-get update && apt-get install -y jq
+}
+
+set -e
+cd /app/yt-cipher
+chown -R root:app .
+
+command -v deno >/dev/null || \
+    /app/install_deno.sh
+
+HOST=127.0.0.1
+PORT=8011
+export HOST PORT
+
+# Create files in a parallel directory structure
+rm -rf /dev/shm/yt-cipher
+mkdir -p /dev/shm/yt-cipher
+cd /dev/shm/yt-cipher
+cp -rs -t ./ /app/yt-cipher/*
+find . '!' -type l -exec chown app:app '{}' +
+
+# Add dependencies to avoid patching
+if [ -f ejs/package.json ]; then
+    command -v jq >/dev/null || install_jq
+    jq_filter='.dependencies|to_entries|map("npm:" + .key + "@" + .value)|.[]'
+    s6-setuidgid app \
+        jq -r "${jq_filter}" ejs/package.json | s6-setuidgid app xargs -r -t deno add
+fi
+
+exec s6-setuidgid app \
+    deno run --allow-env --allow-net --allow-read --allow-write server.ts

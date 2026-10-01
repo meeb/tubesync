@@ -32,7 +32,7 @@ runs:
         then
             tag="${tag#[Vv]}"
         fi
-        
+
         set_sl_var() { local f='%s=%s\n' ; printf -- "${f}" "$@" ; } ;
 
         set_sl_var tag "${tag}" >> "${GITHUB_OUTPUT}"

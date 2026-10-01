@@ -1,17 +1,65 @@
 import cProfile
+import difflib
 import emoji
 import gc
 import io
+import math
 import os
 import pstats
 import string
 import time
 from django.core.paginator import Paginator
 from functools import partial
+from itertools import chain
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from urllib.parse import urlunsplit, urlencode, urlparse
 from .errors import DatabaseConnectionError, QuerySetEmptyError
+
+
+def get_usable_cpu_count() -> int:
+    """
+    Find a reasonable value for available CPUs.
+    Checks: cgroups, scheduler, then physical count.
+    """
+    # Check Cgroup v2 (Modern Docker/K8s)
+    cgroup_dir = Path('/sys/fs/cgroup')
+    try:
+        cpu_max_path = cgroup_dir / 'cpu.max'
+        if cpu_max_path.exists():
+            data = cpu_max_path.read_text().split()
+            # Format: "$MAX $PERIOD" (e.g., "50000 100000")
+            if 'max' != data[0]:
+                quota = int(data[0])
+                period = int(data[1])
+                return max(1, math.ceil(quota / period))
+    except (OSError, ValueError, IndexError):
+        pass
+
+    # Check Cgroup v1 (Legacy Docker/K8s)
+    cgroup_cpu_dir = cgroup_dir / 'cpu'
+    try:
+        quota_path = cgroup_cpu_dir / 'cpu.cfs_quota_us'
+        period_path = cgroup_cpu_dir / 'cpu.cfs_period_us'
+        if quota_path.exists() and period_path.exists():
+            quota = int(quota_path.read_text())
+            period = int(period_path.read_text())
+            if 0 < quota:
+                return max(1, math.ceil(quota / period))
+    except (OSError, ValueError):
+        pass
+
+    # Linux specific: Respects 'taskset' or CPU pinning
+    try:
+        affinity_count = len(os.sched_getaffinity(0))
+        if 0 < affinity_count:
+            return affinity_count
+    except (AttributeError, NotImplementedError):
+        pass
+
+    # Returns total logical CPUs; defaults to 1
+    return max(1, os.cpu_count() or 0)
+
 
 def directory_and_stem(arg_path, /, all_suffixes=False):
     filepath = Path(arg_path)
@@ -68,6 +116,23 @@ def glob_quote(filestr, /):
         raise TypeError(f'expected a str, got "{type(filestr)}"')
 
     return filestr.translate(str.maketrans(_glob_specials))
+
+
+def is_empty_iterator(iterator):
+    """
+    Checks if an iterator is empty without fully consuming it.
+    Returns: (is_empty_boolean, iterator)
+    """
+    returned_iterator = iterator
+    try:
+        first_item = next(iterator)
+    except StopIteration:
+        return True, iter([])
+    else:
+        # Put the first item back at the start of a new iterator
+        # Chaining the single item with the original remaining stream
+        returned_iterator = chain([first_item], iterator)
+    return False, returned_iterator
 
 
 def list_of_dictionaries(arg_list, /, arg_function=lambda x: x):
@@ -144,7 +209,7 @@ def parse_database_connection_string(database_connection_string):
                                       f'as a database connection string: {e}') from e
     driver = parts.scheme
     user_pass_host_port = parts.netloc
-    database = parts.path
+    database = parts.path.removeprefix('/')
     if driver not in valid_drivers:
         raise DatabaseConnectionError(f'Database connection string '
                                       f'"{database_connection_string}" specified an '
@@ -155,6 +220,8 @@ def parse_database_connection_string(database_connection_string):
     if len(host_parts) != 2 or len(user_pass_parts) != 2:
         raise DatabaseConnectionError('Database connection string netloc must be in '
                                       'the format of user:pass@host')
+    # user_pass never used
+    # ruff: ignore[RUF059]
     user_pass, host_port = host_parts
     username, password = user_pass_parts
     host_port_parts = host_port.split(':')
@@ -179,8 +246,6 @@ def parse_database_connection_string(database_connection_string):
         # Malformed
         raise DatabaseConnectionError('Database connection host must be a hostname or '
                                       'a hostname:port combination')
-    if database.startswith('/'):
-        database = database[1:]
     if not database:
         raise DatabaseConnectionError('Database connection string path must be a '
                                       'string in the format of /databasename')    
@@ -200,7 +265,7 @@ def parse_database_connection_string(database_connection_string):
         'OPTIONS': backend_options.get(driver),
     }
     db_dict.update(db_overrides.get(driver))
-    
+
     return db_dict
 
 
@@ -219,9 +284,9 @@ def append_uri_params(uri, params):
     return urlunsplit(('', '', uri, qs, ''))
 
 
-def clean_filename(filename):
+def clean_filename(filename: str) -> str:
     if not isinstance(filename, str):
-        raise ValueError(f'filename must be a str, got {type(filename)}')
+        raise TypeError(f'filename must be a str, got {type(filename)}')
     to_scrub = r'<>\/:*?"|%'
     for char in list(to_scrub):
         filename = filename.replace(char, '')
@@ -234,10 +299,49 @@ def clean_filename(filename):
     return clean_filename.strip()
 
 
-def clean_emoji(s):
+def clean_emoji(s: str) -> str:
     if not isinstance(s, str):
-        raise ValueError(f'parameter must be a str, got {type(s)}')
+        raise TypeError(f'parameter must be a str, got {type(s)}')
     return emoji.replace_emoji(s)
+
+
+def truncate_filename(filename: str, *, max_bytes=216, encoding='utf-8') -> str:
+    '''
+        Shortens a filename to fit within `max_bytes` bytes (not characters)
+        while keeping its extension intact. Filesystems limit name length in
+        bytes (commonly 255), so multi-byte titles can exceed the limit with
+        far fewer characters (see issue #522). The default budget leaves
+        headroom for prefixes/suffixes appended later (e.g. `.fNNN`,
+        `.part-FragNN` fragments written by yt-dlp during downloads).
+
+        Bytes are removed from the middle of the stem, keeping its start
+        (usually the beginning of the title) and its end (usually unique
+        suffixes such as the media key and format details, e.g.
+        `{title_full}_{key}_{format}` from the default media format), joined
+        by `_..._`. Truncation never splits a multi-byte character: partial
+        trailing/leading sequences are dropped when decoding.
+    '''
+    max_bytes = max(96, min(232, max_bytes))
+    if not isinstance(filename, str):
+        raise TypeError(f'filename must be a str, got {type(filename)}')
+    if len(filename.encode(encoding)) <= max_bytes:
+        return filename
+    path = Path(filename)
+    name, ext = clean_filename(path.stem), clean_filename(path.suffix)
+    ext_bytes = ext.encode(encoding)
+    if len(ext_bytes) >= max_bytes:
+        # Pathological extension; fall back to a plain byte cut
+        name, ext_bytes = filename, b''
+    marker = '_..._'
+    stem_budget = max_bytes - len(ext_bytes) - len(marker.encode(encoding))
+    stem_bytes = name.encode(encoding)
+    # Keep the unique suffixes at the end of the stem intact (up to a third of
+    # the bytes limit), then fill the rest from the front.
+    tail_keep = min(stem_budget // 2, max_bytes // 3)
+    head_keep = stem_budget - tail_keep
+    head = stem_bytes[:head_keep].decode(encoding, errors='ignore').rstrip()
+    tail = stem_bytes[-tail_keep:].decode(encoding, errors='ignore').lstrip()
+    return head + marker + tail + ext_bytes.decode(encoding)
 
 
 def seconds_to_timestr(seconds):
@@ -246,7 +350,7 @@ def seconds_to_timestr(seconds):
     seconds %= 3600
     minutes = seconds // 60
     seconds %= 60
-    return '{:02d}:{:02d}:{:02d}'.format(hour, minutes, seconds)
+    return f'{hour:02d}:{minutes:02d}:{seconds:02d}'
 
 
 def time_func(func):
@@ -294,6 +398,37 @@ def remove_enclosed(haystack, /, open='[', close=']', sep=' ', *, valid=None, st
     return haystack[:o] + haystack[len(n)+c:]
 
 
+def resolve_priority_order(user_input, master_list, cutoff=0.6):
+    """
+    Normalizes and validates a user's preferred order against a master set.
+    """
+    resolved = []
+    # Index for case-insensitive and underscore/hyphen normalization
+    norm_map = {m.lower().replace('_', '-'): m for m in master_list}
+
+    for item in user_input:
+        # 1. Exact match (fastest)
+        if item in master_list:
+            if item not in resolved:
+                resolved.append(item)
+            continue
+
+        # 2. Normalized match (handles 'en_US' -> 'en-US' or 'EN-US' -> 'en-US')
+        norm_item = item.lower().replace('_', '-')
+        if norm_item in norm_map:
+            match = norm_map[norm_item]
+            if match not in resolved:
+                resolved.append(match)
+            continue
+
+        # 3. Fuzzy match (handles 'English' -> 'en' or 'USA' -> 'en-US')
+        matches = difflib.get_close_matches(item, master_list, n=1, cutoff=cutoff)
+        if matches and matches[0] not in resolved:
+            resolved.append(matches[0])
+
+    return resolved
+
+
 def django_queryset_generator(query_set, /, *,
     page_size=100,
     chunk_size=None,
@@ -304,33 +439,34 @@ def django_queryset_generator(query_set, /, *,
     if not query_set.ordered:
         qs = qs.order_by('pk')
     collecting = gc.isenabled()
-    gc.disable()
-    if use_chunked_fetch:
-        for key in qs._iterator(use_chunked_fetch, chunk_size):
-            try:
-                yield query_set.filter(pk=key)[0]
-            except IndexError as exc:
-                msg = f'missing primary key: {key}'
-                raise QuerySetEmptyError(msg, exc=exc, key=key) from exc
-            key = None
-            gc.collect(generation=1)
-        key = None
-    else:
-        for page in iter(Paginator(qs, page_size)):
-            for key in page.object_list:
+    try:
+        gc.disable()
+        if use_chunked_fetch:
+            for key in qs._iterator(use_chunked_fetch, chunk_size):
                 try:
                     yield query_set.filter(pk=key)[0]
                 except IndexError as exc:
                     msg = f'missing primary key: {key}'
-                    raise QuerySetEmptyError(msg, exc=exc, key=key) from exc
+                    raise QuerySetEmptyError(msg, key=key) from exc
                 key = None
                 gc.collect(generation=1)
             key = None
+        else:
+            for page in iter(Paginator(qs, page_size)):
+                for key in page.object_list:
+                    try:
+                        yield query_set.filter(pk=key)[0]
+                    except IndexError as exc:
+                        msg = f'missing primary key: {key}'
+                        raise QuerySetEmptyError(msg, key=key) from exc
+                    key = None
+                    gc.collect(generation=1)
+                key = None
+                page = None
+                gc.collect()
             page = None
-            gc.collect()
-        page = None
-    qs = None
-    gc.collect()
-    if collecting:
-        gc.enable()
-
+        qs = None
+    finally:
+        gc.collect()
+        if collecting:
+            gc.enable()

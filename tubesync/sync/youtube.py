@@ -4,6 +4,8 @@
 '''
 
 
+# ruff: file-ignore[SIM118]
+
 import os
 
 from common.errors import FormatUnavailableError
@@ -43,17 +45,20 @@ class YouTubeError(yt_dlp.utils.DownloadError):
     '''
         Generic wrapped error for all errors that could be raised by youtube-dl.
     '''
+    # ruff: ignore[PIE790]
     pass
 
 
 def get_yt_opts():
     opts = deepcopy(_defaults)
+    opts.update(dict(logger=log))
     cookie_file = settings.COOKIES_FILE
     if cookie_file.is_file():
         cookie_file_path = str(cookie_file.resolve())
         log.info(f'[youtube-dl] using cookies.txt from: {cookie_file_path}')
         opts.update({'cookiefile': cookie_file_path})
     return opts
+
 
 def get_channel_id(url):
     # yt-dlp --simulate --no-check-formats --playlist-items 1
@@ -62,7 +67,6 @@ def get_channel_id(url):
     opts.update({
         'skip_download': True,
         'simulate': True,
-        'logger': log,
         'extract_flat': True,  # Change to False to get detailed info
         'check_formats': False,
         'playlist_items': '1',
@@ -81,17 +85,75 @@ def get_channel_id(url):
             else:
                 return channel_id
 
-def get_image_info(url):
+
+def _thumbnail_items(value):
+    return value if isinstance(value, (list, tuple)) else tuple()
+
+
+def _thumbnail_dimension(thumbnail, name):
+    try:
+        return int(thumbnail.get(name, int()))
+    except (TypeError, ValueError):
+        return int()
+
+
+def _thumbnail_identity(thumbnail):
+    thumbnail_id = thumbnail.get('id')
+    if thumbnail_id in ('avatar_uncropped', 'banner_uncropped'):
+        return thumbnail_id,
+
+    return (
+        thumbnail_id,
+        _thumbnail_dimension(thumbnail, 'width'),
+        _thumbnail_dimension(thumbnail, 'height'),
+    )
+
+
+def merge_image_thumbnails(previous, current):
+    thumbnails = dict()
+    for thumbnail in (
+        *_thumbnail_items(previous),
+        *_thumbnail_items(current),
+    ):
+        if not isinstance(thumbnail, dict) or not thumbnail.get('url'):
+            continue
+        thumbnails[_thumbnail_identity(thumbnail)] = thumbnail
+    return list(thumbnails.values())
+
+
+def get_image_urls(response):
     avatar_url = None
     banner_url = None
     thumbnail_url = None
+    if not isinstance(response, dict):
+        return avatar_url, banner_url, thumbnail_url
+    max_height = 0
+    for thumbnail in _thumbnail_items(response.get('thumbnails')):
+        if not isinstance(thumbnail, dict):
+            continue
+        thumbnail_height = _thumbnail_dimension(thumbnail, 'height')
+        thumbnail_id = thumbnail.get('id')
+        thumbnail_url_value = thumbnail.get('url')
+        if not thumbnail_url_value:
+            continue
+        if 'avatar_uncropped' == thumbnail_id:
+            avatar_url = thumbnail_url_value
+        elif 'banner_uncropped' == thumbnail_id:
+            banner_url = thumbnail_url_value
+        elif thumbnail_height > max_height:
+            max_height = thumbnail_height
+            thumbnail_url = thumbnail_url_value
+    return avatar_url, banner_url, thumbnail_url
+
+
+def get_image_info(url):
     opts = get_yt_opts()
     opts.update({
         'skip_download': True,
         'simulate': True,
-        'logger': log,
         'extract_flat': True,  # Change to False to get detailed info
         'check_formats': False,
+        'playlist_items': '1',
     })
 
     with yt_dlp.YoutubeDL(opts) as y:
@@ -100,50 +162,7 @@ def get_image_info(url):
         except yt_dlp.utils.DownloadError as e:
             raise YouTubeError(f'Failed to extract info for "{url}": {e}') from e
         else:
-            max_height = 0
-            for thumbnail in response['thumbnails']:
-                thumbnail_height = thumbnail.get('height')
-                try:
-                    thumbnail_height = int(thumbnail_height)
-                except (TypeError, ValueError,):
-                    thumbnail_height = int()
-                if thumbnail['id'] == 'avatar_uncropped':
-                    avatar_url = thumbnail['url']
-                elif thumbnail['id'] == 'banner_uncropped':
-                    banner_url = thumbnail['url']
-                elif thumbnail_height > max_height:
-                    max_height = thumbnail_height
-                    thumbnail_url = thumbnail['url']
-            try:
-                entry_type = response['entries'][0].get('_type')
-            except IndexError:
-                # an empty entries list
-                pass
-            else:
-                if 'url' == entry_type:
-                    del response['entries']
-                elif 'playlist' == entry_type:
-                    for playlist in response['entries']:
-                        del playlist['entries']
-            from .models import Metadata
-            t = Metadata.objects.defer('value').filter(
-                source__isnull=True,
-                media__isnull=True,
-            ).get_or_create(
-                key=response['id'],
-                site=response['extractor_key'],
-            )
-            md = t[0]
-            field_defaults = {
-                f.attname: f.get_default()
-                for f in md._meta.fields
-                if f.has_default()
-            }
-            if 'retrieved' in field_defaults:
-                md.retrieved = field_defaults['retrieved']
-            md.value = response
-            md.save()
-    return avatar_url, banner_url, thumbnail_url
+            return get_image_urls(response)
 
 
 def _subscriber_only(msg='', response=None):
@@ -215,7 +234,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
     postprocessors.append(dict(
         key='Exec',
         when='playlist',
-        exec_cmd="/usr/bin/env bash /app/full_playlist.sh '%(id)s' '%(playlist_count)d'",
+        exec_cmd="/usr/bin/env python3 /app/manage.py full-playlist %(id)q '%(playlist_count)d'",
     ))
     cache_directory_path = Path(user_set('cachedir', opts, '/dev/shm'))
     playlist_infojson = 'postprocessor_[%(id)s]_%(n_entries)d_%(playlist_count)d_temp'
@@ -232,7 +251,6 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'ignore_no_formats_error': False, # we must fail first to try again with this enabled
         'skip_download': True,
         'simulate': False,
-        'logger': log,
         'extract_flat': True,
         'allow_playlist_files': True,
         'check_formats': True,
@@ -246,7 +264,7 @@ def get_media_info(url, /, *, days=None, info_json=None):
         'postprocessors': postprocessors,
         'skip_unavailable_fragments': False,
         'sleep_interval_requests': sleep_interval_requests,
-        'verbose': True if settings.DEBUG else False,
+        'verbose': bool(settings.DEBUG),
         'writeinfojson': True,
     })
     if start:
@@ -295,6 +313,8 @@ def download_media(
     opts = get_yt_opts()
     default_opts = yt_dlp.parse_options([]).options
     pp_opts = deepcopy(default_opts)
+    # maintain logging while postprocessors are set-up
+    pp_opts.logger = opts.get('logger')
 
     # We fake up this option to make it easier for the user to add post processors.
     postprocessors = opts.get('add_postprocessors', pp_opts.add_postprocessors)
@@ -311,6 +331,7 @@ def download_media(
             ),
             ( 'key', remove_end(key, 'PP'), )
         )
+        # ruff: ignore[C400]
         postprocessors = list(
             dict(
                 _postprocessor_opts_parser( *val.split(':', 1) )
@@ -378,8 +399,8 @@ def download_media(
         'merge_output_format': extension,
         'outtmpl': os.path.basename(output_file),
         'remuxvideo': pp_opts.remuxvideo,
-        'quiet': False if settings.DEBUG else True,
-        'verbose': True if settings.DEBUG else False,
+        'quiet': not bool(settings.DEBUG),
+        'verbose': bool(settings.DEBUG),
         'noprogress': None if settings.DEBUG else True,
         'writeinfojson': info_json,
         'writesubtitles': write_subtitles,

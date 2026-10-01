@@ -1,0 +1,14 @@
+--- /usr/share/perl5/Debconf/DbDriver/Copy.pm.orig	2025-03-10 12:07:15.000000000 +0000
++++ /usr/share/perl5/Debconf/DbDriver/Copy.pm	2026-09-13 02:07:03.178411588 +0000
+@@ -22,7 +22,10 @@
+ 		@owners=("unknown");
+ 	}
+ 	foreach my $owner (@owners) {
+-		my $template = Debconf::Template->get($src->getfield($item, 'template'));
++		my $template_name = $src->getfield($item, 'template');
++		my $template = (defined($template_name) && length($template_name))
++			? Debconf::Template->get($template_name)
++			: undef;
+ 		my $type="";
+ 		$type = $template->type if $template;
+ 		$dest->addowner($item, $owner, $type);

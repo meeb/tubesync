@@ -1,5 +1,3 @@
-import logging
-import sys
 from pathlib import Path
 from urllib.parse import urljoin
 from common.utils import getenv, parse_database_connection_string
@@ -13,10 +11,6 @@ DJANGO_URL_PREFIX = getenv('DJANGO_URL_PREFIX').strip()
 STATIC_URL = getenv('DJANGO_STATIC_URL', '/static/').strip()
 if DJANGO_URL_PREFIX and STATIC_URL:
     STATIC_URL = urljoin(DJANGO_URL_PREFIX, STATIC_URL[1:])
-
-
-# This is not ever meant to be a public web interface so this isn't too critical
-SECRET_KEY = getenv('DJANGO_SECRET_KEY', 'tubesync-django-secret')
 
 
 ALLOWED_HOSTS_STR = getenv('TUBESYNC_HOSTS', '*')
@@ -35,28 +29,118 @@ if database_dict:
         'default': database_dict,
     }
     DATABASES['default']['_msgs'] = database_dict.get('_msgs', list())
-    DATABASES['default']['_msgs'].append((
-        f'Using database connection: {database_dict["DRIVER"]}://'
-        f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
-        f'{database_dict["PORT"]}/{database_dict["NAME"]}',
-    ))
-    DATABASE_CONNECTION_STR = (f'{database_dict["DRIVER"]} at "{database_dict["HOST"]}:'
-                               f'{database_dict["PORT"]}" database '
-                               f'"{database_dict["NAME"]}"')
+    DATABASES['default']['_msgs'].append(
+        (
+            f'Using database connection: {database_dict["DRIVER"]}://'
+            f'{database_dict["USER"]}:[hidden]@{database_dict["HOST"]}:'
+            f'{database_dict["PORT"]}/{database_dict["NAME"]}',
+        )
+    )
+    DATABASE_CONNECTION_STR = (
+        f'{database_dict["DRIVER"]} at "{database_dict["HOST"]}:'
+        f'{database_dict["PORT"]}" database '
+        f'"{database_dict["NAME"]}"'
+    )
+
+    # previously this was in dbutils.py
+    if 'mysql' == database_dict['DRIVER']:
+
+        def patch_ensure_connection():
+            import importlib
+            from django.conf import settings
+            from django.db import DatabaseError
+
+            for config in settings.DATABASES.values():
+                db_engine = config['ENGINE']
+
+                # Only patch for MariaDB/MySQL
+                if 'django.db.backends.mysql' != db_engine:
+                    continue
+
+                module = importlib.import_module(f'{db_engine}.base')
+
+                def ensure_connection(self):
+                    exc = None
+                    with self.wrap_database_errors:
+                        connected = self.connection is not None
+                        fresh_connection = getattr(
+                            self, '_do_not_close_fresh_connections', False
+                        )
+                        in_transaction = self.in_atomic_block
+
+                        if connected and not (fresh_connection or in_transaction):
+                            # this exact ordering is required
+                            self._do_not_close_fresh_connections = True
+                            try:
+                                with self.wrap_database_errors:
+                                    if not self.connection.open:
+                                        self.close()
+                                    self.close_if_unusable_or_obsolete()
+                                    self.close_if_health_check_failed()
+                            except DatabaseError as e:
+                                exc = e
+                        if hasattr(self, '_do_not_close_fresh_connections'):
+                            del self._do_not_close_fresh_connections
+
+                        check_connection = (
+                            # started out as connected
+                            connected
+                            and
+                            # remains connected
+                            self.connection is not None
+                            and
+                            # was already configured
+                            not fresh_connection
+                            and
+                            # outside of a transaction
+                            not in_transaction
+                            and
+                            # health checks are not enabled
+                            not (self.health_check_enabled and self.health_check_done)
+                        )
+                        if check_connection:
+                            try:
+                                with self.wrap_database_errors:
+                                    # use the backend support
+                                    if not self.is_usable():
+                                        raise DatabaseError('connection is not usable')
+                                    self.health_check_done = True
+
+                                    # try an actual query
+                                    self.validate_thread_sharing()
+                                    raw_cursor = self.create_cursor()
+                                    with self.make_cursor(raw_cursor) as cursor:
+                                        cursor.execute('SELECT 1;')
+                            except DatabaseError:
+                                self.close()
+
+                    if connected and self.connection is None:
+                        self._do_not_close_fresh_connections = True
+                        if in_transaction:
+                            msg = 'The database connection was lost inside an atomic transaction'
+                            exc = exc or DatabaseError(msg)
+
+                    if exc is not None:
+                        raise exc
+
+                    super(module.DatabaseWrapper, self).ensure_connection()
+
+                module.DatabaseWrapper.ensure_connection = ensure_connection
+
 else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': CONFIG_BASE_DIR / 'db.sqlite3',
-            "OPTIONS": {
-                "timeout": 10,
-                "transaction_mode": "IMMEDIATE",
+            'OPTIONS': {
+                'timeout': 10,
+                'transaction_mode': 'IMMEDIATE',
                 # PRAGMA locking_mode = NORMAL | EXCLUSIVE
                 # PRAGMA journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
                 # DO NOT change locking_mode to EXCLUSIVE!
                 # This is a foot-gun, and invalidates a behavior the code relies on.
                 # journal_mode WAL offers increased concurrency, the default is DELETE.
-                "init_command": """
+                'init_command': """
                     PRAGMA locking_mode = NORMAL;
                     PRAGMA journal_mode = TRUNCATE;
                     PRAGMA journal_size_limit = 67108864;
@@ -76,16 +160,6 @@ else:
     SQLITE_DELAY_FLOAT = 5
 
 
-DEFAULT_THREADS = 1
-BACKGROUND_TASK_ASYNC_THREADS = getenv('TUBESYNC_WORKERS', DEFAULT_THREADS, integer=True)
-if BACKGROUND_TASK_ASYNC_THREADS > 1:
-    DATABASES['default']['_msgs'] = database_dict.get('_msgs', list())
-    DATABASES['default']['_msgs'].append((logging.WARNING,
-        'Using more than 1 worker is generally a bad idea.',
-    ))
-    BACKGROUND_TASK_RUN_ASYNC = True
-
-
 MEDIA_ROOT = CONFIG_BASE_DIR / 'media'
 DOWNLOAD_ROOT = DOWNLOADS_BASE_DIR
 YOUTUBE_DL_CACHEDIR = CONFIG_BASE_DIR / 'cache/yt-dlp'
@@ -94,7 +168,7 @@ COOKIES_FILE = CONFIG_BASE_DIR / 'cookies.txt'
 
 
 HEALTHCHECK_FIREWALL_STR = getenv('TUBESYNC_HEALTHCHECK_FIREWALL', True)
-HEALTHCHECK_FIREWALL = ( 'true' == HEALTHCHECK_FIREWALL_STR.strip().lower() )
+HEALTHCHECK_FIREWALL = 'true' == HEALTHCHECK_FIREWALL_STR.strip().lower()
 HEALTHCHECK_ALLOWED_IPS_STR = getenv('TUBESYNC_HEALTHCHECK_ALLOWED_IPS', '127.0.0.1')
 HEALTHCHECK_ALLOWED_IPS = HEALTHCHECK_ALLOWED_IPS_STR.split(',')
 
@@ -112,24 +186,33 @@ else:
 
 
 SOURCE_DOWNLOAD_DIRECTORY_PREFIX_STR = getenv('TUBESYNC_DIRECTORY_PREFIX', True)
-SOURCE_DOWNLOAD_DIRECTORY_PREFIX = ( 'true' == SOURCE_DOWNLOAD_DIRECTORY_PREFIX_STR.strip().lower() )
+SOURCE_DOWNLOAD_DIRECTORY_PREFIX = (
+    'true' == SOURCE_DOWNLOAD_DIRECTORY_PREFIX_STR.strip().lower()
+)
 
 
 SHRINK_NEW_MEDIA_METADATA_STR = getenv('TUBESYNC_SHRINK_NEW', False)
-SHRINK_NEW_MEDIA_METADATA = ( 'true' == SHRINK_NEW_MEDIA_METADATA_STR.strip().lower() )
+SHRINK_NEW_MEDIA_METADATA = 'true' == SHRINK_NEW_MEDIA_METADATA_STR.strip().lower()
 SHRINK_OLD_MEDIA_METADATA_STR = getenv('TUBESYNC_SHRINK_OLD', False)
-SHRINK_OLD_MEDIA_METADATA = ( 'true' == SHRINK_OLD_MEDIA_METADATA_STR.strip().lower() )
+SHRINK_OLD_MEDIA_METADATA = 'true' == SHRINK_OLD_MEDIA_METADATA_STR.strip().lower()
 
 
 # TUBESYNC_RENAME_ALL_SOURCES: True or False
 RENAME_ALL_SOURCES_STR = getenv('TUBESYNC_RENAME_ALL_SOURCES', True)
-RENAME_ALL_SOURCES = ( 'true' == RENAME_ALL_SOURCES_STR.strip().lower() )
+RENAME_ALL_SOURCES = 'true' == RENAME_ALL_SOURCES_STR.strip().lower()
+# TUBESYNC_SAVE_MEDIA_AFTER_BULK_ACTION: True or False
+SAVE_MEDIA_AFTER_BULK_ACTION_STR = getenv(
+    'TUBESYNC_SAVE_MEDIA_AFTER_BULK_ACTION', False
+)
+SAVE_MEDIA_AFTER_BULK_ACTION = (
+    'true' == SAVE_MEDIA_AFTER_BULK_ACTION_STR.strip().lower()
+)
 # TUBESYNC_RENAME_SOURCES: A comma-separated list of Source directories
 RENAME_SOURCES_STR = getenv('TUBESYNC_RENAME_SOURCES')
 RENAME_SOURCES = RENAME_SOURCES_STR.split(',') if RENAME_SOURCES_STR else list()
 
 
-VIDEO_HEIGHT_CUTOFF = getenv("TUBESYNC_VIDEO_HEIGHT_CUTOFF", 240, integer=True)
+VIDEO_HEIGHT_CUTOFF = getenv('TUBESYNC_VIDEO_HEIGHT_CUTOFF', 240, integer=True)
 
 
 # ensure that the current directory exists
@@ -137,7 +220,7 @@ if not YOUTUBE_DL_CACHEDIR.is_dir():
     YOUTUBE_DL_CACHEDIR.mkdir(parents=True)
 # rename any old yt_dlp cache directories to the current directory
 old_youtube_cache_dirs = list(YOUTUBE_DL_CACHEDIR.parent.glob('youtube-*'))
-old_youtube_cache_dirs.extend(list(YOUTUBE_DL_CACHEDIR.parent.glob('youtube/youtube-*')))
+old_youtube_cache_dirs.extend(YOUTUBE_DL_CACHEDIR.parent.glob('youtube/youtube-*'))
 for cache_dir in old_youtube_cache_dirs:
     cache_dir.rename(YOUTUBE_DL_CACHEDIR / cache_dir.name)
 # try to remove the old, hopefully empty, directory
@@ -147,4 +230,3 @@ if empty_old_youtube_dir.is_dir():
         empty_old_youtube_dir.rmdir()
     except:
         pass
-

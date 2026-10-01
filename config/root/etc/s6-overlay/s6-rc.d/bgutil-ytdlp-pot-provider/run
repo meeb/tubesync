@@ -1,0 +1,7 @@
+#!/command/with-contenv bash
+
+set -e
+cd /app/bgutil-ytdlp-pot-provider
+
+exec s6-setuidgid app \
+    ./node server/build/main.js -p 4406

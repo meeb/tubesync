@@ -5,6 +5,7 @@ from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone as tz
 from pathlib import Path
+from typing import ClassVar
 from xml.etree import ElementTree
 from django.conf import settings
 from django.db import models
@@ -15,10 +16,11 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from common.logger import log
 from common.errors import NoFormatException
-from common.json import JSONEncoder
+from common.json_encoder import JSONEncoder
 from common.utils import (
     clean_filename, clean_emoji, directory_and_stem,
     glob_quote, mkdir_p, seconds_to_timestr,
+    truncate_filename,
 )
 from ..youtube import (
     get_media_info as get_youtube_media_info,
@@ -41,9 +43,12 @@ from ._migrations import (
 from ._private import _srctype_dict, _nfo_element
 from .media__tasks import (
     copy_thumbnail, download_checklist, download_finished,
-    failed_format, refresh_formats, wait_for_premiere, write_nfo_file,
+    download_thumbnails, failed_format, refresh_formats,
+    wait_for_premiere, write_nfo_file,
 )
 from .source import Source
+
+# ruff: file-ignore[B010,RUF059,SIM118]
 
 
 class Media(models.Model):
@@ -56,14 +61,14 @@ class Media(models.Model):
     posix_epoch = datetime(1970, 1, 1, tzinfo=tz.utc)
 
     # Format to use to display a URL for the media
-    URLS = _srctype_dict('https://www.youtube.com/watch?v={key}')
+    URLS: ClassVar[dict[str, str]] = _srctype_dict('https://www.youtube.com/watch?v={key}')
 
     # Callback functions to get a list of media from the source
-    INDEXERS = _srctype_dict(get_youtube_media_info)
+    INDEXERS: ClassVar[dict[str, type(get_youtube_media_info)]] = _srctype_dict(get_youtube_media_info)
 
     # Maps standardised names to names used in source metdata
     _same_name = lambda n, k=None: {k or n: _srctype_dict(n) }
-    METADATA_FIELDS = {
+    METADATA_FIELDS: ClassVar[dict[str, dict[str, str]]] = {
         **(_same_name('upload_date')),
         **(_same_name('timestamp')),
         **(_same_name('title')),
@@ -80,7 +85,7 @@ class Media(models.Model):
         **(_same_name('playlist_title')),
     }
 
-    STATE_ICONS = dict(zip(
+    STATE_ICONS: ClassVar[dict[str, str]] = dict(zip(
         MediaState.values,
         (
             '<i class="far fa-question-circle" title="Unknown download state"></i>',
@@ -393,9 +398,13 @@ class Media(models.Model):
                             fmt.get('vcodec') and
                             self.source.can_fallback and
                             (
-                                (self.source.fallback == Val(Fallback.NEXT_BEST)) or
+                                (self.source.fallback == Val(Fallback.NEXT_BEST_RESOLUTION)) or
                                 (
-                                    self.source.fallback == Val(Fallback.NEXT_BEST_HD) and
+                                    self.source.fallback == Val(Fallback.REQUIRE_CODEC) and
+                                    self.source.source_vcodec == fmt.get('vcodec')
+                                ) or
+                                (
+                                    self.source.fallback == Val(Fallback.REQUIRE_HD) and
                                     (fmt.get('height') or 0) >= fallback_hd_cutoff
                                 )
                             )
@@ -440,20 +449,30 @@ class Media(models.Model):
                     'hdr': hdr,
                     'format': tuple(fmt),
                 }
-            if self.downloaded_format:
-                resolution = self.downloaded_format.lower()
-            elif self.downloaded_height:
+            is_audio_download = (
+                (self.downloaded_format or '').lower() == Val(SourceResolution.AUDIO)
+            )
+            if is_audio_download:
+                resolution = Val(SourceResolution.AUDIO)
+            elif self.downloaded_height and self.downloaded_height > 0:
                 resolution = f'{self.downloaded_height}p'
+            elif self.downloaded_format:
+                resolution = self.downloaded_format.lower()
             if resolution:
                 fmt.append(resolution)
-            if self.downloaded_format != Val(SourceResolution.AUDIO):
-                vcodec = self.downloaded_video_codec.lower()
-            if vcodec:
+            vcodec = self.downloaded_video_codec
+            if not is_audio_download and vcodec:
+                vcodec = vcodec.lower()
                 fmt.append(vcodec)
-            acodec = self.downloaded_audio_codec.lower()
+            else:
+                vcodec = ''
+            acodec = self.downloaded_audio_codec
             if acodec:
+                acodec = acodec.lower()
                 fmt.append(acodec)
-            if self.downloaded_format != Val(SourceResolution.AUDIO):
+            else:
+                acodec = ''
+            if not is_audio_download:
                 fps = str(self.downloaded_fps)
                 if fps:
                     fmt.append(f'{fps}fps')
@@ -488,10 +507,10 @@ class Media(models.Model):
                 # Combined
                 vformat = cformat
         if vformat:
-            if vformat['format']:
-                resolution = vformat['format'].lower()
-            else:
+            if vformat.get('height', 0) > 0:
                 resolution = f"{vformat['height']}p"
+            elif vformat.get('format'):
+                resolution = str(vformat['format']).lower()
             if resolution:
                 fmt.append(resolution)
             vcodec = vformat['vcodec'].lower()
@@ -565,7 +584,6 @@ class Media(models.Model):
             'uploader': self.uploader,
         }
 
-
     @property
     def has_metadata(self):
         result = self.metadata is not None
@@ -574,28 +592,27 @@ class Media(models.Model):
         value = self.get_metadata_first_value(('id', 'display_id', 'channel_id', 'uploader_id',))
         return value is not None
 
-
     def metadata_clear(self, /, *, save=False):
         self.metadata = None
         setattr(self, '_cached_metadata_dict', None)
         if save:
             self.save()
 
-
-    def metadata_dumps(self, arg_dict=dict()):
+    def metadata_dumps(self, arg_dict=None):
         fallback = dict()
         try:
             fallback.update(self.new_metadata.with_formats)
         except ObjectDoesNotExist:
             pass
-        data = arg_dict or fallback
-        return json.dumps(data, separators=(',', ':'), cls=JSONEncoder)
-
+        return json.dumps(
+            arg_dict or fallback,
+            separators=(',', ':'),
+            cls=JSONEncoder,
+        )
 
     def metadata_loads(self, arg_str='{}'):
         data = json.loads(arg_str) or self.loaded_metadata
         return data
-
 
     @atomic(durable=False)
     def ingest_metadata(self, data):
@@ -616,7 +633,6 @@ class Media(models.Model):
         setattr(self, '_cached_metadata_dict', None)
         return md.ingest_metadata(data)
 
-
     def save_to_metadata(self, key, value, /):
         data = self.loaded_metadata
         using_new_metadata = self.get_metadata_first_value(
@@ -632,15 +648,23 @@ class Media(models.Model):
             migrated['_using_table'] = True
             self.metadata = self.metadata_dumps(arg_dict=migrated)
             self.save()
-        from common.logger import log
         log.debug(f'Saved to metadata: {self.key} / {self.uuid}: {key=}: {value}')
-
 
     @property
     def reduce_data(self):
         now = timezone.now()
+        using_table = False
         try:
             data = json.loads(self.metadata or "{}")
+            old_mdl = len(self.metadata or "")
+            if data.get('_using_table', False):
+                try:
+                    data.update(self.new_metadata.with_formats)
+                except ObjectDoesNotExist:
+                    pass
+                else:
+                    using_table = True
+                    old_mdl = len(str(data))
             if '_reduce_data_ran_at' in data.keys():
                 total_seconds = data['_reduce_data_ran_at']
                 assert isinstance(total_seconds, int), type(total_seconds)
@@ -653,14 +677,12 @@ class Media(models.Model):
             filtered_data = filter_response(data, True)
             filtered_data['_reduce_data_ran_at'] = round((now - self.posix_epoch).total_seconds())
             filtered_json = self.metadata_dumps(arg_dict=filtered_data)
-        except Exception as e:
-            from common.logger import log
-            log.exception('reduce_data: %s', e)
+        # ruff: ignore[BLE001]
+        except Exception:
+            log.exception(f'Media.reduce_data: {self.pk}')
         else:
-            from common.logger import log
             # log the results of filtering / compacting on metadata size
             new_mdl = len(compact_json)
-            old_mdl = len(self.metadata or "")
             if old_mdl > new_mdl:
                 delta = old_mdl - new_mdl
                 log.info(f'{self.key}: metadata compacted by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
@@ -669,10 +691,12 @@ class Media(models.Model):
                 delta = old_mdl - new_mdl
                 log.info(f'{self.key}: metadata reduced by {delta:,} characters ({old_mdl:,} -> {new_mdl:,})')
                 if getattr(settings, 'SHRINK_OLD_MEDIA_METADATA', False):
-                    self.metadata = filtered_json
+                    if using_table:
+                        self.ingest_metadata(filtered_data)
+                    else:
+                        self.metadata = filtered_json
                     return filtered_data
             return data
-
 
     @property
     def loaded_metadata(self):
@@ -694,9 +718,9 @@ class Media(models.Model):
                 pass
             setattr(self, '_cached_metadata_dict', data)
             return data
+        # ruff: ignore[BLE001]
         except Exception:
             return {}
-
 
     @property
     def url(self):
@@ -716,7 +740,6 @@ class Media(models.Model):
             timestamp_float = float(timestamp)
         except (TypeError, ValueError,) as e:
             log.warn(f'Could not compute published from timestamp for: {self.source} / {self} with "{e}"')
-            pass
         else:
             return self.posix_epoch + timedelta(seconds=timestamp_float)
         return None
@@ -749,14 +772,18 @@ class Media(models.Model):
 
     @property
     def upload_date(self):
+        ts = self.get_metadata_first_value('timestamp')
+        dt = self.ts_to_dt(ts) if ts else None
+        if dt and dt > self.posix_epoch:
+            return dt
+
         upload_date_str = self.get_metadata_first_value('upload_date')
         if not upload_date_str:
             return None
         try:
-            return datetime.strptime(upload_date_str, '%Y%m%d')
+            return datetime.strptime(upload_date_str, '%Y%m%d').replace(tzinfo=tz.utc)
         except (AttributeError, ValueError) as e:
             log.debug(f'Media.upload_date: {self.source} / {self}: strptime: {e}')
-            pass
         return None
 
     @property
@@ -815,7 +842,22 @@ class Media(models.Model):
         media_format = str(self.source.media_format)
         media_details = self.format_dict
         result = media_format.format(**media_details)
-        return '.' + result if '/' == result[0] else result
+        result = '.' + result if '/' == result[0] else result
+        # Filesystems limit each path component to 255 bytes (not
+        # characters), and multi-byte titles can blow past that with far
+        # fewer characters — downloads then fail with:
+        #   [Errno 36] File name too long
+        # (issue #522). Only the final component (the name) is shortened;
+        # any directories in the format string are preserved. The budget
+        # leaves headroom for suffixes appended during download
+        # (`.fNNN.ext.part-FragNNN.part` and thumbnail/subtitle siblings).
+        path = Path(result)
+        truncated = truncate_filename(path.name)
+        if truncated != path.name:
+            log.warning(f'Media filename exceeded the filesystem byte limit '
+                        f'and was shortened: {self!r}')
+            return str(path.with_name(truncated))
+        return result
 
     @property
     def directory_path(self):
@@ -996,11 +1038,14 @@ class Media(models.Model):
         if self.downloaded:
             return Val(MediaState.DOWNLOADED)
         if task:
+            # Avoid the circular import `ImportError` from using this at the top of the file.
+            from ..tasks import get_media_download_task
+
             def running(arg_task, /):
                 if hasattr(arg_task, 'locked_by_pid_running'):
                     return arg_task.locked_by_pid_running()
-                from ..tasks import get_media_download_task
                 return get_media_download_task(str(self.pk))
+
             if running(task):
                 return Val(MediaState.DOWNLOADING)
             elif task.has_error():
@@ -1022,10 +1067,10 @@ class Media(models.Model):
         if not format_str:
             raise NoFormatException(f'Cannot download, media "{self.pk}" ({self}) has '
                                     f'no valid format available')
-        # Download the media with youtube-dl
+        # Download the media with yt-dlp
         download_youtube_media(self.url, format_str, self.source.extension,
                                str(self.filepath), self.source.write_json,
-                               self.source.sponsorblock_categories.selected_choices, self.source.embed_thumbnail,
+                               self.source.sponsorblock_categories.expand_choices, self.source.embed_thumbnail,
                                self.source.embed_metadata, self.source.enable_sponsorblock,
                               self.source.write_subtitles, self.source.auto_subtitles,self.source.sub_langs )
         # Return the download paramaters
@@ -1037,6 +1082,7 @@ class Media(models.Model):
         '''
         indexer = self.INDEXERS.get(self.source.source_type, None)
         if not callable(indexer):
+            # ruff: ignore[TRY002,TRY004]
             raise Exception(f'Media with source type f"{self.source.source_type}" '
                             f'has no indexer')
         response = indexer(self.url)
@@ -1186,8 +1232,8 @@ class Media(models.Model):
 Media.copy_thumbnail = copy_thumbnail
 Media.download_checklist = download_checklist
 Media.download_finished = download_finished
+Media.download_thumbnails = download_thumbnails
 Media.failed_format = failed_format
 Media.refresh_formats = refresh_formats
 Media.wait_for_premiere = wait_for_premiere
 Media.write_nfo_file = write_nfo_file
-

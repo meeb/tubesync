@@ -4,20 +4,18 @@ from django.utils.translation import gettext_lazy as _
 from copy import deepcopy
 
 
-DOMAINS = dict({
-    'youtube': frozenset({
+DOMAINS = {
+    'youtube': frozenset((
         'youtube.com',
         'm.youtube.com',
         'music.youtube.com',
         'www.youtube.com',
-    }),
-})
+    )),
+}
 
 
 def Val(*args):
-    results = list(
-        a.value if isinstance(a, models.enums.Choices) else a for a in args
-    )
+    results = [ a.value if isinstance(a, models.enums.Choices) else a for a in args ]
     return results.pop(0) if 1 == len(results) else (*results,)
 
 
@@ -34,10 +32,16 @@ class CapChoices(models.IntegerChoices):
     CAP_10YEARS = 315360000, _('10 years (3650 days)')
 
 
+class AudioTrack(models.TextChoices):
+    ORIGINAL = 'o', _('Original audio (recorded language)')
+    DEFAULT = 'd', _("Publisher's default audio (often an auto-dub)")
+
+
 class Fallback(models.TextChoices):
     FAIL = 'f', _('Fail, do not download any media')
-    NEXT_BEST = 'n', _('Get next best resolution or codec instead')
-    NEXT_BEST_HD = 'h', _('Get next best resolution but at least HD')
+    REQUIRE_CODEC = 'c', _('Get next best resolution, only the preferred codec')
+    REQUIRE_HD = 'h', _('Get next best resolution, any codec, but at least HD')
+    NEXT_BEST_RESOLUTION = 'n', _('Get next best resolution, any codec')
 
 
 class FileExtension(models.TextChoices):
@@ -259,4 +263,3 @@ class YouTube_VideoCodec(models.TextChoices):
 SourceResolutionInteger = SourceResolution._integer_mapping()
 youtube_long_source_types = YouTube_SourceType._long_type_mapping()
 youtube_validation_urls = YouTube_SourceType._validation_urls()
-

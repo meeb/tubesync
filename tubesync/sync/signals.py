@@ -37,7 +37,10 @@ def source_pre_save(sender, instance, **kwargs):
     existing_copy_channel_images = existing_source.copy_channel_images
     new_copy_channel_images = instance.copy_channel_images
     if new_copy_channel_images and not existing_copy_channel_images:
-        download_source_images(str(instance.pk))
+        download_source_images(
+            str(instance.pk),
+            delay=download_source_images.settings.get('delay'),
+        )
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
     new_dirpath = instance.directory_path.resolve(strict=False)
     if existing_dirpath != new_dirpath:
@@ -76,15 +79,18 @@ def source_pre_save(sender, instance, **kwargs):
                         target = new_dirpath / entry_path.name
                         if not target.exists():
                             entry_path = entry_path.rename(target)
+                    # ruff: ignore[BLE001]
                     except Exception as e:
                         log.exception(e)
                 try:
                     existed.rmdir()
+                # ruff: ignore[BLE001]
                 except Exception as e:
                     log.exception(e)
             elif existed:
                 try:
                     existed = existed.rename(new_dirpath / ('.existed-' + new_dirpath.name))
+                # ruff: ignore[BLE001]
                 except Exception as e:
                     log.exception(e)
 
@@ -111,7 +117,10 @@ def source_post_save(sender, instance, created, **kwargs):
     if created:
         check_source_directory_exists(str(source.pk))
         if source.copy_channel_images:
-            download_source_images(str(source.pk))
+            download_source_images(
+                str(source.pk),
+                delay=download_source_images.settings.get('delay'),
+            )
         if source.is_active:
             log.info(f'Scheduling first media indexing for source: {source.name}')
             TaskHistory.schedule(
@@ -142,9 +151,8 @@ def source_pre_delete(sender, instance, **kwargs):
     instance.deactivate()
 
     # Fetch the media source
-    sqs = Source.objects.filter(filter_text=str(source.pk))
-    if sqs.count():
-        media_source = sqs[0]
+    media_source = Source.objects.filter(filter_text=str(source.pk)).first()
+    if media_source:
         # Schedule deletion of media
         on_commit(partial(
             TaskHistory.schedule,
@@ -174,22 +182,21 @@ def media_post_save(sender, instance, created, **kwargs):
     existing_media_thumbnail_task = get_media_thumbnail_task(str(instance.pk))
     existing_media_metadata_task = get_media_metadata_task(str(instance.pk))
     existing_media_download_task = get_media_download_task(str(instance.pk))
-    if not downloaded:
-        # the decision to download was already made if a download task exists
-        if not existing_media_download_task:
-            # Recalculate the "can_download" flag, this may
-            # need to change if the source specifications have been changed
-            if media.has_metadata:
-                if instance.get_format_str():
-                    if not instance.can_download:
-                        instance.can_download = True
-                        can_download_changed = True
-                else:
-                    if instance.can_download:
-                        instance.can_download = False
-                        can_download_changed = True
-            # Recalculate the "skip_changed" flag
-            skip_changed = filter_media(instance)
+    # the decision to download was already made if a download task exists
+    if not (downloaded or existing_media_download_task):
+        # Recalculate the "can_download" flag, this may
+        # need to change if the source specifications have been changed
+        if media.has_metadata:
+            if instance.get_format_str():
+                if not instance.can_download:
+                    instance.can_download = True
+                    can_download_changed = True
+            else:
+                if instance.can_download:
+                    instance.can_download = False
+                    can_download_changed = True
+        # Recalculate the "skip_changed" flag
+        skip_changed = filter_media(instance)
 
     # If the media is missing metadata schedule it to be downloaded
     if not (media.skip or media.has_metadata or existing_media_metadata_task):
@@ -224,12 +231,11 @@ def media_post_save(sender, instance, created, **kwargs):
         media_file_exists |= instance.filepath.exists()
     except OSError as e:
         log.exception(e)
-        pass
     # If the media has not yet been downloaded schedule it to be downloaded
     if not (media_file_exists or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
         if instance.can_download and instance.downloaded:
-            skip_changed = True if not instance.skip else False
+            skip_changed = not instance.skip
             instance.skip = True
         downloaded = False
     if (instance.source.download_media and instance.can_download) and not (
@@ -254,7 +260,7 @@ def media_post_save(sender, instance, created, **kwargs):
 @receiver(pre_delete, sender=Media)
 def media_pre_delete(sender, instance, **kwargs):
     # Remove thumbnail file for deleted media
-    if instance.thumb:
+    if instance.thumb_file_exists:
         instance.thumb.delete(save=False)
     # Save the metadata site & thumbnail URL to the metadata column
     existing_metadata = instance.loaded_metadata
@@ -346,23 +352,21 @@ def media_post_delete(sender, instance, **kwargs):
     created = False
     create_for_indexing_task = (
         not (
-            #not instance.downloaded and
-            instance.skip and
-            instance.manual_skip
+            (
+                instance.source and
+                instance.source.key.endswith('/deleted')
+            ) or
+            (
+                instance.skip and
+                instance.manual_skip
+            )
         )
     )
     if create_for_indexing_task:
-        skipped_media, created = Media.objects.get_or_create(
-            key=instance.key,
-            source=instance.source,
-        )
-    if created:
         old_metadata = instance.loaded_metadata
         site_field = instance.get_metadata_field('extractor_key')
         thumbnail_url = instance.thumbnail
         thumbnail_field = instance.get_metadata_field('thumbnail')
-        skipped_media.downloaded = False
-        skipped_media.duration = instance.duration
         arg_dict=dict(
             _media_instance_was_deleted=True,
         )
@@ -370,14 +374,20 @@ def media_post_delete(sender, instance, **kwargs):
             site_field: old_metadata.get(site_field),
             thumbnail_field: thumbnail_url,
         })
-        skipped_media.metadata = skipped_media.metadata_dumps(
-            arg_dict=arg_dict,
+        skipped_media, created = Media.objects.get_or_create(
+            key=instance.key,
+            source=instance.source,
+            defaults=dict(
+                skip=True,
+                manual_skip=True,
+                downloaded=False,
+                duration=instance.duration,
+                metadata=instance.metadata_dumps(arg_dict=arg_dict),
+                published=instance.published,
+                title=instance.title,
+            ),
         )
-        skipped_media.published = instance.published
-        skipped_media.title = instance.title
-        skipped_media.skip = True
-        skipped_media.manual_skip = True
-        skipped_media.save()
+    if created:
         # Re-use the old metadata if it exists
         instance_qs = Metadata.objects.filter(
             media__isnull=True,
@@ -386,7 +396,7 @@ def media_post_delete(sender, instance, **kwargs):
             key=skipped_media.key,
         )
         try:
-            if instance_qs.count():
+            if instance_qs.exists():
                 with atomic(durable=False):
                     # clear the link to a media instance
                     Metadata.objects.filter(media=skipped_media).update(media=None)
@@ -402,7 +412,7 @@ def media_post_delete(sender, instance, **kwargs):
                     instance_qs.filter(uuid=md.uuid).update(media=skipped_media)
                     # delete any metadata that we are no longer using
                     instance_qs.exclude(uuid=md.uuid).delete()
-                    
+
         except IntegrityError:
             # this probably won't happen, but try it without a transaction
             try:
@@ -417,4 +427,3 @@ def media_post_delete(sender, instance, **kwargs):
                 log.debug(f'Deleting metadata for "{skipped_media.key}": {skipped_media.pk}')
                 # delete the old metadata
                 instance_qs.delete()
-
