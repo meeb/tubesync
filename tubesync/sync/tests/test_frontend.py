@@ -18,6 +18,7 @@ from sync.choices import (
     YouTube_SourceType,
 )
 
+
 class FrontEndTestCase(TestCase):
     maxDiff = None
 
@@ -450,5 +451,3 @@ class FrontEndTestCase(TestCase):
         c = Client()
         response = c.get('/mediaservers')
         self.assertEqual(response.status_code, 200)
-
-

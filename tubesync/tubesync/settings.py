@@ -430,9 +430,10 @@ SAVE_MEDIA_AFTER_BULK_ACTION = False
 # You have been warned!
 
 try:
-    from .local_settings import * # noqa
+    from .local_settings import *
 except ImportError as e:
     import sys
+
     sys.stderr.write(f'Unable to import local_settings: {e}\n')
     sys.exit(1)
 
@@ -495,6 +496,5 @@ DEFAULT_ENGLISH_LCO = (
     'eng',      # 39. Standard 3-letter fallback (ISO 639-2)
 )
 
-
-from .dbutils import patch_ensure_connection # noqa
-patch_ensure_connection()
+if 'patch_ensure_connection' in locals() and callable(patch_ensure_connection):
+    patch_ensure_connection()

@@ -16,15 +16,14 @@ class MaterializeDefaultFieldsMiddleware:
         return response
 
     def process_template_response(self, request, response):
-        for _, v in getattr(response, 'context_data', {}).items():
+        for v in getattr(response, 'context_data', {}).values():
             if isinstance(v, BaseForm):
-                for _, field in v.fields.items():
+                for field in v.fields.values():
                     field.widget.attrs.update({'class':'browser-default'})
         return response
 
 
 class BasicAuthMiddleware(BaseBasicAuthMiddleware):
-
     def process_request(self, request):
         bypass_uris = getattr(settings, 'BASICAUTH_ALWAYS_ALLOW_URIS', [])
         if request.path in bypass_uris:

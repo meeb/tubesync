@@ -9,7 +9,6 @@ from sync.tasks import check_source_directory_exists
 
 
 class Command(BaseCommand):
-
     help = 'Resets all tasks'
 
     def handle(self, *args, **options):

@@ -1,4 +1,3 @@
-
 from django import forms, VERSION as DJANGO_VERSION
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -30,6 +29,7 @@ SourceForm = forms.modelform_factory(
     },
 )
 
+
 def source_clean_media_format(self):
     data = self.cleaned_data.get('media_format', '').strip()
     return data or getattr(settings, 'MEDIA_FORMATSTR', settings.MEDIA_FORMATSTR_DEFAULT)
@@ -47,7 +47,6 @@ class ValidateSourceForm(forms.Form):
 
 
 class ConfirmDeleteSourceForm(forms.Form):
-
     delete_media = forms.BooleanField(
         label=_('Also delete downloaded media'),
         required=False
@@ -55,7 +54,6 @@ class ConfirmDeleteSourceForm(forms.Form):
 
 
 class ScheduleTaskForm(forms.Form):
-
     now = forms.DateTimeField(
         label=_('The current date and time'),
         required=False,

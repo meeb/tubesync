@@ -7,7 +7,6 @@ from sync.models import Source
 
 
 class Command(BaseCommand):
-
     help = 'Adds sources for any new subscription information'
 
     def add_arguments(self, parser):
@@ -52,4 +51,3 @@ class Command(BaseCommand):
             source.save()
             self.stderr.write(f'Added a new source: {source.name}')
         self.stderr.write('Done')
-

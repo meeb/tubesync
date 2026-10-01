@@ -168,11 +168,13 @@ def get_best_video_format(media):
         media.source.can_fallback and
         media.source.fallback != Val(Fallback.REQUIRE_CODEC)
     )
+
     def matched_resolution(fmt):
         return (
             fmt['format'] == source_resolution or
             fmt['height'] == source_resolution_height
         )
+
     # Filter video-only formats by resolution that matches the source
     video_formats = []
     sort_keys = [('height', False), ('vcodec', True), ('vbr', False)] # key, reverse
