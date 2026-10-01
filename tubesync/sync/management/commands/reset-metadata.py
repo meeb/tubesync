@@ -7,7 +7,6 @@ from common.logger import log
 
 
 class Command(BaseCommand):
-
     help = 'Resets all media item metadata'
 
     def handle(self, *args, **options):

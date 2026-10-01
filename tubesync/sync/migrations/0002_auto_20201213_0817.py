@@ -6,7 +6,6 @@ import sync.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('sync', '0001_initial'),
     ]

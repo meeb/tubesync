@@ -5,7 +5,6 @@ import sync.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('sync', '0026_alter_source_sub_langs'),
     ]

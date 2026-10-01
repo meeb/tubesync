@@ -27,14 +27,17 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         def valid_destination_path(arg: str) -> str:
+            arg_path = Path(arg)
             try:
-                arg_path = Path(arg)
                 resolved = arg_path.resolve(strict=True)
             except FileNotFoundError:
-                parent_path = arg_path.parent.resolve(strict=True)
-                if not parent_path.is_dir():
-                    raise ValueError(f'not a directory: {parent_path}')
-                (parent_path / arg_path.name).mkdir()
+                parent_path = arg_path.parent
+                try:
+                    parent_path = parent_path.resolve(strict=True)
+                except (FileNotFoundError, OSError) as e: 
+                    if not parent_path.is_dir():
+                        raise ValueError(f'not a directory: {parent_path!s}') from e
+                arg_path.mkdir()
                 resolved = arg_path.resolve(strict=True)
             if resolved.is_dir() and not resolved.is_symlink():
                 return str(resolved)
@@ -42,16 +45,16 @@ class Command(BaseCommand):
 
         def valid_limit(arg: str) -> int:
             arg_int = int(arg)
-            if not (200 <= arg_int <= 10_000_000):
-                raise ValueError('Must be between 200 and 10,000,000.')
-            return arg_int
+            if 200 <= arg_int <= 10_000_000:
+                return arg_int
+            raise ValueError('Must be between 200 and 10,000,000.')
 
         def valid_source_db_path(arg: str) -> str:
+            arg_path = Path(arg)
             try:
-                arg_path = Path(arg)
                 resolved = arg_path.resolve(strict=True)
-            except (FileNotFoundError, OSError):
-                raise
+            except FileNotFoundError as e:
+                raise ValueError('not an existing database file') from e
             else:
                 if resolved.is_file() and not resolved.is_symlink():
                     return str(resolved)
@@ -365,7 +368,7 @@ class Command(BaseCommand):
 
             if 0 < total_copied:
                 target_path.parent.mkdir(parents=True, exist_ok=True)
-                mem_cursor.execute(f"VACUUM main INTO '{str(target_path.resolve(strict=False))}';")
+                mem_cursor.execute(f"VACUUM main INTO '{target_path.resolve(strict=False)!s}';")
                 self.stdout.write(self.style.SUCCESS(f'Successfully streamed database archive to: {target_path}'))
             else:
                 self.stdout.write('No rows matched within the live boundaries; target archive empty.')

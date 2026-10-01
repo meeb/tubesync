@@ -1,6 +1,7 @@
 import logging
 from os import getenv
 
+
 def level_from_environment(env_var, default=None):
     levels_dict = logging.getLevelNamesMapping()
     if default is None:

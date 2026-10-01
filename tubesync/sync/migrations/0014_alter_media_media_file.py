@@ -7,7 +7,6 @@ import sync.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('sync', '0013_fix_elative_media_file'),
     ]

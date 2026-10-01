@@ -12,7 +12,6 @@ import time
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone as dt_timezone
-from typing import Optional, Tuple
 
 from ._logger import logger
 
@@ -38,6 +37,7 @@ __all__ = ['default_formatter', 'default_handler', 'handler']
 if not handler:
     # Create only enough for tests to fail instead of creating hard to diagnose errors
     from ..std import default_handler as std_default_handler, handler
+
     class MockSyslogHandler(handler):
         def __init__(self, host, port, comm_type, queue_size, reconnect_delay, *args, **kwargs):
             self.host = host
@@ -50,6 +50,7 @@ if not handler:
             kwargs['address'] = std_default_handler.address
             kwargs['facility'] = std_default_handler.facility
             super().__init__(*args, **kwargs)
+
     handler = MockSyslogHandler
     default_handler = handler('127.0.0.1', 6514, 'UDP', 1024, 5)
 else:
@@ -58,7 +59,6 @@ else:
         common.CommType.TLS: lambda state, ctx: _create_tcp_socket(state, ctx),
         common.CommType.UDP: lambda state, ctx: _create_udp_socket(state),
     }
-
 
     @dataclass
     class _ReconnectionState:
@@ -69,22 +69,20 @@ else:
         success: int = 10
         failure: int = 5
 
-
     @dataclass(frozen=True)
     class RetryItem:
         """Encapsulates a structured syslog entry in the retry transport pipeline."""
+
         synthetic: bool
         msg: common.Msg
-
 
     @dataclass
     class ThreadScoreboard:
         """Tracks precision execution lifecycles and diagnostic markers for background workers."""
-        start: Tuple[float, int] = field(default_factory=lambda: (time.time(), time.monotonic_ns()))
-        alive: Optional[Tuple[float, int]] = None
-        initialized: Optional[Tuple[float, int]] = None
-        previous_start: Optional[Tuple[float, int]] = None
-
+        start: tuple[float, int] = field(default_factory=lambda: (time.time(), time.monotonic_ns()))
+        alive: tuple[float, int] | None = None
+        initialized: tuple[float, int] | None = None
+        previous_start: tuple[float, int] | None = None
 
     def _create_tcp_socket(state, ctx=None):
         """Establishes an optimized TCP or wrapped TLS stream transport connection."""
@@ -94,13 +92,11 @@ else:
             s = ctx.wrap_socket(s)
         return s
 
-
     def _create_udp_socket(state):
         """Establishes an un-bonded UDP datagram socket connection endpoint."""
         s = socket.socket(type=socket.SOCK_DGRAM)
         s.connect((state.host, state.port))
         return s
-
 
     def _get_exponential_delay(remaining, total, base_delay):
         """
@@ -112,7 +108,6 @@ else:
         multiplier = 0.1 * (50.0 ** ratio)
 
         return base_delay * multiplier
-
 
     def _item_completed(retry_queue, core_queue, item, reconnect=None):
         """
@@ -128,7 +123,6 @@ else:
         # when there was a working endpoint before the failure.
         if reconnect is not None:
             reconnect.budget = min(reconnect.cap, 1 + reconnect.budget)
-
 
     def _logging_handler_thread(state, shutdown=None, logger=logger):
         """
@@ -178,6 +172,7 @@ else:
                 s = factory(state, ctx)
             except KeyError:
                 raise NotImplementedError(f'Unsupported comm_type: {state.comm_type}')
+            # ruff: ignore[BLE001]
             except Exception:
                 if s is not None:
                     with contextlib.suppress(Exception):
@@ -288,6 +283,7 @@ else:
                         # String binary processing failure: Drop item immediately and preserve connection state
                         logger.exception('Dropping un-encodable Unicode log message string')
                         _item_completed(retry_queue, state.queue, item)
+                    # ruff: ignore[BLE001]
                     except Exception:
                         # On socket break, tear down this loop context cleanly.
                         # The current message remains cleanly preserved at index 0 of retry_queue.
@@ -328,7 +324,6 @@ else:
             if shutdown is not None and callable(shutdown):
                 shutdown()
 
-
     class SyslogHandler(hat_syslog_handler_SyslogHandler):
         """
         A process-safe wrapper for hat.syslog.handler.SyslogHandler.
@@ -347,6 +342,7 @@ else:
             """Initializes the wrapper and neutralizes conflicting parent process states."""
             super().__init__(host, port, common.CommType.UDP, queue_size, reconnect_delay, *args, **kwargs)
 
+            self._MAX_DROPPED_COUNT = 1_000_000
             state = self._get_parent_attr('__state')
 
             if state:
@@ -444,6 +440,7 @@ else:
                 cb_closing = self._closing
                 cb_closed = self.__state.closed
                 cb_handler_close = super(hat_syslog_handler_SyslogHandler, self).close
+
                 def shutdown_cb():
                     cb_closing.set()
                     cb_closed.set()
@@ -475,23 +472,30 @@ else:
 
         def _determine_comm_type(self, comm_type):
             """Maps and cross-checks string connection descriptions to Enumeration definitions."""
+            if isinstance(comm_type, common.CommType):
+                return comm_type
+
             if isinstance(comm_type, str):
-                needle = comm_type
+
+                def vary(value: str) -> set[str]:
+                    folded = value.casefold()
+                    lowered = value.lower()
+                    return {
+                        value, value.upper(),
+                        folded, folded.upper(),
+                        lowered, lowered.upper(),
+                    }
+
                 haystack = frozenset(common.CommType.__members__)
-                vary = lambda x: {
-                    x, x.upper(),
-                    x.casefold(), x.casefold().upper(),
-                    x.lower(), x.lower().upper(),
-                }
+                needles = vary(comm_type)
+                matched_elements = tuple(haystack.intersection(needles))
+
                 try:
-                    matched_elements = tuple(haystack.intersection(vary(needle)))
-                    member = matched_elements[0]
-                    return common.CommType[member]
+                    return common.CommType[matched_elements[0]]
                 except (IndexError, KeyError) as e:
                     raise ValueError(f'Specify a valid comm_type from this list: {list(haystack)}') from e
 
-            if not isinstance(comm_type, common.CommType):
-                raise ValueError('Invalid comm_type argument')
+            raise ValueError('Invalid comm_type argument')
 
         def _parent_class_name(self):
             return hat_syslog_handler_SyslogHandler.__name__
@@ -537,7 +541,7 @@ else:
                 # ACQUIRE LOCK ON MAIN THREAD BEFORE INCREMENTING COUNTER SLICES
                 with state.cv:
                     dropped_count = state.dropped[-1]
-                    if 1_000_000 < dropped_count:
+                    if self._MAX_DROPPED_COUNT < dropped_count:
                         state.dropped.append(1)
                     else:
                         state.dropped[-1] = 1 + dropped_count
@@ -591,7 +595,6 @@ else:
             # dependencies while completely avoiding the parent class thread-joins.
             # =====================================================================
             super(hat_syslog_handler_SyslogHandler, self).close()
-
 
     handler = SyslogHandler
     default_handler = handler(

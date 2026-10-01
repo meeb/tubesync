@@ -36,7 +36,7 @@ class HealthCheckView(View):
                 raise PermissionDenied
         randomint = int(random() * (10 ** 10))
         with connection.cursor() as cursor:
-            cursor.execute('select {}'.format(randomint))
+            cursor.execute(f'select {randomint}')
             row = cursor.fetchone()
         try:
             pong = row[0]

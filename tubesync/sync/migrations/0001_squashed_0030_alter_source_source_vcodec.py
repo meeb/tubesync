@@ -17,6 +17,7 @@ from django.db import migrations, models
 from django.conf import settings
 from pathlib import Path
 
+
 def fix_media_file(apps, schema_editor):
     Media = apps.get_model('sync', 'Media')
     download_dir = str(settings.DOWNLOAD_ROOT)
@@ -28,10 +29,13 @@ def fix_media_file(apps, schema_editor):
             media.media_file.name = str(relative_path)
             media.save()
 
+
 # Function above has been copied/modified and RunPython operations adjusted.
+
 
 def media_file_location():
     return str(settings.DOWNLOAD_ROOT)
+
 
 # Used the above function for storage location.
 

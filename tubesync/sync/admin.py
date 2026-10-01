@@ -13,7 +13,6 @@ from .tasks import save_media
 
 @admin.register(Source)
 class SourceAdmin(admin.ModelAdmin):
-
     ordering = ('-created',)
     list_display = ('uuid', 'name', 'source_type', 'last_crawl',
                     'download_media', 'has_failed')
@@ -23,7 +22,6 @@ class SourceAdmin(admin.ModelAdmin):
 
 @admin.register(Media)
 class MediaAdmin(admin.ModelAdmin):
-
     ordering = ('-created',)
     list_display = ('uuid', 'key', 'source', 'can_download', 'skip', 'downloaded')
     readonly_fields = ('uuid', 'created')
@@ -98,7 +96,6 @@ class MediaAdmin(admin.ModelAdmin):
 
 @admin.register(Metadata)
 class MetadataAdmin(admin.ModelAdmin):
-
     ordering = ('-retrieved', '-created', '-uploaded')
     list_display = ('uuid', 'key', 'retrieved', 'uploaded', 'created', 'site')
     readonly_fields = ('uuid', 'created', 'retrieved')
@@ -107,7 +104,6 @@ class MetadataAdmin(admin.ModelAdmin):
 
 @admin.register(MetadataFormat)
 class MetadataFormatAdmin(admin.ModelAdmin):
-
     ordering = ('site', 'key', 'number')
     list_display = ('uuid', 'key', 'site', 'number', 'metadata')
     readonly_fields = ('uuid', 'metadata', 'site', 'key', 'number')
@@ -116,7 +112,6 @@ class MetadataFormatAdmin(admin.ModelAdmin):
 
 @admin.register(MediaServer)
 class MediaServerAdmin(admin.ModelAdmin):
-
     ordering = ('host', 'port')
     list_display = ('pk', 'server_type', 'host', 'port', 'use_https', 'verify_https')
     search_fields = ('host',)

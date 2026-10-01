@@ -263,4 +263,3 @@ class YouTube_VideoCodec(models.TextChoices):
 SourceResolutionInteger = SourceResolution._integer_mapping()
 youtube_long_source_types = YouTube_SourceType._long_type_mapping()
 youtube_validation_urls = YouTube_SourceType._validation_urls()
-

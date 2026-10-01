@@ -59,6 +59,7 @@ def get_yt_opts():
         opts.update({'cookiefile': cookie_file_path})
     return opts
 
+
 def get_channel_id(url):
     # yt-dlp --simulate --no-check-formats --playlist-items 1
     #   --print 'pre_process:%(playlist_channel_id,playlist_id,channel_id)s'
@@ -83,6 +84,7 @@ def get_channel_id(url):
                 raise YouTubeError(f'Failed to extract channel ID for "{url}": {e}') from e
             else:
                 return channel_id
+
 
 def _thumbnail_items(value):
     return value if isinstance(value, (list, tuple)) else tuple()
