@@ -14,6 +14,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from yt_dlp.utils import DownloadError
+
 from common.errors import (
     NoMetadataException,
 )
@@ -484,9 +486,13 @@ def refresh_formats(self):
     last_attempt = round((now - self.posix_epoch).total_seconds())
     self.save_to_metadata(attempted_key, last_attempt)
     self.skip = False
-    metadata = self.index_metadata()
-    if self.skip:
+    try:
+        metadata = self.index_metadata()
+    except DownloadError:
         return (False, True, 'found no formats; trying again')
+    else:
+        if self.skip:
+            return (False, True, 'found no formats; trying again')
 
     fmt_dict = defaultdict(str)
     response = metadata
