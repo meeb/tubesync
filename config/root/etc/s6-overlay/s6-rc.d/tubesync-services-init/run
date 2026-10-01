@@ -1,0 +1,27 @@
+#!/command/with-contenv bash
+
+set -e
+
+bundle_dependencies() {
+    /command/s6-rc-db all-dependencies "${1}"
+}
+
+bundle_contents() {
+    /command/s6-rc-db contents "${1}"
+}
+
+set_service_permissions() {
+    local _svc _svc_dir
+
+    while IFS= read -r _svc; do
+        _svc_dir="/run/service/${_svc}" ;
+        test -d "${_svc_dir}/supervise" || continue ;
+        /command/s6-svperms "${@}" "${_svc_dir}" ;
+    done
+}
+
+# Read status from gunicorn for enabled services
+bundle_dependencies user | set_service_permissions -g app
+
+# Send control messages from gunicorn when resetting tasks
+bundle_contents huey-consumers | set_service_permissions -G app

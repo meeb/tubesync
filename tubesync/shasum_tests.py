@@ -6,12 +6,13 @@ import tempfile
 import io
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from contextlib import redirect_stdout, redirect_stderr
 from unittest.mock import patch, MagicMock
 
 # Ensure shasum.py is in the same directory
 import shasum
+
 
 class TestShasum(unittest.TestCase):
     def setUp(self):
@@ -93,7 +94,7 @@ class TestShasum(unittest.TestCase):
         """Path Torture: Backslashes (common in Windows-generated sums files)"""
         name = "logs\\2024\\app.log"
         data = b"log_contents"
-        self.create_file(name, data)
+        self.create_file(PureWindowsPath(name).as_posix(), data)
         h = hashlib.sha256(data).hexdigest()
 
         sums_file = self.create_file("win.txt", f"{h} *{name}\n".encode())
@@ -201,6 +202,7 @@ class TestShasum(unittest.TestCase):
     def test_file_modified_mocked(self):
         """Safety: Use mocking to simulate a file change during hashing."""
         from itertools import cycle
+
         # 1. SETUP PHASE (Uses real filesystem)
         name = "mock_test.bin"
         data = b"A" * 1024
@@ -412,7 +414,7 @@ class TestShasum(unittest.TestCase):
         exit_code, out, err = self.run_verify(content, False, "dirty.txt", "sha256")
 
         # 1. Should warn about the '#' in the filename
-        self.assertIn("contained a '#' character", err)
+        self.assertIn('contained a "#" character', err)
         # 2. Should eventually report no files verified (since 'target.txt #...' doesn't exist)
         self.assertIn("no file was verified", err)
         self.assertEqual(exit_code, 1)
@@ -491,6 +493,7 @@ class TestShasum(unittest.TestCase):
 
         # We want Path().resolve() to work for abs_cwd, but fail for target_path
         original_resolve = Path.resolve
+
         def side_effect(self_obj, *args, **kwargs):
             # If resolving 'test.txt', throw the error
             if "test.txt" in str(self_obj):
@@ -559,4 +562,3 @@ if __name__ == "__main__":
     else:
         print("\n\033[1;31mFAILURE: Check logic errors above.\033[0m\n")
         sys.exit(1)
-

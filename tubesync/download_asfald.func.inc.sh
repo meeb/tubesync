@@ -27,19 +27,37 @@ download_asfald() {
 
     case "${1-}" in
         (latest)
-            TMPDIR="$(realpath .)" \
-                ./asfald -o 'asfald-latest' -w -p '${path}/checksums.txt' -- "https://github.com/${owner}/${repo}/releases/latest/download/asfald-${arch}-${os}" && \
-                chmod -v 'a+rx' 'asfald-latest'
-            local latest_version="$(./asfald-latest --version)"
-            test -n "${latest_version}" || return 1
-            local latest_digest="$(./asfald-latest --get-hash "https://github.com/${owner}/${repo}/releases/download/v${latest_version#asfald }/asfald-${arch}-${os}")"
-            verify_digest "${latest_digest}" 'asfald-latest' || return 1
+            local _tmpdir="$(realpath .)"
+            download_gh_release "${owner}" "${repo}" 'checksums.txt' 'latest'
+            local latest_version="${resolved_version}"
+            [[ -n "${latest_version}" ]]
+
+            local download_url="https://github.com/${owner}/${repo}/releases/download"
+
+            local url="${download_url}/${latest_version}/asfald-${arch}-${os}"
+
+            TMPDIR="${_tmpdir}" \
+                ./asfald -q -w -- "${url}" && \
+                "${HERE}/shasum.py" -a 'sha256' 'checksums.txt' && \
+                rm -f 'checksums.txt' && \
+                chmod 'a+rx' "asfald-${arch}-${os}" && \
+                mv -v -f -T "asfald-${arch}-${os}" 'asfald-latest'
+            local latest_digest="$(./asfald-latest --get-hash -- "${url}")"
+            verify_digest "${latest_digest}" 'asfald-latest' || { rm -f './asfald-latest' ; return 1; }
+
+            url="${download_url}/${tag}/asfald-${arch}-${os}"
+            local tag_digest="$(./asfald-latest --get-hash -- "${url}")"
+            verify_digest "${tag_digest}" 'asfald' || { rm -f './asfald' && TMPDIR="${_tmpdir}" ./asfald-latest -qv -o 'asfald' -- "${url}" && chmod 'a+rx' 'asfald' ; }
             ;;
         (*)
+            curl -fsSLo '.mirrored-checksums.txt' -- "${sums_url}"
+            download_gh_release "${owner}" "${repo}" 'checksums.txt' "${tag}"
+
             download_gh_release "${owner}" "${repo}" "asfald-${arch}-${os}" "${tag}" && \
-                curl -sSL -- "${sums_url}" | "${HERE}/shasum.py" -a sha256 - && \
-                mv -v "asfald-${arch}-${os}" 'asfald' && \
-                chmod -v 'a+rx' 'asfald'
+                cat '.mirrored-checksums.txt' 'checksums.txt' | "${HERE}/shasum.py" -a sha256 - && \
+                rm -f '.mirrored-checksums.txt' 'checksums.txt' && \
+                chmod 'a+rx' "asfald-${arch}-${os}" && \
+                mv -v -f -T "asfald-${arch}-${os}" 'asfald'
             ;;
     esac
 

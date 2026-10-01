@@ -46,13 +46,43 @@ download_tailwindcss() {
             ;;
     esac
 
-    TMPDIR="$(realpath .)" ./asfald -o 'tailwindcss' -p '${path}/sha256sums.txt' "https://github.com/${owner}/${repo}/releases/latest/download/${TW_BIN}" && \
-        chmod -v a+rx tailwindcss
-    local latest_version="$(get_tailwindcss_version ./tailwindcss)"
-    test -n "${latest_version}" || return 1
-    local url="https://github.com/${owner}/${repo}/releases/download/v${latest_version}/${TW_BIN}"
-    local latest_digest="$(./asfald-latest --get-hash "${url}")"
-    verify_digest "${latest_digest}" 'tailwindcss' || return 1
+    local fn="${TW_BIN}"
+    local releases_url="https://github.com/${owner}/${repo}/releases"
+    local url="${releases_url}/latest/download/${fn}"
+
+    [[ -n "${fn}" ]]
+
+    # this should never do anything
+    rm -v -f './sha256sums.txt' "./${fn}"*
+
+    # fetch the much smaller manifest first
+    download_gh_release "${owner}" "${repo}" 'sha256sums.txt' 'latest'
+    local latest_version="${resolved_version}"
+    [[ -n "${latest_version}" ]]
+
+    url="${releases_url}/download/${latest_version}/${fn}"
+
+    local latest_digest='' manifest_digest='' _attempt _tmpdir="$(realpath .)"
+    for _attempt in {1..10}; do
+        if [[ -z "${latest_digest}" ]]; then
+            latest_digest="$(./asfald-latest --get-hash -- "${url}" || :)"
+        fi
+        if [[ -z "${manifest_digest}" ]]; then
+            manifest_digest="$(./asfald-latest --get-hash -- "${releases_url}/download/${latest_version}/sha256sums.txt" || :)"
+        fi
+        if ! TMPDIR="${_tmpdir}" ./asfald-latest --quiet --verbose -- "${url}"; then
+            if ! TMPDIR="${_tmpdir}" ./asfald -q -w -o "${fn}" -p '${path}/sha256sums.txt' -- "${url}"; then
+                download_gh_release "${owner}" "${repo}" "${fn}" "${latest_version}"
+            fi
+        fi
+        if [[ -s "./${fn}" ]]; then break; else sleep "${_attempt}"; fi
+    done
+
+    [[ -z "${manifest_digest}" ]] || verify_digest "${manifest_digest}" 'sha256sums.txt' || return 1
+    [[ -z "${latest_digest}" ]] || verify_digest "${latest_digest}" "${fn}" || return 1
+    "${HERE}/shasum.py" -a sha256 './sha256sums.txt' && \
+        chmod 'a+rx' "${fn}" && \
+        mv -v "${fn}" 'tailwindcss'
 }
 
 get_tailwindcss_version() {
@@ -84,8 +114,11 @@ _cleanup() {
 trap '_cleanup' EXIT
 cd "${work_dir}"
 
-download_asfald
-download_asfald latest
+for _attempt in {1..5}; do
+    [[ -x ./asfald ]] || download_asfald
+    download_asfald latest && break
+    sleep "${_attempt}"
+done; unset -v _attempt ;
 
 download_tailwindcss
 install -v -t "${dest_dir}" tailwindcss

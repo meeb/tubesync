@@ -17,8 +17,10 @@ new_tables = {
 }
 sql_statements = db.connection.ops.prepare_sql_script
 
+
 def _(arg_str):
     return str(gettext_lazy(arg_str))
+
 
 def SQLTable(arg_table):
     assert isinstance(arg_table, str), type(arg_table)
@@ -33,12 +35,14 @@ def SQLTable(arg_table):
         raise ValueError(_('Invalid table name'))
     return str(arg_table)
 
+
 def _mk_wrapper():
     return TextIOWrapper(
         BytesIO(),
         line_buffering=True,
         write_through=True,
     )
+
 
 def check_migration_status(migration_str, /, *, needle=None):
     if needle is None:
@@ -63,6 +67,7 @@ def check_migration_status(migration_str, /, *, needle=None):
         stdout_lines,
     )
 
+
 def db_columns(table_str, /):
     columns = list()
     db_gtd = db.connection.introspection.get_table_description
@@ -72,7 +77,6 @@ def db_columns(table_str, /):
 
 
 class Command(BaseCommand):
-
     help = _('Fixes MariaDB database issues')
     output_transaction = True
     requires_migrations_checks = False
@@ -138,12 +142,12 @@ class Command(BaseCommand):
 
         log.info('Start')
 
-
         if options['uuid_columns']:
             if 'uuid' != db.connection.data_types.get('UUIDField', ''):
-                raise CommandError(_(
-                    f'The {display_name} database server does not support UUID columns.'
-                ))
+                msg = _('The {:s} database server does not support UUID columns.')
+                raise CommandError(
+                    msg.format(_(display_name)),
+                )
             uuid_column_type_str = 'uuid(36)'
             both_tables = (
                 self._using_char('sync_source', 'uuid') and
@@ -152,9 +156,10 @@ class Command(BaseCommand):
             if not both_tables:
                 if uuid_column_type_str == self._column_type('sync_source', 'uuid').lower():
                     log.info('The source table is already using a native UUID column.')
-                elif uuid_column_type_str == self._column_type('sync_media', 'uuid').lower():
-                    log.info('The media table is already using a native UUID column.')
-                elif uuid_column_type_str == self._column_type('sync_media', 'source_id').lower():
+                elif (
+                    uuid_column_type_str == self._column_type('sync_media', 'uuid').lower() and
+                    uuid_column_type_str == self._column_type('sync_media', 'source_id').lower()
+                ):
                     log.info('The media table is already using a native UUID column.')
                 else:
                     raise CommandError(_(
@@ -214,9 +219,9 @@ class Command(BaseCommand):
                 )
                 schema.execute(add_fk, None)
 
-
         if table_names:
             # Check that the migration is at an appropriate step
+            # ruff: disable[RUF059]
             at_30, err_30, out_30 = check_migration_status( '0030_alter_source_source_vcodec' )
             at_31, err_31, out_31 = check_migration_status( '0031_metadata_metadataformat' )
             at_31s, err_31s, out_31s = check_migration_status( '0031_squashed_metadata_metadataformat' )
@@ -224,6 +229,7 @@ class Command(BaseCommand):
                 '0031_metadata_metadataformat',
                 needle='Undo Rename table for metadata to sync_media_metadata',
             )
+            # ruff: enable[RUF059]
 
             should_delete = (
                 not (at_31s or after_31) and
@@ -233,7 +239,7 @@ class Command(BaseCommand):
                 raise CommandError(_(
                     'Deleting metadata tables that are in use is not safe!'
                 ))
-            
+
             for table in table_names:
                 schema.execute(
                     schema.sql_delete_table % dict(
@@ -249,7 +255,6 @@ class Command(BaseCommand):
             with db.connection.schema_editor(collect_sql=False) as schema_editor:
                 for sql in schema.collected_sql:
                     schema_editor.execute(sql, None)
-
 
         # All done
         log.info('Done')

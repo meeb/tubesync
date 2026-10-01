@@ -1,0 +1,35 @@
+target-version = "py312"
+
+[format]
+docstring-code-format = false
+indent-style = "space"
+line-ending = "lf"
+quote-style = "single"
+exclude = [
+    "**/migrations/0*.py",
+]
+
+[lint]
+ignore = [
+    "C408", "C409", "C410",
+    "E701", "E722", "E731",
+    "I001",
+    "UP017", "UP018",
+]
+
+[lint.per-file-ignores]
+"healthcheck.py" = ["S110"]
+"shasum_tests.py" = ["RUF059", "SIM117", "UP012"]
+"**/management/commands/*.py" = ["N999"]
+"**/migrations/0*.py" = ["I001", "RUF012"]
+
+[lint.isort]
+known-first-party = ["common", "sync", "tubesync"]
+
+[lint.isort.sections]
+"django" = ["django"]
+"hat" = ["hat"]
+"huey" = ["huey"]
+
+[per-file-target-version]
+"shasum.py" = "py310"

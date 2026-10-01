@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="1.3.1"
+ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="2.0.0"
 ARG FFMPEG_VERSION="N"
-ARG YTDLP_EJS_VERSION="0.3.2"
+ARG YTDLP_EJS_VERSION="0.8.0"
 
 ARG ASFALD_VERSION="0.6.0"
 
@@ -38,13 +38,16 @@ FROM debian:${DEBIAN_VERSION} AS tubesync-prepare-etc
 COPY patches/ /var/tmp/patches/
 RUN --mount=type=tmpfs,target=/cache \
     set -eux && cd /var/tmp/patches/ && \
-    ./fettle.pl --dry-run ./docker/tubesync-base/debconf.diff && \
-    ./fettle.pl ./docker/tubesync-base/debconf.diff && \
-    ./fettle.pl --clean ./docker/tubesync-base/debconf.diff
+    for _df in ./docker/tubesync-base/*.diff ; do \
+        ./fettle.pl --dry-run "${_df}" && \
+        ./fettle.pl "${_df}" && \
+        ./fettle.pl --clean "${_df}" || exit ; \
+    done ; unset -v _df ;
 
 FROM scratch AS tubesync-etc
 
 COPY --from=tubesync-prepare-etc /etc/ /etc/
+COPY --from=tubesync-prepare-etc /usr/share/perl5/Debconf/ /usr/share/perl5/Debconf/
 
 FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
@@ -63,6 +66,8 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     PIP_ROOT_USER_ACTION='ignore'
 
 COPY --from=tubesync-etc /etc/debconf.conf /etc/debconf.conf
+COPY --from=tubesync-etc /usr/share/perl5/Debconf/DbDriver/Copy.pm /usr/share/perl5/Debconf/DbDriver/Copy.pm
+COPY --from=tubesync-etc /usr/share/perl5/Debconf/DbDriver/PackageDir.pm /usr/share/perl5/Debconf/DbDriver/PackageDir.pm
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
@@ -90,6 +95,15 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
     # We must allow these upgrades
     apt-mark unhold libc6 libssl3t64 && \
     apt-get update && \
+    # Include debian-backports.sources for manual use in a container
+    _awk_prog='"Suites:" == $1 && /-security$/ { sub("security", "backports"); print; exit; }' && \
+    _awk_output=$(awk "${_awk_prog}" /etc/apt/sources.list.d/debian.sources) && \
+    printf -- >| /etc/apt/sources.list.d/debian-backports.sources \
+        '%s\n' 'Types: deb' 'URIs: http://deb.debian.org/debian' \
+        "${_awk_output}" \
+        'Components: main' 'Signed-By: /usr/share/keyrings/debian-archive-keyring.pgp' && \
+    unset -v _awk_output _awk_prog && \
+    chmod a+r /etc/apt/sources.list.d/debian-backports.sources && \
     # Install locales
     LC_ALL='C.UTF-8' LANG='C.UTF-8' LANGUAGE='C.UTF-8' \
     apt-get -y --no-install-recommends install locales && \
@@ -491,12 +505,8 @@ RUN --mount=type=bind,source=fontawesome-free,target=/fontawesome-free \
   mv -v /app/tubesync/local_settings.py.container /app/tubesync/local_settings.py
 
 ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION
-ADD "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/archive/refs/tags/${BGUTIL_YTDLP_POT_PROVIDER_VERSION}.tar.gz" /tmp/
-RUN mkdir -v /tmp/extracted && \
-    tar -C /tmp/extracted/ -xvvpf "/tmp/${BGUTIL_YTDLP_POT_PROVIDER_VERSION}.tar.gz" && \
-    mv -v /tmp/extracted/*/server /app/bgutil-ytdlp-pot-provider/ && \
-    ls -alR /app/bgutil-ytdlp-pot-provider && \
-    rm -rf /tmp/extracted
+ADD --checksum=37169ee2656e08c5c2e5dc9df4c598c0cb4c88a8 "https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git#${BGUTIL_YTDLP_POT_PROVIDER_VERSION}:server" /app/bgutil-ytdlp-pot-provider/server
+RUN ls -alR /app/bgutil-ytdlp-pot-provider
 
 ARG YTDLP_EJS_VERSION
 ADD "https://github.com/yt-dlp/ejs/archive/refs/tags/${YTDLP_EJS_VERSION}.tar.gz" /tmp/ejs.tar.gz
@@ -751,6 +761,7 @@ RUN --mount=type=tmpfs,target=/cache \
 
 # Build app
 RUN set -x && \
+  PYTHONDONTWRITEBYTECODE=1 && export PYTHONDONTWRITEBYTECODE && \
   # Record the bundled deno version when it was included
   ( deno_binary="$(command -v deno)" ; \
     test '!' -n "${deno_binary}" || \
@@ -758,10 +769,15 @@ RUN set -x && \
   ) && \
   # Make absolutely sure we didn't accidentally bundle a SQLite dev database
   test '!' -e /app/db.sqlite3 && \
+  # Create /dev/log, using an empty configuration file
+  busybox syslogd -l 7 \
+    -O - -f /etc/s6-overlay/s6-rc.d/busybox-syslogd/dependencies.d/base && \
   # Run any required app commands
   /usr/bin/python3 -B /app/manage.py compilescss && \
   /usr/bin/python3 -B /app/manage.py collectstatic --no-input --link && \
-  rm -rf /config /downloads /run/app && \
+  # Check gunicorn configuration copied from tubesync/tubesync/gunicorn.py
+  gunicorn --config /app/tubesync/gunicorn.py --check-config && \
+  rm -rf /dev/log /config /downloads /run/app && \
   # Create config, downloads and run dirs
   mkdir -v -p /run/app && \
   mkdir -v -p /config/media /config/tasks && \
@@ -783,9 +799,11 @@ HEALTHCHECK --interval=1m --timeout=10s --start-period=3m CMD ["/app/healthcheck
 
 # ENVS and ports
 ENV DENO_DIR="/config/cache/deno" \
+    PYTHON_BASIC_REPL="1" \
     PYTHONPATH="/app" \
     PYTHONPYCACHEPREFIX="/config/cache/pycache" \
     S6_CMD_WAIT_FOR_SERVICES_MAXTIME="0" \
+    SQLITE_TMPDIR="/config/cache" \
     XDG_CACHE_HOME="/config/cache" \
     XDG_CONFIG_HOME="/config/tubesync" \
     XDG_STATE_HOME="/config/state"

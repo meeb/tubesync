@@ -19,9 +19,9 @@ from .metadata import Metadata
 from .metadata_format import MetadataFormat
 from .subtitle import Subtitle
 
+# ruff: ignore[RUF022]
 __all__ = [
     'get_media_file_path', 'get_media_thumb_path',
     'media_file_storage', 'Codec', 'MediaServer', 'Source',
     'Media', 'Metadata', 'MetadataFormat', 'Subtitle',
 ]
-

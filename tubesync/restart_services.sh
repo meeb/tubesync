@@ -31,7 +31,7 @@ fi
 
 for arg in "$@"
 do
-    _svcs="$(only_longruns $(/command/s6-rc -e list "${arg}"))"
+    _svcs="$(only_longruns $(/command/s6-rc-db atomics "${arg}"))"
     for service in $(svc_path ${_svcs})
     do
         printf -- 'Restarting %-28s' "${service#${_dir}/}..."

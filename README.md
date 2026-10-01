@@ -213,44 +213,12 @@ under the "media servers" tab.
 
 # Logging and debugging
 
-TubeSync outputs useful logs, errors and debugging information to the console. Access to the historical and live logs is available from a web browser at: `http://HOSTNAME_OR_IP:4848/web-logs/index.html`
+Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Logging-and-debugging#logging-and-debugging).
 
-> [!TIP]
-> Even more detailed logs are displayed on the console when the environment variable `TUBESYNC_DEBUG` is set to `True`.
-> 
-> Whichever value this environment variable was set to, the more detailed logs will remain available from the `/web-logs/index.html` page.
-
-You can view the console logs with:
-
-```bash
-$ docker logs --follow tubesync
-```
-
-To include logs with an issue report, please extract a file and attach it to the issue.
-The command below creates the `TubeSync.logs.txt` file with the logs from the console of the `tubesync` container instance:
-
-```bash
-docker logs -t tubesync > TubeSync.logs.txt 2>&1
-```
-
-It is also possible to copy the logs database (stored at `/config/state/hat/syslog.db` inside the container) or the web logs from a container instance (stored at `/run/app/log/messages` inside the container) using the [`docker container cp`](https://docs.docker.com/reference/cli/docker/container/cp/) command.
-
-> [!TIP]
-> Log files are highly compressible. You can place any combination of these file into a `.zip` archive to save space and make them easier to attach to an issue.
 
 # Advanced usage guides
 
-Once you're happy using TubeSync there are some advanced usage guides for more complex
-and less common features:
-
- * [Using Plex](https://github.com/meeb/tubesync/blob/main/docs/plex-notes.md)
- * [Import existing media into TubeSync](https://github.com/meeb/tubesync/blob/main/docs/import-existing-media.md)
- * [Sync or create missing metadata files](https://github.com/meeb/tubesync/blob/main/docs/create-missing-metadata.md)
- * [Reset tasks from the command line](https://github.com/meeb/tubesync/blob/main/docs/reset-tasks.md)
- * [Using PostgreSQL, MySQL or MariaDB as database backends](https://github.com/meeb/tubesync/blob/main/docs/other-database-backends.md)
- * [YouTube Proof-of-Origin Tokens](https://github.com/meeb/tubesync/blob/main/docs/youtube-pot.md)
- * [Using cookies](https://github.com/meeb/tubesync/blob/main/docs/using-cookies.md)
- * [Reset metadata](https://github.com/meeb/tubesync/blob/main/docs/reset-metadata.md)
+Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Advanced-usage-guides#advanced-usage-guides).
 
 
 # Warnings
@@ -274,9 +242,11 @@ downloading any media. Check your tasks for the status of your TubeSync install.
 source, if you try to crawl extremely large amounts quickly. **Try to be polite
 with the smallest amount of indexing and concurrent downloads possible for your needs.**
 
+
 # FAQ
 
 Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Frequently-Asked-Questions#faq).
+
 
 # Advanced configuration
 
@@ -297,6 +267,7 @@ useful if you are manually installing TubeSync in some other environment. These 
 | TUBESYNC_DIRECTORY_PREFIX    | Enable `video` and `audio` directory prefixes in `/downloads` | True                                                                          |
 | TUBESYNC_SHRINK_NEW          | Filter unneeded information from newly retrieved metadata     | True                                                                          |
 | TUBESYNC_SHRINK_OLD          | Filter unneeded information from metadata loaded from the database | True                                                                     |
+| TUBESYNC_SAVE_MEDIA_AFTER_BULK_ACTION | Queue a `save_media` task per item changed by an admin bulk action | True                                                |
 | GUNICORN_WORKERS             | Number of `gunicorn` (web request) workers to spawn           | 3                                                                             |
 | LISTEN_HOST                  | IP address for `gunicorn` to listen on                        | 127.0.0.1                                                                     |
 | LISTEN_PORT                  | Port number for `gunicorn` to listen on                       | 8080                                                                          |
@@ -312,14 +283,14 @@ following this rough guide, you are on your own and should be knowledgeable abou
 installing and running WSGI-based Python web applications before attempting this.
 
 1. Clone or download this repo
-2. Make sure you're running a modern version of Python (>=3.10) and have Pipenv
+2. Make sure you're running a modern version of Python (>=3.12) and have Pipenv
    installed
 3. Set up the environment with `pipenv install`
 4. Copy `tubesync/tubesync/local_settings.py.example` to
    `tubesync/tubesync/local_settings.py` and edit it as appropriate
 5. Run migrations with `./manage.py migrate`
 6. Collect static files with `./manage.py collectstatic`
-6. Set up your prefered WSGI server, such as `gunicorn` pointing it to the application
+6. Set up your preferred WSGI server, such as `gunicorn` pointing it to the application
    in `tubesync/tubesync/wsgi.py`
 7. Set up your proxy server such as `nginx` and forward it to the WSGI server
 8. Check the web interface is working

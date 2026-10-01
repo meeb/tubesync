@@ -100,13 +100,23 @@
   </div>
   <div class="col s12 l6">
     <div class="card dashcard">
+      <a href="{% url 'sync:services' %}">
+        <div class="card-content">
+          <div class="center-align">
+            <i class="fa-solid fa-pager fa-4x"></i>
+          </div>
+          <div class="desc truncate">Services</div>
+          <div class="truncate">View details about the state of services</div>
+        </div>
+      </a>
+    </div>
+  </div>
+  <div class="col s12 l6">
+    <div class="card dashcard">
       <a href="/web-logs/index.html">
         <div class="card-content">
           <div class="center-align">
-            <span class="fa-stack fa-2x">
-              <i class="fa-solid fa-database fa-stack-2x"></i>
-              <i class="fa-solid fa-search fa-stack-1x fa-inverse"></i>
-            </span>
+            <i class="fa-solid fa-scroll fa-4x"></i>
           </div>
           <div class="desc truncate">Logs</div>
           <div class="truncate">View, search, and/or filter logs</div>

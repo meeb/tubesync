@@ -20,7 +20,7 @@ class Metadata(db.models.Model):
             ('media', 'site', 'key'),
             ('source', 'site', 'key', ),
         )
-        get_latest_by = ["-retrieved", "-created"]
+        get_latest_by = ("-retrieved", "-created")
 
     uuid = db.models.UUIDField(
         _('uuid'),
@@ -98,7 +98,6 @@ class Metadata(db.models.Model):
         help_text=_('JSON metadata object'),
     )
 
-
     def __str__(self):
         template = '"{}" from {} at: {}'
         return template.format(
@@ -108,9 +107,12 @@ class Metadata(db.models.Model):
         )
 
     @db.transaction.atomic(durable=False)
-    def ingest_formats(self, formats=list(), /):
+    def ingest_formats(self, formats: list, /) -> None:
+        assert isinstance(formats, list), type(formats)
         number = 0
         for number, format in enumerate(formats, start=1):
+            # created never used
+            # ruff: ignore[RUF059]
             mdf, created = self.format.get_or_create(site=self.site, key=self.key, number=number)
             mdf.value = format
             mdf.save()
@@ -162,4 +164,3 @@ class Metadata(db.models.Model):
         self.ingest_formats(formats)
 
         return self.with_formats
-

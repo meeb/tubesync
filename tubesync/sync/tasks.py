@@ -7,23 +7,27 @@
 import os
 import random
 import requests
+import signal
 import time
 import uuid
 from collections import deque as queue
 from io import BytesIO
 from pathlib import Path
 from datetime import timedelta
-from shutil import copyfile, rmtree
+from shutil import rmtree
 from django import db
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from django_huey import lock_task as huey_lock_task, task as huey_task # noqa
+from django_huey import lock_task as huey_lock_task, task as huey_task
 from django_huey import db_periodic_task, db_task, signal as huey_signal
 from huey import crontab as huey_crontab, signals as huey_signals
 from huey.exceptions import TaskLockedException
-from common.huey import CancelExecution, dynamic_retry, register_huey_signals
+from common.huey import (
+    AttemptsTask, BackoffAlgorithm, CancelExecution, DjangoBackgroundTasksBackoff,
+    register_huey_signals,
+)
 from common.logger import log
 from common.models import TaskHistory
 from common.errors import (
@@ -34,13 +38,13 @@ from common.errors import (
 )
 from common.utils import (  django_queryset_generator as qs_gen,
                             remove_enclosed, seconds_to_timestr, )
+from common.yt_dlp import retry_django_db
 from .choices import Val, IndexSchedule, TaskQueue
 from .models import Source, Media, MediaServer, Metadata
 from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
 
 atomic = db.transaction.atomic
-db_vendor = db.connection.vendor
 register_huey_signals()
 
 
@@ -78,6 +82,8 @@ def map_task_to_instance(task):
     task_args = task.task_params
     if len(task_args) != 2:
         return None, None
+    # kwargs never used
+    # ruff: ignore[RUF059]
     args, kwargs = task_args
     if len(args) == 0:
         return None, None
@@ -121,11 +127,9 @@ def update_task_status(task, status):
     else:
         task.verbose_name = f'[{status}] {task._verbose_name}'
     try:
-        task.save(update_fields={'verbose_name'})
+        retry_django_db(3)(task.save)(update_fields={'verbose_name'})
     except db.DatabaseError as e:
-        if 'Save with update_fields did not affect any rows.' == str(e):
-            pass
-        else:
+        if 'Save with update_fields did not affect any rows.' != str(e):
             raise
     return True
 
@@ -148,12 +152,14 @@ def get_model_tasks(model_pk, /, name=None, qs=None):
     #return qs.filter(task_params__0__0=model_pk)
     return qs.filter(task_params__istartswith=f'[["{model_pk}"')
 
+
 def get_running_tasks(arg_dt=None, /):
     max_run_time = getattr(settings, 'MAX_RUN_TIME', 3600)
     return TaskHistory.objects.running(
         now=arg_dt,
         within=timezone.timedelta(seconds=max_run_time),
     )
+
 
 def get_running_tasks_by_name(arg_str, instance_id, /):
     name = arg_str
@@ -162,17 +168,20 @@ def get_running_tasks_by_name(arg_str, instance_id, /):
     tqs = get_model_tasks(instance_id, qs=get_running_tasks())
     return tqs.filter(name=name)
 
+
 def get_media_download_task(media_id):
     tqs = get_running_tasks_by_name('download_media_file', media_id)
-    return tqs[0] if tqs.count() else False
-    
+    return tqs.first() or False
+
+
 def get_media_thumbnail_task(media_id):
     tqs = get_running_tasks_by_name('download_media_image', media_id)
-    return tqs[0] if tqs.count() else False
+    return tqs.first() or False
+
 
 def get_source_index_task(source_id):
     tqs = get_running_tasks_by_name('index_source', source_id)
-    return tqs[0] if tqs.count() else False
+    return tqs.first() or False
 
 
 def get_tasks(task_name, id=None, /, instance=None):
@@ -180,9 +189,11 @@ def get_tasks(task_name, id=None, /, instance=None):
     arg = str(id or instance.pk)
     return get_running_tasks_by_name(str(task_name), arg)
 
+
 def get_first_task(task_name, id=None, /, *, instance=None):
     tqs = get_tasks(task_name, id, instance).order_by('scheduled_at')
-    return tqs[0] if tqs.count() else False
+    return tqs.first() or False
+
 
 def get_media_metadata_task(media_id):
     return get_first_task('sync.tasks.download_media_metadata', media_id)
@@ -196,10 +207,11 @@ def cleanup_completed_tasks():
     TaskHistory.objects.filter(end_at__lt=delta).delete()
 
 
+@retry_django_db(3)
 def save_model(instance):
     with atomic(durable=False):
         instance.save()
-    if 'sqlite' != db_vendor:
+    if 'sqlite' != db.connection.vendor:
         return
 
     # work around for SQLite and its many
@@ -208,11 +220,33 @@ def save_model(instance):
     time.sleep(random.expovariate(arg))
 
 
+@retry_django_db(3)
 def update_model(instance, **kwargs):
     qs = instance.__class__.objects.all()
     return qs.filter(
         pk=instance.pk,
     ).update(**kwargs)
+
+
+@db_periodic_task(
+    huey_crontab(minute=29, strict=True,),
+    priority=10,
+    expires=10*60,
+    queue=Val(TaskQueue.DB),
+)
+def delete_deleted_sources():
+    now = timezone.now()
+    end_time = now + timezone.timedelta(minutes=5)
+    qs = Source.objects.filter(
+        key__endswith='/deleted',
+    )
+    for source in qs_gen(qs):
+        if timezone.now() > end_time:
+            log.info('delete_deleted_sources: beyond end_time')
+            return
+        log.info(f'Deleting: {source.pk}')
+        result = source.delete()
+        log.debug(f'Result: {result!r}')
 
 
 @db_periodic_task(
@@ -271,7 +305,6 @@ def schedule_indexing():
         except QuerySetEmptyError as e:
             msg = f'missing media from "{source.name}": {source.pk}: {e.key}'
             log.exception(msg, exc_info=e)
-            pass
         # schedule a new indexing task
         log.info(f'Scheduling an indexing task for source "{source.name}": {source.pk}')
         TaskHistory.schedule(
@@ -289,15 +322,19 @@ def schedule_media_servers_update():
     # Schedule a task to update media servers
     log.info('Scheduling media server updates')
     for mediaserver in MediaServer.objects.all():
-        rescan_media_server(str(mediaserver.pk))
+        rescan_media_server(
+            str(mediaserver.pk),
+            delay=rescan_media_server.settings.get('delay'),
+        )
 
 
 def contains_http429(q, task_id, /):
     from huey.exceptions import TaskException
+
     try:
         q.result(preserve=True, id=task_id)
     except TaskException as e:
-        return True if 'HTTPError 429: Too Many Requests' in str(e) else False
+        return 'HTTPError 429: Too Many Requests' in str(e)
     return False
 
 
@@ -320,6 +357,7 @@ def wait_for_errors(model, /, *, queue_name=None, task_name=None):
     total_count = int()
     if queue_name:
         from django_huey import get_queue
+
         q = get_queue(queue_name)
         total_count += sum([ 1 if contains_http429(q, k) else 0 for k in q.all_results() ])
     delay = 10 * total_count
@@ -340,8 +378,10 @@ def wait_for_errors(model, /, *, queue_name=None, task_name=None):
         raise HueyConsumerError(_('queue consumer stopped'))
 
 
-@db_task(priority=90, queue=Val(TaskQueue.FS))
+@db_task(priority=90, retries=2, retry_delay=150, queue=Val(TaskQueue.FS))
+@huey_lock_task('sync.tasks.cleanup_old_media', queue=Val(TaskQueue.FS))
 def cleanup_old_media(durable=True):
+    found_locked_media = False
     with atomic(durable=durable):
         for source in qs_gen(Source.objects.filter(delete_old_media=True, days_to_keep__gt=0)):
             delta = timezone.now() - timedelta(days=source.days_to_keep)
@@ -352,13 +392,29 @@ def cleanup_old_media(durable=True):
                 download_date__lt=delta,
             )
             for media in qs_gen(mqs):
-                log.info(f'Deleting expired media: {source} / {media} '
-                         f'(now older than {source.days_to_keep} days / '
-                         f'download_date before {delta})')
-                with atomic(durable=False):
-                    # .delete() also triggers a pre_delete/post_delete signals that remove files
-                    media.delete()
+                try:
+                    with (
+                        huey_lock_task(
+                            f'index_media:{media.uuid}',
+                            queue=Val(TaskQueue.FS),
+                        ),
+                        huey_lock_task(
+                            f'media:{media.uuid}',
+                            queue=Val(TaskQueue.DB),
+                        ),
+                        atomic(durable=False),
+                    ):
+                        log.info(f'Deleting expired media: {source} / {media} '
+                                 f'(now older than {source.days_to_keep} days / '
+                                 f'download_date before {delta})')
+                        # .delete() also triggers a pre_delete/post_delete signals that remove files
+                        media.delete()
+                except TaskLockedException:
+                    found_locked_media = True
+                    continue
     schedule_media_servers_update()
+    if found_locked_media:
+        raise CancelExecution(_('some media was locked'), retry=True)
 
 
 @db_task(priority=90, queue=Val(TaskQueue.FS))
@@ -380,26 +436,40 @@ def cleanup_removed_media(source_id, video_keys):
         for media in qs_gen(mqs):
             if media.key not in video_keys:
                 log.info(f'{media.name} is no longer in source, removing')
-                with atomic(durable=False):
-                    media.delete()
+                try:
+                    with (
+                        huey_lock_task(
+                            f'index_media:{media.uuid}',
+                            queue=Val(TaskQueue.FS),
+                        ),
+                        huey_lock_task(
+                            f'media:{media.uuid}',
+                            queue=Val(TaskQueue.DB),
+                        ),
+                        atomic(durable=False),
+                    ):
+                        media.delete()
+                except TaskLockedException:
+                    delete_media(
+                        str(media.pk),
+                        delay=delete_media.settings.get('delay'),
+                    )
+                    continue
     schedule_media_servers_update()
 
 
 def save_db_batch(qs, objs, fields, /):
-    assert hasattr(qs, 'bulk_update')
-    assert callable(qs.bulk_update)
-    assert hasattr(objs, '__len__')
-    assert callable(objs.__len__)
+    assert callable(getattr(qs, 'bulk_update', False))
+    assert callable(getattr(objs, '__len__', False))
     assert isinstance(fields, (tuple, list, set, frozenset))
 
     num_updated = 0
     num_objs = len(objs)
     with atomic(durable=False):
         num_updated = qs.bulk_update(objs=objs, fields=fields)
-    if num_objs == num_updated:
+    if num_objs == num_updated and callable(func := getattr(objs, 'clear', False)):
         # this covers at least: list, set, deque
-        if hasattr(objs, 'clear') and callable(objs.clear):
-            objs.clear()
+        func()
     return num_updated
 
 
@@ -447,6 +517,8 @@ def migrate_to_metadata(media_id):
                 if existing_value and ('epoch' == key or value == existing_value):
                     continue
                 media.save_to_metadata(field, value)
+        # clean up the record created during indexing
+        data.delete()
     migrating_lock.acquired = False
 
 
@@ -475,6 +547,7 @@ def index_source(source_id):
     if not indexing_lock.acquired:
         indexing_lock.acquired = True
     # update the target schedule column
+    # ruff: ignore[B018]
     source.task_run_at_dt
     update_model(source, target_schedule=source.target_schedule)
     # Reset any errors
@@ -557,6 +630,8 @@ def index_source(source_id):
             *db_fields_media,
         ).get_or_create(defaults=media_defaults, source=source, key=key)
         db_batch_media.append(media)
+        # new_data returned from get_or_create never used
+        # ruff: ignore[RUF059]
         data, new_data = source.videos.defer('value').filter(
             media__isnull=True,
         ).get_or_create(source=source, key=key)
@@ -571,7 +646,10 @@ def index_source(source_id):
         )
         if not migrating_lock.acquired:
             migrating_lock.acquired = True
-        migrate_to_metadata(str(media.pk))
+        migrate_to_metadata(
+            str(media.pk),
+            delay=migrate_to_metadata.settings.get('delay'),
+        )
         if not new_media:
             # update the existing media
             for key, value in media_defaults.items():
@@ -580,18 +658,6 @@ def index_source(source_id):
         else:
             # log the new media instances
             log.info(f'Indexed new media: {source} / {media}')
-            log.info(f'Scheduling tasks to download thumbnail for: {media.key}')
-            thumbnail_fmt = 'https://i.ytimg.com/vi/{}/{}default.jpg'
-            for num, prefix in enumerate(reversed(('hq', 'sd', 'maxres',))):
-                thumbnail_url = thumbnail_fmt.format(
-                    media.key,
-                    prefix,
-                )
-                download_media_image.schedule(
-                    (str(media.pk), thumbnail_url,),
-                    priority=10+(5*num),
-                    delay=65-(30*num),
-                )
             priority = download_media_metadata.settings.get('default_priority', 50)
             if source.download_media:
                 priority += 5
@@ -604,6 +670,13 @@ def index_source(source_id):
                 priority=priority,
                 remove_duplicates=True,
                 vn_fmt=_('Downloading metadata for: "{}": {}'),
+                vn_args=(media.key, media.name,),
+            )
+            TaskHistory.schedule(
+                download_media_thumbnails,
+                str(media.pk),
+                remove_duplicates=True,
+                vn_fmt=_('Downloading thumbnails for: "{}": {}'),
                 vn_args=(media.key, media.name,),
             )
     # Reset task.verbose_name to the saved value
@@ -632,7 +705,7 @@ def index_source(source_id):
     return True
 
 
-@dynamic_retry(db_task, priority=100, retries=15, queue=Val(TaskQueue.FS))
+@db_task(priority=100, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.FS))
 def check_source_directory_exists(source_id):
     '''
         Checks the output directory for a source exists and is writable, if it does
@@ -651,7 +724,7 @@ def check_source_directory_exists(source_id):
         source.make_directory()
 
 
-@dynamic_retry(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.NET))
+@db_task(delay=10, priority=90, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.LIMIT))
 def download_source_images(source_id):
     '''
         Downloads an image and save it as a local thumbnail attached to a
@@ -664,7 +737,17 @@ def download_source_images(source_id):
         log.error(f'Task download_source_images(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
         raise CancelExecution(_('no such source'), retry=False) from e
-    avatar, banner, thumbnail = source.get_image_url
+    keys = list()
+    if source.index_videos:
+        keys.append(source.get_index_url('videos'))
+    if not source.is_playlist and source.index_streams:
+        keys.append(source.get_index_url('streams'))
+    qs = source.videos.filter(media__isnull=True, key__in=keys)
+    if not qs.exists():
+        raise CancelExecution(_('data not yet available'))
+    avatar, banner, thumbnail = source.get_image_urls(qs)
+    if not any((avatar, banner, thumbnail)):
+        raise CancelExecution(_('data not yet available'))
     log.info(f'Thumbnail URL for source with ID: {source_id} / {source} '
         f'Avatar: {avatar} '
         f'Banner: {banner} '
@@ -708,6 +791,13 @@ def delete_media(media_id):
             f'media:{media.uuid}',
             queue=Val(TaskQueue.DB),
         ):
+            # remove thumbnail from storage
+            if media.thumb_file_exists:
+                # copy it before its gone
+                if media.media_file_exists:
+                    media.copy_thumbnail()
+                media.thumb.delete(save=False)
+            # intentionally not removing downloaded file here
             media.delete()
 
 
@@ -778,6 +868,7 @@ def upgrade_media(media_id):
             raise CancelExecution(_('downloaded media is better'))
         download_media_file.call_local(str(media.pk), override=True)
 
+
 @db_task(delay=60, priority=60, retries=3, retry_delay=600, queue=Val(TaskQueue.LIMIT))
 def download_media_metadata(media_id):
     '''
@@ -817,28 +908,28 @@ def download_media_metadata(media_id):
             now = timezone.now()
             published_datetime = None
 
-            parts = e_str.split(': ', 1)[1].rsplit(' ', 2)
-            unit = lambda p: str(p[-1]).lower()
-            number = lambda p: int(str(p[-2]), base=10)
-            log.debug(parts)
             try:
-                if 'days' == unit(parts):
-                    published_datetime = now + timedelta(days=number(parts))
-                if 'hours' == unit(parts):
-                    published_datetime = now + timedelta(hours=number(parts))
-                if 'minutes' == unit(parts):
-                    published_datetime = now + timedelta(minutes=number(parts))
-                log.debug(unit(parts))
-                log.debug(number(parts))
-            except Exception as ee:
-                log.exception(ee)
-                pass
+                parts = e_str.split(': ', 1)[1].rsplit(' ', 2)
+                log.debug(parts)
+                unit = parts[-1].lower()
+                log.debug(unit)
+                number = lambda p: int(str(p[-2]), base=10)
 
-            if published_datetime:
-                media.published = published_datetime
-                media.manual_skip = True
-                media.save()
-                raise_exception = False
+                if 'days' == unit:
+                    published_datetime = now + timedelta(days=number(parts))
+                if 'hours' == unit:
+                    published_datetime = now + timedelta(hours=number(parts))
+                if 'minutes' == unit:
+                    published_datetime = now + timedelta(minutes=number(parts))
+                if published_datetime:
+                    log.debug(number(parts))
+                    media.published = published_datetime
+                    media.manual_skip = True
+                    save_model(media)
+                    raise_exception = False
+            except (ValueError, IndexError, OverflowError):
+                log.exception('could not assign published_datetime')
+
         if raise_exception:
             raise
         log.debug(str(e))
@@ -855,18 +946,21 @@ def download_media_metadata(media_id):
     upload_date = media.upload_date
     # Media must have a valid upload date
     if upload_date:
-        media.published = timezone.make_aware(upload_date)
+        media.published = upload_date
     timestamp = media.get_metadata_first_value(
         ('release_timestamp', 'timestamp',),
         arg_dict=response,
     )
-    try:
-        published_dt = media.ts_to_dt(timestamp)
-    except AssertionError:
-        pass
-    else:
-        if published_dt:
-            media.published = published_dt
+    if timestamp:
+        try:
+            published_dt = media.ts_to_dt(timestamp)
+        except AssertionError:
+            pass
+        else:
+            if published_dt:
+                media.published = published_dt
+    if timezone.is_naive(media.published):
+        media.published = timezone.make_aware(media.published)
 
     # Store title in DB so it's fast to access
     if media.metadata_title:
@@ -878,7 +972,8 @@ def download_media_metadata(media_id):
 
     # Don't filter media here, the post_save signal will handle that
     try:
-        media.save()
+        save_model(media)
+    # ruff: ignore[TRY203]
     except Exception:
         raise
     else:
@@ -888,7 +983,7 @@ def download_media_metadata(media_id):
         metadata_lock.acquired = False
 
 
-@dynamic_retry(db_task, delay=10, priority=90, retries=15, queue=Val(TaskQueue.NET))
+@db_task(delay=10, priority=80, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.NET))
 def download_media_image(media_id, url):
     '''
         Downloads an image from a URL and save it as a local thumbnail attached to a
@@ -923,28 +1018,26 @@ def download_media_image(media_id, url):
     image_file = BytesIO()
     i.save(image_file, 'JPEG', quality=85, optimize=True, progressive=True)
     image_file.seek(0)
-    media.thumb.save(
+    thumbnail_bytes = image_file.read()
+    i = image_file = None
+    if media.thumb_file_exists:
+        media.thumb.delete(save=False)
+    retry_django_db(3)(media.thumb.save)(
         'thumb',
         SimpleUploadedFile(
             'thumb',
-            image_file.read(),
+            thumbnail_bytes,
             'image/jpeg',
         ),
         save=True
     )
-    i = image_file = None
+    thumbnail_bytes = None
     log.info(f'Saved thumbnail for: {media} from: {url}')
     # After media is downloaded, copy the updated thumbnail.
-    copy_thumbnail = (
-        media.downloaded and
-        media.source.copy_thumbnails and
-        media.thumb_file_exists
-    )
-    if copy_thumbnail:
-        log.info(f'Copying media thumbnail from: {media.thumb.path} '
-                 f'to: {media.thumbpath}')
-        copyfile(media.thumb.path, media.thumbpath)        
+    if media.downloaded and media.thumb_file_exists:
+        media.copy_thumbnail()
     return True
+
 
 @huey_signal(huey_signals.SIGNAL_COMPLETE, queue=Val(TaskQueue.NET))
 def on_complete_download_media_image(signal_name, task_obj, exception_obj=None, /, *, huey=None):
@@ -957,8 +1050,9 @@ def on_complete_download_media_image(signal_name, task_obj, exception_obj=None, 
     if result is False or result is True:
         huey.result(preserve=False, id=task_obj.id)
 
-@db_task(delay=60, priority=70, queue=Val(TaskQueue.LIMIT))
-def download_media_file(media_id, override=False):
+
+@db_task(delay=60, priority=70, timeout=max(0, settings.MAX_RUN_TIME-600), context=True, queue=Val(TaskQueue.LIMIT))
+def download_media_file(media_id, override=False, *, task=None):
     '''
         Downloads the media to disk and attaches it to the Media instance.
     '''
@@ -984,6 +1078,19 @@ def download_media_file(media_id, override=False):
         filepath = media.filepath
         container = format_str = None
         log.info(f'Downloading media: {media} (UUID: {media.pk}) to: "{filepath}"')
+        worker_pid = os.getpid()
+        msg = (
+            f'Ended process: {worker_pid}. '
+            f'Downloading media: {media} (UUID: {media.pk}) took longer than MAX_RUN_TIME '
+            f'({terminate_queue_worker.settings.get('delay', 0)})'
+        )
+        watchdog_result = terminate_queue_worker(
+            str(media.pk),
+            worker_pid,
+            Val(TaskQueue.LIMIT),
+            msg,
+            delay=terminate_queue_worker.settings.get('delay', 60 * 60),
+        )
         try:
             format_str, container = media.download_media()
         except FormatUnavailableError as e:
@@ -1024,15 +1131,53 @@ def download_media_file(media_id, override=False):
 
             # Media has been downloaded successfully
             media.download_finished(format_str, container, filepath)
-            media.save()
+            save_model(media)
             media.rename_files()
             media.copy_thumbnail()
             media.write_nfo_file()
             # Try to download a better format later, if the settings allow this
             if getattr(settings, 'VIDEO_HEIGHT_UPGRADE', False):
-                upgrade_media(str(media.pk))
+                upgrade_media(
+                    str(media.pk),
+                    delay=upgrade_media.settings.get('delay'),
+                )
             # Schedule a task to update media servers
             schedule_media_servers_update()
+        finally:
+            watchdog_result.revoke()
+            try:
+                task = TaskHistory.objects.get(task_id=watchdog_result.id)
+            except TaskHistory.DoesNotExist:
+                pass
+            else:
+                if watchdog_result.is_revoked():
+                    default_verbose_name = f'{task.name}: {task.task_id}'
+                    update_model(
+                        task,
+                        verbose_name=f'[revoked] {task.verbose_name or default_verbose_name}',
+                    )
+
+
+@db_task(priority=90, retries=5, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.NET))
+def download_media_thumbnails(media_id):
+    try:
+        media = Media.objects.get(pk=media_id)
+    except Media.DoesNotExist as e:
+        # Task triggered but the media no longer exists, do nothing
+        raise CancelExecution(_('no such media'), retry=False) from e
+    if media.thumb_file_exists:
+        raise CancelExecution(_('thumbnail exists already'), retry=False)
+    selected_thumbnail = media.download_thumbnails()
+    if selected_thumbnail is not None:
+        selected_thumbnail = Path(selected_thumbnail)
+        log.info(f'Selected thumbnail file {selected_thumbnail.name} for: {media.key}')
+        try:
+            temp_dir = selected_thumbnail.resolve(strict=True).parent
+        except FileNotFoundError:
+            pass
+        else:
+            if '-thumbnails-' in temp_dir.name:
+                rmtree(temp_dir, True)
 
 
 @db_task(delay=30, expires=210, priority=100, queue=Val(TaskQueue.NET))
@@ -1050,7 +1195,52 @@ def rescan_media_server(mediaserver_id):
     mediaserver.update()
 
 
-@dynamic_retry(db_task, backoff_func=lambda n: (n*3600)+600, priority=50, retries=15, queue=Val(TaskQueue.LIMIT))
+@huey_task(delay=settings.MAX_RUN_TIME, expires=3600, priority=20, queue=Val(TaskQueue.NET))
+def terminate_queue_worker(media_id, worker_pid, queue, log_message):
+    proc_cmdline_path = Path(f'/proc/{worker_pid}/cmdline')
+    try:
+        os.kill(worker_pid, 0)
+        if not proc_cmdline_path.exists():
+            return
+        raw_bytes = proc_cmdline_path.read_bytes()
+    except OSError:
+        log.exception('[Watchdog] Failed to read /proc command line')
+    else:
+        try:
+            decoded_string = raw_bytes.replace(b'\x00', b'\x20').decode('utf-8')
+        except UnicodeDecodeError:
+            log.exception('[Watchdog] Failed decoding process command line payload')
+        else:
+            needles = ('djangohuey', f'--queue {queue}',)
+            haystack = decoded_string.rstrip(' ')
+            if haystack.endswith(needles[-1]) and all( needle in haystack for needle in needles ):
+                try:
+                    os.kill(worker_pid, signal.SIGKILL)
+                except OSError:
+                    log.exception('[Watchdog] Failed to kill: %d', worker_pid)
+                else:
+                    log.warning('[Watchdog] %s', log_message)
+                    # clear the media lock
+                    huey_lock_task(
+                        f'media:{media_id}',
+                        queue=Val(TaskQueue.DB),
+                    ).clear()
+            else:
+                log.error(
+                    '[Watchdog] Refusing kill: PID %d was recycled by another process. '
+                    'Target media: %s Command line: "%s"',
+                    worker_pid, media_id, haystack,
+                )
+
+
+class RefreshFormatsBackoff(BackoffAlgorithm):
+    key = 'sync.tasks.refresh_formats'
+
+    @staticmethod
+    def calculate(attempt: int) -> int:
+        return 600 + (3600 * attempt)
+
+@db_task(priority=50, retries=15, backoff_class=RefreshFormatsBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.LIMIT))
 def refresh_formats(media_id):
     try:
         media = Media.objects.get(pk=media_id)
@@ -1084,7 +1274,7 @@ def refresh_formats(media_id):
             raise exc
         # the metadata has already been saved, trigger the post_save signal
         log.info(f'Saving refreshed formats for "{media.key}": {msg}')
-        media.save()
+        save_model(media)
 
 
 @db_task(delay=300, priority=80, retries=5, retry_delay=600, queue=Val(TaskQueue.FS))
@@ -1098,7 +1288,7 @@ def rename_all_media_for_source(source_id):
                   f'source exists with ID: {source_id}')
         raise CancelExecution(_('no such source'), retry=False) from e
     # Check that the settings allow renaming
-    rename_sources_setting = getattr(settings, 'RENAME_SOURCES') or list()
+    rename_sources_setting = getattr(settings, 'RENAME_SOURCES', None) or tuple()
     create_rename_tasks = (
         (
             source.directory and
@@ -1113,26 +1303,29 @@ def rename_all_media_for_source(source_id):
         downloaded=True,
     )
     for media in qs_gen(mqs):
-        migrating_lock = huey_lock_task(
-            f'index_media:{media.uuid}',
-            queue=Val(TaskQueue.FS),
-        )
-        if migrating_lock.acquired:
-            # good luck to you in the queue!
-            rename_media(str(media.pk))
-            continue
         try:
-            with huey_lock_task(
-                f'media:{media.uuid}',
-                queue=Val(TaskQueue.DB),
+            with (
+                huey_lock_task(
+                    f'index_media:{media.uuid}',
+                    queue=Val(TaskQueue.FS),
+                ),
+                huey_lock_task(
+                    f'media:{media.uuid}',
+                    queue=Val(TaskQueue.DB),
+                ),
+                atomic(durable=False),
             ):
-                with atomic(durable=False):
-                    media.rename_files()
+                media.rename_files()
         except TaskLockedException:
-            rename_media(str(media.pk))
+            # good luck to you in the queue!
+            rename_media(
+                str(media.pk),
+                delay=rename_media.settings.get('delay'),
+            )
+            continue
 
 
-@dynamic_retry(db_task, delay=600, priority=70, retries=15, queue=Val(TaskQueue.FS))
+@db_task(delay=600, priority=70, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.FS))
 @huey_lock_task('sync.tasks.save_all_media_for_source', queue=Val(TaskQueue.FS))
 def save_all_media_for_source(source_id):
     '''
@@ -1198,6 +1391,7 @@ def save_all_media_for_source(source_id):
         for media in qs_gen(save_qs)
         if str(media.pk) not in saved_later
     }
+    # no delay for these tasks
     save_media.map(saved_now)
 
     TaskHistory.schedule(
@@ -1209,7 +1403,7 @@ def save_all_media_for_source(source_id):
     )
 
 
-@dynamic_retry(db_task, delay=90, priority=99, queue=Val(TaskQueue.FS))
+@db_task(delay=90, priority=99, queue=Val(TaskQueue.FS))
 def delete_all_media_for_source(source_id, source_name, source_directory):
     source = None
     assert source_id
@@ -1221,32 +1415,62 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
         # Task triggered but the source no longer exists, do nothing
         log.warning(f'Task delete_all_media_for_source(pk={source_id}) called but no '
                   f'source exists with ID: {source_id}')
-        #raise CancelExecution(_('no such source'), retry=False) from e
-        pass # this task can run after a source was deleted
-    mqs = Media.objects.all().defer(
-        'metadata',
-    ).filter(
-        source=source or source_id,
-    )
-    delete_media.map({
-        str(media.pk)
-        for media in qs_gen(mqs)
-    })
-    with atomic(durable=True):
-        mqs.update(manual_skip=True, skip=True)
-        log.info(f'Deleting media for source: {source_name}')
-        mqs.delete()
-    # Remove the directory, if the user requested that
+        # this task can run after a source was deleted
+    else:
+        source_lock = huey_lock_task(
+            f'source:{source.uuid}',
+            queue=Val(TaskQueue.FS),
+        )
+        if source_lock.acquired:
+            raise CancelExecution(_('already locked'), retry=True)
+        source_lock.acquired = True
+        update_model(
+            source,
+            key = source.key + '/deleted',
+            name = f'[Deleting] {source.name}',
+        )
     directory_path = Path(source_directory)
     remove = (
         (source and source.delete_removed_media) or
         (directory_path / '.to_be_removed').is_file()
     )
-    if source:
+    mqs = Media.objects.all().defer(
+        'metadata',
+    ).filter(
+        source=source or source_id,
+    )
+
+    for media in qs_gen(mqs):
+        # remove thumbnail from storage
+        if media.thumb_file_exists:
+            # copy it before its gone
+            if media.media_file_exists:
+                media.copy_thumbnail()
+            media.thumb.delete(save=False)
+        # if requested, remove download from storage
+        if remove and media.media_file_exists:
+            media.media_file.delete(save=False)
+        # no delay for these tasks
+        delete_media(str(media.pk))
+
+    try:
         with atomic(durable=True):
-            source.delete()
+            mqs.update(manual_skip=True, skip=True)
+            log.info(f'Deleting media for source: {source_name}')
+            mqs.delete()
+        if source:
+            try:
+                source = Source.objects.get(uuid=source.uuid)
+            except Source.DoesNotExist:
+                source = False
+            else:
+                with atomic(durable=True):
+                    source.delete()
+                    source = False
+    finally:
+        if source is not None:
+            source_lock.acquired = False
+    # Remove the directory, if the user requested that
     if remove:
         log.info(f'Deleting directory for: {source_name}: {directory_path}')
         rmtree(directory_path, True)
-
-

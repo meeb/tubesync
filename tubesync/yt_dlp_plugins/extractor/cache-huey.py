@@ -45,10 +45,9 @@ class TubeSyncHueyPCP(PoTokenCacheProvider):
             huey = get_queue(str(self.HUEY_QUEUE_NAME))
         except KeyError:
             self.logger.error(f'no such queue: {self.HUEY_QUEUE_NAME}')
-            pass
+        # ruff: ignore[BLE001]
         except Exception as exc:
             self.logger.debug(str(exc))
-            pass
         else:
             self.huey = huey
             return True

@@ -1,7 +1,7 @@
 from django import VERSION as DJANGO_VERSION
 from pathlib import Path
 from common.huey import sqlite_tasks
-from common.logs import syslog
+from common.logs import level_from_environment, syslog
 from common.utils import getenv
 from sync.choices import TaskQueue
 
@@ -11,7 +11,7 @@ CONFIG_BASE_DIR = BASE_DIR
 DOWNLOADS_BASE_DIR = BASE_DIR
 
 
-VERSION = '0.18.0'
+VERSION = '0.18.4'
 DEBUG = 'true' == getenv('TUBESYNC_DEBUG').strip().lower()
 ALLOWED_HOSTS = []
 # This is not ever meant to be a public web interface so this isn't too critical
@@ -113,7 +113,7 @@ LOGGING = {
         'default': {},
         'syslog': {
             'format': '%(asctime)s %(name)s: %(message)s',
-            'datefmt': '%b %d %H:%M:%S',
+            'datefmt': '%b %e %H:%M:%S',
         },
         'common': {
             'format':  '%(asctime)s [%(name)s/%(levelname)s] %(message)s',
@@ -159,7 +159,7 @@ LOGGING = {
         },
         'stderr': {
             'class': 'logging.StreamHandler',
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': 'DEBUG' if DEBUG else level_from_environment('TUBESYNC_LOG_LEVEL', 'INFO'),
             'formatter': 'common',
         },
         'stderr_worker_process': {
@@ -376,12 +376,17 @@ YOUTUBE_DEFAULTS = {
         'youtubepot-bgutilhttp': {
             'base_url': ['http://127.0.0.1:4416'],
         },
+        'youtubepot-bgutilscript': {
+            'server_home': ['/app/bgutil-ytdlp-pot-provider/server'],
+        },
     },
     'postprocessor_args': {
         'videoremuxer+ffmpeg': ['-bsf:v', 'setts=pts=DTS'],
+        'merger+ffmpeg': ['-bsf', 'setts=ts=TS-STARTPTS'],
     },
     'js_runtimes': {
         'deno': {'path': None,},
+        'node': {'path': '/usr/bin',},
         'quickjs': {'path': None,},
     },
 }
@@ -391,6 +396,12 @@ YOUTUBE_INFO_SLEEP_REQUESTS = 1
 
 RENAME_ALL_SOURCES = True
 RENAME_SOURCES = list()
+
+
+# When True, admin bulk actions on Media queue a `save_media` task for each
+# changed item so flags are re-evaluated without waiting for the next source
+# edit or indexing run
+SAVE_MEDIA_AFTER_BULK_ACTION = False
 
 
 # An example for changing the ordering for audio tracks.
@@ -411,9 +422,10 @@ RENAME_SOURCES = list()
 # You have been warned!
 
 try:
-    from .local_settings import * # noqa
+    from .local_settings import *
 except ImportError as e:
     import sys
+
     sys.stderr.write(f'Unable to import local_settings: {e}\n')
     sys.exit(1)
 
@@ -426,8 +438,7 @@ except:
     MAX_RUN_TIME = 3600
 
 # Tasks scheduled with `background_task` need a chance to finish
-if MAX_RUN_TIME < 600:
-    MAX_RUN_TIME = 600
+MAX_RUN_TIME = max(600, MAX_RUN_TIME)
 
 DOWNLOAD_MEDIA_DELAY = 1 + round(MAX_RUN_TIME / 100)
 
@@ -477,6 +488,5 @@ DEFAULT_ENGLISH_LCO = (
     'eng',      # 39. Standard 3-letter fallback (ISO 639-2)
 )
 
-
-from .dbutils import patch_ensure_connection # noqa
-patch_ensure_connection()
+if 'patch_ensure_connection' in locals() and callable(patch_ensure_connection):
+    patch_ensure_connection()
