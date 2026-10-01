@@ -545,6 +545,7 @@ def register_huey_signals():
         def _target():
             try:
                 prune_queue_storage(qn)
+            # ruff: ignore[BLE001]
             except Exception:
                 from common.logger import log
                 log.exception(f'Cleanup of {qn=} failed.')
