@@ -1,10 +1,14 @@
 import uuid
-from common.json_encoder import JSONEncoder
-from common.timestamp import timestamp_to_datetime
-from common.utils import django_queryset_generator as qs_gen
+
 from django import db
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+from common.json_encoder import JSONEncoder
+from common.timestamp import timestamp_to_datetime
+from common.utils import django_queryset_generator as qs_gen
+from common.yt_dlp import eager_list
+
 from .media import Media, Source
 
 
@@ -161,6 +165,6 @@ class Metadata(db.models.Model):
             self.media.created,
         )
         self.save()
-        self.ingest_formats(formats)
+        self.ingest_formats(eager_list(formats))
 
         return self.with_formats
