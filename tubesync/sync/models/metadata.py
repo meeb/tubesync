@@ -161,6 +161,9 @@ class Metadata(db.models.Model):
             self.media.created,
         )
         self.save()
+        # convert yt_dlp.utils.LazyList to a list using its method
+        if callable(exhaust := getattr(formats, 'exhaust', None)):
+            formats = exhaust()
         self.ingest_formats(formats)
 
         return self.with_formats
