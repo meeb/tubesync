@@ -4,10 +4,10 @@ from django import db
 
 from yt_dlp.utils import LazyList, RetryManager
 
-from .logger import log
-
 
 def eager_list(list_like, /) -> list:
+    from .logger import log
+
     arg_type = type(list_like)
     result_list = None
 
