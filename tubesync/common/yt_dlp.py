@@ -14,6 +14,7 @@ def eager_list(list_like, /) -> list:
     if isinstance(list_like, list):
         result_list = list_like
     elif callable(exhaust := getattr(list_like, 'exhaust', None)):
+        # convert LazyList to a list using its own exhaust method
         result_list = exhaust()
         log.debug(f'called exhaust(): {len(result_list)=} {arg_type=}')
     elif isinstance(list_like, LazyList):
