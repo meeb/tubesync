@@ -36,8 +36,16 @@ class DashboardView(TemplateView):
             start_at__isnull=False,
             end_at__gt=F('start_at'),
         )
-        waiting_qs = get_waiting_tasks()
-        data['num_tasks'] = waiting_qs.count()
+
+        try:
+            waiting_qs = get_waiting_tasks()
+            data['num_tasks'] = waiting_qs.count()
+        finally:
+            if callable(
+                clean := getattr(waiting_qs, '_tmp_table_cleanup', None)
+            ):
+                clean()
+
         data['num_completed_tasks'] = completed_qs.count()
         # Disk usage
         disk_usage = Media.objects.filter(
