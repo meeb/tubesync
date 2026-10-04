@@ -5,6 +5,7 @@ from django.views.generic import TemplateView
 from django.db import connection
 from django.db.models import F, Q, Sum
 from django.utils import timezone
+from common.logger import log
 from common.models import TaskHistory
 from .utils import get_waiting_tasks
 from ..models import Source, Media
@@ -40,11 +41,15 @@ class DashboardView(TemplateView):
         try:
             waiting_qs = get_waiting_tasks()
             data['num_tasks'] = waiting_qs.count()
+            if hasattr(waiting_qs, '_tmp_table_cleanup'):
+                log.info('Created a temporary table in the database.')
         finally:
             if callable(
                 clean := getattr(waiting_qs, '_tmp_table_cleanup', None)
             ):
+                log.info('Cleaning up a temporary table in the database.')
                 clean()
+                log.info('Finished cleanup of a temporary table in the database.')
 
         data['num_completed_tasks'] = completed_qs.count()
         # Disk usage
