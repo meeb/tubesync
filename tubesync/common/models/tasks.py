@@ -78,7 +78,7 @@ def thqs_from_huey_ids(self, /, huey_task_ids):
     task_history_table = quote(self.model._meta.db_table)
     input_tmp = quote(f'tmp_huey_ids_{unique_suffix}')
     results_name = f'tmp_history_pks_{unique_suffix}'
-    results_tmp = quote(f'tmp_history_pks_{unique_suffix}')
+    results_tmp = quote(results_name)
     index_results_tmp = quote(f'idx_{results_name}')
     del quote
 

@@ -38,13 +38,14 @@ class DashboardView(TemplateView):
             end_at__gt=F('start_at'),
         )
 
+        waiting_qs = None
         try:
             waiting_qs = get_waiting_tasks()
             data['num_tasks'] = waiting_qs.count()
             if hasattr(waiting_qs, '_tmp_table_cleanup'):
                 log.info('Created a temporary table in the database.')
         finally:
-            if callable(
+            if waiting_qs and callable(
                 clean := getattr(waiting_qs, '_tmp_table_cleanup', None)
             ):
                 log.info('Cleaning up a temporary table in the database.')
