@@ -245,9 +245,9 @@ jobs:
             --highestWastedBytes '25M'
 
   docker-image:
-    if: ${{ !cancelled() && 'success' == needs.info.result && 'success' == needs.containerise.result }}
+    if: ${{ !cancelled() && 'success' == needs.info.result && 'success' == needs.test.result && 'success' == needs.containerise.result }}
     concurrency:
-      group: ${{ github.repository }}-${{ github.workflow }}
+      group: ${{ github.repository }}-${{ github.workflow }}-${{ github.ref_name }}
       cancel-in-progress: false
     needs: ['info', 'test', 'containerise']
     uses: docker/github-builder/.github/workflows/build.yml@v1
