@@ -79,10 +79,18 @@ class TasksView(ListView):
                 fmt_vars['task_id'] = task.task_id
             self.message = self.message.format(**fmt_vars)
 
-        return super().dispatch(request, *args, **kwargs)
+        try:
+            return super().dispatch(request, *args, **kwargs)
+        finally:
+            # Retrieve the QS we stored during get_queryset
+            qs = getattr(self, '_active_qs', None)
+            if qs and callable(clean := getattr(qs, '_tmp_table_cleanup', None)):
+                clean()
 
     def get_queryset(self):
         qs = get_waiting_tasks()
+        # Store the QS on the instance so dispatch can access it for cleanup
+        self._active_qs = qs
         if self.filter_source:
             params_prefix=f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
@@ -97,7 +105,7 @@ class TasksView(ListView):
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
         now_dt = timezone.now()
-        scheduled_qs = get_waiting_tasks()
+        scheduled_qs = self._active_qs
         # Huey removes running tasks,
         # so the waiting tasks will not include them.
         running_qs = get_running_tasks(now_dt)
