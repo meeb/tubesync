@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0039_codec_data'),
+        ('sync', '0041_codec_data'),
     ]
 
     operations = [
