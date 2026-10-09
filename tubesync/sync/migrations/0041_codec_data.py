@@ -114,7 +114,7 @@ def reverse_func(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0038_codec'),
+        ('sync', '0040_codec'),
     ]
 
     operations = [
