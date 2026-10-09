@@ -7,7 +7,7 @@ from sync.choices import AssetType
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sync', '0037_alter_source_fallback'),
+        ('sync', '0039_alter_metadata_options_alter_metadataformat_options'),
     ]
 
     operations = [
