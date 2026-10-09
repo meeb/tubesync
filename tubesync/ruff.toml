@@ -16,6 +16,9 @@ ignore = [
     "I001",
     "UP017", "UP018",
 ]
+extend-select = [
+    "DTZ001", "DTZ005", "DTZ006", "DTZ007",
+]
 
 [lint.per-file-ignores]
 "healthcheck.py" = ["S110"]
