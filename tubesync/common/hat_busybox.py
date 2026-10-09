@@ -47,7 +47,6 @@ for _dict in formats:
 
 def msg_from_busybox_str(msg_str: str) -> common.Msg:
     """Strict BusyBox RFC 3164 parser. Raises ValueError on any deviation."""
-    # ruff: ignore[DTZ005]
     now = datetime.now()
 
     for _dict in formats:
@@ -66,7 +65,6 @@ def msg_from_busybox_str(msg_str: str) -> common.Msg:
         time_str = f'{m["hour"]}:{m["minute"]}:{m["second"]}'
         ts_str = f'{now.year} {m["month"]} {day_val} {time_str}'
 
-        # ruff: ignore[DTZ007]
         dt = datetime.strptime(ts_str, '%Y %b %d %H:%M:%S')
         if now < dt:
             dt = dt.replace(year=now.year - 1)
