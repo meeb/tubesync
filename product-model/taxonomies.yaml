@@ -1,0 +1,13 @@
+scenarioKinds:
+- id: primary
+  name: Primary
+  description: The ordinary supported outcome.
+- id: alternative
+  name: Alternative
+  description: A different supported input, route or terminal outcome.
+- id: validation
+  name: Validation
+  description: Observable refusal of invalid input or of who may act.
+- id: edge
+  name: Edge
+  description: Conflict, missing state, or an unavailable dependency.
