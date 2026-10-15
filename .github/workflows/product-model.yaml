@@ -1,0 +1,44 @@
+name: Product model
+
+env:
+  PDD_TOOLKIT_VERSION: '0.37.0'
+
+on:
+  workflow_dispatch:
+  # weekly, just after the scheduled image build in CI
+  workflow_run:
+    workflows:
+      - 'CI'
+    types:
+      - completed
+  pull_request:
+    branches:
+      - 'main'
+      - 'test-*'
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+concurrency:
+  group: ${{ github.repository }}-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lint:
+    if: ${{ 'workflow_run' != github.event_name || 'schedule' == github.event.workflow_run.event }}
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      contents: read # to fetch the repository content
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # the commit the scheduled image was built from
+          ref: ${{ github.event.workflow_run.head_sha || '' }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Lint product-model/
+        run: npx --yes "pdd-toolkit@${PDD_TOOLKIT_VERSION}" lint
