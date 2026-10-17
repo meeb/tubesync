@@ -14,7 +14,7 @@ class IndexCoverageTests(TestCase):
         model = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "Source")
         method = next(node for node in model.body if isinstance(node, ast.FunctionDef) and node.name == "index_media")
         namespace = {"queue": deque, "settings": SimpleNamespace(MAX_ENTRIES_PROCESSING=2)}
-        exec(compile(ast.Module(body=[method], type_ignores=[]), str(source), "exec"), namespace)
+        exec(compile(ast.Module(body=[method], type_ignores=[]), str(source), "exec"), namespace)  # noqa: S102 - selected local method, synthetic globals only
         videos = [{"id": key} for key in ("video-a", "video-b", "video-c")]
         streams = [{"id": key} for key in ("stream-a", "stream-b", "stream-c")]
         for mixed in (False, True):

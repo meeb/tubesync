@@ -42,7 +42,7 @@ class SourceDeletionBoundaryTests(unittest.TestCase):
                      "TaskQueue": SimpleNamespace(FS="synthetic-fs"), "Val": lambda value: value,
                      "update_model": Mock(),
                      "atomic": lambda **kwargs: contextlib.nullcontext(), "log": Mock(), "rmtree": Mock()}
-        exec(compile(ast.Module(body=[self.function], type_ignores=[]), "tasks.py", "exec"), namespace)
+        exec(compile(ast.Module(body=[self.function], type_ignores=[]), "tasks.py", "exec"), namespace)  # noqa: S102 - selected local method, synthetic globals only
         return namespace, source, queryset
 
     def test_invalid_inputs_are_refused_before_queue_or_database_access(self):
