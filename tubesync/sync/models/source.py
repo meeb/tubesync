@@ -652,11 +652,13 @@ class Source(db.models.Model):
 
     def index_media(self):
         '''
-            Index the media source returning a queue of media metadata as dicts.
+            Return the capped processing queue and every upstream media key.
         '''
         entries = queue(list(), getattr(settings, 'MAX_ENTRIES_PROCESSING', 0) or None)
+        upstream_keys = set()
         if self.index_videos:
             videos = self.get_index('videos')
+            upstream_keys.update(item.get(self.key_field) for item in videos if item.get(self.key_field))
             entries.extend(reversed(videos))
 
         # Playlists do something different that I have yet to figure out
@@ -664,6 +666,7 @@ class Source(db.models.Model):
         if not self.is_playlist:
             if self.index_streams:
                 streams = self.get_index('streams')
+                upstream_keys.update(item.get(self.key_field) for item in streams if item.get(self.key_field))
                 if entries.maxlen is None or 0 == len(entries):
                     entries.extend(reversed(streams))
                 else:
@@ -674,4 +677,4 @@ class Source(db.models.Model):
                     )
                     entries.extend(reversed(streams[: allowed_streams]))
 
-        return entries
+        return entries, upstream_keys

@@ -553,7 +553,7 @@ def index_source(source_id):
     # Reset any errors
     source.has_failed = False
     # Index the source
-    videos = source.index_media()
+    videos, video_keys = source.index_media()
     if not videos:
         source.has_failed = True
         update_model(source, has_failed=source.has_failed)
@@ -593,7 +593,6 @@ def index_source(source_id):
             end=task.verbose_name.find('Index'),
         )
     vn = 0
-    video_keys = set()
     while len(videos) > 0:
         vn += 1
         video = videos.popleft()
@@ -602,7 +601,6 @@ def index_source(source_id):
         if not key:
             # Video has no unique key (ID), it can't be indexed
             continue
-        video_keys.add(key)
         if len(db_batch_data) == db_batch_data.maxlen:
             save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
         if len(db_batch_media) == db_batch_media.maxlen:
@@ -1405,10 +1403,15 @@ def save_all_media_for_source(source_id):
 
 @db_task(delay=90, priority=99, queue=Val(TaskQueue.FS))
 def delete_all_media_for_source(source_id, source_name, source_directory):
+    if not source_id or not source_name or not source_directory:
+        raise ValueError('Source ID, name and directory are required')
+    directory_path = Path(source_directory)
+    download_root = Path(settings.DOWNLOAD_ROOT).resolve()
+    resolved_directory = directory_path.resolve()
+    if (not directory_path.is_absolute() or resolved_directory == download_root or
+            not resolved_directory.is_relative_to(download_root)):
+        raise ValueError('Source directory must be inside the download root')
     source = None
-    assert source_id
-    assert source_name
-    assert source_directory
     try:
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist:
@@ -1429,7 +1432,6 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
             key = source.key + '/deleted',
             name = f'[Deleting] {source.name}',
         )
-    directory_path = Path(source_directory)
     remove = (
         (source and source.delete_removed_media) or
         (directory_path / '.to_be_removed').is_file()
