@@ -3,7 +3,6 @@ import re
 import uuid
 
 from collections import deque as queue
-from itertools import islice
 from pathlib import Path
 from typing import ClassVar
 
@@ -673,6 +672,7 @@ class Source(db.models.Model):
         if self.index_videos:
             videos = self.get_index('videos')
             entries.extend(map(register_key, reversed(videos)))
+            del videos
 
         # Playlists do something different that I have yet to figure out
         if not self.is_playlist and self.index_streams:
@@ -685,11 +685,8 @@ class Source(db.models.Model):
                     entries.maxlen // 2,
                     entries.maxlen - len(entries),
                 )
-                entries.extend(reversed(tuple(
-                    islice(
-                        map(register_key, streams),
-                        allowed_streams,
-                    ),
-                )))
+                streams = tuple(map(register_key, streams))[: allowed_streams]
+                entries.extend(reversed(streams))
+            del streams
 
         return entries, seen_keys
