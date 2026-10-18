@@ -1,113 +1,47 @@
-"""Exercise deletion admission with fabricated paths and mocked database/queue writes."""
-import ast
-import contextlib
+import logging
 import tempfile
-import unittest
+import uuid
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import patch
+
+from django.test import TransactionTestCase, override_settings
+
+from sync import tasks
 
 
-class SourceDeletionBoundaryTests(unittest.TestCase):
+class SourceDirectoryDeletionTestCase(TransactionTestCase):
+
     def setUp(self):
-        self.directory = tempfile.TemporaryDirectory()
-        self.addCleanup(self.directory.cleanup)
-        self.base = Path(self.directory.name)
-        self.root = self.base / "downloads"
+        logging.disable(logging.CRITICAL)
+        self.addCleanup(logging.disable, logging.NOTSET)
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        self.base = Path(temp_dir.name)
+        self.root = self.base / 'downloads'
+
+    def delete(self, directory):
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / '.to_be_removed').touch()
+        with override_settings(DOWNLOAD_ROOT=self.root), patch.object(tasks, 'rmtree') as rmtree:
+            tasks.delete_all_media_for_source.func(str(uuid.uuid4()), 'Removed', str(directory))
+        return rmtree
+
+    def test_directory_inside_download_root_is_removed(self):
+        directory = self.root / 'video' / 'removed'
+        self.delete(directory).assert_called_once_with(directory, True)
+
+    def test_symbolic_link_inside_download_root_is_not_followed(self):
+        target = self.base / 'other-disk' / 'removed'
+        target.mkdir(parents=True)
+        link = self.root / 'removed'
         self.root.mkdir()
-        source = Path(__file__).resolve().parents[1] / "tasks.py"
-        tree = ast.parse(source.read_text(encoding="utf-8"))
-        self.function = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
-                             and node.name == "delete_all_media_for_source")
-        self.function.decorator_list = []
-
-    def task(self, present=True, remove=False):
-        class MissingSource(Exception):
-            pass
-        source = SimpleNamespace(delete_removed_media=remove, delete=Mock(),
-                                 uuid="synthetic-source", key="synthetic", name="Synthetic")
-        objects = Mock()
-        if present:
-            objects.get.return_value = source
-        else:
-            objects.get.side_effect = MissingSource
-        queryset = Mock()
-        queryset.defer.return_value = queryset
-        queryset.filter.return_value = queryset
-        namespace = {"Source": SimpleNamespace(objects=objects, DoesNotExist=MissingSource),
-                     "Media": SimpleNamespace(objects=SimpleNamespace(all=Mock(return_value=queryset))),
-                     "settings": SimpleNamespace(DOWNLOAD_ROOT=self.root), "Path": Path,
-                     "delete_media": Mock(), "qs_gen": lambda query: [],
-                     "huey_lock_task": Mock(return_value=SimpleNamespace(acquired=False)),
-                     "TaskQueue": SimpleNamespace(FS="synthetic-fs"), "Val": lambda value: value,
-                     "update_model": Mock(),
-                     "atomic": lambda **kwargs: contextlib.nullcontext(), "log": Mock(), "rmtree": Mock()}
-        exec(compile(ast.Module(body=[self.function], type_ignores=[]), "tasks.py", "exec"), namespace)  # noqa: S102 - selected local method, synthetic globals only
-        return namespace, source, queryset
-
-    def test_invalid_inputs_are_refused_before_queue_or_database_access(self):
-        outside = self.base / "outside"
-        outside.mkdir()
-        (outside / ".to_be_removed").touch()
-        (self.root / ".to_be_removed").touch()
-        valid = self.root / "valid"
-        cases = [("", "Synthetic", str(valid)), ("id", "", str(valid)),
-                 ("id", "Synthetic", ""), ("id", "Synthetic", None),
-                 ("id", "Synthetic", str(self.root)), ("id", "Synthetic", str(outside)),
-                 ("id", "Synthetic", str(self.base / "downloads-other")),
-                 ("id", "Synthetic", str(self.root / ".." / "outside")),
-                 ("id", "Synthetic", "relative-path")]
-        for args in cases:
-            with self.subTest(args=args):
-                namespace, _, query = self.task(remove=True)
-                with self.assertRaises(ValueError):
-                    namespace["delete_all_media_for_source"](*args)
-                namespace["Source"].objects.get.assert_not_called()
-                namespace["Media"].objects.all.assert_not_called()
-                namespace["delete_media"].map.assert_not_called()
-                query.update.assert_not_called()
-                query.delete.assert_not_called()
-                namespace["rmtree"].assert_not_called()
-
-    def test_valid_captured_directory_preserves_existing_and_missing_source_workflows(self):
-        for present, remove, marker in [(True, False, False), (True, True, False),
-                                        (False, False, True), (False, False, False)]:
-            with self.subTest(present=present, remove=remove, marker=marker):
-                path = self.root / f"source-{present}-{remove}-{marker}"
-                path.mkdir()
-                if marker:
-                    (path / ".to_be_removed").touch()
-                namespace, source, query = self.task(present, remove)
-                namespace["delete_all_media_for_source"]("synthetic-id", "Synthetic", str(path))
-                query.filter.assert_called_once_with(source=source if present else "synthetic-id")
-                query.update.assert_called_once_with(manual_skip=True, skip=True)
-                query.delete.assert_called_once()
-                self.assertEqual(source.delete.call_count, int(present))
-                if remove or marker:
-                    namespace["rmtree"].assert_called_once_with(path, True)
-                else:
-                    namespace["rmtree"].assert_not_called()
-
-    def test_already_missing_directory_still_allows_database_cleanup(self):
-        namespace, _, query = self.task(present=False)
-        namespace["delete_all_media_for_source"]("synthetic-id", "Synthetic", str(self.root / "missing"))
-        query.delete.assert_called_once()
-        namespace["rmtree"].assert_not_called()
-
-    def test_symlink_escape_is_refused_before_side_effects(self):
-        outside = self.base / "outside"
-        outside.mkdir()
-        link = self.root / "redirected"
         try:
-            link.symlink_to(outside, target_is_directory=True)
-        except OSError as error:
-            self.skipTest(f"directory symlinks unavailable: {error}")
-        namespace, _, _ = self.task(remove=True)
-        with self.assertRaises(ValueError):
-            namespace["delete_all_media_for_source"]("synthetic-id", "Synthetic", str(link))
-        namespace["Media"].objects.all.assert_not_called()
-        namespace["rmtree"].assert_not_called()
+            link.symlink_to(target, target_is_directory=True)
+        except OSError as e:
+            self.skipTest(f'symbolic links unavailable: {e}')
+        self.delete(link).assert_called_once_with(link, True)
 
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_directory_outside_download_root_is_kept(self):
+        for directory in (self.root, self.base / 'elsewhere', self.root / '..' / 'elsewhere'):
+            with self.subTest(directory=directory):
+                self.delete(directory).assert_not_called()

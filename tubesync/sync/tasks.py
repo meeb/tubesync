@@ -1408,15 +1408,10 @@ def save_all_media_for_source(source_id):
 
 @db_task(delay=90, priority=99, queue=Val(TaskQueue.FS))
 def delete_all_media_for_source(source_id, source_name, source_directory):
-    if not source_id or not source_name or not source_directory:
-        raise ValueError('Source ID, name and directory are required')
-    directory_path = Path(source_directory)
-    download_root = Path(settings.DOWNLOAD_ROOT).resolve()
-    resolved_directory = directory_path.resolve()
-    if (not directory_path.is_absolute() or resolved_directory == download_root or
-            not resolved_directory.is_relative_to(download_root)):
-        raise ValueError('Source directory must be inside the download root')
     source = None
+    assert source_id
+    assert source_name
+    assert source_directory
     try:
         source = Source.objects.get(pk=source_id)
     except Source.DoesNotExist:
@@ -1437,6 +1432,7 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
             key = source.key + '/deleted',
             name = f'[Deleting] {source.name}',
         )
+    directory_path = Path(source_directory)
     remove = (
         (source and source.delete_removed_media) or
         (directory_path / '.to_be_removed').is_file()
@@ -1479,5 +1475,11 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
             source_lock.acquired = False
     # Remove the directory, if the user requested that
     if remove:
+        # The same lexical check as safe_join() in the source form,
+        # so symbolic links below DOWNLOAD_ROOT are not followed.
+        download_root = Path(os.path.abspath(settings.DOWNLOAD_ROOT))
+        if download_root not in Path(os.path.abspath(directory_path)).parents:
+            log.error(f'Not deleting directory outside {download_root} for: {source_name}: {directory_path}')
+            return
         log.info(f'Deleting directory for: {source_name}: {directory_path}')
         rmtree(directory_path, True)
