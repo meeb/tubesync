@@ -6,7 +6,7 @@ from django.test import SimpleTestCase, override_settings
 from sync.models import Source
 
 
-@override_settings(MAX_ENTRIES_PROCESSING=2)
+@override_settings(MAX_ENTRIES_PROCESSING=2, CLEANUP_WHICH='Published ')
 class IndexCoverageTests(SimpleTestCase):
     def test_capped_queue_retains_complete_removal_keys(self):
         videos = [{"id": key} for key in ("video-a", "video-b", "video-c")]
