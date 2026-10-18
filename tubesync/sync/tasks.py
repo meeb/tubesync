@@ -553,7 +553,7 @@ def index_source(source_id):
     # Reset any errors
     source.has_failed = False
     # Index the source
-    videos, video_keys = source.index_media()
+    videos, published_keys = source.index_media()
     if not videos:
         source.has_failed = True
         update_model(source, has_failed=source.has_failed)
@@ -593,6 +593,7 @@ def index_source(source_id):
             end=task.verbose_name.find('Index'),
         )
     vn = 0
+    processed_keys = set()
     while len(videos) > 0:
         vn += 1
         video = videos.popleft()
@@ -601,6 +602,7 @@ def index_source(source_id):
         if not key:
             # Video has no unique key (ID), it can't be indexed
             continue
+        processed_keys.add(key)
         if len(db_batch_data) == db_batch_data.maxlen:
             save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
         if len(db_batch_media) == db_batch_media.maxlen:
@@ -683,7 +685,10 @@ def index_source(source_id):
     save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
     save_db_batch(Media.objects, db_batch_media, db_fields_media)
     # Cleanup of media no longer available from the source
-    cleanup_removed_media(str(source.pk), video_keys)
+    use_published = 'published' == str(
+        getattr(settings, 'CLEANUP_WHICH', 'processed')
+    ).strip().lower()
+    cleanup_removed_media(str(source.pk), published_keys if use_published else processed_keys)
     # Clear references to indexed data
     videos = video = None
     db_batch_data.clear()
