@@ -3,7 +3,6 @@ import re
 import uuid
 
 from collections import deque as queue
-from itertools import islice
 from pathlib import Path
 from typing import ClassVar
 
@@ -685,11 +684,6 @@ class Source(db.models.Model):
                     entries.maxlen // 2,
                     entries.maxlen - len(entries),
                 )
-                entries.extend(reversed(tuple(
-                    islice(
-                        map(register_key, streams),
-                        allowed_streams,
-                    ),
-                )))
+                entries.extend(reversed(tuple(map(register_key, streams))[: allowed_streams]))
 
         return entries, seen_keys
