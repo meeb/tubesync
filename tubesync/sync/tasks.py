@@ -686,7 +686,7 @@ def index_source(source_id):
     save_db_batch(Media.objects, db_batch_media, db_fields_media)
     # Cleanup of media no longer available from the source
     use_published = 'published' == str(
-        getattr(settings, 'CLEANUP_WHICH', 'processed')
+        getattr(settings, 'INDEXING_CLEANUP_UNAVAILABLE_POLICY', 'processed')
     ).strip().lower()
     cleanup_removed_media(str(source.pk), published_keys if use_published else processed_keys)
     # Clear references to indexed data
