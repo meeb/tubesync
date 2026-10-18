@@ -1475,11 +1475,5 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
             source_lock.acquired = False
     # Remove the directory, if the user requested that
     if remove:
-        # The same lexical check as safe_join() in the source form,
-        # so symbolic links below DOWNLOAD_ROOT are not followed.
-        download_root = Path(os.path.abspath(settings.DOWNLOAD_ROOT))
-        if download_root not in Path(os.path.abspath(directory_path)).parents:
-            log.error(f'Not deleting directory outside {download_root} for: {source_name}: {directory_path}')
-            return
         log.info(f'Deleting directory for: {source_name}: {directory_path}')
         rmtree(directory_path, True)
