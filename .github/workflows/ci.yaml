@@ -180,7 +180,7 @@ jobs:
               echo '#### '"${fmt}"' output format'
               echo ''
               echo '```'
-              uvx --no-config --no-managed-python --no-progress --isolated \
+              uv --no-config --no-managed-python --no-progress run \
                   ruff check --exit-zero --output-format "${fmt}"
               echo ''
               echo '```'
@@ -191,12 +191,12 @@ jobs:
           } >> "${GITHUB_STEP_SUMMARY}"
           check_retcode=0
           format_retcode=0
-          uvx --no-config --no-managed-python --no-progress --isolated \
+          uv --no-config --no-managed-python --no-progress run \
               ruff check --output-format github &&
-          { uvx --no-config --no-managed-python --no-progress --isolated \
+          { uv --no-config --no-managed-python --no-progress run \
               ruff format --output-format github --check || format_retcode=$? ; true ; }
           check_retcode=$?
-          uvx --no-config --no-managed-python --no-progress --isolated \
+          uv --no-config --no-managed-python --no-progress run \
               ruff format --output-format github --diff || true
           case "${check_retcode:-0}" in
               (0) true ;;
