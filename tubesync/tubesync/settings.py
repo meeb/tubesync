@@ -11,7 +11,7 @@ CONFIG_BASE_DIR = BASE_DIR
 DOWNLOADS_BASE_DIR = BASE_DIR
 
 
-VERSION = '0.18.0'
+VERSION = '0.18.1'
 DEBUG = 'true' == getenv('TUBESYNC_DEBUG').strip().lower()
 ALLOWED_HOSTS = []
 # This is not ever meant to be a public web interface so this isn't too critical
@@ -112,7 +112,7 @@ LOGGING = {
         'default': {},
         'syslog': {
             'format': '%(asctime)s %(name)s: %(message)s',
-            'datefmt': '%b %d %H:%M:%S',
+            'datefmt': '%b %e %H:%M:%S',
         },
         'common': {
             'format':  '%(asctime)s [%(name)s/%(levelname)s] %(message)s',
