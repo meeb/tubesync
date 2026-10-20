@@ -1,0 +1,26 @@
+#!/command/with-contenv bash
+
+# Copy local_settings.py for the user
+if [ -f /config/tubesync/local_settings.py ]
+then
+    # from the image for an example or comparison
+    cp -v -p /app/tubesync/local_settings.py \
+        /config/tubesync/local_settings.py.image
+
+    # to the image to apply the user's settings
+    cp -v -p /config/tubesync/local_settings.py \
+        /app/tubesync/local_settings.py
+
+    chown app:app \
+        /config/tubesync/local_settings.py.image
+    chmod 0755 \
+        /config/tubesync/local_settings.py.image
+fi
+
+# Reset permissions
+chown -R root:app /app
+chmod -R 0750 /app
+chmod 0755 /app/*.py /app/*.sh
+find /app -mindepth 2 -type f -execdir chmod 640 '{}' +
+chown -R app:app /app/common/static
+chown -R app:app /app/static

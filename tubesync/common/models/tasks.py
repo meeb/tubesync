@@ -5,8 +5,8 @@ from itertools import islice
 from django.db import connection, models, transaction
 from django.utils import timezone
 
-from ..json import JSONEncoder
-# from common.json import JSONEncoder
+from ..json_encoder import JSONEncoder
+# from common.json_encoder import JSONEncoder
 from ..utils import is_empty_iterator
 #from common.utils import is_empty_iterator
 

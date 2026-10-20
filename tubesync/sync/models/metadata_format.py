@@ -1,5 +1,5 @@
 import uuid
-from common.json import JSONEncoder
+from common.json_encoder import JSONEncoder
 from django import db
 from django.utils.translation import gettext_lazy as _
 from .metadata import Metadata

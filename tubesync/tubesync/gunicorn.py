@@ -35,10 +35,13 @@ wsgi_app = 'tubesync.wsgi:application'
 
 ##### Logging
 # Access logs are printed to stdout from nginx
-accesslog = None
-errorlog = '-'
+##accesslog = None
+##errorlog = '-'
 loglevel = 'info'
 capture_output = True
+syslog = True
+syslog_addr = 'unix:///dev/log'
+syslog_facility = 'local2'
 
 ##### Process
 proc_name = 'gunicorn'
