@@ -138,7 +138,7 @@ jobs:
               echo '#### '"${fmt}"' output format'
               echo ''
               echo '```'
-              uvx --no-config --no-managed-python --no-progress --isolated \
+              uv --no-config --no-managed-python --no-progress run \
                   ruff check --exit-zero \
                   --target-version "${target_version}" \
                   --output-format "${fmt}" \
@@ -151,7 +151,7 @@ jobs:
               echo ''
               done
           } >> "${GITHUB_STEP_SUMMARY}"
-          uvx --no-config --no-managed-python --no-progress --isolated \
+          uv --no-config --no-managed-python --no-progress run \
               ruff check \
               --target-version "${target_version}" \
               --output-format github \
