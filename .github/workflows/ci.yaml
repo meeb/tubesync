@@ -122,15 +122,19 @@ jobs:
         python-version: ['3.12', '3.13', '3.14']
     services:
       hat-syslog:
-        image: bozokopic/hat-syslog
+        # avoid hub.docker.com limits
+        # image: bozokopic/hat-syslog
+        image: ghcr.io/tcely/hat-syslog:dockerhub-bozokopic
         ports:
           - 127.0.0.1:6514:6514/tcp
           - 127.0.0.1:6514:6514/udp
     steps:
       - uses: actions/checkout@v7
       - name: Install Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7.0.0
         with:
+          cache: 'pip'
+          cache-dependency-path: 'Pipfile'
           python-version: ${{ matrix.python-version }}
       - name: Test shasum
         run: |
@@ -139,7 +143,7 @@ jobs:
           python3 -B -W default tubesync/shasum_tests.py
       - name: Install dependencies
         run: |
-          python -m pip install uv
+          python3 -m pip install uv
           uv --no-config --no-managed-python --no-progress \
             tool run pipenv requirements --dev --no-lock >| Pipfile-requirements.txt
           uv --no-config --no-managed-python --no-progress \
