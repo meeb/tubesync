@@ -298,11 +298,6 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
 #MEDIA_URL = '/media/'
 MEDIA_ROOT = CONFIG_BASE_DIR / 'media'
-
-# Configure WhiteNoise to use Django's staticfiles finders in development
-# This allows it to find files in app/static/ directories without running collectstatic
-WHITENOISE_USE_FINDERS = True
-WHITENOISE_AUTOREFRESH = True
 DOWNLOAD_ROOT = DOWNLOADS_BASE_DIR / 'downloads'
 DOWNLOAD_VIDEO_DIR = 'video'
 DOWNLOAD_AUDIO_DIR = 'audio'

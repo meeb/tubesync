@@ -14,23 +14,23 @@
       {% if show_skipped %}
       <a href="{% url 'sync:media' %}{% querystring show_skipped=None %}" class="button">
         <span class="icon"><i class="far fa-eye-slash"></i></span>
-        <span>Hide skipped</span>
+        <span>Hide skipped media</span>
       </a>
       {% else %}
       <a href="{% url 'sync:media' %}{% querystring show_skipped='yes' %}" class="button">
         <span class="icon"><i class="far fa-eye"></i></span>
-        <span>Show skipped</span>
+        <span>Show skipped media</span>
       </a>
       {% endif %}
       {% if only_skipped %}
       <a href="{% url 'sync:media' %}{% querystring only_skipped=None %}" class="button is-primary">
         <span class="icon"><i class="far fa-eye"></i></span>
-        <span>All media</span>
+        <span>Only skipped media</span>
       </a>
       {% else %}
       <a href="{% url 'sync:media' %}{% querystring only_skipped='yes' %}" class="button">
         <span class="icon"><i class="far fa-eye-slash"></i></span>
-        <span>Only skipped</span>
+        <span>Only skipped media</span>
       </a>
       {% endif %}
     </div>

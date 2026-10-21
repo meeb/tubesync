@@ -10,7 +10,7 @@
   Tasks are the background work that TubeSync undertakes to index and download
   media. This page allows you to see basic overview of what is running and what is
   scheduled to perform in the future as well as check up on any errors that might
-  have occurred.
+  have occured.
 </p>
 
 {% include 'infobox.html' with message=message %}
@@ -70,7 +70,7 @@
         <span class="icon"><i class="fas fa-history"></i></span>
         <span>Task will be retried at <strong>{{ task.scheduled_at|date:'Y-m-d H:i:s' }}</strong></span>
       </span>
-      <a href="{% url 'sync:run-task' pk=task.pk %}" class="button is-small" title="Retry now">
+      <a href="{% url 'sync:run-task' pk=task.pk %}" class="button is-small">
         <span class="icon"><i class="fas fa-undo"></i></span>
       </a>
     </div>
@@ -118,14 +118,14 @@
       </a>
     </div>
     <div class="buttons">
-      <a href="{% url 'sync:revoke-task' pk=task.pk %}" class="button" title="Cancel task">
+      <a href="{% url 'sync:revoke-task' pk=task.pk %}" class="button">
         <span class="icon"><i class="far fa-stop-circle"></i></span>
-        <span>Cancel</span>
       </a>
-      <a href="{% url 'sync:run-task' pk=task.pk %}" class="button" title="Reschedule task">
-        <span class="icon"><i class="fas fa-play"></i></span>
-        <span>Reschedule</span>
+      {% if not task.run_now %}
+      <a href="{% url 'sync:run-task' pk=task.pk %}" class="button">
+        <span class="icon"><i class="far fa-play-circle"></i></span>
       </a>
+      {% endif %}
     </div>
   </div>
   {% empty %}

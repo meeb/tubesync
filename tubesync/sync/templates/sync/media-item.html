@@ -40,14 +40,13 @@
     <div class="card mediacard">
       <div class="card-image">
         <figure class="image">
-          <img src="{% if media.thumb %}{% url 'sync:media-thumb' pk=media.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}" alt="{{ media.name }}">
+          <img src="{% if media.thumb %}{% url 'sync:media-thumb' pk=media.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}">
         </figure>
       </div>
       <div class="card-content">
         <div class="content">
           <a href="{% url 'sync:redownload-thumb' pk=media.pk %}" class="button is-small is-fullwidth">
             <span class="icon"><i class="fas fa-redo"></i></span>
-            <span>Refresh thumbnail</span>
           </a>
         </div>
       </div>

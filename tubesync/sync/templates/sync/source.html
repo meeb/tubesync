@@ -24,7 +24,7 @@
       <td class="is-hidden-mobile">Type</td>
       <td><span class="is-hidden-tablet">Type<br></span><strong>{{ source.get_source_type_display }}</strong></td>
     </tr>
-    <tr title="Name of the source in TubeSync for your reference">
+    <tr title="Name of the souce in TubeSync for your reference">
       <td class="is-hidden-mobile">Name</td>
       <td><span class="is-hidden-tablet">Name<br></span><strong>{{ source.name }}</strong></td>
     </tr>
@@ -82,7 +82,7 @@
       <td class="is-hidden-mobile">Download media?</td>
       <td><span class="is-hidden-tablet">Download media?<br></span><strong>{% if source.download_media %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
     </tr>
-    <tr title="When the source was created locally in TubeSync">
+    <tr title="When then source was created locally in TubeSync">
       <td class="is-hidden-mobile">Created</td>
       <td><span class="is-hidden-tablet">Created<br></span><strong>{{ source.created|date:'Y-m-d H:i:s' }}</strong></td>
     </tr>
@@ -227,7 +227,7 @@
     <span class="has-text-danger">
       <i class="fas fa-exclamation-triangle"></i> <strong>{{ task.verbose_name }}</strong><br>
       Error: "{{ task.error_message }}"<br>
-      <i class="far fa-clock"></i> Occurred at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong>
+      <i class="far fa-clock"></i> Occured at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong>
     </span>
   </div>
   {% endfor %}

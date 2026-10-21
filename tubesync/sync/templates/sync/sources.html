@@ -27,7 +27,7 @@
               <h2 class="title is-5 mb-2">
                 <span class="icon-text">
                   <span class="icon">{{ source.icon|safe }}</span>
-                  <span>{{ source.name }}</span>
+                  <span><a href="{% url 'sync:source' pk=source.pk %}">{{ source.name }}</a></span>
                 </span>
               </h2>
               <p class="subtitle is-6 mb-2">
@@ -51,22 +51,6 @@
             </div>
             <div class="media-right source-buttons">
               <div class="buttons">
-                <a href="{% url 'sync:source' pk=source.pk %}" class="button" title="View source details">
-                  <span class="icon"><i class="fas fa-info-circle"></i></span>
-                  <span>Details</span>
-                </a>
-                <a href="{% url 'sync:update-source' pk=source.pk %}" class="button" title="Edit source">
-                  <span class="icon"><i class="fas fa-pen"></i></span>
-                  <span>Edit</span>
-                </a>
-                <a href="{% url 'sync:media' %}?filter={{ source.pk }}" class="button" title="View media">
-                  <span class="icon"><i class="fas fa-film"></i></span>
-                  <span>Media</span>
-                </a>
-                <a href="{% url 'sync:tasks-completed' %}?filter={{ source.pk }}" class="button" title="View tasks">
-                  <span class="icon"><i class="far fa-clock"></i></span>
-                  <span>Tasks</span>
-                </a>
                 <a href="{% url 'sync:source-sync-now' pk=source.pk %}" class="button is-primary">
                   <span class="icon"><i class="fas fa-sync"></i></span>
                   <span>Sync Now</span>

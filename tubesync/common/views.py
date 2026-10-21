@@ -28,15 +28,15 @@ def toggle_theme(request):
 
 
 def error403(request, *args, **kwargs):
-    return render(request, 'error403.html', status=403)
+    return render(request, 'error403.html', status=403) 
 
 
 def error404(request, *args, **kwargs):
-    return render(request, 'error404.html', status=404)
+    return render(request, 'error404.html', status=404) 
 
 
 def error500(request, *args, **kwargs):
-    return render(request, 'error500.html', status=500)
+    return render(request, 'error500.html', status=500) 
 
 
 class HealthCheckView(View):

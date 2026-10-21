@@ -89,7 +89,7 @@ class PlexMediaServer(MediaServer):
              'section IDs <a href="https://support.plex.tv/articles/201242707-plex-'
              'media-scanner-via-command-line/#toc-1" target="_blank">here</a> or '
              '<a href="https://www.plexopedia.com/plex-media-server/api/server/libraries/" '
-             'target="_blank">here</a>.</p>')
+             'target="_blank">here</a></p>.')
 
     def make_request(self, uri='/', /, *, headers=None, params=None):
         if headers is None:
