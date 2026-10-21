@@ -1,5 +1,6 @@
 from django.conf import settings
 
+
 def read_testdata(arg_dict, *, testdata_path=None):
     if testdata_path is None:
         testdata_path = settings.BASE_DIR / "sync" / "testdata"
@@ -16,6 +17,7 @@ _TESTDATA_FILES = {
     "60fps": "metadata_60fps.json",
     "60fps+hdr": "metadata_60fps_hdr.json",
     "20230629": "metadata_2023-06-29.json",
+    "multi_audio": "metadata_multi_audio.json",
     "issue499_1080p50": "metadata_issue_499_1080p50.json",
     "issue499_premium": "metadata_issue_499_premium.json",
     "expected_nfo": "expected_nfo.xml",

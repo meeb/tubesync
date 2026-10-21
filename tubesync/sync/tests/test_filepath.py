@@ -1,8 +1,10 @@
+import json
 import logging
 from pathlib import Path
 from django.conf import settings
 from django.test import TestCase
 from django.utils import timezone
+from common.utils import truncate_filename
 from sync.models import Source, Media
 from sync.choices import (
     Val, Fallback, SourceResolution,
@@ -157,6 +159,77 @@ class FilepathTestCase(TestCase):
         self.assertEqual(test_media.filename,
                          ('no-fancy-stuff-title_test_720p-720x1280-opus'
                           '-vp9-30fps-hdr.mkv'))
+
+    def test_media_filename_truncates_to_filesystem_byte_limit(self):
+        # Filesystems limit each name component to 255 bytes (issue #522).
+        # Multi-byte titles reach that with far fewer characters, and the
+        # download then fails with '[Errno 36] File name too long'.
+        long_metadata = json.loads(metadata)
+        long_metadata['title'] = '耳' * 120  # 3 bytes per char = 360 bytes
+        long_title_media = Media.objects.create(
+            key='longkey',
+            source=self.source,
+            metadata=json.dumps(long_metadata),
+        )
+        self.source.media_format = '{yyyy}/{title_full}_{key}.{ext}'
+        filename = long_title_media.filename
+        directory, _, name = filename.rpartition('/')
+        # Directories from the format string survive untouched
+        self.assertEqual('2017', directory)
+        # The name component fits in the byte budget...
+        self.assertLessEqual(len(name.encode('utf-8')), 216)
+        # ... keeps its extension and key suffix material intact ...
+        self.assertTrue(name.endswith('_longkey.mkv'))
+        # ... and was not cut mid multi-byte character (encodes cleanly)
+        name.encode('utf-8').decode('utf-8')
+
+    def test_media_filename_unchanged_when_within_limit(self):
+        self.source.media_format = '{yyyy}/{key}.{ext}'
+        self.assertEqual(self.media.filename, '2017/mediakey.mkv')
+
+    def test_truncate_filename_bytes_encoding_edge_cases(self):
+        # Bytes known to cause encoding/decoding trouble must never produce
+        # an invalid or over-budget name: the cut points land inside
+        # multi-byte sequences on purpose here.
+
+        cases = [
+            # 4-byte astral plane (emoji): cut lands mid-sequence
+            '🍣' * 100 + '_key.mkv',
+            # combining characters (é as e + U+0301)
+            ('e\u0301' * 150) + '_key.mkv',
+            # zero-width joiner sequences (family emoji)
+            ('👨\u200d👩\u200d👧\u200d👦' * 30) + '_key.mkv',
+            # mixed 1-byte/3-byte at every boundary parity
+            ('a耳' * 120) + '_key.mkv',
+            # right-to-left text
+            ('שלום' * 60) + '_key.mkv',
+            # no extension at all
+            '⽕' * 200,
+            # dotfile-style name (suffix is empty for PurePosixPath)
+            '.' + ('h' * 300),
+            # very long "extension" exceeding the whole budget
+            'name.' + ('x' * 300),
+        ]
+        for original in cases:
+            with self.subTest(original=original[:24]):
+                result = truncate_filename(original, max_bytes=208)
+                # fits the byte budget
+                self.assertLessEqual(len(result.encode('utf-8')), 208)
+                # still valid UTF-8 round-trip (no partial sequences kept)
+                self.assertEqual(
+                    result,
+                    result.encode('utf-8').decode('utf-8'),
+                )
+                # never empty
+                self.assertTrue(result)
+
+    def test_truncate_filename_bytes_rejects_non_str(self):
+
+        for bad in (None, 42, b'bytes.mkv', Path('p.mkv')):
+            # ruff: ignore[SIM117]
+            with self.subTest(bad=bad):
+                with self.assertRaises(TypeError):
+                    truncate_filename(bad)
 
     def test_directory_prefix(self):
         # Confirm the setting exists and is valid

@@ -41,6 +41,10 @@
               <span class="icon"><i class="fas fa-fw fa-film"></i></span>
               <span class="is-hidden-mobile">Media</span>
             </a>
+            <a class="navbar-item{% block active_services %}{% endblock %}" href="{% url 'sync:services' %}">
+              <span class="icon"><i class="fas fa-fw fa-pager"></i></span>
+              <span class="is-hidden-mobile">Services</span>
+            </a>
             <a class="navbar-item{% block active_tasks %}{% endblock %}" href="{% url 'sync:tasks' %}">
               <span class="icon"><i class="far fa-fw fa-clock"></i></span>
               <span class="is-hidden-mobile">Tasks</span>
@@ -48,6 +52,10 @@
             <a class="navbar-item{% block active_mediaservers %}{% endblock %}" href="{% url 'sync:mediaservers' %}">
               <span class="icon"><i class="fas fa-fw fa-stream"></i></span>
               <span class="is-hidden-mobile">Media Servers</span>
+            </a>
+            <a class="navbar-item{% block active_logs %}{% endblock %}" href="/web-logs/index.html">
+              <span class="icon"><i class="fas fa-fw fa-scroll"></i></span>
+              <span class="is-hidden-mobile">Logs</span>
             </a>
           </div>
           <div class="navbar-end">

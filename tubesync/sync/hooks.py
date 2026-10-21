@@ -1,5 +1,7 @@
 import os
 
+from typing import ClassVar
+
 from common.logger import log
 from common.utils import remove_enclosed
 from sync.utils import filter_response
@@ -15,8 +17,8 @@ postprocessor_hook = {
 
 
 class BaseStatus:
-    status_dict = dict()
-    valid = set()
+    status_dict: ClassVar[dict[str, object]] = dict()
+    valid = frozenset()
 
     @classmethod
     def get(cls, key):
@@ -87,6 +89,7 @@ class BaseStatus:
             task.verbose_name = f'{self.task_status} {self.task_verbose_name}'
             task.save()
 
+
 class ProgressHookStatus(BaseStatus):
     status_dict = progress_hook['status']
     valid = frozenset((
@@ -95,7 +98,9 @@ class ProgressHookStatus(BaseStatus):
         'error',
     ))
 
-    def __init__(self, *args, status=None, info_dict={}, filename=None, **kwargs):
+    def __init__(self, *args, status=None, info_dict=None, filename=None, **kwargs):
+        if info_dict is None:
+            info_dict = dict()
         super().__init__(self.status_dict)
         self.filename = filename
         self.info = info_dict
@@ -107,6 +112,7 @@ class ProgressHookStatus(BaseStatus):
             return 0
         return 1 + self.download_progress
 
+
 class PPHookStatus(BaseStatus):
     status_dict = postprocessor_hook['status']
     valid = frozenset((
@@ -115,7 +121,9 @@ class PPHookStatus(BaseStatus):
         'finished',
     ))
 
-    def __init__(self, *args, status=None, postprocessor=None, info_dict={}, filename=None, **kwargs):
+    def __init__(self, *args, status=None, postprocessor=None, info_dict=None, filename=None, **kwargs):
+        if info_dict is None:
+            info_dict = dict()
         super().__init__(self.status_dict)
         self.filename = filename
         self.info = info_dict
@@ -123,10 +131,11 @@ class PPHookStatus(BaseStatus):
         self.name = postprocessor
         self.status = status
 
+
 def yt_dlp_progress_hook(event):
     if not ProgressHookStatus.valid_status(event['status']):
-        log.warn(f'[youtube-dl] unknown progress event: {str(event)}')
-        return None
+        log.warning(f'[youtube-dl] unknown progress event: {event!s}')
+        return
 
     key = None
     if 'display_id' in event['info_dict']:
@@ -156,6 +165,7 @@ def yt_dlp_progress_hook(event):
         percent = None
         try:
             percent = int(float(percent_str.rstrip('%')))
+        # ruff: ignore[S110]
         except:
             pass
         if fragment_index >= 0 and fragment_count > 0:
@@ -186,10 +196,11 @@ def yt_dlp_progress_hook(event):
 
         status.cleanup()
 
+
 def yt_dlp_postprocessor_hook(event):
     if not PPHookStatus.valid_status(event['status']):
-        log.warn(f'[youtube-dl] unknown postprocessor event: {str(event)}')
-        return None
+        log.warning(f'[youtube-dl] unknown postprocessor event: {event!s}')
+        return
 
     name = key = 'Unknown'
     filename = os.path.basename(event.get('filename', '???'))
@@ -233,6 +244,7 @@ def yt_dlp_postprocessor_hook(event):
         files_to_merge = event['info_dict'].get('__files_to_merge') or list()
         log.info(f'[{event["postprocessor"]}] Files to merge: {files_to_merge}')
         from .models import Media
+
         try:
             media = Media.objects.get(pk=status.media_uuid)
             media.new_metadata.value['requested_formats'] = event['info_dict'].get('requested_formats')
@@ -240,6 +252,7 @@ def yt_dlp_postprocessor_hook(event):
             media.new_metadata.save()
         except Media.DoesNotExist:
             pass
+        # ruff: ignore[BLE001]
         except Exception as e:
             log.exception(e)
     if 'finished' == event['status']:

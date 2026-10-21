@@ -1,0 +1,180 @@
+{% extends 'base.html' %}{% load humanize %}{% load filters %}
+
+{% block headtitle %}Services{% endblock %}
+
+{% block content %}
+<style>
+  /* Unique structural layout properties absent from core framework bundles */
+  .services-card { overflow: auto; }
+  .services-table { min-width: 800px; }
+  .services-table thead { background-color: #f5f5f5; position: sticky; top: 0; z-index: 1; }
+  .services-table th { color: #666; text-transform: uppercase; }
+  .services-table td { white-space: nowrap; }
+  
+  /* Flex alignment grid details */
+  .services-badge-container { gap: 6px; }
+  
+  /* High-Contrast Error Log Badges */
+  .services-code-badge { padding: 2px 6px; max-width: 100%; display: inline-block; }
+  .badge-exit-code { background-color: #212121 !important; }
+  .badge-signal { background-color: #3e2723 !important; }
+
+  /* Metric Card Box Styles */
+  .services-card-panel { padding: 15px; }
+  .services-card-panel span { display: block; }
+
+  /* Row States */
+  .row-service-down { background-color: #fff8e1 !important; }
+
+  /* Empty State Cell Details */
+  .cell-empty-state { padding: 48px; }
+  .cell-badge-column { overflow: hidden; text-overflow: ellipsis; }
+
+  /* Clean, semantic text wrapping utility class */
+  .cell-text-wrap { display: block !important; overflow-wrap: anywhere; white-space: normal !important; }
+
+  /* Clean, explicit atomic spacing utilities */
+  .pl-24 { padding-left: 24px !important; }
+  .pr-24 { padding-right: 24px !important; }
+
+  /* Independent Margin Utility Classes */
+  .mb-0 { margin-bottom: 0 !important; }
+  .mb-4 { margin-bottom: 4px !important; }
+
+  /* Independent Border Radius Utility Classes */
+  .br-3 { border-radius: 3px !important; }
+  .br-4 { border-radius: 4px !important; }
+  .br-6 { border-radius: 6px !important; }
+
+  /* Independent Font Weight Utility Classes */
+  .font-weight-500 { font-weight: 500; }
+  .font-weight-600 { font-weight: 600; }
+  .font-weight-700 { font-weight: 700; }
+
+  /* Modularized, isolated Font Size Utility Classes */
+  .font-size-80 { font-size: 0.8rem; }
+  .font-size-90 { font-size: 0.9rem; }
+  .font-size-95 { font-size: 0.95rem; }
+  .font-size-110 { font-size: 1.1rem; }
+
+  /* Typography family mappings */
+  .font-monospace { font-family: monospace; }
+
+  .blue-tubesync { background-color: #1e5c83; }
+</style>
+
+<div class="row">
+  <div class="col s12">
+    <h1>Services</h1>
+    <p class="caption">
+      Services are used to consume queued tasks, provide web pages, etc.
+    </p>
+  </div>
+</div>
+
+<!-- Header Overview Metric Cards -->
+<div class="row">
+  <div class="col s12 m6 l4">
+    <div class="card-panel blue-tubesync white-text text-center z-depth-1 services-card-panel br-6">
+      <span class="font-size-110 font-weight-500 mb-4">Total Services</span>
+      <h4 class="font-weight-700 mb-0">{{ total_count|default:"0" }}</h4>
+    </div>
+  </div>
+  <div class="col s12 m6 l4">
+    <div class="card-panel {% if total_count == running_count %}green{% else %}red lighten-1{% endif %} white-text text-center z-depth-1 services-card-panel br-6">
+      <span class="font-size-110 font-weight-500 mb-4">Running Services</span>
+      <h4 class="font-weight-700 mb-0">{{ running_count|default:"0" }}</h4>
+    </div>
+  </div>
+</div>
+
+<!-- Supervised Process Matrix Table -->
+<div class="row">
+  <div class="col s12">
+    <div class="card services-card z-depth-1 br-6">
+      <table class="striped highlight services-table mb-0">
+        <thead>
+          <tr>
+            <th class="pl-24 font-size-80 font-weight-600">Service Identifier</th>
+            <th class="font-size-80 font-weight-600">Status</th>
+            <th class="font-size-80 font-weight-600">PID</th>
+            <th class="font-size-80 font-weight-600">PGID</th>
+            <th class="pr-24 font-size-80 font-weight-600">State Duration</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for service in services %}
+          <tr class="{% if not service.is_running %}row-service-down{% endif %}">
+            
+            <!-- Service Name String -->
+            <td class="pl-24 font-size-95 font-weight-600 grey-text text-darken-4 cell-text-wrap">{{ service.name }}</td>
+
+            <!-- Real-time Status Badge Handling -->
+            <td class="cell-badge-column">
+              <div class="services-badge-container left valign-wrapper">
+                {% if service.is_running %}
+                  <span class="new badge green font-weight-600 br-4" data-badge-caption="Running"></span>
+                {% else %}
+                  <span class="new badge red font-weight-600 br-4" data-badge-caption="Down"></span>
+                  
+                  {% if service.exit_code is not None %}
+                    <code class="services-code-badge badge-exit-code white-text font-monospace font-size-80 font-weight-600 br-3">Exit Code: {{ service.exit_code }}</code>
+                  {% elif service.signal_name is not None %}
+                    <code class="services-code-badge badge-signal white-text font-monospace font-size-80 font-weight-600 br-3">Signal: {{ service.signal_name }}</code>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </td>
+ 
+            <!-- Process IDs (PID / PGID Mapping) -->
+            <td class="font-monospace font-size-90 grey-text text-darken-1">{{ service.pid|default:"-" }}</td>
+            <td class="font-monospace font-size-90 grey-text text-darken-1">{{ service.pgid|default:"-" }}</td>
+
+            <!-- Incrementing Duration Fields -->
+            <td class="pr-24">
+              <span class="service-uptime font-size-95 grey-text text-darken-3 font-weight-500" data-start-seconds="{{ service.elapsed_seconds }}">
+                {{ service.elapsed_seconds|timedelta }}
+              </span>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="center-align grey-text font-size-110 cell-empty-state">
+              No services included in this context.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Programmatic Active Live-Counter Increment script -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Poll updates locally over active elements to increment relative uptime cleanly
+    setInterval(function() {
+      const elements = document.querySelectorAll('.service-uptime');
+      elements.forEach(function(el) {
+        let currentSeconds = parseInt(el.getAttribute('data-start-seconds'), 10);
+        if (!isNaN(currentSeconds)) {
+          currentSeconds += 1;
+          el.setAttribute('data-start-seconds', currentSeconds);
+
+          // Generate simple, humanized relative output duration configurations
+          if (60 > currentSeconds) {
+            el.textContent = currentSeconds + ' seconds';
+          } else if (3600 > currentSeconds) {
+            el.textContent = Math.floor(currentSeconds / 60) + 'm ' + (currentSeconds % 60) + 's';
+          } else {
+            let hours = Math.floor(currentSeconds / 3600);
+            let mins = Math.floor((currentSeconds % 3600) / 60);
+            el.textContent = hours + 'h ' + mins + 'm';
+          }
+        }
+      });
+    }, 1000);
+  });
+</script>
+{% endblock %}

@@ -44,7 +44,7 @@
                   <strong>{{ source.media_count }}</strong> media items, <strong>{{ source.downloaded_count }}</strong> downloaded{% if source.delete_old_media and source.days_to_keep > 0 %}, keeping {{ source.days_to_keep }} days of media{% endif %}
                 </p>
                 <p class="mb-1">
-                  Next update target: <strong>{% if source.target_schedule %}{{ source.target_schedule|date:'l, h:00 A' }}{% else %}Not set{% endif %}</strong>
+                  Next update target: <strong>{% if source.target_schedule %}{{ source.target_schedule|date:'l, H:00' }}{% else %}Not set{% endif %}</strong>
                 </p>
                 {% endif %}
               </div>

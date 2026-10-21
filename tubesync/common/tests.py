@@ -1,4 +1,4 @@
-import os.path
+from pathlib import Path
 from django.conf import settings
 from django.test import TestCase, Client
 from .testutils import prevent_request_warnings
@@ -7,7 +7,6 @@ from .errors import DatabaseConnectionError
 
 
 class ErrorPageTestCase(TestCase):
-
     @prevent_request_warnings
     def test_error_403(self):
         c = Client()
@@ -28,7 +27,6 @@ class ErrorPageTestCase(TestCase):
 
 
 class HealthcheckTestCase(TestCase):
-
     def test_healthcheck(self):
         c = Client()
         response = c.get('/healthcheck')
@@ -37,36 +35,32 @@ class HealthcheckTestCase(TestCase):
 
 
 class CommonStaticTestCase(TestCase):
-
     def test_robots(self):
         response = self.client.get('/robots.txt')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content.decode(), settings.ROBOTS)
 
     def test_favicon(self):
+        root = Path(settings.STATIC_ROOT)
+
         # /favicon.ico should be a redirect to the real icon somewhere in STATIC_FILES
         response = self.client.get('/favicon.ico')
         self.assertEqual(response.status_code, 302)
         # Given tests run with DEBUG=False calls to files in /static/ will fail, check
         # the file exists on disk in common/static/ manually
-        root = settings.STATIC_ROOT
-        root_parts = str(root).split(os.sep)
-        url = response.url
-        if url.startswith('/'):
-            url = url[1:]
-        url_parts = url.split(os.sep)
-        if url_parts[0] == root_parts[-1]:
-            del root_parts[-1]
+        url_sep = '/'
+        url = response.url.removeprefix(url_sep)
+        url_parts = url.split(url_sep)
+        if url_parts[0] == root.name:
             del url_parts[0]
-        root_parts.append('common')
-        root_parts.append('static')
-        favicon_real_path = os.path.join(os.sep.join(root_parts),
-                                         os.sep.join(url_parts))
-        self.assertTrue(os.path.exists(favicon_real_path))
+            root = root.parent
+        root /= 'common'
+        root /= 'static'
+        favicon_real_path = root.joinpath(*url_parts)
+        self.assertTrue(favicon_real_path.exists())
 
 
 class UtilsTestCase(TestCase):
-
     def test_parse_database_connection_string(self):
         database_dict = parse_database_connection_string(
             'postgresql://tubesync:password@localhost:5432/tubesync')

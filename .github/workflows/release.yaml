@@ -24,7 +24,7 @@ jobs:
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
       # ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Get tag
         id: tag
         uses: ./.github/actions/get-tag

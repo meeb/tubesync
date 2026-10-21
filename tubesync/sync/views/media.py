@@ -1,8 +1,11 @@
 import glob
 import os
-from base64 import b64decode
 import pathlib
 import sys
+from base64 import b64decode
+from typing import ClassVar
+
+from django import forms
 from django.conf import settings
 from django.http import FileResponse, HttpResponseNotFound, HttpResponseRedirect
 from django.views.generic import ListView, DetailView
@@ -15,7 +18,6 @@ from django.utils.translation import gettext_lazy as _
 from common.models import TaskHistory
 from common.utils import append_uri_params, glob_quote
 from ..models import Source, Media, Metadata
-from django import forms
 from ..utils import delete_file
 from ..tasks import (
     get_media_download_task, download_media_image, download_media_file,
@@ -31,7 +33,7 @@ class MediaView(ListView):
     template_name = 'sync/media.html'
     context_object_name = 'media'
     paginate_by = settings.MEDIA_PER_PAGE
-    messages = {
+    messages: ClassVar[dict[str, str]] = {
         'filter': _('Viewing media filtered for source: <strong>{name}</strong>'),
     }
 
@@ -49,6 +51,7 @@ class MediaView(ListView):
             return str(arg).strip().lower() in (
                 'enable', 'enabled', 'on', 'true', 'yes', '1',
             )
+
         def post_or_get(request, /, key, default=None):
             return request.POST.get(key) or request.GET.get(key) or default
 
@@ -173,7 +176,7 @@ class MediaItemView(DetailView):
 
     template_name = 'sync/media-item.html'
     model = Media
-    messages = {
+    messages: ClassVar[dict[str, str]] = {
         'thumbnail': _('Thumbnail has been scheduled to redownload'),
         'redownloading': _('Media file has been deleted and scheduled to redownload'),
         'skipped': _('Media file has been deleted and marked to never download'),
@@ -198,6 +201,7 @@ class MediaItemView(DetailView):
         data['combined_format_dict'] = {'id': str(combined_format)}
         data['audio_format_dict'] = {'id': str(audio_format)}
         data['video_format_dict'] = {'id': str(video_format)}
+        # ruff: ignore[SIM118]
         context_keys = { k for k in data.keys() if k.endswith('_format_dict') }
         for fmt in self.object.iter_formats():
             for k in context_keys:
@@ -344,6 +348,8 @@ class MediaSkipView(FormView, SingleObjectMixin):
         if self.object.media_file_exists:
             # Delete all files which contains filename
             filepath = self.object.media_file.path
+            # fileext never used
+            # ruff: ignore[RUF059]
             barefilepath, fileext = os.path.splitext(filepath)
             # Delete the media file itself
             delete_file(self.object.media_file.path)
@@ -432,12 +438,13 @@ class MediaContent(DetailView):
             else:
                 pth = pth[0]
 
-
             # build final path
             filepth = pathlib.Path(str(settings.DOWNLOAD_ROOT) + pth)
 
             if filepth.exists():
                 # return file
+                # FileResponse is responsible for closing
+                # ruff: ignore[SIM115]
                 response = FileResponse(open(filepth,'rb'))
                 return response
             else:

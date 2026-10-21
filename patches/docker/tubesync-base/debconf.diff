@@ -1,6 +1,6 @@
 --- /etc/debconf.conf.orig	2025-03-10 12:07:15.000000000 +0000
 +++ /etc/debconf.conf	2026-03-01 12:49:05.110194306 +0000
-@@ -33,13 +33,23 @@
+@@ -33,13 +33,24 @@
  Driver: Stack
  Stack: config, passwords
  
@@ -17,6 +17,7 @@
 +Name: docker-templates
 +Driver: PackageDir
 +Mode: 644
++Backup: false
 +Directory: /var/cache/debconf/docker-templates
 +
 +Name: templatedb
