@@ -1,16 +1,20 @@
 import os
 import re
 import uuid
+
 from collections import deque as queue
 from pathlib import Path
 from typing import ClassVar
+
 from django import db
 from django.conf import settings
 from django.core.validators import RegexValidator
 from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
+
 from yt_dlp import DownloadError
+
 from ..choices import (Val,
     AudioTrack, SponsorBlock_Category, YouTube_SourceType, IndexSchedule,
     CapChoices, Fallback, FileExtension, FilterSeconds,
@@ -24,12 +28,9 @@ from ..youtube import (
     get_image_urls as get_youtube_image_urls,
     merge_image_thumbnails,
 )
+
 from ._migrations import media_file_storage
 from ._private import _srctype_dict
-
-
-def _has_index_metadata_value(value):
-    return bool(value) or value in (0, False,)
 
 
 class Source(db.models.Model):
@@ -619,6 +620,10 @@ class Source(db.models.Model):
             if not isinstance(response, dict):
                 return entries
             entries = response.pop('entries', list())
+
+            def _has_index_metadata_value(value):
+                return bool(value) or value in (0, False,)
+
             default_site = self.videos.model._meta.get_field('site').get_default()
             site = response.get('extractor_key') or default_site
             metadata, _ = self.videos.filter(
@@ -633,13 +638,15 @@ class Source(db.models.Model):
                 previous.get('thumbnails'),
                 response.get('thumbnails'),
             )
+    
             for key, value in previous.items():
                 if 'thumbnails' == key:
                     continue
-                if (
+                write_to_key = (
                     _has_index_metadata_value(value) and
                     not _has_index_metadata_value(response.get(key))
-                ):
+                )
+                if write_to_key:
                     response[key] = value
             update_fields = {'retrieved', 'value'}
             if site and site not in (metadata.site, default_site):
@@ -651,27 +658,35 @@ class Source(db.models.Model):
         return entries
 
     def index_media(self):
-        '''
-            Index the media source returning a queue of media metadata as dicts.
-        '''
-        entries = queue(list(), getattr(settings, 'MAX_ENTRIES_PROCESSING', 0) or None)
+        """
+        Index the media source returning a queue of media metadata as dicts and a set of media keys.
+        """
+        entries = queue(maxlen=getattr(settings, 'MAX_ENTRIES_PROCESSING', 0) or None)
+        seen_keys = set()
+        def register_key(item):
+            key = item.get(self.key_field, None)
+            if key is not None:
+                seen_keys.add(key)
+            return item
+
         if self.index_videos:
             videos = self.get_index('videos')
-            entries.extend(reversed(videos))
+            entries.extend(map(register_key, reversed(videos)))
+            del videos
 
         # Playlists do something different that I have yet to figure out
-        # ruff: ignore[SIM102]
-        if not self.is_playlist:
-            if self.index_streams:
-                streams = self.get_index('streams')
-                if entries.maxlen is None or 0 == len(entries):
-                    entries.extend(reversed(streams))
-                else:
-                    # share the queue between streams and videos
-                    allowed_streams = max(
-                        entries.maxlen // 2,
-                        entries.maxlen - len(entries),
-                    )
-                    entries.extend(reversed(streams[: allowed_streams]))
+        if not self.is_playlist and self.index_streams:
+            streams = self.get_index('streams')
+            if entries.maxlen is None or 0 == len(entries):
+                entries.extend(map(register_key, reversed(streams)))
+            else:
+                # share the queue between streams and videos
+                allowed_streams = max(
+                    entries.maxlen // 2,
+                    entries.maxlen - len(entries),
+                )
+                streams = tuple(map(register_key, streams))[: allowed_streams]
+                entries.extend(reversed(streams))
+            del streams
 
-        return entries
+        return entries, seen_keys
