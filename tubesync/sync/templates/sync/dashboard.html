@@ -87,31 +87,23 @@
       </div>
     </div>
   </div>
-  <div class="col s12 l6">
-    <div class="card dashcard">
-      <a href="{% url 'sync:services' %}">
-        <div class="card-content">
-          <div class="center-align">
-            <i class="fa-solid fa-pager fa-4x"></i>
-          </div>
-          <div class="desc truncate">Services</div>
-          <div class="truncate">View details about the state of services</div>
-        </div>
-      </a>
-    </div>
+  <div class="column is-half-desktop">
+    <a href="{% url 'sync:services' %}" class="box has-text-centered">
+      <div class="mb-3">
+        <i class="fa-solid fa-pager fa-4x"></i>
+      </div>
+      <div class="title is-3">Services</div>
+      <div class="subtitle is-6">View details about the state of services</div>
+    </a>
   </div>
   <div class="column is-half-desktop">
-    <div class="box has-text-centered">
-      <a href="/web-logs/index.html">
-        <div class="card-content">
-          <div class="center-align">
-            <i class="fa-solid fa-scroll fa-4x"></i>
-          </div>
-          <div class="title is-3">Logs</div>
-          <div class="subtitle is-6">View, search, and/or filter logs</div>
-        </div>
-      </a>
-    </div>
+    <a href="/web-logs/index.html" class="box has-text-centered">
+      <div class="mb-3">
+        <i class="fa-solid fa-scroll fa-4x"></i>
+      </div>
+      <div class="title is-3">Logs</div>
+      <div class="subtitle is-6">View, search, and/or filter logs</div>
+    </a>
   </div>
 </div>
 
