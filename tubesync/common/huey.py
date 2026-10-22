@@ -606,14 +606,19 @@ class AttemptsTask(Task):
     def retry_delay(self) -> int:
         attempt = getattr(self, '_custom_attempt_counter', 1)
         initial_delay = getattr(self, '_initial_retry_delay', 0)
+        retry_backoff = getattr(self, 'retry_backoff', None)
 
         algo_key = getattr(self, '_backoff_key', None)
         algo_class = self.backoff_base_class.lookup(algo_key)
 
-        if self.retry_backoff is None or 0 == self.retry_backoff:
+        if retry_backoff is None or 0 == retry_backoff:
             current_delay = getattr(self, '_retry_delay', initial_delay)
             return current_delay
         elif algo_class and issubclass(algo_class, self.backoff_base_class):
+            # Always exceed the initial delay value
+            while algo_class.calculate(attempt) <= initial_delay:
+                attempt += 1
+            self._custom_attempt_counter = attempt
             return algo_class.calculate(attempt)
 
         # Fallback Mode: Exponential math using Task-resolved defaults
