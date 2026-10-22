@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'django.contrib.humanize',
     'sass_processor',
     'django_huey',
+    'django_tasks_db',
     'common',
     'sync',
 ]
@@ -50,6 +51,13 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'tubesync.urls'
 FORCE_SCRIPT_NAME = None
 
+
+TASKS = {
+    'default': {
+        'BACKEND': 'django_tasks_db.DatabaseBackend',
+        'QUEUES': TaskQueue.values + ['default'],
+    },
+}
 
 DJANGO_HUEY = {
     'default': TaskQueue.LIMIT.value,
