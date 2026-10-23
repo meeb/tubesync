@@ -23,13 +23,13 @@
       </a>
       {% endif %}
       {% if only_skipped %}
-      <a href="{% url 'sync:media' %}{% querystring only_skipped=None %}" class="button is-primary">
-        <span class="icon"><i class="far fa-eye"></i></span>
+      <a href="{% url 'sync:media' %}{% querystring only_skipped=None %}" class="button">
+        <span class="icon"><i class="far fa-eye-slash"></i></span>
         <span>Only skipped media</span>
       </a>
       {% else %}
       <a href="{% url 'sync:media' %}{% querystring only_skipped='yes' %}" class="button">
-        <span class="icon"><i class="far fa-eye-slash"></i></span>
+        <span class="icon"><i class="far fa-eye"></i></span>
         <span>Only skipped media</span>
       </a>
       {% endif %}
@@ -54,7 +54,7 @@
           </div>
         </div>
         <div class="field is-narrow">
-          <label class="label">Options</label>
+          <label class="label">&nbsp;</label>
           <div class="control">
             <label class="checkbox">
               <input name="search_description" type="checkbox" value="yes"{% if search_description %} checked{% endif %} />
@@ -65,10 +65,7 @@
         <div class="field is-narrow">
           <label class="label">&nbsp;</label>
           <div class="control">
-            <button type="submit" class="button is-primary">
-              <span class="icon"><i class="fas fa-search"></i></span>
-              <span>Search</span>
-            </button>
+            <button type="submit" class="button is-primary">Go</button>
           </div>
         </div>
       </div>
