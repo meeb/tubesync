@@ -70,137 +70,119 @@
   </div>
 </div>
 {% endif %}
-<div class="columns">
-  <div class="column is-12">
-    <div class="box">
-      <h2 class="title is-5 mb-4">Media Details</h2>
-      <div class="content">
-        <table class="table is-fullwidth is-striped">
-          <tbody>
-            <tr>
-              <td><strong>Source</strong></td>
-              <td><a href="{% url 'sync:source' pk=media.source.pk %}">{{ media.source }}</a></td>
-            </tr>
-            <tr>
-              <td><strong>Duration</strong></td>
-              <td>{{ media.duration_formatted }}</td>
-            </tr>
-            <tr>
-              <td><strong>Published</strong></td>
-              <td>{{ media.published |date:'Y-m-d H:i' }}</td>
-            </tr>
-            <tr>
-              <td><strong>Desired format</strong></td>
-              <td>{{ media.source.format_summary }}</td>
-            </tr>
-            <tr>
-              <td><strong>Fallback</strong></td>
-              <td>{{ media.source.get_fallback_display }}</td>
-            </tr>
-            <tr>
-              <td><strong>Title</strong></td>
-              <td>{{ media.title }}</td>
-            </tr>
-            {% if not media.source.download_media %}
-            <tr>
-              <td><strong>Source download?</strong></td>
-              <td>{% if media.source.download_media %}<i class="fas fa-check has-text-success"></i>{% else %}<i class="fas fa-times has-text-danger"></i>{% endif %}</td>
-            </tr>
-            {% endif %}
-            {% if media.skip %}
-            <tr>
-              <td><strong>Skipping?</strong></td>
-              <td>{% if media.skip %}<i class="fas fa-check has-text-success"></i>{% else %}<i class="fas fa-times has-text-danger"></i>{% endif %}</td>
-            </tr>
-            {% else %}
-            <tr>
-              <td><strong>Downloaded?</strong></td>
-              <td>{% if media.downloaded %}<i class="fas fa-check has-text-success"></i> {{ media.download_date |date:'Y-m-d H:i:s' }}{% else %}<i class="fas fa-times has-text-danger"></i>{% endif %}</td>
-            </tr>
-            {% endif %}
-            {% if media.downloaded %}
-            <tr>
-              <td><strong>Filename</strong></td>
-              <td><code>{{ filename_path.name }}</code></td>
-            </tr>
-            <tr>
-              <td><strong>Directory</strong></td>
-              <td><code>{{ media.directory_path }}</code></td>
-            </tr>
-            <tr>
-              <td><strong>Database Filepath</strong></td>
-              <td><code>{{ media_file_path }}</code>{% if media_file_path == media.filepath %} <span class="tag is-success">matched</span>{% endif %}</td>
-            </tr>
-            <tr>
-              <td><strong>File size</strong></td>
-              <td>{{ media.downloaded_filesize|bytesformat }}</td>
-            </tr>
-            <tr>
-              <td><strong>Downloaded codecs</strong></td>
-              <td>audio:{{ media.downloaded_audio_codec }}{% if media.downloaded_video_codec %}, video:{{ media.downloaded_video_codec }}{% endif %}</td>
-            </tr>
-            <tr>
-              <td><strong>Container</strong></td>
-              <td><span class="tag">{{ media.downloaded_container|upper }}</span></td>
-            </tr>
-            {% if media.downloaded_video_codec %}
-            <tr>
-              <td><strong>Downloaded FPS</strong></td>
-              <td>{{ media.downloaded_fps }} FPS</td>
-            </tr>
-            <tr>
-              <td><strong>Downloaded HDR?</strong></td>
-              <td>{% if media.downloaded_hdr %}<i class="fas fa-check has-text-success"></i>{% else %}<i class="fas fa-times has-text-danger"></i>{% endif %}</td>
-            </tr>
-            {% endif %}
-            {% else %}
-            <tr>
-              <td><strong>Can download?</strong></td>
-              <td>{% if media.can_download %}<i class="fas fa-check has-text-success"></i>{% else %}<i class="fas fa-times has-text-danger"></i>{% endif %}</td>
-            </tr>
-            {% endif %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div class="box">
-      <h2 class="title is-5 mb-4">Available Formats</h2>
-      <div class="content">
+<table class="table is-striped is-fullwidth">
+  <tbody>
+    <tr title="The media source">
+      <td class="is-hidden-mobile">Source</td>
+      <td><span class="is-hidden-tablet">Source<br></span><strong><a href="{% url 'sync:source' pk=media.source.pk %}">{{ media.source }}</a></strong></td>
+    </tr>
+    <tr title="The media duration">
+      <td class="is-hidden-mobile">Duration</td>
+      <td><span class="is-hidden-tablet">Duration<br></span><strong>{{ media.duration_formatted }}</strong></td>
+    </tr>
+    <tr title="The media publication date">
+      <td class="is-hidden-mobile">Published</td>
+      <td><span class="is-hidden-tablet">Published<br></span><strong>{{ media.published |date:'Y-m-d H:i' }}</strong></td>
+    </tr>
+    <tr title="The desired format">
+      <td class="is-hidden-mobile">Desired format</td>
+      <td><span class="is-hidden-tablet">Desired format<br></span><strong>{{ media.source.format_summary }}</strong></td>
+    </tr>
+    <tr title="Fallback setting on the source">
+      <td class="is-hidden-mobile">Fallback</td>
+      <td><span class="is-hidden-tablet">Fallback<br></span><strong>{{ media.source.get_fallback_display }}</strong></td>
+    </tr>
+    <tr title="The media title">
+      <td class="is-hidden-mobile">Title</td>
+      <td><span class="is-hidden-tablet">Title<br></span><strong>{{ media.title }}</strong></td>
+    </tr>
+    {% if not media.source.download_media %}
+    <tr title="Is media marked to be downloaded at the source?">
+      <td class="is-hidden-mobile">Source download?</td>
+      <td><span class="is-hidden-tablet">Source download?<br></span><strong>{% if media.source.download_media %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+    </tr>
+    {% endif %}
+    {% if media.skip %}
+    <tr title="Is the media marked to be skipped?">
+      <td class="is-hidden-mobile">Skipping?</td>
+      <td><span class="is-hidden-tablet">Skipping?<br></span><strong>{% if media.skip %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+    </tr>
+    {% else %}
+    <tr title="Has the media been downloaded?">
+      <td class="is-hidden-mobile">Downloaded?</td>
+      <td><span class="is-hidden-tablet">Downloaded?<br></span><strong>{% if media.downloaded %}<i class="fas fa-check"></i>&nbsp;{{ media.download_date |date:'Y-m-d H:i:s' }}{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+    </tr>
+    {% endif %}
+    {% if media.downloaded %}
+    <tr title="The filename the media will be downloaded as">
+      <td class="is-hidden-mobile">Filename</td>
+      <td><span class="is-hidden-tablet">Filename<br></span><strong>{{ filename_path.name }}</strong></td>
+    </tr>
+    <tr title="The directory the media will be downloaded to">
+      <td class="is-hidden-mobile">Directory</td>
+      <td><span class="is-hidden-tablet">Directory<br></span><strong>{{ media.directory_path }}</strong></td>
+    </tr>
+    <tr title="The filepath the media was saved to">
+      <td class="is-hidden-mobile">Database&nbsp;Filepath</td>
+      <td><span class="is-hidden-tablet">DB&nbsp;Filepath<br></span><strong>{{ media_file_path }}</strong>
+        {% if media_file_path == media.filepath %}
+        <span class="has-text-success">&nbsp;(matched)</span>
+        {% endif %}
+      </td>
+    </tr>
+    <tr title="Size of the file on disk">
+      <td class="is-hidden-mobile">File size</td>
+      <td><span class="is-hidden-tablet">File size<br></span><strong>{{ media.downloaded_filesize|bytesformat }}</strong></td>
+    </tr>
+    <tr title="Codecs used in the downloaded file">
+      <td class="is-hidden-mobile">Downloaded codecs</td>
+      <td><span class="is-hidden-tablet">Downloaded codecs<br></span><strong>audio:{{ media.downloaded_audio_codec }}{% if media.downloaded_video_codec %}, video:{{ media.downloaded_video_codec }}{% endif %}</strong></td>
+    </tr>
+    <tr title="Container file format used in the download file">
+      <td class="is-hidden-mobile">Container</td>
+      <td><span class="is-hidden-tablet">Container<br></span><strong>{{ media.downloaded_container|upper }}</strong></td>
+    </tr>
+    {% if media.downloaded_video_codec %}
+    <tr title="Frames per second in the downloaded file">
+      <td class="is-hidden-mobile">Downloaded FPS</td>
+      <td><span class="is-hidden-tablet">Downloaded FPS<br></span><strong>{{ media.downloaded_fps }} FPS</strong></td>
+    </tr>
+    <tr title="Does the downloaded file have high dynamic range?">
+      <td class="is-hidden-mobile">Downloaded HDR?</td>
+      <td><span class="is-hidden-tablet">Downloaded HDR?<br></span><strong>{% if media.downloaded_hdr %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+    </tr>
+    {% endif %}
+    {% else %}
+    <tr title="Can the media be downloaded?">
+      <td class="is-hidden-mobile">Can download?</td>
+      <td><span class="is-hidden-tablet">Can download?<br></span><strong>{% if media.can_download %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
+    </tr>
+    {% endif %}
+    <tr title="The available media formats">
+      <td class="is-hidden-mobile">Available formats</td>
+      <td><span class="is-hidden-tablet">Available formats<br></span>
         {% for format in media.iter_formats %}
-        <div class="mb-2">
-          <strong>ID: {{ format.id }}</strong>
+        <div>
+          ID: <strong>{{ format.id }}</strong>
           {% if format.vcodec|lower != 'none' %}, {{ format.format_note }} ({{ format.width }}x{{ format.height }}), fps:{{ format.fps|lower }}, video:{{ format.vcodec }} @{{ format.vbr }}k{% endif %}
           {% if format.acodec|lower != 'none' %}, audio:{{ format.acodec }} {% if format.abr %}@{{ format.abr }}k / {% endif %}{{ format.asr|intcomma }}Hz{% if format.language_code %} [{{ format.language_code }}]{% endif %}{% if format.abr %} {{ format.format_note }}{% endif %}{% endif %}
-          {% if format.id == combined_format or format.id == audio_format or format.id == video_format %}<span class="tag is-success">matched</span>{% endif %}
+          {% if format.id == combined_format or format.id == audio_format or format.id == video_format %}<strong>(matched)</strong>{% endif %}
         </div>
         {% empty %}
-        <p class="has-text-grey">Media has no indexed available formats</p>
+        Media has no indexed available formats
         {% endfor %}
-      </div>
-    </div>
-    <div class="box">
-      <h2 class="title is-5 mb-4">Matched Formats</h2>
-      <div class="content">
-        <table class="table is-fullwidth">
-          <tbody>
-            <tr>
-              <td><strong>Combined</strong></td>
-              <td><strong>{% if combined_format %}{{ combined_format }}{% if combined_format_dict.language_code %} [{{ combined_format_dict.language_code }}]{% endif %} {% if combined_exact %}<span class="tag is-success">exact match</span>{% else %}<span class="tag is-warning">fallback</span>{% endif %}{% else %}<span class="tag is-danger">no match</span>{% endif %}</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Audio</strong></td>
-              <td><strong>{% if audio_format %}{{ audio_format }}{% if audio_format_dict.language_code %} [{{ audio_format_dict.language_code }}]{% endif %} {% if audio_exact %}<span class="tag is-success">exact match</span>{% else %}<span class="tag is-warning">fallback</span>{% endif %}{% else %}<span class="tag is-danger">no match</span>{% endif %}</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Video</strong></td>
-              <td><strong>{% if video_format %}{{ video_format }} {% if video_exact %}<span class="tag is-success">exact match</span>{% else %}<span class="tag is-warning">fallback</span>{% endif %}{% else %}<span class="tag is-danger">no match</span>{% endif %}</strong></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
+      </td>
+    </tr>
+    <tr title="Best available format for source requirements">
+      <td class="is-hidden-mobile">Matched formats</td>
+      <td><span class="is-hidden-tablet">Matched formats<br></span>
+        Combined: <strong>{% if combined_format %}{{ combined_format }}{% if combined_format_dict.language_code %} [{{ combined_format_dict.language_code }}]{% endif %} {% if combined_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}</strong><br>
+        Audio: <strong>{% if audio_format %}{{ audio_format }}{% if audio_format_dict.language_code %} [{{ audio_format_dict.language_code }}]{% endif %} {% if audio_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}</strong><br>
+        Video: <strong>{% if video_format %}{{ video_format }} {% if video_exact %}(exact match){% else %}(fallback){% endif %}{% else %}no match{% endif %}
+      </strong></td>
+    </tr>
+  </tbody>
+</table>
 {% if media.downloaded %}
 <div class="columns">
   <div class="column is-6">
