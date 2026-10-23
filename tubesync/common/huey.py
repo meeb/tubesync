@@ -6,7 +6,7 @@ import time
 import uuid
 from functools import partial
 from huey import (
-    CancelExecution, Huey as huey_Huey,
+    Huey as huey_Huey,
     signals, utils,
 )
 from huey.api import Task, TaskLock
@@ -153,14 +153,6 @@ class Huey(huey_Huey):
 
 class SqliteHuey(Huey):
     storage_class = SqliteStorage
-
-
-def CancelExecution_init(self, *args, retry=None, **kwargs):
-    self.retry = retry
-    super(CancelExecution, self).__init__(*args, **kwargs)
-
-
-CancelExecution.__init__ = CancelExecution_init
 
 
 def delay_to_eta(delay, /):
