@@ -3,24 +3,21 @@
 {% block headtitle %}Enable (unskip) media - {{ media }}{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Enable (unskip) <strong>{{ media }}</strong></h1>
-    <p>
-      You can enable your previously skipped media <strong>{{ media }}</strong>. This
-      will re-enable the media to be downloaded.
-    </p>
-  </div>
-</div>
-<div class="row">
-  <form method="post" action="{% url 'sync:enable-media' pk=media.pk %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Enable and download media <i class="fas fa-cloud-download-alt"></i></button>
-      </div>
+<h1 class="title mb-4">Enable (unskip) <strong>{{ media }}</strong></h1>
+<p class="mb-4">
+  You can enable your previously skipped media <strong>{{ media }}</strong>. This
+  will re-enable the media to be downloaded.
+</p>
+<form method="post" action="{% url 'sync:enable-media' pk=media.pk %}" class="simpleform">
+  {% csrf_token %}
+  {% include 'simpleform.html' with form=form %}
+  <div class="field pt-4 has-text-centered">
+    <div class="control">
+      <button class="button is-primary" type="submit" name="action">
+        <span class="icon"><i class="fas fa-cloud-download-alt"></i></span>
+        <span>Enable and download media</span>
+      </button>
     </div>
-  </form>
-</div>
+  </div>
+</form>
 {% endblock %}
