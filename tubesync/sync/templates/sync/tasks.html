@@ -117,6 +117,7 @@
         </small>
       </a>
     </div>
+    {% if not task.run_now %}
     <div class="buttons">
       <a href="{% url 'sync:revoke-task' pk=task.pk %}" class="button" title="Cancel task">
         <span class="icon"><i class="far fa-stop-circle"></i></span>
@@ -127,6 +128,7 @@
         <span>Reschedule</span>
       </a>
     </div>
+    {% endif %}
   </div>
   {% empty %}
   <div class="notification">
