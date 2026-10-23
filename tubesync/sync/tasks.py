@@ -4,6 +4,7 @@
 '''
 
 
+import contextlib
 import os
 import random
 import requests
@@ -18,6 +19,7 @@ from shutil import rmtree
 from django import db
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.tasks import task as django_task
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_huey import lock_task as huey_lock_task, task as huey_task
@@ -45,7 +47,7 @@ from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
 
 atomic = db.transaction.atomic
-register_huey_signals()
+cleanup_threads = register_huey_signals()
 
 
 def get_task_map():
@@ -378,6 +380,22 @@ def wait_for_errors(model, /, *, queue_name=None, task_name=None):
         raise HueyConsumerError(_('queue consumer stopped'))
 
 
+@django_task(backend='huey')
+def cleanup_huey_storage():
+    workers = cleanup_threads
+    if not all(
+        (callable(getattr(workers, 'clear', None)),) +
+        tuple(callable(getattr(w, 'join', None)) for w in workers) +
+        tuple(callable(getattr(w, 'start', None)) for w in workers),
+    ):
+        return
+    while workers:
+        worker = workers.pop()
+        with contextlib.suppress(RuntimeError):
+            worker.start()
+        worker.join()
+
+
 @db_task(priority=90, retries=2, retry_delay=150, queue=Val(TaskQueue.FS))
 @huey_lock_task('sync.tasks.cleanup_old_media', queue=Val(TaskQueue.FS))
 def cleanup_old_media(durable=True):
@@ -708,6 +726,15 @@ def index_source(source_id):
     return True
 
 
+@django_task(priority=100, queue_name=Val(TaskQueue.FS))
+def make_source_directory(source_id):
+    with contextlib.suppress(Source.DoesNotExist):
+        source = Source.objects.get(pk=source_id)
+        if not source.directory_exists():
+            log.info(f'Creating directory: {source.directory_path}')
+            source.make_directory()
+
+
 @db_task(priority=100, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.FS))
 def check_source_directory_exists(source_id):
     '''
@@ -723,8 +750,8 @@ def check_source_directory_exists(source_id):
     # Check the source output directory exists
     if not source.directory_exists():
         # Try to create it
-        log.info(f'Creating directory: {source.directory_path}')
         source.make_directory()
+        log.info(f'Created directory: {source.directory_path}')
 
 
 @db_task(delay=10, priority=90, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.LIMIT))
