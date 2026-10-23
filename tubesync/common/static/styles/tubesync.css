@@ -206,7 +206,11 @@ main h1.title {
 
 a.box,
 a.box .title,
-a.box .subtitle {
+a.box .subtitle,
+a.media-content,
+a.media-content .title,
+a.media-content .subtitle,
+a.media-content .content {
   color: var(--tubesync-light-blue);
 }
 

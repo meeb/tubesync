@@ -23,11 +23,11 @@
       <div class="card mb-4">
         <div class="card-content">
           <div class="media is-flex-direction-column-mobile">
-            <div class="media-content">
+            <a href="{% url 'sync:source' pk=source.pk %}" class="media-content">
               <h2 class="title is-5 mb-2">
                 <span class="icon-text">
                   <span class="icon">{{ source.icon|safe }}</span>
-                  <span><a href="{% url 'sync:source' pk=source.pk %}">{{ source.name }}</a></span>
+                  <span>{{ source.name }}</span>
                 </span>
               </h2>
               <p class="subtitle is-6 mb-2">
@@ -48,13 +48,10 @@
                 </p>
                 {% endif %}
               </div>
-            </div>
+            </a>
             <div class="media-right source-buttons">
               <div class="buttons">
-                <a href="{% url 'sync:source-sync-now' pk=source.pk %}" class="button is-primary">
-                  <span class="icon"><i class="fas fa-sync"></i></span>
-                  <span>Sync Now</span>
-                </a>
+                <a href="{% url 'sync:source-sync-now' pk=source.pk %}" class="button is-primary">Sync Now</a>
               </div>
             </div>
           </div>
