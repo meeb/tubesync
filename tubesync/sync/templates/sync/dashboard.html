@@ -111,23 +111,23 @@
 <div class="box">
   <table class="table is-fullwidth is-hoverable is-striped">
     <tbody>
-      <tr>
+      <tr title="User ID TubeSync is running under">
         <td>User ID</td>
         <td><strong>{{ uid }}</strong></td>
       </tr>
-      <tr>
+      <tr title="Group ID TubeSync is running under">
         <td>Group ID</td>
         <td><strong>{{ gid }}</strong></td>
       </tr>
-      <tr>
+      <tr title="Local directory where configuration data is stored">
         <td>Config directory</td>
         <td><strong>{{ config_dir }}</strong></td>
       </tr>
-      <tr>
+      <tr title="Local directory where media will be downloaded to">
         <td>Downloads directory</td>
         <td><strong>{{ downloads_dir }}</strong></td>
       </tr>
-      <tr>
+      <tr title="Database connection used by TubeSync">
         <td>Database</td>
         <td><strong>{{ database_connection }}{% if database_filesize %} ({{ database_filesize|bytesformat }}){% endif %}</strong></td>
       </tr>
