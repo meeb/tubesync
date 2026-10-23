@@ -95,7 +95,7 @@
   {% for task in scheduled %}
   <div class="mb-4 is-flex is-align-items-center is-justify-content-space-between">
     <div>
-      <a href="{%if task.instance.pk %}{% url task.url pk=task.instance.pk %}{% else %}#{{ task.task_id }}{% endif %}" title="View Source">
+      <a href="{%if task.instance.pk %}{% url task.url pk=task.instance.pk %}{% else %}#{{ task.task_id }}{% endif %}">
         <span class="icon-text">
           <span class="icon"><i class="fas fa-hourglass-start"></i></span>
           <span><strong>{{ task }}</strong></span>
