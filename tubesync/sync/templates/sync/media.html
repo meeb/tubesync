@@ -89,45 +89,45 @@
           <div class="content is-small">
             {% if m.downloaded %}
               <span class="icon-text">
-                <span class="icon has-text-success"><i class="fas fa-check-circle"></i></span>
+                <span class="icon has-text-success"><i class="fas fa-check-circle" title="Downloaded"></i></span>
                 <span>{{ m.download_date|date:'Y-m-d' }}</span>
               </span>
             {% else %}
               {% if m.manual_skip %}
               <span class="has-text-danger">
                 <span class="icon-text">
-                  <span class="icon"><i class="fas fa-times"></i></span>
+                  <span class="icon"><i class="fas fa-times" title="Skipping media"></i></span>
                   <span>Manually skipped</span>
                 </span>
               </span>
               {% elif m.skip %}
               <span class="has-text-danger">
                 <span class="icon-text">
-                  <span class="icon"><i class="fas fa-times"></i></span>
+                  <span class="icon"><i class="fas fa-times" title="Skipping media"></i></span>
                   <span>Skipped by system</span>
                 </span>
               </span>
               {% elif not m.source.download_media %}
               <span class="has-text-danger">
                 <span class="icon-text">
-                  <span class="icon"><i class="fas fa-times"></i></span>
+                  <span class="icon"><i class="fas fa-times" title="Not downloading media for this source"></i></span>
                   <span>Disabled at source</span>
                 </span>
               </span>
               {% elif not m.has_metadata %}
               <span class="icon-text">
-                <span class="icon"><i class="far fa-clock"></i></span>
+                <span class="icon"><i class="far fa-clock" title="Waiting for metadata"></i></span>
                 <span>Fetching metadata</span>
               </span>
               {% elif m.can_download %}
               <span class="icon-text">
-                <span class="icon"><i class="far fa-clock"></i></span>
+                <span class="icon"><i class="far fa-clock" title="Waiting to download or downloading"></i></span>
                 <span>Downloading</span>
               </span>
               {% else %}
               <span class="has-text-danger">
                 <span class="icon-text">
-                  <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+                  <span class="icon"><i class="fas fa-exclamation-triangle" title="No matching formats to download"></i></span>
                   <span>No matching formats</span>
                 </span>
               </span>
