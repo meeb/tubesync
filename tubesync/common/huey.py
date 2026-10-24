@@ -294,7 +294,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=No
         consumer=dict(
             workers=workers if thread else 1,
             worker_type='thread' if thread else 'process',
-            max_delay=20.0,
+            max_delay=29.0,
             max_tasks=10_000,
             check_worker_health=True,
             health_check_interval=30.0,
