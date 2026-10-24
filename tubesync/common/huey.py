@@ -590,7 +590,10 @@ class AttemptsTask(Task):
     def __init__(self, *args, backoff_class=None, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.backoff_class = backoff_class or self.backoff_class
+        # Used type to set backoff_class already?
+        # Otherwise, use the argument.
+        attr_backoff_class = getattr(self, 'backoff_class', None)
+        self.backoff_class = backoff_class or attr_backoff_class
         if self.backoff_class:
             # Register directly onto the algorithm base class
             self._backoff_key = self.backoff_base_class.register(self.backoff_class)
