@@ -7,7 +7,8 @@ import uuid
 from functools import partial
 from huey import (
     Huey as huey_Huey,
-    signals, utils,
+    signals,
+    utils,
 )
 from huey.api import Task, TaskLock
 from huey.exceptions import TaskLockedException
@@ -27,7 +28,9 @@ def _set_acquired(self, value=True):
         return False
     else:
         return True
-#TaskLock._set_acquired = _set_acquired
+
+
+# TaskLock._set_acquired = _set_acquired
 TaskLock.acquired = property(
     TaskLock.is_locked,
     _set_acquired,
@@ -67,10 +70,10 @@ class SqliteStorage(huey_SqliteStorage):
         try:
             current = int(current[0][0])
             expected = int(expected)
-        except (TypeError, ValueError,):
+        except (TypeError, ValueError):
             pass
         else:
-            vacuum_db = (current != expected)
+            vacuum_db = (current != expected)  # fmt: skip
         with self.db(close=True) as curs:
             curs.execute('PRAGMA wal_checkpoint(TRUNCATE)')
             if vacuum_db:
@@ -81,7 +84,7 @@ class SqliteStorage(huey_SqliteStorage):
 class Huey(huey_Huey):
     # do not use __len__ (pending_count) for bool
     def __bool__(self):
-        return (self._registry._registry or self._registry._periodic_tasks)
+        return (self._registry._registry or self._registry._periodic_tasks)  # fmt: skip
 
     def _emit(self, signal, task, *args, **kwargs):
         kwargs['huey'] = self
@@ -144,7 +147,7 @@ class Huey(huey_Huey):
             return None
         if self.utc:
             scheduled_at = task_obj.eta.replace(tzinfo=datetime.timezone.utc)
-        else: # this path is unlikely
+        else:  # this path is unlikely
             scheduled_at = timestamp_to_datetime(
                 datetime_to_timestamp(task_obj.eta, integer=False),
             ).astimezone(tz=datetime.timezone.utc)
@@ -161,9 +164,9 @@ def delay_to_eta(delay, /):
 
 def h_q_dict(q, /):
     return dict(
-        scheduled=(q.scheduled_count(), q.scheduled(),),
-        pending=(q.pending_count(), q.pending(),),
-        results=(q.result_count(), list(q.all_results().keys()),),
+        scheduled=(q.scheduled_count(), q.scheduled()),
+        pending=(q.pending_count(), q.pending()),
+        results=(q.result_count(), list(q.all_results().keys())),
     )
 
 
@@ -195,24 +198,25 @@ def start_consumer(queue_name):
         pass
     else:
         subprocess.Popen(
-            [ '/command/s6-svc', '-U', str(svc_dir) ],
-            stdout=-1, stderr=-1, start_new_session=True,
+            ['/command/s6-svc', '-U', str(svc_dir)],
+            stdout=-1, stderr=-1, start_new_session=True
         )
 
 
 def h_q_reset_maint_func(queue, /, exception=None, status=None):
-        if status is None:
-            return
-        elif 'started' == status:
-            start_consumer(queue.name)
-        elif 'exception' == status and exception is not None:
-            # log, but do not raise an exception
-            from huey.api import logger
-            logger.error(
-                f'{queue.name}: maintenance function exception: {exception}'
-            )
-            return
-        return True
+    if status is None:
+        return
+    elif 'started' == status:
+        start_consumer(queue.name)
+    elif 'exception' == status and exception is not None:
+        # log, but do not raise an exception
+        from huey.api import logger
+        logger.error(
+            f'{queue.name}: maintenance function exception: {exception}'
+        )
+        return
+    return True
+
 
 # Configuration convenience helpers
 
@@ -287,7 +291,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=No
         connection=dict(
             filename=str(Path(tasks_dir or '/config/tasks') / f'{name}.db'),
             fsync=True,
-            isolation_level='IMMEDIATE', # _create_connection sets this to None
+            isolation_level='IMMEDIATE',  # _create_connection sets this to None
             strict_fifo=True,
             timeout=60,
         ),
@@ -383,7 +387,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         signals.SIGNAL_ERROR,
         signals.SIGNAL_CANCELED,
         signals.SIGNAL_COMPLETE,
-    ))
+    ))  # fmt: skip
     recorded_signals = frozenset((
         signals.SIGNAL_REVOKED,
         signals.SIGNAL_EXPIRED,
@@ -391,7 +395,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         signals.SIGNAL_EXECUTING,
         signals.SIGNAL_RETRYING,
         signals.SIGNAL_RATE_LIMITED,
-    )) | add_to_elapsed_signals
+    )) | add_to_elapsed_signals  # fmt: skip
     storage_key = f'{storage_key_prefix}{task_obj.id}'
     task_obj_attr = '_signals_history'
 
@@ -403,7 +407,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
             peek=True,
         ) or dict(
             created=signal_dt,
-            data=(task_obj.args, repr(task_obj.kwargs),),
+            data=(task_obj.args, repr(task_obj.kwargs)),
             elapsed=0,
             module=task_obj.__module__,
             name=task_obj.name,
@@ -424,7 +428,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     # ruff: ignore[RUF059]
     th, created = retry_django_db(5)(TaskHistory.objects.get_or_create)(
         task_id=str(task_obj.id),
-        name=f"{task_obj.__module__}.{task_obj.name}",
+        name=f'{task_obj.__module__}.{task_obj.name}',
         queue=huey.name,
     )
     th.priority = task_obj.priority
@@ -461,10 +465,10 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
                 except ValueError:
                     instance_uuid = None
                 else:
-                    for model in (Source, Media,):
+                    for model in (Source, Media):
                         try:
                             model_instance = model.objects.get(pk=instance_uuid)
-                        except (model.DoesNotExist, ValidationError,):
+                        except (model.DoesNotExist, ValidationError):
                             pass
                         else:
                             if hasattr(model_instance, 'key'):
@@ -558,9 +562,11 @@ class BackoffAlgorithm:
         """
         Merges a BackoffAlgorithm subclass into the base class registry.
         """
-        algorithm_key = issubclass(algorithm, cls) and getattr(algorithm, 'key', cls.key)
+        algorithm_key = (
+            issubclass(algorithm, cls) and getattr(algorithm, 'key', cls.key)
+        )
         if algorithm_key:
-            cls._registry.update({ algorithm_key: algorithm })
+            cls._registry.update({algorithm_key: algorithm})
             return algorithm_key
 
 
@@ -570,7 +576,7 @@ class DjangoBackgroundTasksBackoff(BackoffAlgorithm):
     @staticmethod
     def calculate(attempt: int) -> int:
         # The exact formula used by django-background-tasks
-        return 5 + (attempt ** 4)
+        return 5 + (attempt ** 4)  # fmt: skip
 
 
 class AttemptsTask(Task):
