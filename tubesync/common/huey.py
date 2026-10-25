@@ -588,11 +588,13 @@ class AttemptsTask(Task):
     backoff_base_class = BackoffAlgorithm
 
     def __init__(self, *args, backoff_class=None, **kwargs):
+        attr_backoff_class = getattr(self, 'backoff_class', None)
+        default_retry_backoff = getattr(self, 'default_retry_backoff', 0)
+        self_retry_backoff = getattr(self, 'retry_backoff', default_retry_backoff)
         super().__init__(*args, **kwargs)
 
         # Used type to set backoff_class already?
         # Otherwise, use the argument.
-        attr_backoff_class = getattr(self, 'backoff_class', None)
         self.backoff_class = backoff_class or attr_backoff_class
         if self.backoff_class:
             # Register directly onto the algorithm base class
@@ -600,8 +602,17 @@ class AttemptsTask(Task):
 
         algo_key = getattr(self, '_backoff_key', None)
         retry_backoff = kwargs.get('retry_backoff', None)
-        if retry_backoff is None and not self.default_retry_backoff and algo_key:
-            self.retry_backoff = 1
+        # We had a backoff_class and registered it.
+        # No retry_backoff was specified.
+        # The default retry backoff (zero) was assigned.
+        set_retry_backoff = (
+            algo_key and
+            retry_backoff is None and
+            self_retry_backoff == default_retry_backoff and
+            self.retry_backoff == self.default_retry_backoff
+        )
+        if set_retry_backoff:
+            self.retry_backoff = 1.15
 
     @property
     def retry_delay(self) -> int:
