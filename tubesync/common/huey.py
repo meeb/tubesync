@@ -443,6 +443,25 @@ class Huey(huey_Huey):
 class SqliteHuey(Huey):
     storage_class = SqliteStorage
 
+    def create_consumer(self, **options):
+        from django.conf import settings
+        configs = list()
+        if (single := getattr(settings, 'HUEY', None)):
+            configs.append(single)
+        if (multiple := getattr(settings, 'DJANGO_HUEY', None)):
+            configs.extend(multiple.get('queues', {}).values())
+        try:
+            my_config = next(filter(lambda d: d.get('name') == self.name, configs))
+        except StopIteration:
+            pass
+        else:
+            self.storage_kwargs['blocking'] = my_config.get('consumer', {}).get('blocking') is True
+
+        if self.storage_kwargs['blocking'] and not self.storage.blocking:
+            self.storage.close()
+            self.storage = self.create_storage()
+        return super().create_consumer(**options)
+
 
 def CancelExecution_init(self, *args, retry=None, **kwargs):
     self.retry = retry
@@ -558,7 +577,7 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
     return maint_result
 
 
-def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=None):
+def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, blocking=False, tasks_dir=None):
     name_fmt = 'huey_{}'
     if prefix:
         name_fmt = f'huey_{prefix}_' + '{}'
@@ -589,6 +608,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=No
             timeout=60,
         ),
         consumer=dict(
+            blocking=blocking,
             workers=workers if thread else 1,
             worker_type='thread' if thread else 'process',
             max_delay=20.0,
