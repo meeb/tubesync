@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import ctypes
 import datetime
 import os
 import socket
@@ -10,6 +11,7 @@ import time
 import uuid
 
 from functools import partial
+from multiprocessing import Value
 from pathlib import Path
 from select import select
 from types import SimpleNamespace
@@ -44,6 +46,53 @@ TaskLock.acquired = property(
     _set_acquired,
     TaskLock.clear,
 )
+
+
+class BlockingCounter:
+    def __init__(self, initial_value=0):
+        if not self._is_valid(initial_value):
+            raise ValueError('Initial counter value must be a non-negative integer.')
+
+        self.lock = threading.RLock()
+        self._counter = Value(ctypes.c_int, initial_value)
+        self._cv = threading.Condition(lock=self.lock)
+
+    def _is_valid(self, val):
+        return isinstance(val, int) and val >= 0
+
+    def set_value(self, new_count):
+        if not self._is_valid(new_count):
+            return False
+
+        with self._cv:
+            self._counter.value = new_count
+            self._cv.notify(n=self._counter.value)
+        return True
+
+    def release(self, n=1):
+        return self.set_value(self._counter.value + n)
+
+    def acquire(self, timeout=None):
+        with self._cv:
+            success = self._cv.wait_for(lambda: self._counter.value > 0, timeout=timeout)
+            if not success:
+                return False
+
+            self._counter.value -= 1
+            return True
+
+    @property
+    def current_value(self):
+        """Introspection property to safely read the value at any time."""
+        return self._counter.value
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.release()
 
 
 class SqliteStorage(huey_SqliteStorage):
@@ -89,8 +138,7 @@ class SqliteStorage(huey_SqliteStorage):
 
         self._forked_child = False
         self._local = threading.local()
-        self._queued = threading.Semaphore(0)
-        self._queued_lock = threading.Lock()
+        self._queued = BlockingCounter(initial_value=0)
         self._serializer = Serializer()
         self._stopping = threading.Event()
         self._storage_key = self.broker_settings.STORAGE_KEY_FMT.format(self.name)
@@ -281,16 +329,8 @@ class SqliteStorage(huey_SqliteStorage):
             else:
                 self.sock_consumer.recv(self.broker_settings.BUFFER_SIZE)
 
-            with self._queued_lock:
-                ready_tasks = self.queue_size()
-
-                # drain
-                while self._queued.acquire(blocking=False):
-                    pass
-
-                # refill
-                for _ in range(ready_tasks):
-                    self._queued.release()
+            with self._queued.lock:
+                self._queued.set_value(self.queue_size())
 
             r, _, _ = select([self.sock_consumer], [], [])
         self._queued.release()
@@ -302,13 +342,13 @@ class SqliteStorage(huey_SqliteStorage):
 
     def dequeue(self):
         if not self.blocking:
-            with self._queued_lock:
+            with self._queued.lock:
                 return super().dequeue()
 
         while self._queued.acquire():
             task = None
             try:
-                with self._queued_lock:
+                with self._queued.lock:
                     if self._stopping.is_set():
                         return task
                     task = super().dequeue()
@@ -319,7 +359,7 @@ class SqliteStorage(huey_SqliteStorage):
                     self._queued.release()
 
     def enqueue(self, *args, **kwargs):
-        with self._queued_lock:
+        with self._queued.lock:
             res = super().enqueue(*args, **kwargs)
 
         addr = self._get_remote_broker_address()
