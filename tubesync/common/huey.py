@@ -1,18 +1,29 @@
 from __future__ import annotations
 
+import contextlib
 import datetime
+import os
+import socket
 import subprocess
+import threading
 import time
 import uuid
+
 from functools import partial
+from pathlib import Path
+from select import select
+from types import SimpleNamespace
+from typing import ClassVar
+
 from huey import (
     CancelExecution, Huey as huey_Huey,
     signals, utils,
 )
 from huey.api import Task, TaskLock
 from huey.exceptions import TaskLockedException
+from huey.serializer import Serializer
 from huey.storage import SqliteStorage as huey_SqliteStorage
-from pathlib import Path
+
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
 from .utils import get_usable_cpu_count
 from .yt_dlp import retry_django_db
@@ -37,45 +48,323 @@ TaskLock.acquired = property(
 
 class SqliteStorage(huey_SqliteStorage):
     begin_sql = 'BEGIN IMMEDIATE'
-    auto_vacuum = 'INCREMENTAL'
-    journal_size_limit = 1024 * 1024 * 64
-    wal_autocheckpoint = 100
-    vacuum_pages = 10
+
+    auto_vacuum_dict: ClassVar[dict[str, int]] = {'NONE': 0, 'FULL': 1, 'INCREMENTAL': 2}
+    pragma_settings = SimpleNamespace(
+        auto_vacuum = 'INCREMENTAL',
+        journal_size_limit = 1024 * 1024 * 64,
+        wal_autocheckpoint = 100,
+        vacuum_pages = 10,
+    )
+
+    broker_settings = SimpleNamespace(
+        # Max length of the queue of pending TCP connections
+        SOCKET_BACKLOG = 128,
+
+        # Chunk size in bytes for reading from socket stream buffers
+        BUFFER_SIZE = 4,
+
+        # Idle duration before select() yields to evaluate loop health
+        SELECT_TIMEOUT_SEC = 60.0,
+
+        # Network deadline for client connections to prevent blocking web threads
+        PRODUCER_TIMEOUT_SEC = 1.5,
+
+        # Bind globally to all interfaces on an OS-assigned ephemeral port
+        BIND_ADDR = ('0.0.0.0', 0),
+
+        # Start probing after 1 hour idle.
+        TCP_KEEPALIVE_IDLE_SEC=3600,
+        # Probe once per minute.
+        TCP_KEEPALIVE_INTERVAL_SEC=60,
+        # Give up after 5 unanswered probes.
+        TCP_KEEPALIVE_COUNT=5,
+
+        STORAGE_KEY_FMT = 'broker_endpoint:{}',
+    )
+
+    def __init__(self, name, *args, blocking=False, **kwargs):
+        self.blocking = blocking
+        super().__init__(name, *args, **kwargs)
+
+        self._forked_child = False
+        self._local = threading.local()
+        self._queued = threading.Semaphore(0)
+        self._queued_lock = threading.Lock()
+        self._serializer = Serializer()
+        self._stopping = threading.Event()
+        self._storage_key = self.broker_settings.STORAGE_KEY_FMT.format(self.name)
+        self.deserialize = self._serializer.deserialize
+        self.serialize = self._serializer.serialize
+
+        if callable(register_func := getattr(os, 'register_at_fork', None)):
+            register_func(
+                before=self._fork_parent_before,
+                after_in_parent=self._fork_parent_after,
+                after_in_child=self._fork_child_after
+            )
+
+        try:
+            self.sock_consumer, self.sock_broker = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+        except (AttributeError, ValueError, OSError):
+            self.sock_consumer, self.sock_broker = socket.socketpair(socket.AF_INET, socket.SOCK_STREAM)
+
+        self.start_broker_services()
+
+    def _fork_parent_before(self):
+        """Acquire locks to freeze storage in the parent process before cloning."""
+        self.lock.acquire()
+
+    def _fork_parent_after(self):
+        """Release storage locks back to the parent process."""
+        self.lock.release()
+
+    def _fork_child_after(self):
+        """Isolate the child process context after a fork occurs."""
+        self._forked_child = True
+
+        # Prevent garbage collection in the child
+        self._local.inherited = set()
+        self._local.inherited.add(getattr(self, '_conn', None))
+        self._local.inherited.add(getattr(self._local, 'sock', None))
+
+        # Clean up tracking variables first while the lock is still securely held
+        self._conn = None
+        self._local.sock = None
+        self._local.addr = None
+
+        self.lock.release()
 
     def _create_connection(self):
         conn = super()._create_connection()
-        conn.execute(f'PRAGMA auto_vacuum = {self.auto_vacuum}')
+        conn.execute(f'PRAGMA auto_vacuum = {self.pragma_settings.auto_vacuum}')
         conn.execute('PRAGMA foreign_keys = ON')
-        conn.execute(f'PRAGMA journal_size_limit = {self.journal_size_limit}')
+        conn.execute(f'PRAGMA journal_size_limit = {self.pragma_settings.journal_size_limit}')
         conn.execute('PRAGMA user_version = 1')
-        conn.execute(f'PRAGMA wal_autocheckpoint={self.wal_autocheckpoint}')
+        conn.execute(f'PRAGMA wal_autocheckpoint={self.pragma_settings.wal_autocheckpoint}')
         # copied from huey_SqliteHuey to use EXTRA or NORMAL
         # instead of FULL or OFF
         conn.execute('pragma synchronous=%s' % (3 if self._fsync else 1))
         # take at most vacuum_pages off the free list
-        conn.execute(f'PRAGMA incremental_vacuum({self.vacuum_pages})')
+        conn.execute(f'PRAGMA incremental_vacuum({self.pragma_settings.vacuum_pages})')
         return conn
+
+    def _cleanup_socket(self, sock, inputs_set):
+        """Safely tears down a socket descriptor and untracks it from the active set."""
+        if callable(close_func := getattr(sock, 'close', None)):
+            with contextlib.suppress(Exception):
+                close_func()
+        inputs_set.discard(sock)
+
+    def _configure_tcp_keepalive(self, sock):
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+
+        # Linux uses TCP_KEEPIDLE; macOS and some other systems use TCP_KEEPALIVE.
+        idle_option = getattr(
+            socket,
+            'TCP_KEEPIDLE',
+            getattr(socket, 'TCP_KEEPALIVE', None),
+        )
+        options = (
+            (idle_option, self.broker_settings.TCP_KEEPALIVE_IDLE_SEC),
+            (
+                getattr(socket, 'TCP_KEEPINTVL', None),
+                self.broker_settings.TCP_KEEPALIVE_INTERVAL_SEC,
+            ),
+            (
+                getattr(socket, 'TCP_KEEPCNT', None),
+                self.broker_settings.TCP_KEEPALIVE_COUNT,
+            ),
+        )
+
+        for option, value in options:
+            if option is not None:
+                with contextlib.suppress(OSError):
+                    sock.setsockopt(socket.IPPROTO_TCP, option, value)
+
+    def _get_pooled_socket(self, current_addr):
+        """Manages thread-local socket reuse, ensuring configuration drift triggers updates safely."""
+        cached_sock = getattr(self._local, 'sock', None)
+        cached_addr = getattr(self._local, 'addr', None)
+
+        if cached_sock and cached_addr != current_addr:
+            with contextlib.suppress(Exception):
+                cached_sock.close()
+            cached_sock = None
+
+        if cached_sock is None:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._configure_tcp_keepalive(sock)
+                sock.settimeout(self.broker_settings.PRODUCER_TIMEOUT_SEC)
+                sock.connect(current_addr)
+
+                self._local.sock = sock
+                self._local.addr = current_addr
+                return sock
+            # ruff: ignore[BLE001]
+            except Exception:
+                return None
+
+        return cached_sock
+
+    def _get_primary_network_ip(self):
+        """Resolves the host's actual network interface IP address by checking
+        the routing table path to the secondary DNS anycast address.
+        """
+        with contextlib.suppress(Exception), socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(('8.8.4.4', 53))
+            l_addr, _ =  s.getsockname()
+            return l_addr
+        return '127.0.0.1'
+
+    def _get_remote_broker_address(self):
+        """Fetches and unpacks the cached connection tuple from storage using Huey's native hooks."""
+        data = self.peek_data(self._storage_key)
+        if data:
+            with contextlib.suppress(Exception):
+                return self.deserialize(data)
+        return None
+
+    def _run_tcp_and_discovery_service(self):
+        """Binds globally to all interfaces and registers its discoverable multi-host location."""
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind(self.broker_settings.BIND_ADDR)
+
+        _, bound_port = server.getsockname()
+        server.listen(self.broker_settings.SOCKET_BACKLOG)
+
+        # Store the exact (ip, port) tuple directly using Huey's built-in serialization API
+        addr_tuple = (self._get_primary_network_ip(), bound_port)
+        self.put_data(self._storage_key, self.serialize(addr_tuple))
+        self.sock_broker.sendall(b'1')
+
+        inputs_set = {server}
+        set_mutated = True
+        while not self._stopping.is_set():
+            if set_mutated:
+                cached_inputs_list = list(inputs_set)
+                set_mutated = False
+
+            readable, _, _ = select(cached_inputs_list, [], [], self.broker_settings.SELECT_TIMEOUT_SEC)
+
+            for sock in readable:
+                if sock is server:
+                    client, _ = sock.accept()
+                    self._configure_tcp_keepalive(client)
+                    inputs_set.add(client)
+                    set_mutated = True
+                else:
+                    try:
+                        if sock.recv(self.broker_settings.BUFFER_SIZE):
+                            self.sock_broker.sendall(b'1')
+                        else:
+                            self._cleanup_socket(sock, inputs_set)
+                            set_mutated = True
+                    # ruff: ignore[BLE001]
+                    except Exception:
+                        self._cleanup_socket(sock, inputs_set)
+                        set_mutated = True
+        addr_tuple = ('0.0.0.0', bound_port)
+        self.put_data(self._storage_key, self.serialize(addr_tuple))
+        self.sock_broker.sendall(b'1')
+        cached_inputs_list = list(inputs_set)
+        for sock in cached_inputs_list:
+            self._cleanup_socket(sock, inputs_set)
+
+    def _unix_socket_handler(self):
+        """Wakes up instantly via the local Unix gate to re-balance capacities to true DB depth."""
+        first_time = r = True
+        while not self._stopping.is_set() and r:
+            if first_time:
+                first_time = False
+            else:
+                self.sock_consumer.recv(self.broker_settings.BUFFER_SIZE)
+
+            with self._queued_lock:
+                ready_tasks = self.queue_size()
+
+                # drain
+                while self._queued.acquire(blocking=False):
+                    pass
+
+                # refill
+                for _ in range(ready_tasks):
+                    self._queued.release()
+
+            r, _, _ = select([self.sock_consumer], [], [])
+        self._queued.release()
+
+    def close(self):
+        self._stopping.set()
+        self._queued.release()
+        return super().close()
+
+    def dequeue(self):
+        if not self.blocking:
+            with self._queued_lock:
+                return super().dequeue()
+
+        while self._queued.acquire():
+            task = None
+            try:
+                with self._queued_lock:
+                    if self._stopping.is_set():
+                        return task
+                    task = super().dequeue()
+                    if task is not None:
+                        return task
+            finally:
+                if task is None:
+                    self._queued.release()
+
+    def enqueue(self, *args, **kwargs):
+        with self._queued_lock:
+            res = super().enqueue(*args, **kwargs)
+
+        addr = self._get_remote_broker_address()
+        if addr and '0.0.0.0' != addr[0]:
+            sock = self._get_pooled_socket(addr)
+            if sock:
+                try:
+                    sock.sendall(b'w')
+                # ruff: ignore[BLE001]
+                except Exception:
+                    self._local.addr = None
+                    with contextlib.suppress(Exception):
+                        sock.close()
+                    self._local.sock = None
+
+                    if (retry_sock := self._get_pooled_socket(addr)):
+                        with contextlib.suppress(Exception):
+                            retry_sock.sendall(b'w')
+        return res
 
     def initialize_schema(self):
         super().initialize_schema()
-        auto_vacuum_dict = {'NONE': 0, 'FULL': 1, 'INCREMENTAL': 2}
-        valid = set(auto_vacuum_dict.values()) | set(auto_vacuum_dict.keys())
-        assert self.auto_vacuum in valid, 'auto_vacuum was invalid'
+        configured = self.pragma_settings.auto_vacuum
+        valid = set(self.auto_vacuum_dict.values()) | set(self.auto_vacuum_dict.keys())
+        assert configured in valid, 'auto_vacuum was invalid'
         current = self.sql('PRAGMA auto_vacuum', results=True)
-        expected = auto_vacuum_dict.get(self.auto_vacuum) or self.auto_vacuum
         vacuum_db = True
         try:
             current = int(current[0][0])
-            expected = int(expected)
+            expected = int(self.auto_vacuum_dict.get(configured, configured))
         except (TypeError, ValueError,):
             pass
         else:
-            vacuum_db = (current != expected)
+            vacuum_db = (expected != current)
         with self.db(close=True) as curs:
             curs.execute('PRAGMA wal_checkpoint(TRUNCATE)')
             if vacuum_db:
-                curs.execute(f'PRAGMA auto_vacuum = {self.auto_vacuum}')
+                curs.execute(f'PRAGMA auto_vacuum = {configured}')
                 curs.execute('VACUUM')
+
+    def start_broker_services(self):
+        """Spawns background network loops if this process is the manager parent."""
+        if self.blocking and self._forked_child is False:
+            threading.Thread(target=self._run_tcp_and_discovery_service, daemon=True).start()
+            threading.Thread(target=self._unix_socket_handler, daemon=True).start()
 
 
 class Huey(huey_Huey):
@@ -432,7 +721,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     # ruff: ignore[RUF059]
     th, created = retry_django_db(5)(TaskHistory.objects.get_or_create)(
         task_id=str(task_obj.id),
-        name=f"{task_obj.__module__}.{task_obj.name}",
+        name=f'{task_obj.__module__}.{task_obj.name}',
         queue=huey.name,
     )
     th.priority = task_obj.priority
