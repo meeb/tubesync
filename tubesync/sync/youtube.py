@@ -7,10 +7,12 @@
 # ruff: file-ignore[SIM118]
 
 import os
+import shutil
 
 from common.errors import FormatUnavailableError
 from common.logger import log
 from common.utils import mkdir_p
+from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -188,6 +190,39 @@ def _subscriber_only(msg='', response=None):
     return False
 
 
+def _age_restricted(msg=''):
+    msg = str(msg).lower()
+    return any(reason in msg for reason in (
+        'confirm your age',
+        'age-restricted',
+        'inappropriate for some users',
+    ))
+
+
+def _age_restricted_cookies_file():
+    cookie_file = getattr(settings, 'AGE_RESTRICTED_COOKIES_FILE', None)
+    if cookie_file and Path(cookie_file).is_file():
+        return Path(cookie_file)
+    return None
+
+
+@contextmanager
+def _age_restricted_opts(opts):
+    '''
+        Yields a copy of opts that uses a temporary copy of the age restricted
+        cookies file. yt-dlp writes updated cookies back to its cookie file,
+        so the configured file itself is never handed to yt-dlp.
+    '''
+    cookie_file = _age_restricted_cookies_file()
+    with TemporaryDirectory(prefix='.yt_dlp-cookies-') as temp_dir:
+        temp_cookie_file = Path(temp_dir) / cookie_file.name
+        shutil.copyfile(cookie_file, temp_cookie_file)
+        log.info(f'[youtube-dl] retrying with age restricted cookies from: {cookie_file}')
+        age_opts = dict(opts)
+        age_opts['cookiefile'] = str(temp_cookie_file)
+        yield age_opts
+
+
 def get_media_info(url, /, *, days=None, info_json=None):
     '''
         Extracts information from a YouTube URL and returns it as a dict. For a channel
@@ -274,18 +309,26 @@ def get_media_info(url, /, *, days=None, info_json=None):
         try:
             response = y.extract_info(url, download=False)
         except yt_dlp.utils.DownloadError as e:
-            if not _subscriber_only(msg=e.msg):
+            if _age_restricted(msg=e.msg) and _age_restricted_cookies_file():
+                # try again with the age restricted cookies
+                with _age_restricted_opts(opts) as age_opts, yt_dlp.YoutubeDL(age_opts) as yy:
+                    try:
+                        response = yy.extract_info(url, download=False)
+                    except yt_dlp.utils.DownloadError as ee:
+                        raise YouTubeError(f'Failed (again) to extract_info for "{url}": {ee}') from ee
+            elif not _subscriber_only(msg=e.msg):
                 raise YouTubeError(f'Failed to extract_info for "{url}": {e}') from e
-            # adjust options and try again
-            opts.update({'ignore_no_formats_error': True,})
-            with yt_dlp.YoutubeDL(opts) as yy:
-                try:
-                    response = yy.extract_info(url, download=False)
-                except yt_dlp.utils.DownloadError as ee:
-                    raise YouTubeError(f'Failed (again) to extract_info for "{url}": {ee}') from ee
-                # validate the response is what we expected
-                if not _subscriber_only(response=response):
-                    response = {}
+            else:
+                # adjust options and try again
+                opts.update({'ignore_no_formats_error': True,})
+                with yt_dlp.YoutubeDL(opts) as yy:
+                    try:
+                        response = yy.extract_info(url, download=False)
+                    except yt_dlp.utils.DownloadError as ee:
+                        raise YouTubeError(f'Failed (again) to extract_info for "{url}": {ee}') from ee
+                    # validate the response is what we expected
+                    if not _subscriber_only(response=response):
+                        response = {}
 
     if not response:
         raise YouTubeError(f'Failed to extract_info for "{url}": No metadata was '
@@ -473,15 +516,25 @@ def download_media(
 
     opts.update(ytopts)
 
+    def _download_error(e):
+        remove_unavailable_format = (
+            settings.YOUTUBE_DL_SKIP_UNAVAILABLE_FORMAT and
+            ': Requested format is not available.' in str(e)
+        )
+        if remove_unavailable_format:
+            return FormatUnavailableError(url, exc=e.__cause__, format=opts.get('format'))
+        return YouTubeError(f'Failed to download for "{url}": {e}')
+
     with yt_dlp.YoutubeDL(opts) as y:
         try:
             return y.download([url])
         except yt_dlp.utils.DownloadError as e:
-            remove_unavailable_format = (
-                settings.YOUTUBE_DL_SKIP_UNAVAILABLE_FORMAT and
-                ': Requested format is not available.' in str(e)
-            )
-            if remove_unavailable_format:
-                raise FormatUnavailableError(url, exc=e.__cause__, format=opts.get('format')) from e
-            raise YouTubeError(f'Failed to download for "{url}": {e}') from e
+            if not (_age_restricted(msg=e.msg) and _age_restricted_cookies_file()):
+                raise _download_error(e) from e
+            # try again with the age restricted cookies
+            with _age_restricted_opts(opts) as age_opts, yt_dlp.YoutubeDL(age_opts) as yy:
+                try:
+                    return yy.download([url])
+                except yt_dlp.utils.DownloadError as ee:
+                    raise _download_error(ee) from ee
     return False
