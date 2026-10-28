@@ -214,6 +214,9 @@ def _age_restricted_opts(opts):
         so the configured file itself is never handed to yt-dlp.
     '''
     cookie_file = _age_restricted_cookies_file()
+    if cookie_file is None:
+        yield dict(opts)
+        return
     with TemporaryDirectory(prefix='.yt_dlp-cookies-') as temp_dir:
         temp_cookie_file = Path(temp_dir) / cookie_file.name
         shutil.copyfile(cookie_file, temp_cookie_file)
