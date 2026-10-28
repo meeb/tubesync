@@ -19,6 +19,7 @@ from .tasks import (
 )
 from .utils import delete_file
 from .filtering import filter_media
+from .thumb_key import sync_media_thumb_key_symlink
 
 
 @receiver(pre_save, sender=Source)
@@ -170,6 +171,7 @@ def source_pre_delete(sender, instance, **kwargs):
 @receiver(post_save, sender=Media)
 def media_post_save(sender, instance, created, **kwargs):
     media = instance
+    sync_media_thumb_key_symlink(media)
     # If the media is skipped manually, bail.
     if instance.manual_skip:
         return
