@@ -7,7 +7,6 @@
 # ruff: file-ignore[SIM118]
 
 import os
-import shutil
 
 from common.errors import FormatUnavailableError
 from common.logger import log
@@ -219,7 +218,8 @@ def _age_restricted_opts(opts):
         return
     with TemporaryDirectory(prefix='.yt_dlp-cookies-') as temp_dir:
         temp_cookie_file = Path(temp_dir) / cookie_file.name
-        shutil.copyfile(cookie_file, temp_cookie_file)
+        with temp_cookie_file.open(mode='xb') as fdest:
+            fdest.write(cookie_file.read_bytes())
         log.info(f'[youtube-dl] retrying with age restricted cookies from: {cookie_file}')
         age_opts = dict(opts)
         age_opts['cookiefile'] = str(temp_cookie_file)
