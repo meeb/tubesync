@@ -5,7 +5,7 @@ from django_huey import DJANGO_HUEY
 from common.huey import h_q_reset_maint_func, h_q_reset_tasks
 from common.logger import log
 from sync.models import Source
-from sync.tasks import check_source_directory_exists
+from sync.tasks import make_source_directory
 
 
 class Command(BaseCommand):
@@ -19,7 +19,7 @@ class Command(BaseCommand):
             # Iter all sources, creating new tasks
             for source in Source.objects.all():
                 log.info(f'Resetting tasks for source: {source}')
-                check_source_directory_exists(str(source.pk))
+                make_source_directory.enqueue(str(source.pk))
                 # This also chains down to call each Media objects .save() as well
                 source.save()
 

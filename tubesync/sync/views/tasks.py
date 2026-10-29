@@ -24,7 +24,7 @@ from ..models import Source
 from ..forms import ScheduleTaskForm
 from ..tasks import (
     get_task_map, map_task_to_instance, get_error_message,
-    get_running_tasks, check_source_directory_exists,
+    get_running_tasks, make_source_directory,
 )
 
 
@@ -295,7 +295,7 @@ class ResetTasks(FormView):
             h_q_reset_tasks(queue_name, maint_func=h_q_reset_maint_func)
         # Iter all tasks
         for source in Source.objects.all():
-            check_source_directory_exists(str(source.pk))
+            make_source_directory.enqueue(str(source.pk))
             # This also chains down to call each Media objects .save() as well
             source.save()
         return super().form_valid(form)
