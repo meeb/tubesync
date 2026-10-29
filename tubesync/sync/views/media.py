@@ -5,7 +5,6 @@ import sys
 from base64 import b64decode
 from typing import ClassVar
 
-from django import forms
 from django.conf import settings
 from django.http import FileResponse, HttpResponseNotFound, HttpResponseRedirect
 from django.views.generic import ListView, DetailView
