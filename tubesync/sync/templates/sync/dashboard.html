@@ -63,7 +63,7 @@
         {% for media in latest_downloads %}
         <a href="{% url 'sync:media-item' pk=media.pk %}" class="download-item is-block is-fullwidth p-3">
           <div class="is-clipped mb-1"><strong>{{ media.name }}</strong></div>
-          <div class="is-clipped"><strong>{{ media.download_date|timesince:now }} ago</strong> from "{{ media.source.name }}"</div>
+          <div class="is-clipped"><strong>{{ media.download_date|timesince:now }}</strong> ago from &quot;{{ media.source.name }}&quot;</div>
         </a>
         {% empty %}
         <div class="download-item is-block is-fullwidth p-3">No media has been downloaded.</div>
