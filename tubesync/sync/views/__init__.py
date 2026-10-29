@@ -1,21 +1,18 @@
 from .dashboard import DashboardView
-from .sources import (
-    SourcesView, ValidateSourceView, AddSourceView, SourceView,
-    UpdateSourceView, DeleteSourceView, SourceSyncNowView
-)
-from .media import (
-    MediaView, MediaThumbView, MediaItemView, MediaRedownloadView,
-    MediaSkipView, MediaEnableView, MediaContent
-)
-from .tasks import (
-    TasksView, CompletedTasksView, ResetTasks, TaskScheduleView,
-    RevokeTaskView
-)
-from .mediaservers import (
-    MediaServersView, AddMediaServerView, MediaServerView,
-    DeleteMediaServerView, UpdateMediaServerView
-)
+from .sources import (SourcesView, SourceSyncNowView, ValidateSourceView,
+                      AddSourceView, SourceView, UpdateSourceView,
+                      DeleteSourceView)
+from .media import (MediaView, MediaThumbView, MediaItemView,
+                    MediaRedownloadView, MediaSkipView, MediaEnableView,
+                    MediaContent)
+from .services import ServicesView
+from .tasks import (TasksView, RevokeTaskView, CompletedTasksView,
+                    ResetTasks, TaskScheduleView)
+from .mediaservers import (MediaServersView, AddMediaServerView,
+                           MediaServerView, DeleteMediaServerView,
+                           UpdateMediaServerView)
 
+# ruff: ignore[RUF022]
 __all__ = [
     'DashboardView',
     'SourcesView', 'ValidateSourceView', 'AddSourceView',
@@ -24,8 +21,9 @@ __all__ = [
     'MediaView', 'MediaThumbView', 'MediaItemView',
     'MediaRedownloadView', 'MediaSkipView', 'MediaEnableView',
     'MediaContent',
-    'TasksView', 'CompletedTasksView', 'ResetTasks',
-    'TaskScheduleView', 'RevokeTaskView',
+    'ServicesView',
+    'TasksView', 'RevokeTaskView', 'CompletedTasksView', 'ResetTasks',
+    'TaskScheduleView',
     'MediaServersView', 'AddMediaServerView', 'MediaServerView',
     'DeleteMediaServerView', 'UpdateMediaServerView',
 ]

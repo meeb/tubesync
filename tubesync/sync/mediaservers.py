@@ -1,32 +1,37 @@
-import warnings
-from xml.etree import ElementTree
 import requests
-from django.forms import ValidationError
+import warnings
+from typing import ClassVar
 from urllib.parse import urlsplit, urlunsplit, urlencode
-from django.utils.translation import gettext_lazy as _
-from common.logger import log
+from xml.etree import ElementTree
+
 from django.conf import settings
+from django.forms import ValidationError
+from django.utils.translation import gettext_lazy as _
+
+from common.logger import log
 
 
 class MediaServerError(Exception):
-    '''
+    """
         Raised when a back-end error occurs.
-    '''
-    pass
+    """
 
 
 class MediaServer:
-
     TIMEOUT = 0
     HELP = ''
-    default_headers = {'User-Agent': 'TubeSync'}
+    default_headers: ClassVar[dict[str, str]] = {'User-Agent': 'TubeSync'}
 
     def __init__(self, mediaserver_instance):
         self.object = mediaserver_instance
         self.headers = dict(**self.default_headers)
         self.token = None
 
-    def make_request_args(self, uri='/', token_header=None, headers={}, token_param=None, params={}):
+    def make_request_args(self, uri='/', token_header=None, headers=None, token_param=None, params=None):
+        if headers is None:
+            headers = dict()
+        if params is None:
+            params = dict()
         base_parts = urlsplit(self.object.url)
         if self.token is None:
             self.token = self.object.options['token'] or None
@@ -47,7 +52,7 @@ class MediaServer:
                 timeout=self.TIMEOUT,
             ))
 
-    def make_request(self, uri='/', /, *, headers={}, params={}):
+    def make_request(self, uri='/', /, *, headers=None, params=None):
         '''
             A very simple implementation is:
                 url, kwargs = self.make_request_args(uri=uri, headers=headers, params=params)
@@ -69,7 +74,6 @@ class MediaServer:
 
 
 class PlexMediaServer(MediaServer):
-
     TIMEOUT = 5
 
     HELP = _('<p>To connect your TubeSync sevrer to your Plex Media Server you will '
@@ -87,7 +91,11 @@ class PlexMediaServer(MediaServer):
              '<a href="https://www.plexopedia.com/plex-media-server/api/server/libraries/" '
              'target="_blank">here</a></p>.')
 
-    def make_request(self, uri='/', /, *, headers={}, params={}):
+    def make_request(self, uri='/', /, *, headers=None, params=None):
+        if headers is None:
+            headers = dict()
+        if params is None:
+            params = dict()
         url, kwargs = self.make_request_args(uri=uri, headers=headers, token_param='X-Plex-Token', params=params)
         log.debug(f'[plex media server] Making HTTP GET request to: {url}')
         if self.object.use_https and not kwargs['verify']:
@@ -147,6 +155,7 @@ class PlexMediaServer(MediaServer):
                                   f'{response.status_code}.' + check_token)
         try:
             parsed_response = ElementTree.fromstring(response.content)
+        # ruff: ignore[BLE001]
         except Exception as e:
             raise ValidationError(f'Your Plex Media Server returned unexpected data, '
                                   f'expected valid XML but parsing it as XML caused '
@@ -159,6 +168,7 @@ class PlexMediaServer(MediaServer):
                     library_id = d.attrib['key']
                     library_name = d.attrib['title']
                     remote_libraries[library_id] = library_name
+        # ruff: ignore[BLE001]
         except Exception as e:
             raise ValidationError(f'Your Plex Media Server returned unexpected data, '
                                   f'the XML it returned could not be parsed and the '
@@ -203,9 +213,15 @@ class JellyfinMediaServer(MediaServer):
              '<p>The "API Key" <strong>token</strong> is required for API access. Your Jellyfin administrator can generate an "API Key" token for use with TubeSync for you.</p>'
              '<p>The <strong>libraries</strong> is a comma-separated list of library IDs in Jellyfin. Leave this blank to see a list.</p>')
 
-    def make_request(self, uri='/', /, *, headers={}, params={}, data={}, json=None, method='GET'):
+    def make_request(self, uri='/', /, *, headers=None, params=None, data=None, json=None, method='GET'):
         assert method in {'GET', 'POST'}, f'Unimplemented method: {method}'
-        
+        if headers is None:
+            headers = dict()
+        if params is None:
+            params = dict()
+        if data is None:
+            data = dict()
+
         headers.update({'Content-Type': 'application/json'})
         url, kwargs = self.make_request_args(uri=uri, token_header='X-Emby-Token', headers=headers, params=params)
         # From the Emby source code;
@@ -269,6 +285,7 @@ class JellyfinMediaServer(MediaServer):
             data = response.json()
             if 'Items' not in data:
                 raise ValidationError('Jellyfin Media Server returned unexpected data.')
+        # ruff: ignore[BLE001]
         except Exception as e:
             raise ValidationError(f'Connection error: {e}')
 
@@ -279,6 +296,7 @@ class JellyfinMediaServer(MediaServer):
                 library_id = d['Id']
                 library_name = d['Name']
                 remote_libraries[library_id] = library_name
+        # ruff: ignore[BLE001]
         except Exception as e:
             raise ValidationError(f'Jellyfin Media Server returned unexpected data, '
                                   f'the JSON it returned could not be parsed and the '

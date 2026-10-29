@@ -53,7 +53,7 @@ download_gh_release() {
     dl_url="${_base_url}/download/${resolved_version}/${filename}"
     unset -v _base_url
 
-    stdout "Fetching from ${owner}/${repo}: ${filename}"
+    stdout "Fetching from ${owner}/${repo} [${resolved_version}]: ${filename}"
 
-    curl --progress-bar --fail --location --remote-name --remote-time "${dl_url}"
+    curl --progress-bar --fail --location --remote-name --remote-time --retry 5 --retry-connrefused --retry-all-errors "${dl_url}"
 }

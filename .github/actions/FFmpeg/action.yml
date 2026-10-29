@@ -100,7 +100,13 @@ runs:
           var='FFMPEG_DATE' ;
           delim="$(mk_delim "${var}")" ;
           open_ml_var "${delim}" "${var}" ;
-          jq_arg='[foreach .[] as $release ([{}, []]; [ .[0] + {($release.commit): ([ $release.date ] + (.[0][($release.commit)] // []) ) }, [ .[1][0] // $release.commit ] ] ; .[0][(.[1][0])] ) ][-1][0]' ;
+          jq_arg='.[0].commit as $first_commit |
+            [
+              .[] |
+              select(.commit == $first_commit) |
+              .date
+            ] |
+            last' ;
           jq -r "${jq_arg}" -- .ffmpeg.releases.json ;
           close_ml_var "${delim}" "${var}" ;
 

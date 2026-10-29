@@ -11,12 +11,14 @@ from .fixtures import all_test_metadata
 from sync.tasks import (
     check_source_directory_exists,
     get_media_download_task, get_media_thumbnail_task,
+    make_source_directory,
 )
 from sync.choices import (
     Val, Fallback, FilterSeconds, IndexSchedule, SourceResolution,
     TaskQueue, YouTube_AudioCodec, YouTube_VideoCodec,
     YouTube_SourceType,
 )
+
 
 class FrontEndTestCase(TestCase):
     maxDiff = None
@@ -118,7 +120,7 @@ class FrontEndTestCase(TestCase):
         c = Client()
         response = c.get('/source-validate')
         self.assertEqual(response.status_code, 200)
-        for (source_type, tests) in test_sources.items():
+        for tests in test_sources.values():
             for test, urls in tests.items():
                 for url in urls:
                     data = {'source_url': url}
@@ -185,6 +187,7 @@ class FrontEndTestCase(TestCase):
             'source_acodec': 'OPUS',
             'prefer_60fps': False,
             'prefer_hdr': False,
+            'audio_track': 'o',
             'fallback': 'f',
             'sponsorblock_categories': data_categories,
             'sub_langs': 'en',
@@ -193,8 +196,7 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         url_parts = urlsplit(response.url)
         url_path = str(url_parts.path).strip()
-        if url_path.startswith('/'):
-            url_path = url_path[1:]
+        url_path = url_path.removeprefix('/')
         path_parts = url_path.split('/')
         self.assertEqual(path_parts[0], 'source')
         source_uuid = path_parts[1]
@@ -205,6 +207,8 @@ class FrontEndTestCase(TestCase):
                          expected_categories)
         # Run the check_source_directory_exists task
         check_source_directory_exists.call_local(source_uuid)
+        # Run the make_source_directory task
+        make_source_directory.call(source_uuid)
         # Check the source is now on the source overview page
         response = c.get('/sources')
         self.assertEqual(response.status_code, 200)
@@ -246,6 +250,7 @@ class FrontEndTestCase(TestCase):
             'source_acodec': Val(YouTube_AudioCodec.OPUS),
             'prefer_60fps': False,
             'prefer_hdr': False,
+            'audio_track': 'o',
             'fallback': Val(Fallback.FAIL),
             'sponsorblock_categories': data_categories,
             'sub_langs': 'en',
@@ -254,8 +259,7 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         url_parts = urlsplit(response.url)
         url_path = str(url_parts.path).strip()
-        if url_path.startswith('/'):
-            url_path = url_path[1:]
+        url_path = url_path.removeprefix('/')
         path_parts = url_path.split('/')
         self.assertEqual(path_parts[0], 'source')
         source_uuid = path_parts[1]
@@ -283,6 +287,7 @@ class FrontEndTestCase(TestCase):
             'source_acodec': Val(YouTube_AudioCodec.OPUS),
             'prefer_60fps': False,
             'prefer_hdr': False,
+            'audio_track': 'o',
             'fallback': Val(Fallback.FAIL),
             'sponsorblock_categories': data_categories,
             'sub_langs': 'en',
@@ -291,8 +296,7 @@ class FrontEndTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
         url_parts = urlsplit(response.url)
         url_path = str(url_parts.path).strip()
-        if url_path.startswith('/'):
-            url_path = url_path[1:]
+        url_path = url_path.removeprefix('/')
         path_parts = url_path.split('/')
         self.assertEqual(path_parts[0], 'source')
         source_uuid = path_parts[1]
@@ -450,5 +454,3 @@ class FrontEndTestCase(TestCase):
         c = Client()
         response = c.get('/mediaservers')
         self.assertEqual(response.status_code, 200)
-
-

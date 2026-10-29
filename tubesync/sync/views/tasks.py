@@ -1,4 +1,8 @@
+from typing import ClassVar
+
+from django import forms
 from django.conf import settings
+from django.forms import ValidationError
 from django.http import HttpResponseNotFound, HttpResponseRedirect
 from django.views import View
 from django.views.generic import ListView
@@ -6,22 +10,21 @@ from django.views.generic.edit import FormView
 from django.views.generic.detail import SingleObjectMixin
 from django.urls import reverse_lazy
 from django.db.models import F
-from django.forms import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django_huey import DJANGO_HUEY, get_queue
+
 from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params, multi_key_sort, remove_enclosed
-from common.huey import h_q_reset_tasks
+from common.huey import h_q_reset_maint_func, h_q_reset_tasks
 from common.logger import log
-from django_huey import DJANGO_HUEY, get_queue
 from .utils import get_waiting_tasks
 from ..models import Source
-from django import forms
-from ..forms import ScheduleTaskForm
+from ..forms import ResetTasksForm, ScheduleTaskForm
 from ..tasks import (
     get_task_map, map_task_to_instance, get_error_message,
-    get_running_tasks, check_source_directory_exists,
+    get_running_tasks, make_source_directory,
 )
 
 
@@ -34,7 +37,7 @@ class TasksView(ListView):
     template_name = 'sync/tasks.html'
     context_object_name = 'tasks'
     paginate_by = settings.TASKS_PER_PAGE
-    messages = {
+    messages: ClassVar[dict[str, str]] = {
         'filter': _('Viewing tasks filtered for source: <strong>{name}</strong>'),
         'reset': _('All tasks have been reset'),
         'revoked': _('Revoked task: {task_id}'),
@@ -76,10 +79,18 @@ class TasksView(ListView):
                 fmt_vars['task_id'] = task.task_id
             self.message = self.message.format(**fmt_vars)
 
-        return super().dispatch(request, *args, **kwargs)
+        try:
+            return super().dispatch(request, *args, **kwargs)
+        finally:
+            # Retrieve the QS we stored during get_queryset
+            qs = getattr(self, '_active_qs', None)
+            if qs and callable(clean := getattr(qs, '_tmp_table_cleanup', None)):
+                clean()
 
     def get_queryset(self):
         qs = get_waiting_tasks()
+        # Store the QS on the instance so dispatch can access it for cleanup
+        self._active_qs = qs
         if self.filter_source:
             params_prefix=f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
@@ -94,7 +105,7 @@ class TasksView(ListView):
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
         now_dt = timezone.now()
-        scheduled_qs = get_waiting_tasks()
+        scheduled_qs = self._active_qs
         # Huey removes running tasks,
         # so the waiting tasks will not include them.
         running_qs = get_running_tasks(now_dt)
@@ -113,14 +124,13 @@ class TasksView(ListView):
         data['wait_for_database_queue'] = False
 
         def add_to_task(task):
-            setattr(task, 'run_now', task.scheduled_at < now_dt)
+            task.run_now = task.scheduled_at < now_dt
             obj, url = map_task_to_instance(task)
             if obj:
-                setattr(task, 'instance', obj)
-                setattr(task, 'url', url)
+                task.instance = obj
+                task.url = url
             if task.has_error():
-                error_message = get_error_message(task)
-                setattr(task, 'error_message', error_message)
+                task.error_message = get_error_message(task)
                 return 'error'
             return True and obj
 
@@ -185,6 +195,38 @@ class TasksView(ListView):
                 self.kwargs[page_kwarg] = 'last'
         return super().paginate_queryset(queryset, page_size)
 
+    def get(self, *args, **kwargs):
+        path = args[0].path
+        if path.startswith('/task/') and path.endswith('/cancel'):
+            try:
+                task = TaskHistory.objects.get(pk=kwargs["pk"])
+            except TaskHistory.DoesNotExist:
+                return HttpResponseNotFound()
+            else:
+                huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+                huey_queues = { q.name: q for q in map(get_queue, huey_queue_names) }
+                q = huey_queues.get(task.queue)
+                if q is None:
+                    msg = f'TasksView: queue not found: {task.pk=} {task.queue=}'
+                    log.warning(msg)
+                    return HttpResponseNotFound()
+                # revoke the task we want to cancel
+                q.revoke_by_id(id=task.task_id, revoke_once=True)
+                vn = task.verbose_name or task.task_id or task.pk
+                if not vn.startswith('[revoked] '):
+                    task.verbose_name = f'[revoked] {vn}'
+                    task.save()
+                return HttpResponseRedirect(append_uri_params(
+                    reverse_lazy('sync:tasks'),
+                    dict(
+                        message='revoked',
+                        pk=str(task.pk),
+                        task_id=str(task.task_id),
+                    ),
+                ))
+        else:
+            return super().get(self, *args, **kwargs)
+
 
 class RevokeTaskView(View):
     '''
@@ -227,7 +269,7 @@ class CompletedTasksView(ListView):
     template_name = 'sync/tasks-completed.html'
     context_object_name = 'tasks'
     paginate_by = settings.TASKS_PER_PAGE
-    messages = {
+    messages: ClassVar[dict[str, str]] = {
         'filter': _('Viewing tasks filtered for source: <strong>{name}</strong>'),
     }
 
@@ -258,8 +300,7 @@ class CompletedTasksView(ListView):
         data = super().get_context_data(*args, **kwargs)
         for task in data['tasks']:
             if task.has_error():
-                error_message = get_error_message(task)
-                setattr(task, 'error_message', error_message)
+                task.error_message = get_error_message(task)
         data['message'] = ''
         data['source'] = self.filter_source
         if self.filter_source:
@@ -276,16 +317,16 @@ class ResetTasks(FormView):
     '''
 
     template_name = 'sync/tasks-reset.html'
-    form_class = forms.Form
+    form_class = ResetTasksForm
 
     def form_valid(self, form):
         # Delete all tasks
         huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
         for queue_name in huey_queue_names:
-            h_q_reset_tasks(queue_name)
+            h_q_reset_tasks(queue_name, maint_func=h_q_reset_maint_func)
         # Iter all tasks
         for source in Source.objects.all():
-            check_source_directory_exists(str(source.pk))
+            make_source_directory.enqueue(str(source.pk))
             # This also chains down to call each Media objects .save() as well
             source.save()
         return super().form_valid(form)
@@ -304,7 +345,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
     form_class = ScheduleTaskForm
     model = TaskHistory
     context_object_name = 'task'
-    errors = dict(
+    errors: ClassVar[dict[str, str]] = dict(
         invalid_when=_('The type ({}) was incorrect.'),
         when_before_now=_('The date and time must be in the future.'),
     )

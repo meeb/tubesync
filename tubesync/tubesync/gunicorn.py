@@ -1,3 +1,4 @@
+import contextlib
 import os
 import multiprocessing
 
@@ -7,26 +8,18 @@ def get_bind():
     port = os.getenv('LISTEN_PORT', '8080')
     return f'{host}:{port}'
 
+
 def get_num_workers():
+    keys = ('GUNICORN_WORKERS', 'WEB_CONCURRENCY')
     # Sane max workers to allow to be spawned
-    cpu_workers = multiprocessing.cpu_count() * 2 + 1
+    cpu_workers = 1 + 2 * multiprocessing.cpu_count()
     # But default to 3
     num_workers = 3
-    try:
-        gunicorn_workers = os.getenv('GUNICORN_WORKERS')
-        web_concurrency = os.getenv('WEB_CONCURRENCY')
-        if gunicorn_workers is not None:
-            try:
-                num_workers = int(gunicorn_workers)
-            except:
-                pass
-        elif web_concurrency is not None:
-            try:
-                num_workers = int(web_concurrency)
-            except:
-                pass
-    except:
-        pass
+    for key in (k for k in keys if k in os.environ):
+        value = os.getenv(key)
+        with contextlib.suppress(ValueError):
+            num_workers = int(float(value))
+            break
     return max(1, min(num_workers, cpu_workers))
 
 
@@ -35,10 +28,13 @@ wsgi_app = 'tubesync.wsgi:application'
 
 ##### Logging
 # Access logs are printed to stdout from nginx
-accesslog = None
-errorlog = '-'
+##accesslog = None
+##errorlog = '-'
 loglevel = 'info'
 capture_output = True
+syslog = True
+syslog_addr = 'unix:///dev/log'
+syslog_facility = 'local2'
 
 ##### Process
 proc_name = 'gunicorn'

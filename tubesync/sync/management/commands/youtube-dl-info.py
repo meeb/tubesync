@@ -1,11 +1,10 @@
 import json
 from django.core.management.base import BaseCommand, CommandError # noqa
 from sync.youtube import get_media_info
-from common.json import JSONEncoder
+from common.json_encoder import JSONEncoder
 
 
 class Command(BaseCommand):
-
     help = 'Displays information obtained by youtube-dl in JSON to the console'
 
     def add_arguments(self, parser):

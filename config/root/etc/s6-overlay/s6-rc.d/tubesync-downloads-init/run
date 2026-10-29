@@ -1,0 +1,12 @@
+#!/command/with-contenv bash
+
+# Optionally reset the download dir permissions
+if [[ 'True' != "${TUBESYNC_RESET_DOWNLOAD_DIR:-True}" ]]
+then
+    exit 0
+fi
+
+echo "TUBESYNC_RESET_DOWNLOAD_DIR=True, Resetting /downloads directory permissions"
+
+chown -R app:app /downloads
+chmod -R 0755 /downloads

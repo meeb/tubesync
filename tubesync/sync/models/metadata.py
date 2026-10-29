@@ -1,10 +1,14 @@
 import uuid
-from common.json import JSONEncoder
-from common.timestamp import timestamp_to_datetime
-from common.utils import django_queryset_generator as qs_gen
+
 from django import db
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+from common.json_encoder import JSONEncoder
+from common.timestamp import timestamp_to_datetime
+from common.utils import django_queryset_generator as qs_gen
+from common.yt_dlp import eager_list
+
 from .media import Media, Source
 
 
@@ -20,7 +24,7 @@ class Metadata(db.models.Model):
             ('media', 'site', 'key'),
             ('source', 'site', 'key', ),
         )
-        get_latest_by = ["-retrieved", "-created"]
+        get_latest_by = ("-retrieved", "-created")
 
     uuid = db.models.UUIDField(
         _('uuid'),
@@ -98,7 +102,6 @@ class Metadata(db.models.Model):
         help_text=_('JSON metadata object'),
     )
 
-
     def __str__(self):
         template = '"{}" from {} at: {}'
         return template.format(
@@ -108,9 +111,12 @@ class Metadata(db.models.Model):
         )
 
     @db.transaction.atomic(durable=False)
-    def ingest_formats(self, formats=list(), /):
+    def ingest_formats(self, formats: list, /) -> None:
+        assert isinstance(formats, list), type(formats)
         number = 0
         for number, format in enumerate(formats, start=1):
+            # created never used
+            # ruff: ignore[RUF059]
             mdf, created = self.format.get_or_create(site=self.site, key=self.key, number=number)
             mdf.value = format
             mdf.save()
@@ -159,7 +165,6 @@ class Metadata(db.models.Model):
             self.media.created,
         )
         self.save()
-        self.ingest_formats(formats)
+        self.ingest_formats(eager_list(formats))
 
         return self.with_formats
-
