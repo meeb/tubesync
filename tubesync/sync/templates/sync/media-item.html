@@ -5,9 +5,9 @@
 {% block content %}
 <h1 class="title mb-4">Media <strong>{{ media.key }}</strong> {{ download_state_icon|safe }}</h1>
 <div class="mb-4">
-    {% if media.title %}<h2 class="is-clipped"><strong>{{ media.title }}</strong></h2>{% endif %}
-    <p class="is-clipped"><strong><a href="{{ media.url }}" target="_blank"><i class="fas fa-link"></i> {{ media.url }}</a></strong></p>
-  <p class="is-clipped">Downloading to: <strong>{{ media.source.directory_path }}</strong></p>
+    {% if media.title %}<h2 class="title is-5 mb-3 is-clipped">{{ media.title }}</h2>{% endif %}
+    <p class="is-clipped mb-3"><strong><a href="{{ media.url }}" target="_blank"><i class="fas fa-link"></i> {{ media.url }}</a></strong></p>
+  <p class="is-clipped mb-3">Downloading to: <strong>{{ media.source.directory_path }}</strong></p>
   {% if download_state == 'downloaded' %}
     {% if media.source.is_audio %}
     <audio controls src="{% url 'sync:media-content' pk=media.pk %}"></audio>
