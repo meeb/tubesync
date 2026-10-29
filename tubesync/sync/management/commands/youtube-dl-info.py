@@ -5,7 +5,6 @@ from common.json_encoder import JSONEncoder
 
 
 class Command(BaseCommand):
-
     help = 'Displays information obtained by youtube-dl in JSON to the console'
 
     def add_arguments(self, parser):

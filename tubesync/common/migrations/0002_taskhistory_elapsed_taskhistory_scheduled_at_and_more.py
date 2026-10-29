@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('common', '0001_initial'),
     ]
@@ -32,4 +31,3 @@ class Migration(migrations.Migration):
             field=models.BigIntegerField(default=int),
         ),
     ]
-

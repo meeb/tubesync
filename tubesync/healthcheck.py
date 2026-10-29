@@ -41,6 +41,7 @@ def do_heatlhcheck(url):
     response = requests.get(url, headers=headers, auth=auth, timeout=TIMEOUT)
     return 200 == response.status_code
 
+
 def atomic_write(path, data):
     tmp = f'{path}.aw.tmp'
     try:
@@ -49,6 +50,7 @@ def atomic_write(path, data):
         os.replace(tmp, path)
     except:
         pass
+
 
 def bg_v(s, lock):
     u = 'https://github.com/yt-dlp/yt-dlp/releases/latest'
@@ -64,12 +66,14 @@ def bg_v(s, lock):
     except:
         pass
 
+
 def exists_read(p, default=None):
     if os.path.exists(p):
         with open(p) as f:
             return f.read()
     else:
         return default
+
 
 def get_container_id():
     try:
@@ -111,9 +115,11 @@ def get_container_id():
 
     return get_hostname_as_short_id()
 
+
 def get_down_file(service_name):
     path = os.path.join('/run/service', service_name)
     return os.path.join(path, 'down')
+
 
 def get_hostname_as_short_id():
     try:
@@ -123,6 +129,7 @@ def get_hostname_as_short_id():
     except:
         pass
     return None
+
 
 def get_root_start_time(curr=None):
     if curr is None or 0 >= curr:
@@ -140,6 +147,7 @@ def get_root_start_time(curr=None):
         curr = int(parts[1])
     return start_time
 
+
 def get_service_pid(service_name):
     try:
         path = os.path.join('/run/service', service_name)
@@ -147,6 +155,7 @@ def get_service_pid(service_name):
         return int(pid_str.strip())
     except:
         return None
+
 
 def get_unique_id(service_name=None):
     # Unique ID based on the OS boot + the top-level process start time
@@ -167,10 +176,12 @@ def get_unique_id(service_name=None):
     combined_seed = f'{boot_id}_{container_id}_{root_start}_{cgroup_data}'
     return hashlib.md5(combined_seed.encode()).hexdigest()[:8]
 
+
 def is_hex(s, length):
     # Strict length and character validation
     hex_chars = '0123456789abcdef'
     return length == len(s) and all(c in hex_chars for c in s.lower())
+
 
 def is_old(s, lock, down_file):
     os.makedirs(os.path.dirname(s), exist_ok=True)
@@ -221,6 +232,7 @@ if '__main__' == __name__:
     except IndexError:
         try:
             from tubesync.gunicorn import get_bind
+
             host_port = get_bind()
         except:
             host = os.getenv('LISTEN_HOST', '127.0.0.1')

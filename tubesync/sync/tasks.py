@@ -152,12 +152,14 @@ def get_model_tasks(model_pk, /, name=None, qs=None):
     #return qs.filter(task_params__0__0=model_pk)
     return qs.filter(task_params__istartswith=f'[["{model_pk}"')
 
+
 def get_running_tasks(arg_dt=None, /):
     max_run_time = getattr(settings, 'MAX_RUN_TIME', 3600)
     return TaskHistory.objects.running(
         now=arg_dt,
         within=timezone.timedelta(seconds=max_run_time),
     )
+
 
 def get_running_tasks_by_name(arg_str, instance_id, /):
     name = arg_str
@@ -166,13 +168,16 @@ def get_running_tasks_by_name(arg_str, instance_id, /):
     tqs = get_model_tasks(instance_id, qs=get_running_tasks())
     return tqs.filter(name=name)
 
+
 def get_media_download_task(media_id):
     tqs = get_running_tasks_by_name('download_media_file', media_id)
     return tqs.first() or False
 
+
 def get_media_thumbnail_task(media_id):
     tqs = get_running_tasks_by_name('download_media_image', media_id)
     return tqs.first() or False
+
 
 def get_source_index_task(source_id):
     tqs = get_running_tasks_by_name('index_source', source_id)
@@ -184,9 +189,11 @@ def get_tasks(task_name, id=None, /, instance=None):
     arg = str(id or instance.pk)
     return get_running_tasks_by_name(str(task_name), arg)
 
+
 def get_first_task(task_name, id=None, /, *, instance=None):
     tqs = get_tasks(task_name, id, instance).order_by('scheduled_at')
     return tqs.first() or False
+
 
 def get_media_metadata_task(media_id):
     return get_first_task('sync.tasks.download_media_metadata', media_id)
@@ -323,6 +330,7 @@ def schedule_media_servers_update():
 
 def contains_http429(q, task_id, /):
     from huey.exceptions import TaskException
+
     try:
         q.result(preserve=True, id=task_id)
     except TaskException as e:
@@ -349,6 +357,7 @@ def wait_for_errors(model, /, *, queue_name=None, task_name=None):
     total_count = int()
     if queue_name:
         from django_huey import get_queue
+
         q = get_queue(queue_name)
         total_count += sum([ 1 if contains_http429(q, k) else 0 for k in q.all_results() ])
     delay = 10 * total_count
@@ -859,6 +868,7 @@ def upgrade_media(media_id):
             raise CancelExecution(_('downloaded media is better'))
         download_media_file.call_local(str(media.pk), override=True)
 
+
 @db_task(delay=60, priority=60, retries=3, retry_delay=600, queue=Val(TaskQueue.LIMIT))
 def download_media_metadata(media_id):
     '''
@@ -1027,6 +1037,7 @@ def download_media_image(media_id, url):
     if media.downloaded and media.thumb_file_exists:
         media.copy_thumbnail()
     return True
+
 
 @huey_signal(huey_signals.SIGNAL_COMPLETE, queue=Val(TaskQueue.NET))
 def on_complete_download_media_image(signal_name, task_obj, exception_obj=None, /, *, huey=None):
@@ -1463,5 +1474,3 @@ def delete_all_media_for_source(source_id, source_name, source_directory):
     if remove:
         log.info(f'Deleting directory for: {source_name}: {directory_path}')
         rmtree(directory_path, True)
-
-

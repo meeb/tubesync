@@ -525,8 +525,8 @@ def refresh_formats(self):
     self.save_to_metadata(refreshed_key, response.get('epoch', formats_seconds))
     if data.get('availability', 'public') != response.get('availability', 'public'):
         self.save_to_metadata('availability', response.get('availability', 'public'))
-        fmt_dict['a'] = 'availability'
         fmt_dict['j'] = ', and ' if 'thumbnails' == fmt_dict['t'] else ', '
+        fmt_dict['a'] = 'availability'
         fmt_dict['s'] = '; '
     return (True, False, 'updated formats{s}{a}{j}{t}'.format(**{k:fmt_dict[k] for k in 'sajt'}))
 

@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django_huey import DJANGO_HUEY
 from common.logger import log
 
+
 def find_best_match(query: str, candidates: list[str]) -> str | None:
     """
     Finds the single best match among candidates by looking for trailing suffix
@@ -26,6 +27,7 @@ def find_best_match(query: str, candidates: list[str]) -> str | None:
         return candidates[matched_idx]
 
     return None
+
 
 class Command(BaseCommand):
     help = 'Stops a specific task queue consumer service by mapping the provided input to its service name.'
@@ -111,7 +113,7 @@ class Command(BaseCommand):
             except KeyError:
                 # Backup tracking path for loose casings, names, or full service strings
                 fuzzy_key = find_best_match(service_input, valid_queue_keys)
-  
+
                 if fuzzy_key and fuzzy_key in configured_queues:
                     matched_queue_key = fuzzy_key
                     matched_queue_name = configured_queues[fuzzy_key].get('name')

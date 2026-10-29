@@ -34,5 +34,5 @@ class Command(BaseCommand):
                 if source.write_json and item.has_metadata and not jsonpath.is_file():
                     log.info(f'Writing missing JSON file: {jsonpath}')
                     write_text_file(jsonpath, item.metadata_dumps())
-                    
+
         log.info('Done')

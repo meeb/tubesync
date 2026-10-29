@@ -13,7 +13,6 @@ from sync.youtube import merge_image_thumbnails
 
 
 class SourceImagesTestCase(TestCase):
-
     def setUp(self):
         # Disable general logging for test case
         logging.disable(logging.CRITICAL)

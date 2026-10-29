@@ -7,6 +7,7 @@ from ._logger import app_logger, logger
 
 logger = logger(__name__)
 
+# ruff: ignore[RUF022]
 __all__ = [
     'app_logger',
     'default_formatter',

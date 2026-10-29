@@ -166,7 +166,7 @@ def _url_keys(arg_dict, filter_func):
 
 # ruff: disable[SIM118]
 # expects a dictionary where the value at key is a:
-# list of dictionaries 
+# list of dictionaries
 def _drop_url_keys(arg_dict, key, filter_func):
     def _del_url_keys(_arg_dict):
         for url_key, remove in _url_keys(_arg_dict, filter_func).items():
@@ -277,7 +277,7 @@ def filter_response(arg_dict, copy_arg=False):
                     _drop_url_keys(lang_codes, lang_code, drop_subtitles_url)
                     condense_exts(lang_codes, lang_code)
     # end of subtitles cleanup }}}
- 
+
     # beginning of heatmap cleanup {{{
     for key in ('heatmap',):
         if key in response_dict.keys():
@@ -285,6 +285,8 @@ def filter_response(arg_dict, copy_arg=False):
     # end of heatmap cleanup }}}
 
     return response_dict
+
+
 # ruff: enable[SIM118]
 
 

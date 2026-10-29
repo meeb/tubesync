@@ -30,4 +30,3 @@ def get_waiting_tasks():
 
     huey_task_ids = deduplicating_id_generator()
     return TaskHistory.objects.from_huey_ids(huey_task_ids)
-

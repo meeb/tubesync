@@ -1,5 +1,6 @@
 from django.conf import settings
 
+
 def read_testdata(arg_dict, *, testdata_path=None):
     if testdata_path is None:
         testdata_path = settings.BASE_DIR / "sync" / "testdata"

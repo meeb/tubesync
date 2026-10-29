@@ -79,15 +79,18 @@ def source_pre_save(sender, instance, **kwargs):
                         target = new_dirpath / entry_path.name
                         if not target.exists():
                             entry_path = entry_path.rename(target)
+                    # ruff: ignore[BLE001]
                     except Exception as e:
                         log.exception(e)
                 try:
                     existed.rmdir()
+                # ruff: ignore[BLE001]
                 except Exception as e:
                     log.exception(e)
             elif existed:
                 try:
                     existed = existed.rename(new_dirpath / ('.existed-' + new_dirpath.name))
+                # ruff: ignore[BLE001]
                 except Exception as e:
                     log.exception(e)
 
@@ -179,22 +182,21 @@ def media_post_save(sender, instance, created, **kwargs):
     existing_media_thumbnail_task = get_media_thumbnail_task(str(instance.pk))
     existing_media_metadata_task = get_media_metadata_task(str(instance.pk))
     existing_media_download_task = get_media_download_task(str(instance.pk))
-    if not downloaded:
-        # the decision to download was already made if a download task exists
-        if not existing_media_download_task:
-            # Recalculate the "can_download" flag, this may
-            # need to change if the source specifications have been changed
-            if media.has_metadata:
-                if instance.get_format_str():
-                    if not instance.can_download:
-                        instance.can_download = True
-                        can_download_changed = True
-                else:
-                    if instance.can_download:
-                        instance.can_download = False
-                        can_download_changed = True
-            # Recalculate the "skip_changed" flag
-            skip_changed = filter_media(instance)
+    # the decision to download was already made if a download task exists
+    if not (downloaded or existing_media_download_task):
+        # Recalculate the "can_download" flag, this may
+        # need to change if the source specifications have been changed
+        if media.has_metadata:
+            if instance.get_format_str():
+                if not instance.can_download:
+                    instance.can_download = True
+                    can_download_changed = True
+            else:
+                if instance.can_download:
+                    instance.can_download = False
+                    can_download_changed = True
+        # Recalculate the "skip_changed" flag
+        skip_changed = filter_media(instance)
 
     # If the media is missing metadata schedule it to be downloaded
     if not (media.skip or media.has_metadata or existing_media_metadata_task):
@@ -229,12 +231,11 @@ def media_post_save(sender, instance, created, **kwargs):
         media_file_exists |= instance.filepath.exists()
     except OSError as e:
         log.exception(e)
-        pass
     # If the media has not yet been downloaded schedule it to be downloaded
     if not (media_file_exists or existing_media_download_task):
         # The file was deleted after it was downloaded, skip this media.
         if instance.can_download and instance.downloaded:
-            skip_changed = True if not instance.skip else False
+            skip_changed = not instance.skip
             instance.skip = True
         downloaded = False
     if (instance.source.download_media and instance.can_download) and not (
@@ -426,4 +427,3 @@ def media_post_delete(sender, instance, **kwargs):
                 log.debug(f'Deleting metadata for "{skipped_media.key}": {skipped_media.pk}')
                 # delete the old metadata
                 instance_qs.delete()
-

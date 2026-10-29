@@ -4,8 +4,9 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-autopep8 = "*"
-pycodestyle = "*"
+django-stubs = "*"
+mypy = "*"
+ruff = "*"
 
 [packages]
 django = "~=6.0.0"
