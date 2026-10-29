@@ -3,7 +3,7 @@
 {% block headtitle %}Source - {{ source.name }}{% endblock %}
 
 {% block content %}
-<h1 class="title is-4">Source <strong>{{ source.name }}</strong></h1>
+<h1 class="title mb-4">Source <strong>{{ source.name }}</strong></h1>
 <p><strong><a href="{{ source.url }}" target="_blank"><i class="fas fa-link"></i> {{ source.url }}</a></strong></p>
 <p class="mb-4">Saving to: <strong>{{ source.directory_path }}</strong></p>
 <div class="buttons mb-4">
@@ -220,7 +220,7 @@
   </a>
 </div>
 {% if errors %}
-<h2 class="title is-5 mt-5">Source has encountered {{ errors|length }} Error{{ errors|length|pluralize }}</h2>
+<h2 class="title is-4 mt-5">Source has encountered {{ errors|length }} Error{{ errors|length|pluralize }}</h2>
 <div class="box">
   {% for task in errors %}
   <div class="{% if not forloop.last %}mb-4{% endif %}">

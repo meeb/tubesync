@@ -204,6 +204,10 @@ main h1.title {
   font-weight: var(--bulma-weight-normal);
 }
 
+main .title strong {
+  font-weight: var(--bulma-weight-bold);
+}
+
 a.box,
 a.box .title,
 a.box .subtitle {

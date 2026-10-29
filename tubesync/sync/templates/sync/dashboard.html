@@ -58,7 +58,7 @@
 
   <div class="column is-half-desktop">
     <div class="box">
-      <h4 class="title is-5">Latest downloads</h4>
+      <h4 class="title is-4">Latest downloads</h4>
       <div class="is-fullwidth">
         {% for media in latest_downloads %}
         <a href="{% url 'sync:media-item' pk=media.pk %}" class="download-item is-block is-fullwidth p-3">
@@ -74,7 +74,7 @@
 
   <div class="column is-half-desktop">
     <div class="box">
-      <h4 class="title is-5">Largest downloads</h4>
+      <h4 class="title is-4">Largest downloads</h4>
       <div class="is-fullwidth">
         {% for media in largest_downloads %}
         <a href="{% url 'sync:media-item' pk=media.pk %}" class="download-item is-block is-fullwidth p-3">
