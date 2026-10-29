@@ -370,42 +370,6 @@ hr {
   background-color: var(--bulma-danger);
 }
 
-.has-background-transparent {
-  background-color: transparent !important;
-}
-
-.is-borderless {
-  border: none !important;
-}
-
-.m-0 {
-  margin: 0 !important;
-}
-
-.is-fullheight {
-  height: 100%;
-}
-
-.is-flex-grow-1 {
-  flex-grow: 1;
-}
-
-.is-align-items-flex-start {
-  align-items: flex-start;
-}
-
-.is-align-self-flex-start {
-  align-self: flex-start;
-}
-
-.has-text-decoration-underline {
-  text-decoration: underline;
-}
-
-.has-cursor-pointer {
-  cursor: pointer;
-}
-
 /* ============================================
    Tables
    ============================================ */
