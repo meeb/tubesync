@@ -2,7 +2,6 @@ from typing import ClassVar
 
 from django import forms
 from django.conf import settings
-from django.forms import ValidationError
 from django.http import HttpResponseNotFound, HttpResponseRedirect
 from django.views import View
 from django.views.generic import ListView
@@ -400,7 +399,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         if not isinstance(when, self.now.__class__):
             form.add_error(
                 'when',
-                ValidationError(
+                forms.ValidationError(
                     self.errors['invalid_when'].format(
                         type(when),
                     ),
@@ -409,7 +408,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         if when < self.now:
             form.add_error(
                 'when',
-                ValidationError(self.errors['when_before_now']),
+                forms.ValidationError(self.errors['when_before_now']),
             )
 
         if form.errors:
