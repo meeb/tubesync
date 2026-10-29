@@ -12,22 +12,22 @@
 
 <div class="columns is-multiline">
   <div class="column is-half-tablet is-one-third-desktop">
-    <div class="box has-text-centered">
-      <p class="title is-3">{{ total_count|default:"0" }}</p>
-      <p class="subtitle is-6">Total Services</p>
+    <div class="box has-text-centered services-panel services-panel-total">
+      <p class="services-panel-label">Total Services</p>
+      <p class="services-panel-value">{{ total_count|default:"0" }}</p>
     </div>
   </div>
   <div class="column is-half-tablet is-one-third-desktop">
-    <div class="box has-text-centered">
-      <p class="title is-3 {% if total_count == running_count %}has-text-success{% else %}has-text-danger{% endif %}">{{ running_count|default:"0" }}</p>
-      <p class="subtitle is-6">Running Services</p>
+    <div class="box has-text-centered services-panel {% if total_count == running_count %}has-background-success{% else %}has-background-danger{% endif %}">
+      <p class="services-panel-label">Running Services</p>
+      <p class="services-panel-value">{{ running_count|default:"0" }}</p>
     </div>
   </div>
 </div>
 
-<div class="box">
+<div class="box p-0 services-card">
   <div class="table-container">
-    <table class="table is-fullwidth is-hoverable is-striped">
+    <table class="table is-fullwidth is-hoverable is-striped services-table">
       <thead>
         <tr>
           <th>Service Identifier</th>
@@ -39,7 +39,7 @@
       </thead>
       <tbody>
         {% for service in services %}
-        <tr{% if not service.is_running %} class="has-background-danger-light"{% endif %}>
+        <tr{% if not service.is_running %} class="has-background-warning-light"{% endif %}>
           <td><strong>{{ service.name }}</strong></td>
           <td>
             {% if service.is_running %}
@@ -47,9 +47,9 @@
             {% else %}
             <span class="tag is-danger">Down</span>
             {% if service.exit_code is not None %}
-            <code>Exit Code: {{ service.exit_code }}</code>
+            <code class="services-code-badge services-exit-code">Exit Code: {{ service.exit_code }}</code>
             {% elif service.signal_name is not None %}
-            <code>Signal: {{ service.signal_name }}</code>
+            <code class="services-code-badge services-signal">Signal: {{ service.signal_name }}</code>
             {% endif %}
             {% endif %}
           </td>

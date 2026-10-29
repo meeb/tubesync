@@ -29,26 +29,20 @@
 {% endif %}
 {% include 'infobox.html' with message=message %}
 <div class="columns">
-  <div class="column is-6">
-    <div class="content">
-      <blockquote>
-        <p>{% if media.description %}{{ media.description|truncatewords:200 }}{% else %}(Media has no description).{% endif %}</p>
-      </blockquote>
-    </div>
+  <div class="column is-7-tablet">
+    <div><i class="fas fa-quote-left"></i></div>
+    <p>{% if media.description %}{{ media.description|truncatewords:200 }}{% else %}(Media has no description).{% endif %}</p>
+    <div class="has-text-right"><i class="fas fa-quote-right"></i></div>
   </div>
-  <div class="column is-6">
+  <div class="column is-5-tablet">
     <div class="card mediacard">
       <div class="card-image">
         <figure class="image">
           <img src="{% if media.thumb %}{% url 'sync:media-thumb' pk=media.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}">
         </figure>
       </div>
-      <div class="card-content">
-        <div class="content">
-          <a href="{% url 'sync:redownload-thumb' pk=media.pk %}" class="button is-small is-fullwidth">
-            <span class="icon"><i class="fas fa-redo"></i></span>
-          </a>
-        </div>
+      <div>
+        <a href="{% url 'sync:redownload-thumb' pk=media.pk %}"><i class="fas fa-redo"></i></a>
       </div>
     </div>
   </div>

@@ -5,69 +5,56 @@
 {% block headtitle %}Media{% if source %} - {{ source }}{% endif %}{% endblock %}
 
 {% block content %}
-<div class="columns is-vcentered mb-4">
-  <div class="column">
+<div class="columns is-vcentered">
+  <div class="column is-6-tablet">
     <h1 class="title">Media</h1>
   </div>
-  <div class="column is-narrow">
-    <div class="buttons">
-      {% if show_skipped %}
-      <a href="{% url 'sync:media' %}{% querystring show_skipped=None %}" class="button">
-        <span class="icon"><i class="far fa-eye-slash"></i></span>
-        <span>Hide skipped media</span>
-      </a>
-      {% else %}
-      <a href="{% url 'sync:media' %}{% querystring show_skipped='yes' %}" class="button">
-        <span class="icon"><i class="far fa-eye"></i></span>
-        <span>Show skipped media</span>
-      </a>
-      {% endif %}
-      {% if only_skipped %}
-      <a href="{% url 'sync:media' %}{% querystring only_skipped=None %}" class="button">
-        <span class="icon"><i class="far fa-eye-slash"></i></span>
-        <span>Only skipped media</span>
-      </a>
-      {% else %}
-      <a href="{% url 'sync:media' %}{% querystring only_skipped='yes' %}" class="button">
-        <span class="icon"><i class="far fa-eye"></i></span>
-        <span>Only skipped media</span>
-      </a>
-      {% endif %}
-    </div>
+  <div class="column is-3-tablet">
+    {% if show_skipped %}
+    <a href="{% url 'sync:media' %}{% querystring show_skipped=None %}" class="button is-primary is-fullwidth">
+      <span class="icon"><i class="far fa-eye-slash"></i></span>
+      <span>Hide skipped media</span>
+    </a>
+    {% else %}
+    <a href="{% url 'sync:media' %}{% querystring show_skipped='yes' %}" class="button is-primary is-fullwidth">
+      <span class="icon"><i class="far fa-eye"></i></span>
+      <span>Show skipped media</span>
+    </a>
+    {% endif %}
+  </div>
+  <div class="column is-3-tablet">
+    {% if only_skipped %}
+    <a href="{% url 'sync:media' %}{% querystring only_skipped=None %}" class="button is-primary is-fullwidth">
+      <span class="icon"><i class="far fa-eye-slash"></i></span>
+      <span>Only skipped media</span>
+    </a>
+    {% else %}
+    <a href="{% url 'sync:media' %}{% querystring only_skipped='yes' %}" class="button is-primary is-fullwidth">
+      <span class="icon"><i class="far fa-eye"></i></span>
+      <span>Only skipped media</span>
+    </a>
+    {% endif %}
   </div>
 </div>
-
-<div class="box mb-5">
-  <form method="get">
+<div class="search-bar">
+  <form method="get" class="simpleform">
     {% if only_skipped %}
     <input type="hidden" name="only_skipped" value="yes" />
     {% endif %}
     {% if show_skipped %}
     <input type="hidden" name="show_skipped" value="yes" />
     {% endif %}
-    <div class="field is-horizontal">
-      <div class="field-body">
-        <div class="field">
-          <label class="label">Search for:</label>
-          <div class="control is-expanded">
-            <input name="query" class="input" type="text" placeholder="A key or title containing this text"{% if query %} value="{{ query }}"{% endif %} />
-          </div>
-        </div>
-        <div class="field is-narrow">
-          <label class="label">&nbsp;</label>
-          <div class="control">
-            <label class="checkbox">
-              <input name="search_description" type="checkbox" value="yes"{% if search_description %} checked{% endif %} />
-              In description?
-            </label>
-          </div>
-        </div>
-        <div class="field is-narrow">
-          <label class="label">&nbsp;</label>
-          <div class="control">
-            <button type="submit" class="button is-primary">Go</button>
-          </div>
-        </div>
+    <div class="columns">
+      <div class="column is-9-tablet">
+        <label class="label">Search for:</label>
+        <input name="query" class="input" type="text" placeholder="A key or title containing this text"{% if query %} value="{{ query }}"{% endif %} />
+      </div>
+      <div class="column is-3-tablet search-options">
+        <label class="checkbox">
+          <input name="search_description" type="checkbox" value="yes"{% if search_description %} checked{% endif %} />
+          In description?
+        </label>
+        <input value="Go" class="button is-primary is-fullwidth mt-3" type="submit" />
       </div>
     </div>
   </form>
@@ -75,72 +62,42 @@
 {% include 'infobox.html' with message=message %}
 <div class="columns is-multiline">
   {% for m in media %}
-  <div class="column is-half-tablet is-one-third-desktop is-one-quarter-widescreen">
-    <a href="{% url 'sync:media-item' pk=m.pk %}" title="{{ m.source.name }} / {{ m.name }}">
-      <div class="card mediacard">
+  <div class="column is-12-mobile is-6-tablet is-4-desktop is-3-widescreen">
+    <div class="card mediacard">
+      <a href="{% url 'sync:media-item' pk=m.pk %}" class="is-block" title="{{ m.source.name }} / {{ m.name }}">
         <div class="card-image">
           <figure class="image">
-            <img src="{% if m.thumb %}{% url 'sync:media-thumb' pk=m.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}" alt="{{ m.name }}">
+            <img src="{% if m.thumb %}{% url 'sync:media-thumb' pk=m.pk %}{% else %}{% static 'images/nothumb.png' %}{% endif %}">
           </figure>
-        </div>
-        <div class="card-content">
-          <p class="title is-6 is-clipped mb-1">{{ m.source }}</p>
-          <p class="subtitle is-7 is-clipped mb-2">{{ m.name }}</p>
-          <div class="content is-small">
+          <span class="card-title">{{ m.source }}<br>
+            <span>{{ m.name }}</span><br>
+            <span>
             {% if m.downloaded %}
-              <span class="icon-text">
-                <span class="icon has-text-success"><i class="fas fa-check-circle" title="Downloaded"></i></span>
-                <span>{{ m.download_date|date:'Y-m-d' }}</span>
-              </span>
+              <i class="fas fa-check-circle" title="Downloaded"></i> {{ m.download_date|date:'Y-m-d' }}
             {% else %}
               {% if m.manual_skip %}
-              <span class="has-text-danger">
-                <span class="icon-text">
-                  <span class="icon"><i class="fas fa-times" title="Skipping media"></i></span>
-                  <span>Manually skipped</span>
-                </span>
-              </span>
+              <span class="has-text-danger"><i class="fas fa-times" title="Skipping media"></i> Manually skipped</span>
               {% elif m.skip %}
-              <span class="has-text-danger">
-                <span class="icon-text">
-                  <span class="icon"><i class="fas fa-times" title="Skipping media"></i></span>
-                  <span>Skipped by system</span>
-                </span>
-              </span>
+              <span class="has-text-danger"><i class="fas fa-times" title="Skipping media"></i> Skipped by system</span>
               {% elif not m.source.download_media %}
-              <span class="has-text-danger">
-                <span class="icon-text">
-                  <span class="icon"><i class="fas fa-times" title="Not downloading media for this source"></i></span>
-                  <span>Disabled at source</span>
-                </span>
-              </span>
+              <span class="has-text-danger"><i class="fas fa-times" title="Not downloading media for this source"></i> Disabled at source</span>
               {% elif not m.has_metadata %}
-              <span class="icon-text">
-                <span class="icon"><i class="far fa-clock" title="Waiting for metadata"></i></span>
-                <span>Fetching metadata</span>
-              </span>
+              <i class="far fa-clock" title="Waiting for metadata"></i> Fetching metadata
               {% elif m.can_download %}
-              <span class="icon-text">
-                <span class="icon"><i class="far fa-clock" title="Waiting to download or downloading"></i></span>
-                <span>Downloading</span>
-              </span>
+              <i class="far fa-clock" title="Waiting to download or downloading"></i> Downloading
               {% else %}
-              <span class="has-text-danger">
-                <span class="icon-text">
-                  <span class="icon"><i class="fas fa-exclamation-triangle" title="No matching formats to download"></i></span>
-                  <span>No matching formats</span>
-                </span>
-              </span>
+              <span class="has-text-danger"><i class="fas fa-exclamation-triangle" title="No matching formats to download"></i> No matching formats</span>
               {% endif %}
             {% endif %}
-          </div>
+            </span>
+          </span>
         </div>
-      </div>
-    </a>
+      </a>
+    </div>
   </div>
   {% empty %}
   <div class="column is-12">
-    <div class="notification is-info is-light">
+    <div class="box">
       <i class="fas fa-info-circle"></i> No media has been indexed{% if source %} that matches the specified source filter{% endif %}.
     </div>
   </div>

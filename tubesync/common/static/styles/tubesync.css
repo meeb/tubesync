@@ -206,11 +206,7 @@ main h1.title {
 
 a.box,
 a.box .title,
-a.box .subtitle,
-a.media-content,
-a.media-content .title,
-a.media-content .subtitle,
-a.media-content .content {
+a.box .subtitle {
   color: var(--tubesync-light-blue);
 }
 
@@ -237,8 +233,46 @@ hr {
   border-color: var(--tubesync-orange);
 }
 
+.mediacard .card-image {
+  position: relative;
+}
+
 .mediacard .card-image img {
   border-radius: 0 !important;
+}
+
+.mediacard .card-title {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  margin: 5px;
+  padding: 3px 10px 3px 5px;
+  max-width: 80%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.3rem;
+  line-height: 1.4rem;
+  background-color: var(--tubesync-surface-dark);
+  color: var(--tubesync-text-on-dark);
+}
+
+.mediacard .card-title span {
+  font-size: 1rem;
+  line-height: 1rem;
+}
+
+.search-bar {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem 0 0.5rem;
+  border-top: 2px dashed slategray;
+  border-bottom: 2px dashed slategray;
+}
+
+.search-bar .search-options {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 
@@ -392,38 +426,94 @@ hr {
 }
 
 /* ============================================
-   Responsive Source Cards
+   Source List
    ============================================ */
-.media-right.source-buttons {
-  flex-shrink: 1;
-  min-width: 0;
+.source-item:not(:last-child) {
+  border-bottom: 1px solid var(--bulma-border);
 }
 
-.media-right.source-buttons .buttons {
-  flex-wrap: wrap;
-  gap: 0.5rem;
+.source-item:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }
 
-.media-right.source-buttons .buttons .button {
-  flex: 0 1 auto;
-  min-width: fit-content;
+.source-item > a.is-block {
+  color: var(--tubesync-light-blue);
 }
 
-@media screen and (max-width: 768px) {
-  .media.is-flex-direction-column-mobile {
-    flex-direction: column !important;
-  }
+/* ============================================
+   Task Lists
+   ============================================ */
+.task-item {
+  padding: 0.75rem 0;
+}
 
-  .media.is-flex-direction-column-mobile .media-right {
-    margin-top: 1rem;
-    margin-left: 0;
-    width: 100%;
-  }
+.task-item:not(:last-child) {
+  border-bottom: 1px solid var(--bulma-border);
+}
 
-  .media-right.source-buttons .buttons .button {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
+.task-item:first-child {
+  padding-top: 0;
+}
+
+.task-item:last-child {
+  padding-bottom: 0;
+}
+
+/* ============================================
+   Services
+   ============================================ */
+.services-panel {
+  color: var(--tubesync-text-on-light-blue);
+}
+
+.services-panel-total {
+  background-color: var(--tubesync-light-blue);
+}
+
+.services-panel.has-background-success,
+.services-panel.has-background-danger {
+  color: #fff;
+}
+
+.services-panel-label {
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.services-panel-value {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.services-card {
+  overflow: hidden;
+}
+
+.services-table th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.services-table td {
+  white-space: nowrap;
+}
+
+.services-code-badge {
+  margin-left: 6px;
+  padding: 2px 6px;
+  color: #fff;
+  font-family: monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.services-exit-code {
+  background-color: #212121;
+}
+
+.services-signal {
+  background-color: #3e2723;
 }
 
 /* ============================================

@@ -19,7 +19,7 @@
       </label>
     </div>
     {% else %}
-    <label class="label">{{ field.label }}</label>
+    <label class="label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.label|last not in ':?.!' %}:{% endif %}</label>
     <div class="control{% if field.field.widget.input_type == 'select' %} select is-fullwidth{% endif %}">
       {{ field }}
     </div>

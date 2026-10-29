@@ -7,7 +7,7 @@
 {% include 'infobox.html' with message=message %}
 <div class="box">
   {% for task in tasks %}
-  <div class="box mb-4">
+  <div class="task-item">
     {% if task.has_error %}
     <span class="icon-text">
       <span class="icon has-text-danger"><i class="fas fa-exclamation-triangle"></i></span>
