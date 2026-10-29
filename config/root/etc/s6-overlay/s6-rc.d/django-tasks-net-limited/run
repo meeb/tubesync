@@ -1,9 +1,5 @@
 #!/command/with-contenv bash
 
-nice -n "${TUBESYNC_NICE:-1}" s6-setuidgid app \
-    /usr/bin/python3 /app/manage.py prune_db_task_results \
-    --queue-name limited
-
 exec nice -n "${TUBESYNC_NICE:-1}" s6-setuidgid app \
     /usr/bin/python3 /app/manage.py db_worker -v 2 \
     --no-reload --interval 20 --max-tasks 100 \
