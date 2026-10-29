@@ -1,7 +1,6 @@
-<!--<input type="{{ option.type }}" name="{{ option.name }}" value="{{ option.value }}" id="{{ option.value }}"><BR>
-    <label for="{{ option.value }}">{{option.label}}</label>-->
-
-<label>
-    <input type="{{ option.type }}" name="{{ option.name }}" value="{{ option.value }}" id="{{ option.value }}" {% if option.selected %}checked{% endif %}>
-    <span class="no-text-transform">{{option.label}}</span>
-</label>
+<div class="field">
+    <label class="checkbox">
+        <input type="{{ option.type }}" name="{{ option.name }}" value="{{ option.value }}" id="{{ option.value }}"{% if option.selected %} checked{% endif %}>
+        {{ option.label }}
+    </label>
+</div>

@@ -11,7 +11,6 @@ ruff = "*"
 [packages]
 django = "~=6.0.0"
 django-huey = "*"
-django-sass-processor = {extras = ["management-command"], version = "*"}
 pillow = "*"
 whitenoise = "*"
 gunicorn = "*"
