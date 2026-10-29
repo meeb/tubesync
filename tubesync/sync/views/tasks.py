@@ -20,7 +20,7 @@ from common.huey import h_q_reset_maint_func, h_q_reset_tasks
 from common.logger import log
 from .utils import get_waiting_tasks
 from ..models import Source
-from ..forms import ResetTasksForm, ScheduleTaskForm
+from ..forms import ScheduleTaskForm
 from ..tasks import (
     get_task_map, map_task_to_instance, get_error_message,
     get_running_tasks, make_source_directory,
@@ -316,7 +316,7 @@ class ResetTasks(FormView):
     '''
 
     template_name = 'sync/tasks-reset.html'
-    form_class = ResetTasksForm
+    form_class = forms.Form
 
     def form_valid(self, form):
         # Delete all tasks
