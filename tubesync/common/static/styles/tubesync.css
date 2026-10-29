@@ -480,6 +480,18 @@ hr {
   background-color: #3e2723;
 }
 
+[data-theme="dark"] .services-panel.has-background-success {
+  background-color: #2e7d32 !important;
+}
+
+[data-theme="dark"] .services-panel.has-background-danger {
+  background-color: var(--tubesync-red) !important;
+}
+
+[data-theme="dark"] .services-table tr.has-background-warning-light {
+  background-color: color-mix(in srgb, var(--tubesync-orange) 45%, transparent) !important;
+}
+
 /* ============================================
    Download Lists
    ============================================ */
