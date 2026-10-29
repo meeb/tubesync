@@ -1,0 +1,65 @@
+#!/command/with-contenv bash
+
+set -eu
+
+scan_directory='/run/s6-rc/scandir'
+service_dirs_directory='/run/s6-rc/servicedirs'
+
+service_name='django-tasks-default-workers'
+staging_directory="/run/servicedirs-${service_name}"
+service_directory="${service_dirs_directory}/${service_name}"
+worker_template='/etc/s6-overlay/s6-rc.d/django-tasks-default/worker@'
+
+[[ -d /run/ ]]
+
+# Stage the new service
+rm -rf "${staging_directory}"
+if [[ -e "${service_directory}" ]] ; then
+    # Attempt to clean up old instance processes
+    /command/s6-svc -wD -d "${service_directory}" || true
+    /command/s6-svunlink "${scan_directory}/" "${service_name}"
+    mkdir -p "${staging_directory}"
+    mv -t "${staging_directory}" "${service_directory}"
+    rm -rf "${staging_directory}"
+fi
+mkdir -p "${staging_directory}"
+/command/s6-instance-maker "${worker_template}" "${staging_directory}/${service_name}"
+
+# Install the new service
+mv "${staging_directory}/${service_name}" "${service_directory}"
+rmdir "${staging_directory}"
+/command/s6-svlink -t 1000 "${scan_directory}/" "${service_directory}"
+
+create_workers() {
+    local i=0 timeout=5000 total="${1}"
+    while (( ++i <= total )); do
+        /command/s6-instance-create -t "${timeout}" "${service_directory}" "${i}" || return
+    done
+}
+
+determine_cores() {
+    local minimum="${1:-1}" nproc_cores usable
+
+    nproc_cores="$(nproc --ignore=2 || echo 0)"
+    usable="$(python3 -c 'n=int("'"${nproc_cores}"'"); from common.utils import get_usable_cpu_count; print(min(n, get_usable_cpu_count()));' || echo 0)"
+
+    if (( "${usable}" < "${minimum}" )) ; then
+        printf -- '%d\n' "${minimum}"
+    else
+        printf -- '%d\n' "${usable}"
+    fi
+}
+
+cores="$(determine_cores 2 || echo 2)"
+WORKERS="${TUBESYNC_DJANGO_TASKS_WORKERS:-${cores}}"
+create_workers "${WORKERS}" || true
+
+if [[ -d "${service_directory}/instances/1/supervise" ]]; then
+    exec /command/s6-svwait -D -a "${service_directory}"/instance/*
+fi
+
+# When the first worker was not created, run at least one.
+exec nice -n "${TUBESYNC_NICE:-1}" s6-setuidgid app \
+    /usr/bin/python3 /app/manage.py db_worker -v 2 \
+    --no-reload --interval 20 --max-tasks 100 \
+    --queue-name '*' --exclude-queues limited
