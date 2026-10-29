@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.http import HttpResponseNotFound, HttpResponseRedirect
+from django.views import View
 from django.views.generic import ListView
 from django.views.generic.edit import FormView
 from django.views.generic.detail import SingleObjectMixin
@@ -11,14 +12,14 @@ from django.utils.translation import gettext_lazy as _
 from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
 from common.utils import append_uri_params, multi_key_sort
-from common.huey import h_q_reset_tasks
+from common.huey import h_q_reset_maint_func, h_q_reset_tasks
 from common.logger import log
 from django_huey import DJANGO_HUEY, get_queue
 from .utils import get_waiting_tasks
 from ..models import Source
 from ..forms import ResetTasksForm, ScheduleTaskForm
 from ..tasks import (
-    map_task_to_instance, get_error_message,
+    get_task_map, map_task_to_instance, get_error_message,
     get_running_tasks, check_source_directory_exists,
 )
 
@@ -81,6 +82,8 @@ class TasksView(ListView):
         if self.filter_source:
             params_prefix=f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
+        if not settings.DEBUG:
+            qs = qs.filter(name__in=set(get_task_map().keys()))
         return qs.order_by(
             '-priority',
             'scheduled_at',
@@ -214,6 +217,40 @@ class TasksView(ListView):
             return super().get(self, *args, **kwargs)
 
 
+class RevokeTaskView(View):
+    '''
+        Revokes (cancels) a single queued task, then redirects back to the
+        tasks list.
+    '''
+
+    def get(self, request, pk):
+        try:
+            task = TaskHistory.objects.get(pk=pk)
+        except TaskHistory.DoesNotExist:
+            return HttpResponseNotFound()
+        huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
+        huey_queues = { q.name: q for q in map(get_queue, huey_queue_names) }
+        q = huey_queues.get(task.queue)
+        if q is None:
+            msg = f'RevokeTaskView: queue not found: {task.pk=} {task.queue=}'
+            log.warning(msg)
+            return HttpResponseNotFound()
+        # revoke the task we want to cancel
+        q.revoke_by_id(id=task.task_id, revoke_once=True)
+        vn = task.verbose_name or task.task_id or task.pk
+        if not vn.startswith('[revoked] '):
+            task.verbose_name = f'[revoked] {vn}'
+            task.save()
+        return HttpResponseRedirect(append_uri_params(
+            reverse_lazy('sync:tasks'),
+            dict(
+                message='revoked',
+                pk=str(task.pk),
+                task_id=str(task.task_id),
+            ),
+        ))
+
+
 class CompletedTasksView(ListView):
     '''
         List of tasks which have been completed with an optional per-source filter.
@@ -277,7 +314,7 @@ class ResetTasks(FormView):
         # Delete all tasks
         huey_queue_names = (DJANGO_HUEY or {}).get('queues', {})
         for queue_name in huey_queue_names:
-            h_q_reset_tasks(queue_name)
+            h_q_reset_tasks(queue_name, maint_func=h_q_reset_maint_func)
         # Iter all tasks
         for source in Source.objects.all():
             check_source_directory_exists(str(source.pk))

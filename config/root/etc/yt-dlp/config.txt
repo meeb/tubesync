@@ -1,2 +1,4 @@
 --js-runtimes quickjs
 --mtime
+--output Download [%(id)s].%(ext)s
+--output chapter:Download - %(section_number)03d %(section_title)s [%(id)s].%(ext)s

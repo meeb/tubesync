@@ -1,5 +1,5 @@
 import uuid
-from common.json import JSONEncoder
+from common.json_encoder import JSONEncoder
 from common.timestamp import timestamp_to_datetime
 from common.utils import django_queryset_generator as qs_gen
 from django import db

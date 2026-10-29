@@ -10,7 +10,7 @@ import re
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 # Buffer size to match common coreutils I/O block size
 CHUNK_SIZE = (1024) * 32 # KiB
@@ -19,8 +19,8 @@ CHUNK_SIZE = (1024) * 32 # KiB
 PROG_NAME = Path(__file__).stem
 
 # Versioning
-VERSION = (1, 1, 3)
-VERSION_STR = "v" + ".".join(map(str, VERSION))
+VERSION = (1, 1, 5)
+VERSION_STR = 'v' + '.'.join(map(str, VERSION))
 
 def _std_base(*args, **kwargs):
     try:
@@ -44,9 +44,9 @@ def parse_args():
     """Configures and returns command line arguments."""
     parser = argparse.ArgumentParser(
         prog=PROG_NAME,
-        description="Verify file checksums, enforcing strict line formatting and skipping missing files.",
+        description='Verify file checksums, enforcing strict line formatting and skipping missing files.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=f"""
+        epilog=f'''
 Examples:
   Standard (sha256sum style):
     python3 {PROG_NAME}.py sums.txt
@@ -61,14 +61,14 @@ Notes:
   - Missing files are skipped (non-fatal).
   - Uses all available CPU cores for hashing.
   - Rejects UTF-16 manifests to ensure audit integrity.
-"""
+'''
     )
-    parser.add_argument("-a", "--algorithm", default="sha256",
-                        help="checksum algorithm to use (default: sha256)")
-    parser.add_argument("file", nargs="?", default="-",
-                        help="checksum file to read (default: '-' for stdin)")
-    parser.add_argument("-v", "--version", action="version",
-                        version=f"%(prog)s {VERSION_STR} (Python {platform.python_version()})")
+    parser.add_argument('-a', '--algorithm', default='sha256',
+                        help='checksum algorithm to use (default: sha256)')
+    parser.add_argument('file', nargs='?', default='-',
+                        help='checksum file to read (default: "-" for stdin)')
+    parser.add_argument('-v', '--version', action='version',
+                        version=f'%(prog)s {VERSION_STR} (Python {platform.python_version()})')
     return parser.parse_args()
 
 def get_algo_suggestion(word, available):
@@ -133,9 +133,9 @@ def validate_algo(algo_name):
     if algo_lower not in available:
         suggestion = get_algo_suggestion(algo_lower, available)
 
-        error_msg = f"{PROG_NAME}: Error: Unsupported algorithm '{algo_name}'"
+        error_msg = f'{PROG_NAME}: Error: Unsupported algorithm "{algo_name}"'
         if suggestion:
-            error_msg += f". Did you mean '{suggestion}?'"
+            error_msg += f'. Did you mean "{suggestion}?"'
 
         stderr(error_msg)
         sys.exit(1)
@@ -144,33 +144,33 @@ def validate_algo(algo_name):
 def get_input_and_format(file_arg):
     """Verifies argument is a file, handles stdin, and determines format."""
     def error_exit(message, /, label):
-        stderr(f"{PROG_NAME}: error: {label}: {message}")
+        stderr(f'{PROG_NAME}: error: {label}: {message}')
         sys.exit(1)
 
-    if "-" == file_arg:
-        label = "stdin"
+    if '-' == file_arg:
+        label = 'stdin'
         raw_data = sys.stdin.buffer.read()
 
         if raw_data.startswith(b'\xef\xbb\xbf'):
-            error_exit("UTF-8 BOM detected; please provide a clean stream", label)
+            error_exit('UTF-8 BOM detected; please provide a clean stream', label)
         if raw_data.startswith((b'\xff\xfe', b'\xfe\xff')):
-            error_exit("UTF-16 BOM detected; only UTF-8 (without BOM) is supported", label)
+            error_exit('UTF-16 BOM detected; only UTF-8 (without BOM) is supported', label)
 
         try:
             lines = raw_data.decode('utf-8').splitlines()
         except UnicodeDecodeError:
-            error_exit("invalid UTF-8 encoding", label)
+            error_exit('invalid UTF-8 encoding', label)
     else:
         label = file_arg
         p = Path(file_arg)
         if not p.exists():
-            error_exit("No such file or directory")
+            error_exit('No such file or directory')
         if not p.is_file():
-            error_exit("Is not a regular file")
+            error_exit('Is not a regular file')
         with p.open('rb') as f:
             raw_data = f.read(2)
             if raw_data.startswith((b'\xff\xfe', b'\xfe\xff')):
-                error_exit("UTF-16 manifest detected; only UTF-8 (with/without BOM) is supported", label)
+                error_exit('UTF-16 manifest detected; only UTF-8 (with/without BOM) is supported', label)
 
         lines = p.read_text(encoding='utf-8-sig').splitlines()
 
@@ -213,7 +213,7 @@ def path_resolve(path_str, *, strict=False):
             resolved.resolve(strict=True)
         except OSError as e:
             if e.errno == errno.ELOOP:
-                raise RuntimeError(f"Symlink loop detected: {path_str}") from e
+                raise RuntimeError(f'Symlink loop detected: {path_str}') from e
             raise
     return resolved
 
@@ -224,12 +224,11 @@ def verify_checksums(line_data, is_tag, label, algorithm):
     exit_code = 0
     file_buffers = 32
     file_buffer_size = (1024 * 1024) * 1 # MiB
-    file_buffer_pool = queue.Queue()
+    file_buffer_pool = queue.SimpleQueue()
     files_verified = 0
     format_errors = 0
-    hexdigest_args = []
     is_windows = "Windows" == platform.system()
-    max_pending_tasks = 50_000
+    max_pending_tasks = 2_500
     semaphore = threading.Semaphore(max_pending_tasks)
     tasks = []
 
@@ -239,6 +238,9 @@ def verify_checksums(line_data, is_tag, label, algorithm):
     else:
         pattern = re.compile(r'^([a-fA-F0-9]+) ([ \*])(.+)$')
 
+    def create_view():
+        return memoryview(bytearray(file_buffer_size)).cast('B')
+
     def fill_buffer(target_path, /, stat = None, pool = file_buffer_pool, max_size = file_buffer_size):
         """Attempts to grab a buffer from the pool and fill it with file content."""
         try:
@@ -247,17 +249,20 @@ def verify_checksums(line_data, is_tag, label, algorithm):
             if stat.st_size > max_size:
                 return None, 0
             buf = pool.get_nowait()
-            with target_path.open('rb') as f:
+            with target_path.open(mode='rb', buffering=0) as f:
                 actual_read = f.readinto(buf)
             return buf, actual_read
-        except (queue.Empty, IOError, OSError):
+        except (queue.Empty, OSError):
             return None, 0
 
     def return_buffer(buffer, /, pool = file_buffer_pool):
-        pool.put(buffer)
+        try:
+            pool.put_nowait(buffer)
+        except queue.Full:
+            pass
 
     for _ in range(file_buffers):
-        return_buffer(bytearray(file_buffer_size))
+        return_buffer(create_view())
 
     for line_no, data in line_data.items():
         line = data.get('value')
@@ -270,11 +275,11 @@ def verify_checksums(line_data, is_tag, label, algorithm):
 
         match = pattern.match(line)
         if not match:
-            msg = f"{label}:{line_no}: WARNING: improperly formatted line"
+            msg = f'{label}:{line_no}: WARNING: improperly formatted line'
             if is_tag:
                 found_match = algo_extractor.match(line)
                 if found_match:
-                    msg += f" (found {found_match.group(1)})"
+                    msg += f' (found {found_match.group(1)})'
             stderr(msg)
             format_errors += 1
             exit_code = 1
@@ -285,31 +290,36 @@ def verify_checksums(line_data, is_tag, label, algorithm):
         else:
             expected_hash, mode_char, filename_str = match.groups()
             if is_windows and ' ' == mode_char:
-                msg = f"{label}:{line_no}: {filename_str}: WARNING: text conversion is not supported; hashing as binary"
+                msg = f'{label}:{line_no}: {filename_str}: WARNING: text conversion is not supported; hashing as binary'
                 stderr(msg)
 
         if '#' in filename_str:
             msg = (
-                f"{label}:{line_no}: WARNING: filename contained a "
-                "'#' character; inline comments are not supported and "
-                "this will be treated as part of the literal filename."
+                f'{label}:{line_no}: WARNING: filename contained a '
+                '"#" character; inline comments are not supported and '
+                'this will be treated as part of the literal filename.'
             )
             stderr(msg)
 
-        target_path = Path(filename_str)
+        path_in = filename_str
+        if not hasattr(PureWindowsPath, 'parser') and (m := getattr(PureWindowsPath, '_flavour', None)):
+            PureWindowsPath.parser = m
+        if not is_windows and PureWindowsPath.parser.sep in path_in:
+            path_in = PureWindowsPath(path_in).as_posix()
+        target_path = Path(path_in)
 
         # Security: Prevent Path Traversal
         # Skip files outside the directory to prevent traversal attacks
         # Resolve to absolute path and check if it's within CWD
-        msg = f"{label}:{line_no}: WARNING: "
+        msg = f'{label}:{line_no}: WARNING: '
         try:
             abs_target = path_resolve(target_path, strict=False)
             if abs_cwd not in abs_target.parents and abs_target != abs_cwd:
-                msg += "skipping path that is outside the current directory"
+                msg += 'skipping path that is outside the current directory'
                 stderr(msg)
                 continue
         except (OSError, RuntimeError) as e:
-            msg += f"skipping path that could not be resolved: {e}"
+            msg += f'skipping path that could not be resolved: {e}'
             stderr(msg)
             continue
 
@@ -336,79 +346,95 @@ def verify_checksums(line_data, is_tag, label, algorithm):
                     current.st_ino   != original_stat.st_ino   or
                     current.st_ctime != original_stat.st_ctime
                 )
-                return "File modified during processing" if changed else None
+                return 'File modified during processing' if changed else None
             except (OSError, RuntimeError):
-                return "Metadata access failed"
+                return 'Metadata access failed'
+
+        def update_chunks(hasher, view, total_length, chunk_size):
+            for begin in range(0, total_length, chunk_size):
+                end = min(total_length, chunk_size + begin)
+                hasher.update(view[begin:end])
 
         try:
             # Pre-hash integrity check
             if err := check_file_integrity(target_path, stat):
                 if 'File modified' in err:
-                    err = "File modified since scan"
+                    err = 'File modified since scan'
                 return target_path, False, err
 
             hasher = hashlib.new(algorithm)
-            if buffer is not None:
-                hasher.update(buffer[:actual_len])
-                return_buffer(buffer)
-                buffer = None
+            if buffer:
+                update_chunks(hasher, buffer, actual_len, CHUNK_SIZE)
             else:
-                with target_path.open('rb') as fb:
-                    if sys.version_info >= (3, 11):
-                        hasher = hashlib.file_digest(fb, algorithm)
-                    else:
-                        for chunk in iter(lambda: fb.read(CHUNK_SIZE), b""):
-                            hasher.update(chunk)
+                buffer = file_buffer_pool.get()
+                if stat is None:
+                    stat = target_path.stat()
+                with target_path.open(mode='rb', buffering=0) as fb:
+                    while actual_read := fb.readinto(buffer):
+                        update_chunks(hasher, buffer, actual_read, CHUNK_SIZE)
 
             # Post-hash integrity check
             if err := check_file_integrity(target_path, stat):
                 return target_path, False, err
 
-            hexdigest_args.clear()
+            hexdigest_args = []
             if algorithm.startswith('shake'):
                 hexdigest_args.append(len(expected_hash) // 2)
             is_ok = hasher.hexdigest(*hexdigest_args) == expected_hash.lower()
             return target_path, is_ok, None
-        except (IOError, OSError) as e:
+        except OSError as e:
             return target_path, False, str(e)
         finally:
             if buffer is not None:
                 return_buffer(buffer)
+                buffer = None
 
     def harvest(future, path):
         nonlocal files_verified, checksum_failures, exit_code
+        # At the end, reduce the file_buffer_pool
+        if not tasks:
+            work_left_in_flight = max_pending_tasks - semaphore._value
+            if file_buffer_pool.qsize() > work_left_in_flight:
+                try:
+                    excess_buf = file_buffer_pool.get_nowait()
+                except queue.Empty:
+                    return_buffer(create_view())
+                else:
+                    del excess_buf
         # Release semaphore slot so a new task can be submitted.
         semaphore.release()
         try:
             _, ok, err = future.result()
-            msg = f"{path}: "
+            msg = f'{path}: '
             if ok:
-                msg += "OK"
+                msg += 'OK'
                 files_verified += 1
             else:
-                msg += "FAILED"
+                msg += 'FAILED'
                 if err:
-                    msg += f" (Error: {err})"
+                    msg += f' (Error: {err})'
                 checksum_failures += 1
                 exit_code = 1
             stdout(msg)
+        # ruff: ignore[BLE001]
         except Exception as e:
             checksum_failures += 1
             exit_code = 1
-            stdout(f"{path}: FAILED (Unexpected Error: {e!r})")
+            stdout(f'{path}: FAILED (Unexpected Error: {e!r})')
 
-    tasks.sort(key=lambda x: x[0], reverse=True)
+    tasks.sort(key=lambda x: (x[4] is not None, -x[0]))
     with ThreadPoolExecutor() as executor:
         while tasks:
             semaphore.acquire()
 
             _, target_path, stat, expected_hash, buffer, blen = tasks.pop()
             if buffer is None:
+                blen = 0
                 assigned_buffer, actual_read = fill_buffer(target_path, stat=stat)
-                if assigned_buffer and actual_read:
+                if assigned_buffer and 0 <= actual_read:
                     buffer = assigned_buffer
                     blen = actual_read
-                elif assigned_buffer:
+                elif assigned_buffer is not None:
                     return_buffer(assigned_buffer)
 
             future = executor.submit(
@@ -425,19 +451,19 @@ def verify_checksums(line_data, is_tag, label, algorithm):
 
     def warning(msg, singular, plural, /, count):
         if 0 < count:
-            alt = plural if 1 < count else singular
-            prefix = f"{PROG_NAME}: WARNING: {count} "
+            alt = singular if 1 == count else plural
+            prefix = f'{PROG_NAME}: WARNING: {count} '
             stderr(prefix + msg.format(alt))
-    warning("line{0} improperly formatted", " is", "s are", count=format_errors)
-    warning("computed checksum{0} did NOT match", "", "s", count=checksum_failures)
+    warning('line{0} improperly formatted', ' is', 's are', count=format_errors)
+    warning('computed checksum{0} did NOT match', '', 's', count=checksum_failures)
     if 0 == files_verified:
         exit_code = 1
-        msg = f"{PROG_NAME}: WARNING: {label}: no file was verified"
+        msg = f'{PROG_NAME}: WARNING: {label}: no file was verified'
         stderr(msg)
 
     sys.exit(exit_code)
 
-if __name__ == "__main__":
+if '__main__' == __name__:
     args = parse_args()
     algo = validate_algo(args.algorithm)
     content, tag_mode, file_label = get_input_and_format(args.file)

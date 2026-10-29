@@ -1,11 +1,13 @@
 import pathlib
 from django.conf import settings
 from django.http import HttpResponseNotFound, HttpResponseRedirect
+from django.views import View
 from django.views.generic import ListView, DetailView
 from django.views.generic.edit import FormView, FormMixin, CreateView, UpdateView, DeleteView
 from django.core.exceptions import SuspiciousFileOperation
 from django.urls import reverse_lazy
 from django.db.models import Count, When, Case
+from django.db.models.functions import Lower
 from django.forms import Form, ValidationError
 from django.utils.text import slugify
 from django.utils._os import safe_join
@@ -65,16 +67,41 @@ class SourcesView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        all_sources = Source.objects.all().order_by('name')
-        return all_sources.annotate(
+        all_sources = Source.objects.all()
+        qs = all_sources.annotate(
+            lower_name=Lower('name'),
             media_count=Count('media_source'),
             downloaded_count=Count(Case(When(media_source__downloaded=True, then=1)))
         )
+        return qs.order_by('lower_name')
 
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
         data['message'] = self.message
         return data
+
+
+class SourceSyncNowView(View):
+    '''
+        Triggers an immediate index of a source, then redirects back to the
+        sources list.
+    '''
+
+    def get(self, request, pk):
+        try:
+            source = Source.objects.get(pk=pk)
+        except Source.DoesNotExist:
+            return HttpResponseNotFound()
+        TaskHistory.schedule(
+            index_source,
+            str(source.pk),
+            delay=index_source.settings.get('delay'),
+            vn_fmt=_('Index media from source "{}" once'),
+            vn_args=(source.name,),
+        )
+        url = reverse_lazy('sync:sources')
+        url = append_uri_params(url, {'message': 'source-refreshed'})
+        return HttpResponseRedirect(url)
 
 
 class ValidateSourceView(FormView):
@@ -291,7 +318,7 @@ class UpdateSourceView(EditSourceMixin, UpdateView):
 
     def get_initial(self):
         initial = super().get_initial()
-        when = getattr(self.object, 'target_schedule') or timezone.now()
+        when = getattr(self.object, 'target_schedule', None) or timezone.now()
         initial['target_schedule'] = when.replace(second=0, microsecond=0)
         return initial
 
@@ -322,13 +349,14 @@ class DeleteSourceView(DeleteView, FormMixin):
             filter_text=str(source.pk),
             target_schedule=source.target_schedule or timezone.now(),
         )
-        copy_fields = set(map(lambda f: f.name, source._meta.fields)) - set(media_source.keys())
+        # ruff: ignore[C401]
+        copy_fields = set(f.name for f in source._meta.fields) - set(media_source.keys())
         for k, v in source.__dict__.items():
             if k in copy_fields:
                 media_source[k] = v
         media_source = Source(**media_source)
         delete_media_val = request.POST.get('delete_media', False)
-        delete_media = True if delete_media_val is not False else False
+        delete_media = delete_media_val is not False
         # overload this boolean for our own use
         media_source.delete_removed_media = delete_media
         # adjust the directory and key on the source to be deleted
