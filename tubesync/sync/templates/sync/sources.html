@@ -26,7 +26,17 @@
       Next update target: <strong>{% if source.target_schedule %}{{ source.target_schedule|date:'l, H:00' }}{% else %}Not set{% endif %}</strong>
       {% endif %}
     </a>
-    <a href="{% url 'sync:source-sync-now' pk=source.pk %}" class="button is-primary is-fullwidth">Sync Now</a>
+    <div class="columns is-mobile">
+      <div class="column">
+        <a href="{% url 'sync:source' pk=source.pk %}" class="button is-primary is-fullwidth">
+          <span class="icon"><i class="fas fa-info-circle"></i></span>
+          <span>Details</span>
+        </a>
+      </div>
+      <div class="column">
+        <a href="{% url 'sync:source-sync-now' pk=source.pk %}" class="button is-fullwidth">Sync Now</a>
+      </div>
+    </div>
   </div>
   {% empty %}
   <div class="notification">
