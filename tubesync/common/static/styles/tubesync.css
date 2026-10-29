@@ -7,6 +7,7 @@
   --tubesync-surface-dark: #011627;
   --tubesync-text-on-dark: #fdfffc;
   --tubesync-light-blue: #1e5c83;
+  --tubesync-primary: #1e5c83;
   --tubesync-text-on-light-blue: #ffffff;
   --tubesync-red: #e71d36;
   --tubesync-orange: #ff9c00;
@@ -16,7 +17,8 @@
 [data-theme="dark"] {
   --tubesync-surface-dark: #1e2936;
   --tubesync-text-on-dark: #e8eaed;
-  --tubesync-light-blue: #2a7ab8;
+  --tubesync-light-blue: #4d9de0;
+  --tubesync-primary: #1d6399;
   --tubesync-text-on-light-blue: #e8eaed;
   --tubesync-red: #b8152a;
   --tubesync-orange: #856308;
@@ -166,7 +168,7 @@ nav.navbar .navbar-item .icon {
 
 
 nav.navbar .navbar-item.is-active {
-  background-color: var(--tubesync-light-blue) !important;
+  background-color: var(--tubesync-primary) !important;
   color: var(--tubesync-text-on-light-blue) !important;
 }
 
@@ -294,8 +296,8 @@ hr {
 }
 
 .pagination .pagination-link.is-current {
-  background-color: var(--tubesync-light-blue);
-  border-color: var(--tubesync-light-blue);
+  background-color: var(--tubesync-primary);
+  border-color: var(--tubesync-primary);
   color: var(--tubesync-text-on-light-blue);
 }
 
@@ -327,14 +329,14 @@ hr {
 }
 
 .button.is-primary {
-  background-color: var(--tubesync-light-blue);
-  border-color: var(--tubesync-light-blue);
+  background-color: var(--tubesync-primary);
+  border-color: var(--tubesync-primary);
   color: var(--tubesync-text-on-light-blue);
 }
 
 .button.is-primary:hover {
-  background-color: var(--tubesync-light-blue);
-  border-color: var(--tubesync-light-blue);
+  background-color: var(--tubesync-primary);
+  border-color: var(--tubesync-primary);
   filter: brightness(1.1);
 }
 
@@ -352,8 +354,8 @@ hr {
 }
 
 [data-theme="dark"] .button.is-primary {
-  background-color: var(--tubesync-light-blue);
-  border-color: var(--tubesync-light-blue);
+  background-color: var(--tubesync-primary);
+  border-color: var(--tubesync-primary);
   color: var(--tubesync-text-on-light-blue);
 }
 
@@ -389,7 +391,7 @@ hr {
    Notifications
    ============================================ */
 [data-theme="dark"] .notification.is-info {
-  background-color: var(--tubesync-light-blue);
+  background-color: var(--tubesync-primary);
   color: var(--tubesync-text-on-dark);
 }
 
@@ -436,7 +438,7 @@ hr {
 }
 
 .services-panel-total {
-  background-color: var(--tubesync-light-blue);
+  background-color: var(--tubesync-primary);
 }
 
 .services-panel.has-background-success,
