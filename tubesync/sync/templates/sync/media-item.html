@@ -12,7 +12,7 @@
     {% if media.source.is_audio %}
     <audio controls src="{% url 'sync:media-content' pk=media.pk %}"></audio>
     {% else %}
-    <video controls class="is-fullwidth">
+    <video controls style="width: 100%">
       <source src="{% url 'sync:media-content' pk=media.pk %}">
     </video>
     {% endif %}
