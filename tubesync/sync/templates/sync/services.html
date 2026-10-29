@@ -12,13 +12,13 @@
 
 <div class="columns is-multiline">
   <div class="column is-half-tablet is-one-third-desktop">
-    <div class="box has-text-centered services-panel services-panel-total">
+    <div class="box services-panel services-panel-total">
       <p class="services-panel-label">Total Services</p>
       <p class="services-panel-value">{{ total_count|default:"0" }}</p>
     </div>
   </div>
   <div class="column is-half-tablet is-one-third-desktop">
-    <div class="box has-text-centered services-panel {% if total_count == running_count %}has-background-success{% else %}has-background-danger{% endif %}">
+    <div class="box services-panel {% if total_count == running_count %}has-background-success{% else %}has-background-danger{% endif %}">
       <p class="services-panel-label">Running Services</p>
       <p class="services-panel-value">{{ running_count|default:"0" }}</p>
     </div>
