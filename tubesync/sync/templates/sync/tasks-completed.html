@@ -8,20 +8,18 @@
 <div class="box">
   {% for task in tasks %}
   <div class="task-item">
+    <span class="icon-text">
     {% if task.has_error %}
-    <span class="icon-text">
       <span class="icon has-text-danger"><i class="fas fa-exclamation-triangle"></i></span>
-      <span><strong>{% if task.verbose_name %}{{ task.verbose_name }}{% else %}{{ task.name }}{% endif %}</strong></span>
-    </span><br>
-    Queue: "{{ task.queue }}"<br>
-    Error: "{{ task.error_message }}"<br>
     {% else %}
-    <span class="icon-text">
       <span class="icon has-text-success"><i class="fas fa-check"></i></span>
+    {% endif %}
       <span><strong>{% if task.verbose_name %}{{ task.verbose_name }}{% else %}{{ task.name }}{% endif %}</strong></span>
     </span><br>
-    Queue: "{{ task.queue }}"<br>
+    {% if task.has_error %}
+    Error: "{{ task.error_message }}"<br>
     {% endif %}
+    Queue: "{{ task.queue }}"<br>
     Task locked for: {{ task.end_at|sub:task.start_at|timedelta }}<br>
     <i class="far fa-clock"></i> Task locked at <strong>{{ task.start_at|date:'Y-m-d H:i:s' }}</strong><br>
     <i class="fas fa-hourglass-end"></i> Task ended at <strong>{{ task.end_at|date:'Y-m-d H:i:s' }}</strong>
