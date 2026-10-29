@@ -11,6 +11,7 @@ from .fixtures import all_test_metadata
 from sync.tasks import (
     check_source_directory_exists,
     get_media_download_task, get_media_thumbnail_task,
+    make_source_directory,
 )
 from sync.choices import (
     Val, Fallback, FilterSeconds, IndexSchedule, SourceResolution,
@@ -206,6 +207,8 @@ class FrontEndTestCase(TestCase):
                          expected_categories)
         # Run the check_source_directory_exists task
         check_source_directory_exists.call_local(source_uuid)
+        # Run the make_source_directory task
+        make_source_directory.call(source_uuid)
         # Check the source is now on the source overview page
         response = c.get('/sources')
         self.assertEqual(response.status_code, 200)

@@ -27,6 +27,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize',
     'django_huey',
+    'django_tasks_db',
+    'huey.contrib.djhuey',
     'common',
     'sync',
 ]
@@ -48,6 +50,23 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'tubesync.urls'
 FORCE_SCRIPT_NAME = None
 
+
+TASKS = {
+    'default': {
+        'BACKEND': 'django_tasks_db.DatabaseBackend',
+        'QUEUES': TaskQueue.values + ['default'],
+    },
+    'huey': {
+        'BACKEND': 'huey.contrib.djhuey.tasks_backend.HueyBackend',
+        'OPTIONS': {
+            'enqueue_on_commit': True,
+        },
+    },
+}
+
+# Used by TASKS 'huey' backend
+HUEY = sqlite_tasks('tasks', thread=True, workers=0)
+HUEY['consumer']['verbose'] = True if DEBUG else None
 
 DJANGO_HUEY = {
     'default': TaskQueue.LIMIT.value,
