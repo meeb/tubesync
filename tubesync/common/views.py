@@ -10,10 +10,10 @@ from .context_processors import THEME_COOKIE_NAME
 
 
 def toggle_theme(request):
-    '''
+    """
     Toggle between light and dark theme by setting a cookie.
     Redirects back to the referring page or dashboard.
-    '''
+    """
     current_theme = request.COOKIES.get(THEME_COOKIE_NAME, 'light')
     new_theme = 'dark' if current_theme == 'light' else 'light'
     redirect_url = request.META.get('HTTP_REFERER', '/')
@@ -40,11 +40,11 @@ def error500(request, *args, **kwargs):
 
 
 class HealthCheckView(View):
-    '''
-        A basic healthcheck view. SELECTs a random int via the database connection
-        and verifies it matches. This checks that the application server, django and
-        the database connection are all working correctly.
-    '''
+    """
+    A basic healthcheck view. SELECTs a random int via the database connection
+    and verifies it matches. This checks that the application server, django and
+    the database connection are all working correctly.
+    """
 
     ALLOWED_IPS = settings.HEALTHCHECK_ALLOWED_IPS
 
