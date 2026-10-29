@@ -11,7 +11,7 @@ CONFIG_BASE_DIR = BASE_DIR
 DOWNLOADS_BASE_DIR = BASE_DIR
 
 
-VERSION = '0.18.5'
+VERSION = '0.20.0'
 DEBUG = 'true' == getenv('TUBESYNC_DEBUG').strip().lower()
 ALLOWED_HOSTS = []
 # This is not ever meant to be a public web interface so this isn't too critical
@@ -26,7 +26,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
-    'sass_processor',
     'django_huey',
     'django_tasks_db',
     'huey.contrib.djhuey',
@@ -44,7 +43,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'common.middleware.MaterializeDefaultFieldsMiddleware',
     'common.middleware.BasicAuthMiddleware',
 ]
 
@@ -276,7 +274,6 @@ TEMPLATES = [
 STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.FileSystemFinder',
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
-    'sass_processor.finders.CssFinder',
 ]
 
 
@@ -322,7 +319,6 @@ MEDIA_ROOT = CONFIG_BASE_DIR / 'media'
 DOWNLOAD_ROOT = DOWNLOADS_BASE_DIR / 'downloads'
 DOWNLOAD_VIDEO_DIR = 'video'
 DOWNLOAD_AUDIO_DIR = 'audio'
-SASS_PROCESSOR_ROOT = STATIC_ROOT
 
 
 ROBOTS = '''

@@ -576,7 +576,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libonig5 \
   pkgconf \
   python3 \
-  python3-libsass \
   python3-pip-whl \
   python3-socks \
   busybox-syslogd \
@@ -773,7 +772,6 @@ RUN set -x && \
   busybox syslogd -l 7 \
     -O - -f /etc/s6-overlay/s6-rc.d/busybox-syslogd/dependencies.d/base && \
   # Run any required app commands
-  /usr/bin/python3 -B /app/manage.py compilescss && \
   /usr/bin/python3 -B /app/manage.py collectstatic --no-input --link && \
   # Check gunicorn configuration copied from tubesync/tubesync/gunicorn.py
   gunicorn --config /app/tubesync/gunicorn.py --check-config && \

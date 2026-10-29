@@ -3,31 +3,24 @@
 {% block headtitle %}Update source - {{ source.name }}{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Update source <strong>{{ source.name }}</strong></h1>
-    <p>
-      You can use this form to update your source. A source is what's polled on regular
-      basis to find new media to download, such as a channel or playlist. Any changes
-      to a source will only apply to new media and will not update media previously
-      downloaded.
-    </p>
-  </div>
-</div>
-<div class="row">
-  <form method="post" action="{% url 'sync:update-source' pk=source.pk %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Update source <i class="fas fa-pen-square"></i></button>
-      </div>
+<h1 class="title">Update source <strong>{{ source.name }}</strong></h1>
+<p class="mb-4">
+  You can use this form to update your source. A source is what's polled on regular
+  basis to find new media to download, such as a channel or playlist. Any changes
+  to a source will only apply to new media and will not update media previously
+  downloaded.
+</p>
+<form method="post" action="{% url 'sync:update-source' pk=source.pk %}" class="simpleform">
+  {% csrf_token %}
+  {% include 'simpleform.html' with form=form %}
+  <div class="field pt-4">
+    <div class="control">
+      <button class="button is-primary" type="submit" name="action">
+        <span class="icon"><i class="fas fa-pen-square"></i></span>
+        <span>Update source</span>
+      </button>
     </div>
-  </form>
-</div>
-<div class="row">
-  <div class="col s12">
-{% include 'sync/_mediaformatvars.html' %}
   </div>
-</div>
+</form>
+{% include 'sync/_mediaformatvars.html' %}
 {% endblock %}

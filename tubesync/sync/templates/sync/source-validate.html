@@ -3,29 +3,26 @@
 {% block headtitle %}Add a YouTube Source{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Add Source</h1>
-    <p>
-      Enter any YouTube channel or playlist URL below.
-    </p>
-    <p><strong>Supported formats:</strong></p>
-    <ul>
-      <li><strong>YouTube Channel:</strong> <code>https://www.youtube.com/@rossmanngroup</code></li>
-      <li><strong>YouTube Channel by ID:</strong> <code>https://www.youtube.com/channel/UCl2mFZoRqjw_ELax4Yisf6w</code></li>
-      <li><strong>YouTube Playlist:</strong> <code>https://www.youtube.com/playlist?list=PLkVbIsAWN2lsmovRO20_gtfUfgWi-XnnT</code></li>
-    </ul>
-  </div>
-</div>
-<div class="row">
-  <form method="post" action="{% url 'sync:validate-source' %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Add Source <i class="fas fa-check"></i></button>
-      </div>
+<h1 class="title">Add Source</h1>
+<p class="mb-4">
+  Enter any YouTube channel or playlist URL below.
+</p>
+<p><strong>Supported formats:</strong></p>
+<ul class="mb-4">
+  <li><strong>YouTube Channel:</strong> <code>https://www.youtube.com/@rossmanngroup</code></li>
+  <li><strong>YouTube Channel by ID:</strong> <code>https://www.youtube.com/channel/UCl2mFZoRqjw_ELax4Yisf6w</code></li>
+  <li><strong>YouTube Playlist:</strong> <code>https://www.youtube.com/playlist?list=PLkVbIsAWN2lsmovRO20_gtfUfgWi-XnnT</code></li>
+</ul>
+<form method="post" action="{% url 'sync:validate-source' %}" class="simpleform">
+  {% csrf_token %}
+  {% include 'simpleform.html' with form=form %}
+  <div class="field pt-4">
+    <div class="control">
+      <button class="button is-primary" type="submit" name="action">
+        <span class="icon"><i class="fas fa-check"></i></span>
+        <span>Add Source</span>
+      </button>
     </div>
-  </form>
-</div>
+  </div>
+</form>
 {% endblock %}
