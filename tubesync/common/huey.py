@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import subprocess
+import threading
 import time
 import uuid
 from functools import partial
@@ -503,21 +504,13 @@ def register_huey_signals():
             return
         db.close_old_connections()
 
-    for qn in DJANGO_HUEY.get('queues', dict()):
+    def prune_queue_storage(qn):
+        # clean up old history and results from storage
         q = get_queue(qn)
 
-        # hooks to clean up database connections at task boundaries
-        pre_execute(queue=qn, name='close_db')(partial(close_db, huey=q))
-        post_execute(queue=qn, name='close_db')(partial(close_db, huey=q))
-
-        # signals for tracking / maintenance of tasks
-        signal(signals.SIGNAL_INTERRUPTED, queue=qn)(on_interrupted)
-        signal(queue=qn)(historical_task)
-        signal(signals.SIGNAL_EXECUTING, queue=qn)(on_executing_remove_duplicates)
-
-        # clean up old history and results from storage
         now_time = time.monotonic()
         now_dt = datetime.datetime.now(datetime.timezone.utc)
+
         # ruff: ignore[SIM118]
         for key in q.all_results().keys():
             if not key.startswith(storage_key_prefix):
@@ -542,6 +535,37 @@ def register_huey_signals():
                 result_key = key[len(storage_key_prefix) :]
                 q.get(peek=False, key=result_key)
                 q.get(peek=False, key=key)
+
+    def _create_cleanup_worker(qn):
+        def _target():
+            try:
+                prune_queue_storage(qn)
+            # ruff: ignore[BLE001]
+            except Exception:
+                from common.logger import log
+                log.exception(f'Cleanup of {qn=} failed.')
+        # The pruning is happening in a huey consumer worker;
+        # short running tasks won't start these threads.
+        worker = threading.Thread(target=_target, daemon=True)
+        worker.queue_name = qn
+        return worker
+
+    queues = { qn: get_queue(qn) for qn in DJANGO_HUEY.get('queues', dict()) }
+    threads = set()
+    for qn, q in queues.items():
+        # hooks to clean up database connections at task boundaries
+        pre_execute(queue=qn, name='close_db')(partial(close_db, huey=q))
+        post_execute(queue=qn, name='close_db')(partial(close_db, huey=q))
+
+        # signals for tracking / maintenance of tasks
+        signal(signals.SIGNAL_INTERRUPTED, queue=qn)(on_interrupted)
+        signal(queue=qn)(historical_task)
+        signal(signals.SIGNAL_EXECUTING, queue=qn)(on_executing_remove_duplicates)
+
+        # add the thread to prune the queue storage
+        threads.add(_create_cleanup_worker(qn))
+
+    return threads
 
 
 class BackoffAlgorithm:
@@ -626,7 +650,7 @@ class AttemptsTask(Task):
         if retry_backoff is None or 0 == retry_backoff:
             current_delay = getattr(self, '_retry_delay', initial_delay)
             return current_delay
-        elif algo_class and issubclass(algo_class, self.backoff_base_class):
+        elif algo_class and callable(getattr(algo_class, 'calculate', None)):
             # Always exceed the initial delay value
             while algo_class.calculate(attempt) <= initial_delay:
                 attempt += 1
