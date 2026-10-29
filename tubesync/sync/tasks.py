@@ -726,6 +726,15 @@ def index_source(source_id):
     return True
 
 
+@django_task(priority=100, queue_name=Val(TaskQueue.FS))
+def make_source_directory(source_id):
+    with contextlib.suppress(Source.DoesNotExist):
+        source = Source.objects.get(pk=source_id)
+        if not source.directory_exists():
+            log.info(f'Creating directory: {source.directory_path}')
+            source.make_directory()
+
+
 @db_task(priority=100, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.FS))
 def check_source_directory_exists(source_id):
     '''
@@ -741,8 +750,8 @@ def check_source_directory_exists(source_id):
     # Check the source output directory exists
     if not source.directory_exists():
         # Try to create it
-        log.info(f'Creating directory: {source.directory_path}')
         source.make_directory()
+        log.info(f'Created directory: {source.directory_path}')
 
 
 @db_task(delay=10, priority=90, retries=15, backoff_class=DjangoBackgroundTasksBackoff, task_base=AttemptsTask, queue=Val(TaskQueue.LIMIT))
