@@ -7,24 +7,24 @@
 {% include 'infobox.html' with message=message %}
 <table class="table is-striped is-fullwidth">
   <tbody>
-    <tr title="The source type">
+    <tr title="The media server type">
       <td class="is-hidden-mobile">Type</td>
       <td><span class="is-hidden-tablet">Type<br></span><strong>{{ mediaserver.get_server_type_display }}</strong></td>
     </tr>
-    <tr title="Name of the souce in TubeSync for your reference">
+    <tr title="Media server URL">
       <td class="is-hidden-mobile">Location</td>
       <td><span class="is-hidden-tablet">Location<br></span><strong>{{ mediaserver.url }}</strong></td>
     </tr>
-    <tr title="Number of media items downloaded for the source">
+    <tr title="Use HTTPS to communicate with the media server">
       <td class="is-hidden-mobile">Use HTTPS</td>
       <td><span class="is-hidden-tablet">Use HTTPS<br></span><strong>{% if mediaserver.use_https %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
     </tr>
-    <tr title="Number of media items downloaded for the source">
+    <tr title="HTTPS certificate is verified">
       <td class="is-hidden-mobile">Verify HTTPS</td>
       <td><span class="is-hidden-tablet">Verify HTTPS<br></span><strong>{% if mediaserver.verify_https %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}</strong></td>
     </tr>
     {% for name, value in mediaserver.options.items %}
-    <tr title="Unique key of the source, such as the channel name or playlist ID">
+    <tr>
       <td class="is-hidden-mobile">{{ name|title }}</td>
       <td><span class="is-hidden-tablet">{{ name|title }}<br></span><strong>{% if name in private_options %}{{ value|truncatechars:6 }} (hidden){% else %}{{ value }}{% endif %}</strong></td>
     </tr>
