@@ -14,7 +14,7 @@ from .models import Source, Media, Metadata
 from .tasks import (
     get_media_download_task, get_media_metadata_task, get_media_thumbnail_task,
     delete_all_media_for_source, save_all_media_for_source,
-    check_source_directory_exists, download_source_images, index_source,
+    make_source_directory, download_source_images, index_source,
     download_media_file, download_media_metadata, download_media_image,
 )
 from .utils import delete_file
@@ -23,7 +23,9 @@ from .filtering import filter_media
 
 @receiver(pre_save, sender=Source)
 def source_pre_save(sender, instance, **kwargs):
-    source = instance # noqa: F841
+    args = ( str(instance.pk), )
+    # ruff: ignore[F841]
+    source = instance
     # Triggered before a source is saved, if the schedule has been updated recreate
     # its indexing task
     try:
@@ -31,14 +33,15 @@ def source_pre_save(sender, instance, **kwargs):
     except Source.DoesNotExist:
         log.debug(f'source_pre_save signal: no existing source: {sender} - {instance}')
         return
+    else:
+        if not existing_source.directory_exists():
+            existing_source.make_directory()
 
-    args = ( str(instance.pk), )
-    check_source_directory_exists.call_local(*args)
     existing_copy_channel_images = existing_source.copy_channel_images
     new_copy_channel_images = instance.copy_channel_images
     if new_copy_channel_images and not existing_copy_channel_images:
         download_source_images(
-            str(instance.pk),
+            *args,
             delay=download_source_images.settings.get('delay'),
         )
     existing_dirpath = existing_source.directory_path.resolve(strict=True)
@@ -55,7 +58,7 @@ def source_pre_save(sender, instance, **kwargs):
         work_directory = existing_dirpath
         for _count in range(parents_count, 0, -1):
             work_directory = work_directory.parent
-        if not Path(work_directory).resolve(strict=True).is_relative_to(Path(settings.DOWNLOAD_ROOT)):
+        if not Path(work_directory).resolve(strict=True).is_relative_to(Path(settings.DOWNLOAD_ROOT).resolve(strict=True)):
             work_directory = Path(settings.DOWNLOAD_ROOT)
         with TemporaryDirectory(suffix=('.'+new_dirpath.name), prefix='.tmp.', dir=work_directory) as tmp_dir:
             tmp_dirpath = Path(tmp_dir)
@@ -102,7 +105,7 @@ def source_pre_save(sender, instance, **kwargs):
         # Indexing schedule has changed, recreate the indexing task
         TaskHistory.schedule(
             index_source,
-            str(instance.pk),
+            *args,
             eta=instance.task_run_at_dt,
             remove_duplicates=True,
             vn_fmt=_('Index media from source "{}"'),
@@ -115,7 +118,7 @@ def source_post_save(sender, instance, created, **kwargs):
     source = instance
     # Check directory exists and create an indexing task for newly created sources
     if created:
-        check_source_directory_exists(str(source.pk))
+        make_source_directory.enqueue(str(source.pk))
         if source.copy_channel_images:
             download_source_images(
                 str(source.pk),
