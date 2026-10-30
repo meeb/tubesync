@@ -236,7 +236,10 @@ def get_media_info(url, /, *, days=None, info_json=None):
         when='playlist',
         exec_cmd="/usr/bin/env python3 /app/manage.py full-playlist %(id)q '%(playlist_count)d'",
     ))
-    cache_directory_path = Path(user_set('cachedir', opts, '/dev/shm'))
+    try:
+        cache_directory_path = Path(user_set('cachedir', opts))
+    except TypeError:
+        cache_directory_path = Path('/dev/shm')
     playlist_infojson = 'postprocessor_[%(id)s]_%(n_entries)d_%(playlist_count)d_temp'
     outtmpl = dict(
         default='',
