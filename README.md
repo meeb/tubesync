@@ -223,13 +223,6 @@ Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Logging-and-debugging#
  * [Development guide](docs/dev.md) - Local setup, running tests, contributing
  * [Environment variables](docs/environment-variables.md) - Full configuration reference
 
-# Documentation
-
-### Getting started
-
- * [Development guide](docs/dev.md) - Local setup, running tests, contributing
- * [Environment variables](docs/environment-variables.md) - Full configuration reference
-
 ### Advanced usage guides
 
 Moved to the [wiki](https://github.com/meeb/tubesync/wiki/Advanced-usage-guides#advanced-usage-guides).
