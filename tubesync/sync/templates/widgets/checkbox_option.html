@@ -1,7 +1,4 @@
-<!--<input type="{{ option.type }}" name="{{ option.name }}" value="{{ option.value }}" id="{{ option.value }}"><BR>
-    <label for="{{ option.value }}">{{option.label}}</label>-->
-
-<label>
+<label class="flex items-center gap-2 cursor-pointer py-1">
     <input type="{{ option.type }}" name="{{ option.name }}" value="{{ option.value }}" id="{{ option.value }}" {% if option.selected %}checked{% endif %}>
-    <span class="no-text-transform">{{option.label}}</span>
+    <span class="text-sm">{{option.label}}</span>
 </label>

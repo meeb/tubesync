@@ -505,12 +505,12 @@ RUN --mount=type=bind,source=fontawesome-free,target=/fontawesome-free \
   mkdir -v -p /app/common/static/styles && \
   rm -v -f /app/common/static/styles/.output.css /app/common/static/styles/output.css && \
   ( tailwindcss --help || : ) && \
-  test -s /app/common/static/styles/tubesync.css && \
+  test -s /app/common/static/styles/tailwind/tubesync.css && \
   DEBUG=1 timeout 20m tailwindcss build \
-    --input /app/common/static/styles/tubesync.css \
-    --output /app/common/static/styles/.output.css \
+    --input /app/common/static/styles/tailwind/tubesync.css \
+    --output /app/common/static/styles/tailwind/.output.css \
     --cwd /app --optimize && \
-  mv -v /app/common/static/styles/.output.css /app/common/static/styles/output.css && \
+  mv -v /app/common/static/styles/tailwind/.output.css /app/common/static/styles/tailwind/tubesync-compiled.css && \
   # install local_settings.py
   rm -v /app/tubesync/local_settings.py.example && \
   mv -v /app/tubesync/local_settings.py.container /app/tubesync/local_settings.py
@@ -587,7 +587,6 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
   libonig5 \
   pkgconf \
   python3 \
-  python3-libsass \
   python3-pip-whl \
   python3-socks \
   busybox-syslogd \
@@ -784,7 +783,6 @@ RUN set -x && \
   busybox syslogd -l 7 \
     -O - -f /etc/s6-overlay/s6-rc.d/busybox-syslogd/dependencies.d/base && \
   # Run any required app commands
-  /usr/bin/python3 -B /app/manage.py compilescss && \
   /usr/bin/python3 -B /app/manage.py collectstatic --no-input --link && \
   # Check gunicorn configuration copied from tubesync/tubesync/gunicorn.py
   gunicorn --config /app/tubesync/gunicorn.py --check-config && \

@@ -30,23 +30,23 @@ ghcr.io/meeb/tubesync:latest
 
 ### Dashboard
 
-![TubeSync Dashboard](docs/dashboard-v0.5.png)
+![TubeSync Dashboard](docs/assets/dashboard-v0.5.png)
 
 ### Sources overview
 
-![TubeSync sources overview](docs/sources-v0.5.png)
+![TubeSync sources overview](docs/assets/sources-v0.5.png)
 
 ### Source details
 
-![TubeSync source details](docs/source-v0.5.png)
+![TubeSync source details](docs/assets/source-v0.5.png)
 
 ### Media overview
 
-![TubeSync media overview](docs/media-v0.5.png)
+![TubeSync media overview](docs/assets/media-v0.5.png)
 
 ### Media details
 
-![TubeSync media-details](docs/media-item-v0.5.png)
+![TubeSync media-details](docs/assets/media-item-v0.5.png)
 
 </details>
 

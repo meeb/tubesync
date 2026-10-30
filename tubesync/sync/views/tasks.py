@@ -2,7 +2,6 @@ from typing import ClassVar
 
 from django import forms
 from django.conf import settings
-from django.forms import ValidationError
 from django.http import HttpResponseNotFound, HttpResponseRedirect
 from django.views import View
 from django.views.generic import ListView
@@ -16,12 +15,12 @@ from django_huey import DJANGO_HUEY, get_queue
 
 from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
-from common.utils import append_uri_params, multi_key_sort
+from common.utils import append_uri_params, multi_key_sort, remove_enclosed
 from common.huey import h_q_reset_maint_func, h_q_reset_tasks
 from common.logger import log
 from .utils import get_waiting_tasks
 from ..models import Source
-from ..forms import ResetTasksForm, ScheduleTaskForm
+from ..forms import ScheduleTaskForm
 from ..tasks import (
     get_task_map, map_task_to_instance, get_error_message,
     get_running_tasks, make_source_directory,
@@ -75,7 +74,7 @@ class TasksView(ListView):
             except TaskHistory.DoesNotExist:
                 fmt_vars['name'] = fmt_vars['pk']
             else:
-                fmt_vars['name'] = task.verbose_name or task.task_id or task.pk
+                fmt_vars['name'] = remove_enclosed(task.verbose_name or str(task.task_id or task.pk), '[', ']', ' ')
                 fmt_vars['task_id'] = task.task_id
             self.message = self.message.format(**fmt_vars)
 
@@ -248,10 +247,9 @@ class RevokeTaskView(View):
             return HttpResponseNotFound()
         # revoke the task we want to cancel
         q.revoke_by_id(id=task.task_id, revoke_once=True)
-        vn = task.verbose_name or task.task_id or task.pk
-        if not vn.startswith('[revoked] '):
-            task.verbose_name = f'[revoked] {vn}'
-            task.save()
+        vn = remove_enclosed(task.verbose_name or str(task.task_id or task.pk), '[', ']', ' ')
+        task.verbose_name = f'[revoked] {vn}'
+        task.save()
         return HttpResponseRedirect(append_uri_params(
             reverse_lazy('sync:tasks'),
             dict(
@@ -318,7 +316,7 @@ class ResetTasks(FormView):
     '''
 
     template_name = 'sync/tasks-reset.html'
-    form_class = ResetTasksForm
+    form_class = forms.Form
 
     def form_valid(self, form):
         # Delete all tasks
@@ -401,7 +399,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         if not isinstance(when, self.now.__class__):
             form.add_error(
                 'when',
-                ValidationError(
+                forms.ValidationError(
                     self.errors['invalid_when'].format(
                         type(when),
                     ),
@@ -410,7 +408,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         if when < self.now:
             form.add_error(
                 'when',
-                ValidationError(self.errors['when_before_now']),
+                forms.ValidationError(self.errors['when_before_now']),
             )
 
         if form.errors:
@@ -428,7 +426,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
         else:
             eta = max(self.now, when)
             if q.reschedule(task_id, eta):
-                vn = self.object.verbose_name or task_id or pk
+                vn = remove_enclosed(self.object.verbose_name or str(task_id or pk), '[', ']', ' ')
                 self.object.verbose_name = f'[revoked] {vn}'
                 self.object.save()
             else:

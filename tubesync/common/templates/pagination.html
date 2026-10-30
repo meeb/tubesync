@@ -1,11 +1,9 @@
 {% if paginator.num_pages > 1 %}
-<div class="row">
-  <div class="col s12">
-    <div class="pagination">
-      {% for i in paginator.page_range %}
-        <a class="pagenum{% if i == page_obj.number %} currentpage{% endif %}" href="{% if i == paginator.num_pages %}{% querystring page='last' %}{% else %}{% querystring page=i %}{% endif %}">{{ i }}</a>
-      {% endfor %}
-    </div>
+<div class="flex justify-center pt-6">
+  <div class="flex flex-wrap items-center gap-1.5">
+    {% for i in paginator.page_range %}
+      <a class="inline-flex items-center justify-center min-w-[2.5rem] h-10 px-3 text-sm font-medium rounded-md border transition-colors{% if i == page_obj.number %} bg-accent text-accent-foreground border-accent{% else %} bg-card text-foreground border-border hover:bg-primary hover:text-primary-foreground hover:border-primary{% endif %}" href="{% if i == paginator.num_pages %}{% querystring page='last' %}{% else %}{% querystring page=i %}{% endif %}">{{ i }}</a>
+    {% endfor %}
   </div>
 </div>
 {% endif %}

@@ -3,29 +3,21 @@
 {% block headtitle %}Add a new source{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Add a source</h1>
-    <p>
-      You can use this form to add a new source. A source is what's polled on regular
-      basis to find new media to download, such as a channel or playlist.
-    </p>
+<h1>Add a source</h1>
+<p class="text-muted-foreground mb-6">
+  You can use this form to add a new source. A source is what's polled on regular
+  basis to find new media to download, such as a channel or playlist.
+</p>
+
+<form method="post" action="{% url 'sync:add-source' %}" class="max-w-2xl">
+  {% csrf_token %}
+  {% include 'simpleform.html' with form=form %}
+  <div class="pt-4">
+    <button class="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-primary text-primary-foreground font-medium text-sm hover:bg-accent hover:text-accent-foreground transition-colors" type="submit" name="action">Add source <i class="fas fa-fw fa-plus"></i></button>
   </div>
-</div>
-<div class="row">
-  <form method="post" action="{% url 'sync:add-source' %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Add source <i class="fas fa-fw fa-plus"></i></button>
-      </div>
-    </div>
-  </form>
-</div>
-<div class="row">
-  <div class="col s12">
-{% include 'sync/_mediaformatvars.html' %}
-  </div>
+</form>
+
+<div class="mt-8">
+  {% include 'sync/_mediaformatvars.html' %}
 </div>
 {% endblock %}

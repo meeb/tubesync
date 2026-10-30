@@ -15,8 +15,9 @@ from .mediaservers import (MediaServersView, AddMediaServerView,
 # ruff: ignore[RUF022]
 __all__ = [
     'DashboardView',
-    'SourcesView', 'SourceSyncNowView', 'ValidateSourceView', 'AddSourceView',
+    'SourcesView', 'ValidateSourceView', 'AddSourceView',
     'SourceView', 'UpdateSourceView', 'DeleteSourceView',
+    'SourceSyncNowView',
     'MediaView', 'MediaThumbView', 'MediaItemView',
     'MediaRedownloadView', 'MediaSkipView', 'MediaEnableView',
     'MediaContent',

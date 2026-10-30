@@ -26,7 +26,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
-    'sass_processor',
     'django_huey',
     'django_tasks_db',
     'huey.contrib.djhuey',
@@ -44,7 +43,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'common.middleware.MaterializeDefaultFieldsMiddleware',
     'common.middleware.BasicAuthMiddleware',
 ]
 
@@ -53,6 +51,7 @@ ROOT_URLCONF = 'tubesync.urls'
 FORCE_SCRIPT_NAME = None
 
 
+HUEY_TASKS_DIR = None  # Set in local_settings.py, defaults to /config/tasks
 TASKS = {
     'default': {
         'BACKEND': 'django_tasks_db.DatabaseBackend',
@@ -65,33 +64,6 @@ TASKS = {
         },
     },
 }
-
-# Used by TASKS 'huey' backend
-HUEY = sqlite_tasks('tasks', thread=True, workers=0)
-HUEY['consumer']['verbose'] = True if DEBUG else None
-
-DJANGO_HUEY = {
-    'default': TaskQueue.LIMIT.value,
-    'queues': dict(),
-    'verbose': True if DEBUG else None,
-}
-for queue_name in TaskQueue.values:
-    queues = DJANGO_HUEY['queues']
-    if TaskQueue.LIMIT.value == queue_name:
-        queues[queue_name] = sqlite_tasks(queue_name, prefix='net')
-    elif TaskQueue.NET.value == queue_name:
-        queues[queue_name] = sqlite_tasks(queue_name, thread=True, workers=0)
-    else:
-        queues[queue_name] = sqlite_tasks(queue_name, thread=True)
-for django_huey_queue in DJANGO_HUEY['queues'].values():
-    connection = django_huey_queue.get('connection')
-    if connection:
-        filepath = Path('/.' + connection.get('filename') or '').resolve(strict=False)
-        filepath.parent.mkdir(exist_ok=True, parents=True)
-    consumer = django_huey_queue.get('consumer')
-    if consumer:
-        consumer['verbose'] = DJANGO_HUEY.get('verbose', None)
-
 
 LOGGING = {
     'version': 1,
@@ -276,7 +248,6 @@ TEMPLATES = [
 STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.FileSystemFinder',
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
-    'sass_processor.finders.CssFinder',
 ]
 
 
@@ -322,9 +293,6 @@ MEDIA_ROOT = CONFIG_BASE_DIR / 'media'
 DOWNLOAD_ROOT = DOWNLOADS_BASE_DIR / 'downloads'
 DOWNLOAD_VIDEO_DIR = 'video'
 DOWNLOAD_AUDIO_DIR = 'audio'
-SASS_PROCESSOR_ROOT = STATIC_ROOT
-
-
 ROBOTS = '''
 User-agent: *
 Disallow: /
@@ -447,6 +415,36 @@ except ImportError as e:
 
     sys.stderr.write(f'Unable to import local_settings: {e}\n')
     sys.exit(1)
+
+
+# Allow local_settings.py to fully override DJANGO_HUEY (e.g. to use Redis instead of SQLite).
+# If not overridden, fall back to the default sqlite_tasks-based configuration.
+if not globals().get('DJANGO_HUEY'):
+    DJANGO_HUEY = {
+        'default': TaskQueue.LIMIT.value,
+        'queues': dict(),
+        'verbose': True if DEBUG else None,
+    }
+    for queue_name in TaskQueue.values:
+        queues = DJANGO_HUEY['queues']
+        if TaskQueue.LIMIT.value == queue_name:
+            queues[queue_name] = sqlite_tasks(queue_name, prefix='net', tasks_dir=HUEY_TASKS_DIR)
+        elif TaskQueue.NET.value == queue_name:
+            queues[queue_name] = sqlite_tasks(queue_name, thread=True, workers=0, tasks_dir=HUEY_TASKS_DIR)
+        else:
+            queues[queue_name] = sqlite_tasks(queue_name, thread=True, tasks_dir=HUEY_TASKS_DIR)
+for django_huey_queue in DJANGO_HUEY['queues'].values():
+    connection = django_huey_queue.get('connection')
+    if connection:
+        filepath = Path('/.' + connection.get('filename') or '').resolve(strict=False)
+        filepath.parent.mkdir(exist_ok=True, parents=True)
+    consumer = django_huey_queue.get('consumer')
+    if consumer:
+        consumer['verbose'] = DJANGO_HUEY.get('verbose', None)
+
+# Used by TASKS 'huey' backend
+HUEY = sqlite_tasks('tasks', thread=True, workers=0, tasks_dir=HUEY_TASKS_DIR)
+HUEY['consumer']['verbose'] = DJANGO_HUEY.get('verbose', None)
 
 
 try:

@@ -11,7 +11,6 @@ from django.utils.translation import gettext_lazy as _
 
 from common.utils import append_uri_params
 from ..models import MediaServer
-from ..forms import ConfirmDeleteMediaServerForm
 from ..choices import MediaServerType
 
 
@@ -157,7 +156,7 @@ class DeleteMediaServerView(DeleteView, FormMixin):
 
     template_name = 'sync/mediaserver-delete.html'
     model = MediaServer
-    form_class = ConfirmDeleteMediaServerForm
+    form_class = Form
     context_object_name = 'mediaserver'
 
     def get_success_url(self):
