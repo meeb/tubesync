@@ -65,33 +65,6 @@ TASKS = {
     },
 }
 
-# Used by TASKS 'huey' backend
-HUEY = sqlite_tasks('tasks', thread=True, workers=0)
-HUEY['consumer']['verbose'] = True if DEBUG else None
-
-DJANGO_HUEY = {
-    'default': TaskQueue.LIMIT.value,
-    'queues': dict(),
-    'verbose': True if DEBUG else None,
-}
-for queue_name in TaskQueue.values:
-    queues = DJANGO_HUEY['queues']
-    if TaskQueue.LIMIT.value == queue_name:
-        queues[queue_name] = sqlite_tasks(queue_name, prefix='net')
-    elif TaskQueue.NET.value == queue_name:
-        queues[queue_name] = sqlite_tasks(queue_name, thread=True, workers=0)
-    else:
-        queues[queue_name] = sqlite_tasks(queue_name, thread=True)
-for django_huey_queue in DJANGO_HUEY['queues'].values():
-    connection = django_huey_queue.get('connection')
-    if connection:
-        filepath = Path('/.' + connection.get('filename') or '').resolve(strict=False)
-        filepath.parent.mkdir(exist_ok=True, parents=True)
-    consumer = django_huey_queue.get('consumer')
-    if consumer:
-        consumer['verbose'] = DJANGO_HUEY.get('verbose', None)
-
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -450,7 +423,7 @@ if not globals().get('DJANGO_HUEY'):
     DJANGO_HUEY = {
         'default': TaskQueue.LIMIT.value,
         'queues': dict(),
-        'verbose': None if DEBUG else False,
+        'verbose': True if DEBUG else None,
     }
     for queue_name in TaskQueue.values:
         queues = DJANGO_HUEY['queues']
@@ -467,7 +440,11 @@ for django_huey_queue in DJANGO_HUEY['queues'].values():
         filepath.parent.mkdir(exist_ok=True, parents=True)
     consumer = django_huey_queue.get('consumer')
     if consumer:
-        consumer['verbose'] = DJANGO_HUEY.get('verbose', False)
+        consumer['verbose'] = DJANGO_HUEY.get('verbose', None)
+
+# Used by TASKS 'huey' backend
+HUEY = sqlite_tasks('tasks', thread=True, workers=0, tasks_dir=HUEY_TASKS_DIR)
+HUEY['consumer']['verbose'] = DJANGO_HUEY.get('verbose', None)
 
 
 try:
