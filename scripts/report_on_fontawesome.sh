@@ -13,7 +13,7 @@ stdout() {
 
 # Helper to write to stderr with flag termination
 stderr() {
-    printf >&2 -- '%s\n' "$@"
+    printf 1>&2 -- '%s\n' "$@"
 }
 
 # 1. Fail fast if git is not installed or the directory is not a repo
@@ -26,6 +26,8 @@ if ! git rev-parse --is-inside-work-tree &> /dev/null; then
     stderr 'Error: This script must be run inside a git repository.'
     exit 1
 fi
+
+cd "${1:-.}"
 
 # Function to count occurrences using "$@" to preserve individual pathspecs
 count_icons() {
