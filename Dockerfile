@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="2.0.0"
+ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="2.0.2"
 ARG FFMPEG_VERSION="N"
 ARG YTDLP_EJS_VERSION="0.8.0"
 
@@ -505,7 +505,7 @@ RUN --mount=type=bind,source=fontawesome-free,target=/fontawesome-free \
   mv -v /app/tubesync/local_settings.py.container /app/tubesync/local_settings.py
 
 ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION
-ADD --checksum=37169ee2656e08c5c2e5dc9df4c598c0cb4c88a8 "https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git#${BGUTIL_YTDLP_POT_PROVIDER_VERSION}:server" /app/bgutil-ytdlp-pot-provider/server
+ADD --checksum=26475e9d3665b972c4aeb83b4dbaafcf64b88438 "https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git#${BGUTIL_YTDLP_POT_PROVIDER_VERSION}:server" /app/bgutil-ytdlp-pot-provider/server
 RUN ls -alR /app/bgutil-ytdlp-pot-provider
 
 ARG YTDLP_EJS_VERSION
