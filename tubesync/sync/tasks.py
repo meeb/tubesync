@@ -237,6 +237,8 @@ def update_model(instance, **kwargs):
     queue=Val(TaskQueue.DB),
 )
 def delete_deleted_sources():
+    result = cleanup_huey_storage.enqueue()
+    log.info('Cleanup of Huey storage scheduled: %s', result.id)
     now = timezone.now()
     end_time = now + timezone.timedelta(minutes=5)
     qs = Source.objects.filter(
