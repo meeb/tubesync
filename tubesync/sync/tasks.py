@@ -485,9 +485,17 @@ def save_db_batch(qs, objs, fields, /):
     num_objs = len(objs)
     with atomic(durable=False):
         num_updated = qs.bulk_update(objs=objs, fields=fields)
-    if num_objs == num_updated and callable(func := getattr(objs, 'clear', False)):
+    if (num_updated == num_objs) and callable(func := getattr(objs, 'clear', False)):
         # this covers at least: list, set, deque
         func()
+    elif (num_updated < num_objs) and callable(func := getattr(objs, 'pop', False)):
+        # Fallback to saving each object one at a time.
+        num_saved = 0
+        while objs:
+            obj = func()
+            obj.save(update_fields=fields)
+            num_saved += 1
+        return num_saved
     return num_updated
 
 
