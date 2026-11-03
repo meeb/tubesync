@@ -491,6 +491,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 
 def register_huey_signals():
     from django import db
+    from django.conf import settings
     from django_huey import DJANGO_HUEY, get_queue, pre_execute, post_execute, signal
 
     def close_db(task, task_value=None, exception=None, /, *, huey=None):
@@ -504,15 +505,14 @@ def register_huey_signals():
             return
         db.close_old_connections()
 
-    def prune_queue_storage(qn):
+    def prune_queue_storage(qn, days):
         # clean up old history and results from storage
         q = get_queue(qn)
 
         now_time = time.monotonic()
         now_dt = datetime.datetime.now(datetime.timezone.utc)
 
-        # ruff: ignore[SIM118]
-        for key in q.all_results().keys():
+        for key in q.all_results():
             if not key.startswith(storage_key_prefix):
                 continue
             history = q.get(peek=True, key=key)
@@ -531,15 +531,16 @@ def register_huey_signals():
                 )
             else:
                 age = now_dt - history['created']
-            if age > datetime.timedelta(days=7):
+            if age > datetime.timedelta(days=days):
                 result_key = key[len(storage_key_prefix) :]
-                q.get(peek=False, key=result_key)
-                q.get(peek=False, key=key)
+                q.delete(key=result_key)
+                q.restore_by_id(id=result_key)
+                q.delete(key=key)
 
-    def _create_cleanup_worker(qn):
+    def _create_cleanup_worker(qn, days):
         def _target():
             try:
-                prune_queue_storage(qn)
+                prune_queue_storage(qn, days)
             # ruff: ignore[BLE001]
             except Exception:
                 from common.logger import log
@@ -550,6 +551,7 @@ def register_huey_signals():
         worker.queue_name = qn
         return worker
 
+    days_to_keep = getattr(settings, 'COMPLETED_TASKS_DAYS_TO_KEEP', 14)
     queues = { qn: get_queue(qn) for qn in DJANGO_HUEY.get('queues', dict()) }
     threads = set()
     for qn, q in queues.items():
@@ -563,7 +565,7 @@ def register_huey_signals():
         signal(signals.SIGNAL_EXECUTING, queue=qn)(on_executing_remove_duplicates)
 
         # add the thread to prune the queue storage
-        threads.add(_create_cleanup_worker(qn))
+        threads.add(_create_cleanup_worker(qn, days_to_keep))
 
     return threads
 
