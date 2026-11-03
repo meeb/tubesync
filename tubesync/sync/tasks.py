@@ -487,9 +487,17 @@ def save_db_batch(qs, objs, fields, /):
     num_objs = len(objs)
     with atomic(durable=False):
         num_updated = qs.bulk_update(objs=objs, fields=fields)
-    if num_objs == num_updated and callable(func := getattr(objs, 'clear', False)):
+    if (num_updated == num_objs) and callable(func := getattr(objs, 'clear', False)):
         # this covers at least: list, set, deque
         func()
+    elif (num_updated < num_objs) and callable(func := getattr(objs, 'pop', False)):
+        # Fallback to saving each object one at a time.
+        num_saved = 0
+        while objs:
+            obj = func()
+            obj.save(update_fields=fields)
+            num_saved += 1
+        return num_saved
     return num_updated
 
 
@@ -592,13 +600,13 @@ def index_source(source_id):
     num_videos = len(videos)
     log.info(f'Found {num_videos} media items for source: {source}')
     tvn_format = '{:,}' + f'/{num_videos:,}'
-    db_batch_data = queue(list(), maxlen=50)
+    db_batch_data = queue(list(), maxlen=100)
     db_fields_data = frozenset((
         'retrieved',
         'site',
         'value',
     ))
-    db_batch_media = queue(list(), maxlen=10)
+    db_batch_media = queue(list(), maxlen=30)
     db_fields_media = frozenset((
         'duration',
         'published',
@@ -615,19 +623,23 @@ def index_source(source_id):
     vn = 0
     processed_keys = set()
     while len(videos) > 0:
+        while len(db_batch_data) == db_batch_data.maxlen:
+            with contextlib.suppress(db.DatabaseError):
+                save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
+        while len(db_batch_media) == db_batch_media.maxlen:
+            with contextlib.suppress(db.DatabaseError):
+                save_db_batch(Media.objects, db_batch_media, db_fields_media)
         vn += 1
         video = videos.popleft()
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
-        if not key:
-            # Video has no unique key (ID), it can't be indexed
+        if not key or key in processed_keys:
+            # Video has no unique key (ID), it can't be indexed.
+            # Or the same key has already been processed.
             continue
         processed_keys.add(key)
-        if len(db_batch_data) == db_batch_data.maxlen:
-            save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
-        if len(db_batch_media) == db_batch_media.maxlen:
-            save_db_batch(Media.objects, db_batch_media, db_fields_media)
-        update_task_status(task, tvn_format.format(vn))
+        if 0 == (vn % 10):
+            update_task_status(task, tvn_format.format(vn))
         media_defaults = dict()
         # create a dummy instance to use its functions
         media = Media(source=source, key=key)
@@ -702,8 +714,12 @@ def index_source(source_id):
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
     # Update any remaining items in the batches
-    save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
-    save_db_batch(Media.objects, db_batch_media, db_fields_media)
+    while 0 < len(db_batch_data):
+        with contextlib.suppress(db.DatabaseError):
+            save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
+    while 0 < len(db_batch_media):
+        with contextlib.suppress(db.DatabaseError):
+            save_db_batch(Media.objects, db_batch_media, db_fields_media)
     # Cleanup of media no longer available from the source
     use_published = 'published' == str(
         getattr(settings, 'INDEXING_CLEANUP_UNAVAILABLE_POLICY', 'processed')
