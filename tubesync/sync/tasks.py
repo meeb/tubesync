@@ -623,8 +623,9 @@ def index_source(source_id):
         video = videos.popleft()
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
-        if not key:
-            # Video has no unique key (ID), it can't be indexed
+        if not key or key in processed_keys:
+            # Video has no unique key (ID), it can't be indexed.
+            # Or the same key has already been processed.
             continue
         processed_keys.add(key)
         if 0 == (vn % 10):
