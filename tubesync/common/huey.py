@@ -532,7 +532,7 @@ def register_huey_signals():
             else:
                 age = now_dt - history['created']
             if age > datetime.timedelta(days=days):
-                result_key = key[len(storage_key_prefix) :]
+                result_key = key.removeprefix(storage_key_prefix)
                 q.delete(key=result_key)
                 q.restore_by_id(id=result_key)
                 q.delete(key=key)
