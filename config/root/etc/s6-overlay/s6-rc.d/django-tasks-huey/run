@@ -1,0 +1,6 @@
+#!/command/with-contenv bash
+
+exec nice -n "${TUBESYNC_NICE:-1}" s6-setuidgid app \
+    /usr/bin/python3 /app/manage.py run_huey \
+    --disable-autoload --no-periodic \
+    --graceful-signal TERM --shutdown-timeout 60

@@ -40,6 +40,7 @@ from ..choices import (
 from ._migrations import (
     media_file_storage, get_media_thumb_path, get_media_file_path,
 )
+from ..thumb_key import MediaThumbFieldFile
 from ._private import _srctype_dict, _nfo_element
 from .media__tasks import (
     copy_thumbnail, download_checklist, download_finished,
@@ -1237,3 +1238,4 @@ Media.failed_format = failed_format
 Media.refresh_formats = refresh_formats
 Media.wait_for_premiere = wait_for_premiere
 Media.write_nfo_file = write_nfo_file
+Media._meta.get_field('thumb').attr_class = MediaThumbFieldFile

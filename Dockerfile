@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="2.0.0"
+ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION="2.0.2"
 ARG FFMPEG_VERSION="N"
 ARG YTDLP_EJS_VERSION="0.8.0"
 
@@ -10,11 +10,11 @@ ARG ASFALD_VERSION="0.6.0"
 ARG SHA256_ASFALD_AMD64="017cdc44d767bb4733a3bd3fa5f97719e3f58236d006321dfae1924fdda3de9d"
 ARG SHA256_ASFALD_ARM64="4fc112617a71f97592b8760b98c16339d5243577186c970c784fbcab2ef8abd1"
 
-ARG S6_VERSION="3.2.2.0"
+ARG S6_VERSION="3.2.3.2"
 
-ARG SHA256_S6_AMD64="5a09e2f1878dc5f7f0211dd7bafed3eee1afe4f813e872fff2ab1957f266c7c0"
-ARG SHA256_S6_ARM64="50a5d4919e688fafc95ce9cf0055a46f74847517bcf08174bac811de234ec7d2"
-ARG SHA256_S6_NOARCH="85848f6baab49fb7832a5557644c73c066899ed458dd1601035cf18e7c759f26"
+ARG SHA256_S6_AMD64="e6befcc96a437a3831386ecfc51808c5d3e939dc5fe3c02ae9284599e8aa2408"
+ARG SHA256_S6_ARM64="b17f17a82e7a515c682a91edaf2ffdabb73f891981b6c1fd712115693a2f8b4c"
+ARG SHA256_S6_NOARCH="5379750ed30a84bbd2e2dd74847ba6b5bd29cd0b2e3ea2ec58049b57eb2eda12"
 
 ARG QJS_VERSION="2025-09-13"
 
@@ -505,7 +505,7 @@ RUN --mount=type=bind,source=fontawesome-free,target=/fontawesome-free \
   mv -v /app/tubesync/local_settings.py.container /app/tubesync/local_settings.py
 
 ARG BGUTIL_YTDLP_POT_PROVIDER_VERSION
-ADD --checksum=37169ee2656e08c5c2e5dc9df4c598c0cb4c88a8 "https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git#${BGUTIL_YTDLP_POT_PROVIDER_VERSION}:server" /app/bgutil-ytdlp-pot-provider/server
+ADD --checksum=26475e9d3665b972c4aeb83b4dbaafcf64b88438 "https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git#${BGUTIL_YTDLP_POT_PROVIDER_VERSION}:server" /app/bgutil-ytdlp-pot-provider/server
 RUN ls -alR /app/bgutil-ytdlp-pot-provider
 
 ARG YTDLP_EJS_VERSION

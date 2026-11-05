@@ -11,6 +11,7 @@ from .fixtures import all_test_metadata
 from sync.tasks import (
     check_source_directory_exists,
     get_media_download_task, get_media_thumbnail_task,
+    make_source_directory,
 )
 from sync.choices import (
     Val, Fallback, FilterSeconds, IndexSchedule, SourceResolution,
@@ -206,6 +207,8 @@ class FrontEndTestCase(TestCase):
                          expected_categories)
         # Run the check_source_directory_exists task
         check_source_directory_exists.call_local(source_uuid)
+        # Run the make_source_directory task
+        make_source_directory.call(source_uuid)
         # Check the source is now on the source overview page
         response = c.get('/sources')
         self.assertEqual(response.status_code, 200)
@@ -350,7 +353,7 @@ class FrontEndTestCase(TestCase):
         # Add some media
         test_minimal_metadata = all_test_metadata['minimal']
         before_dt = timezone.now()
-        past_date = timezone.make_aware(datetime(year=2000, month=1, day=1))  # noqa: DTZ001
+        past_date = timezone.make_aware(datetime(year=2000, month=1, day=1))
         test_media1 = Media.objects.create(
             key='mediakey1',
             source=test_source,

@@ -1,0 +1,12 @@
+#!/command/with-contenv bash
+
+set -eu
+
+scan_directory='/run/s6-rc/scandir'
+service_dirs_directory='/run/s6-rc/servicedirs'
+
+service_name='django-tasks-default-workers'
+service_directory="${service_dirs_directory}/${service_name}"
+
+/command/s6-svc -wD -d "${service_directory}"
+/command/s6-svunlink "${scan_directory}/" "${service_name}"

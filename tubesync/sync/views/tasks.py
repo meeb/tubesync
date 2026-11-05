@@ -16,7 +16,7 @@ from django_huey import DJANGO_HUEY, get_queue
 
 from common.models import TaskHistory
 from common.timestamp import timestamp_to_datetime
-from common.utils import append_uri_params, multi_key_sort
+from common.utils import append_uri_params, multi_key_sort, remove_enclosed
 from common.huey import h_q_reset_maint_func, h_q_reset_tasks
 from common.logger import log
 from .utils import get_waiting_tasks
@@ -24,7 +24,7 @@ from ..models import Source
 from ..forms import ScheduleTaskForm
 from ..tasks import (
     get_task_map, map_task_to_instance, get_error_message,
-    get_running_tasks, check_source_directory_exists,
+    get_running_tasks, make_source_directory,
 )
 
 
@@ -75,14 +75,22 @@ class TasksView(ListView):
             except TaskHistory.DoesNotExist:
                 fmt_vars['name'] = fmt_vars['pk']
             else:
-                fmt_vars['name'] = task.verbose_name or task.task_id or task.pk
+                fmt_vars['name'] = remove_enclosed(task.verbose_name or str(task.task_id or task.pk), '[', ']', ' ')
                 fmt_vars['task_id'] = task.task_id
             self.message = self.message.format(**fmt_vars)
 
-        return super().dispatch(request, *args, **kwargs)
+        try:
+            return super().dispatch(request, *args, **kwargs)
+        finally:
+            # Retrieve the QS we stored during get_queryset
+            qs = getattr(self, '_active_qs', None)
+            if qs and callable(clean := getattr(qs, '_tmp_table_cleanup', None)):
+                clean()
 
     def get_queryset(self):
         qs = get_waiting_tasks()
+        # Store the QS on the instance so dispatch can access it for cleanup
+        self._active_qs = qs
         if self.filter_source:
             params_prefix=f'[["{self.filter_source.pk}"'
             qs = qs.filter(task_params__istartswith=params_prefix)
@@ -97,7 +105,7 @@ class TasksView(ListView):
     def get_context_data(self, *args, **kwargs):
         data = super().get_context_data(*args, **kwargs)
         now_dt = timezone.now()
-        scheduled_qs = get_waiting_tasks()
+        scheduled_qs = self._active_qs
         # Huey removes running tasks,
         # so the waiting tasks will not include them.
         running_qs = get_running_tasks(now_dt)
@@ -209,9 +217,9 @@ class RevokeTaskView(View):
         # revoke the task we want to cancel
         q.revoke_by_id(id=task.task_id, revoke_once=True)
         vn = task.verbose_name or task.task_id or task.pk
-        if not vn.startswith('[revoked] '):
-            task.verbose_name = f'[revoked] {vn}'
-            task.save()
+        vn = remove_enclosed(str(vn), '[', ']', ' ')
+        task.verbose_name = f'[revoked] {vn}'
+        task.save()
         return HttpResponseRedirect(append_uri_params(
             reverse_lazy('sync:tasks'),
             dict(
@@ -287,7 +295,7 @@ class ResetTasks(FormView):
             h_q_reset_tasks(queue_name, maint_func=h_q_reset_maint_func)
         # Iter all tasks
         for source in Source.objects.all():
-            check_source_directory_exists(str(source.pk))
+            make_source_directory.enqueue(str(source.pk))
             # This also chains down to call each Media objects .save() as well
             source.save()
         return super().form_valid(form)
@@ -389,6 +397,7 @@ class TaskScheduleView(FormView, SingleObjectMixin):
             eta = max(self.now, when)
             if q.reschedule(task_id, eta):
                 vn = self.object.verbose_name or task_id or pk
+                vn = remove_enclosed(str(vn), '[', ']', ' ')
                 self.object.verbose_name = f'[revoked] {vn}'
                 self.object.save()
             else:

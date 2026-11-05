@@ -10,10 +10,10 @@
   .services-table thead { background-color: #f5f5f5; position: sticky; top: 0; z-index: 1; }
   .services-table th { color: #666; text-transform: uppercase; }
   .services-table td { white-space: nowrap; }
-  
+
   /* Flex alignment grid details */
   .services-badge-container { gap: 6px; }
-  
+
   /* High-Contrast Error Log Badges */
   .services-code-badge { padding: 2px 6px; max-width: 100%; display: inline-block; }
   .badge-exit-code { background-color: #212121 !important; }
@@ -105,7 +105,7 @@
         <tbody>
           {% for service in services %}
           <tr class="{% if not service.is_running %}row-service-down{% endif %}">
-            
+
             <!-- Service Name String -->
             <td class="pl-24 font-size-95 font-weight-600 grey-text text-darken-4 cell-text-wrap">{{ service.name }}</td>
 
@@ -116,7 +116,7 @@
                   <span class="new badge green font-weight-600 br-4" data-badge-caption="Running"></span>
                 {% else %}
                   <span class="new badge red font-weight-600 br-4" data-badge-caption="Down"></span>
-                  
+
                   {% if service.exit_code is not None %}
                     <code class="services-code-badge badge-exit-code white-text font-monospace font-size-80 font-weight-600 br-3">Exit Code: {{ service.exit_code }}</code>
                   {% elif service.signal_name is not None %}
@@ -125,7 +125,7 @@
                 {% endif %}
               </div>
             </td>
- 
+
             <!-- Process IDs (PID / PGID Mapping) -->
             <td class="font-monospace font-size-90 grey-text text-darken-1">{{ service.pid|default:"-" }}</td>
             <td class="font-monospace font-size-90 grey-text text-darken-1">{{ service.pgid|default:"-" }}</td>
