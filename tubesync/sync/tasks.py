@@ -38,8 +38,10 @@ from common.errors import (
     NoFormatException, NoMediaException, NoThumbnailException,
     QuerySetEmptyError,
 )
-from common.utils import (  django_queryset_generator as qs_gen,
-                            remove_enclosed, seconds_to_timestr, )
+from common.utils import (
+    django_queryset_generator as qs_gen,
+    remove_enclosed, seconds_to_timestr, wait_for_task_result,
+)
 from common.yt_dlp import retry_django_db
 from .choices import Val, IndexSchedule, TaskQueue
 from .models import Source, Media, MediaServer, Metadata
@@ -239,6 +241,7 @@ def update_model(instance, **kwargs):
 def delete_deleted_sources():
     result = cleanup_huey_storage.enqueue()
     log.info('Cleanup of Huey storage scheduled: %s', result.id)
+    cleanup = result
     now = timezone.now()
     end_time = now + timezone.timedelta(minutes=5)
     qs = Source.objects.filter(
@@ -251,6 +254,8 @@ def delete_deleted_sources():
         log.info(f'Deleting: {source.pk}')
         result = source.delete()
         log.debug(f'Result: {result!r}')
+    result = wait_for_task_result(cleanup)
+    log.debug(f'Cleanup of Huey storage result: {result!r}')
 
 
 @db_periodic_task(
