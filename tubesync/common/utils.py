@@ -1,3 +1,4 @@
+import asyncio
 import cProfile
 import difflib
 import emoji
@@ -8,12 +9,17 @@ import os
 import pstats
 import string
 import time
-from django.core.paginator import Paginator
+
 from functools import partial
 from itertools import chain
 from operator import attrgetter, itemgetter
 from pathlib import Path
 from urllib.parse import urlunsplit, urlencode, urlparse
+
+from asgiref import sync
+from django.core.paginator import Paginator
+from django.tasks import TaskResult
+
 from .errors import DatabaseConnectionError, QuerySetEmptyError
 
 
@@ -425,6 +431,43 @@ def resolve_priority_order(user_input, master_list, cutoff=0.6):
             resolved.append(matches[0])
 
     return resolved
+
+
+async def await_tasks_task_result(
+    result: TaskResult,
+    *,
+    timeout: float | None = None,
+    initial_interval: float = 0.1,
+    max_interval: float = 60.0,
+    backoff: float = 1.15,
+) -> TaskResult:
+    """
+    Wait until a django.tasks TaskResult has finished, then return it.
+
+    Polls with arefresh() using exponential backoff so a long-running
+    task doesn't cause a flood of queue-store queries.
+
+    Raises TimeoutError if `timeout` seconds elapse first.
+    """
+
+    async def _poll() -> TaskResult:
+        interval = initial_interval
+        while not result.is_finished:
+            await asyncio.sleep(interval)
+            interval = min(interval * backoff, max_interval)
+            await result.arefresh()
+        return result
+
+    if timeout is None:
+        return await _poll()
+
+    async with asyncio.timeout(timeout):
+        return await _poll()
+
+
+def wait_for_task_result(result: TaskResult, **kwargs) -> TaskResult:
+    """Blocking wrapper for synchronous callers. See await_tasks_task_result for kwargs."""
+    return sync.async_to_sync(await_tasks_task_result)(result, **kwargs)
 
 
 def django_queryset_generator(query_set, /, *,
