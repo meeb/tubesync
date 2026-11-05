@@ -170,12 +170,12 @@ def multi_key_sort(iterable, specs, /, use_reversed=False, *, item=False, attr=F
 
 
 def parse_database_connection_string(database_connection_string):
-    '''
-        Parses a connection string in a URL style format, such as:
-            postgresql://tubesync:password@localhost:5432/tubesync
-            mysql://someuser:somepassword@localhost:3306/tubesync
-        into a Django-compatible settings.DATABASES dict format. 
-    '''
+    """
+    Parses a connection string in a URL style format, such as:
+        postgresql://tubesync:password@localhost:5432/tubesync
+        mysql://someuser:somepassword@localhost:3306/tubesync
+    into a Django-compatible settings.DATABASES dict format. 
+    """
     valid_drivers = ('postgresql', 'mysql')
     default_ports = {
         'postgresql': 5432,
@@ -187,20 +187,18 @@ def parse_database_connection_string(database_connection_string):
     }
     backend_options = {
         'postgresql': dict(pool={
-            'max_size': 10, # default: None (static min_size pool)
-            'min_size': 3, # default: 4
-            'num_workers': 2, # default: 3
-            'timeout': 180, # default: 30
+            'max_size': 10,  # default: None (static min_size pool)
+            'min_size': 1,  # default: 4
+            'num_workers': 3,  # default: 3
+            'timeout': 90,  # default: 30
         }),
         'mysql': {
             'charset': 'utf8mb4',
         }
     }
     db_overrides = {
-        'mysql': {
-            'CONN_MAX_AGE': 300,
-        },
-        'postgresql': dict(),
+        'mysql': dict(CONN_MAX_AGE=300),
+        'postgresql': dict(CONN_MAX_AGE=0),  # required to be zero with pool
     }
     try:
         parts = urlparse(str(database_connection_string))
@@ -217,7 +215,7 @@ def parse_database_connection_string(database_connection_string):
     django_driver = django_backends.get(driver)
     host_parts = user_pass_host_port.split('@')
     user_pass_parts = host_parts[0].split(':')
-    if len(host_parts) != 2 or len(user_pass_parts) != 2:
+    if 2 != len(host_parts) or 2 != len(user_pass_parts):
         raise DatabaseConnectionError('Database connection string netloc must be in '
                                       'the format of user:pass@host')
     # user_pass never used
@@ -225,11 +223,11 @@ def parse_database_connection_string(database_connection_string):
     user_pass, host_port = host_parts
     username, password = user_pass_parts
     host_port_parts = host_port.split(':')
-    if len(host_port_parts) == 1:
+    if 1 == len(host_port_parts):
         # No port number, assign a default port
         hostname = host_port_parts[0]
         port = default_ports.get(driver)
-    elif len(host_port_parts) == 2:
+    elif 2 == len(host_port_parts):
         # Host name and port number
         hostname, port = host_port_parts
         try:

@@ -77,9 +77,9 @@ class UtilsTestCase(TestCase):
                 'CONN_MAX_AGE': 0,
                 'OPTIONS': dict(pool={
                     'max_size': 10,
-                    'min_size': 3,
-                    'num_workers': 2,
-                    'timeout': 180,
+                    'min_size': 1,
+                    'num_workers': 3,
+                    'timeout': 90,
                 }),
             }
         )
