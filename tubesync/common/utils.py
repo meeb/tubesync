@@ -198,7 +198,7 @@ def parse_database_connection_string(database_connection_string):
     }
     db_overrides = {
         'mysql': dict(CONN_MAX_AGE=300),
-        'postgresql': dict(CONN_MAX_AGE=0),  # required o be zero with pool
+        'postgresql': dict(CONN_MAX_AGE=0),  # required to be zero with pool
     }
     try:
         parts = urlparse(str(database_connection_string))
