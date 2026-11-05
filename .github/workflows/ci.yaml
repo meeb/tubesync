@@ -16,6 +16,7 @@ on:
     branches:
       - 'main'
       - 'test-*'
+      - 'issue/1419/*'
     types:
       - opened
       - reopened
