@@ -17,6 +17,13 @@ so media which fails to download will be retried for an extended period making i
 hopefully, quite reliable.
 
 
+# Cookies for age-restricted videos
+
+You can provide a separate cookies file that is only used after an age-restriction
+error is observed. TubeSync copies it to a temporary file and retries the download,
+allowing regular visitor cookies to be used the rest of the time.
+
+
 # Latest container image
 
 ```yaml
