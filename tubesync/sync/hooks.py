@@ -1,11 +1,36 @@
+import contextlib
+import json
 import os
+import sqlite3
+import subprocess
+import tempfile
+import threading
+import time
 
-from typing import ClassVar
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, ClassVar
+
+from django import db
 
 from common.logger import log
-from common.utils import remove_enclosed
 from sync.utils import filter_response
 
+
+@dataclass
+class QueueState:
+    dir: str
+    path: Path
+    conn: sqlite3.Connection | None = None
+    created_at: float = 0.0
+    last_used_at: float = 0.0
+    last_flush_at: float = 0.0
+    buffer: list[dict[str, Any]] = field(default_factory=list)
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+
+# Global state instance
+_state: QueueState | None = None
 
 progress_hook = {
     'status': dict(),
@@ -14,6 +39,85 @@ progress_hook = {
 postprocessor_hook = {
     'status': dict(),
 }
+
+
+def init_queue_db():
+    global _state
+    q_dir = tempfile.mkdtemp(prefix='sync_hooks_')
+    q_path = Path(q_dir) / 'queue.db'
+    
+    with sqlite3.connect(q_path) as conn:
+        conn.execute('PRAGMA auto_vacuum = INCREMENTAL;')
+        conn.execute('PRAGMA journal_mode = WAL;')
+        conn.execute('PRAGMA journal_size_limit = 0;')
+        conn.execute('VACUUM;')
+
+    with sqlite3.connect(q_path) as conn:
+        conn.execute('PRAGMA synchronous = 3;')
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                payload TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS media (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                key TEXT NOT NULL CHECK (0 < length(trim(key))),
+                uuid TEXT CHECK (uuid IS NULL OR 0 < length(trim(uuid)))
+            )
+        """)
+        conn.execute('PRAGMA user_version = 1;')
+    
+    _state = QueueState(dir=q_dir, path=q_path)
+    
+    threading.Thread(target=_connection_reaper, daemon=True).start()
+
+def _connection_reaper():
+    """Background thread that closes connections idle for more than 10 minutes."""
+    if _state is not None:
+        while _state.conn is None:
+            time.sleep(1)
+    while _state is not None:
+        time.sleep(60)
+        if _state.conn is None:
+            continue
+        with _state.lock:
+            if _state.conn is not None and (600 < (time.monotonic() - _state.last_used_at)):
+                _state.conn.close()
+                _state.conn = None
+
+def _flush_buffer(state: QueueState):
+    """Writes the current buffer to SQLite using an IMMEDIATE transaction."""
+    if not state.buffer or state.conn is None:
+        return
+
+    in_transaction = False
+    try:
+        # BEGIN IMMEDIATE prevents other connections from starting a write 
+        # transaction, avoiding SQLITE_BUSY during high contention.
+        state.conn.execute('BEGIN IMMEDIATE;')
+        in_transaction = True
+        
+        payloads = [(json.dumps(p),) for p in state.buffer]
+        state.conn.executemany('INSERT INTO queue (payload) VALUES (?)', payloads)
+        
+        state.conn.execute('COMMIT;')
+        in_transaction = False
+        state.buffer.clear()
+        state.last_flush_at = time.monotonic()
+    except sqlite3.Error:
+        if in_transaction:
+            with contextlib.suppress(sqlite3.Error):
+                state.conn.execute('ROLLBACK;')
+                in_transaction = False
+        raise
+    finally:
+        if in_transaction is not False and state.conn is not None:
+            with contextlib.suppress(sqlite3.Error):
+                state.conn.close()
+            state.conn = None
+        in_transaction = False
 
 
 class BaseStatus:
@@ -43,6 +147,8 @@ class BaseStatus:
                 self._registered_keys.add(key)
                 additions[key] = self
         self._status_dict.update(additions)
+        if _state is None:
+            self.launch_worker()
 
     def cleanup(self):
         for key in self._registered_keys:
@@ -50,45 +156,69 @@ class BaseStatus:
                 del self._status_dict[key]
 
     def update_task(self):
-        if self.media_key is None:
+        if _state is None or (self.media_key is None and self.media_uuid is None):
             return
-        from .models import Media
-        from .tasks import get_media_download_task
+            
+        with _state.lock:
+            now = time.monotonic()
+            
+            # 1. Connection Lifecycle (Max Age 10m)
+            if _state.conn is not None and (600 < (now - _state.created_at)):
+                _state.conn.close()
+                _state.conn = None
 
-        media = task = None
-        mqs = Media.objects.all()
-        if self.media_uuid:
-            media = mqs.get(uuid=self.media_uuid)
-            task = get_media_download_task(str(media.pk))
-        else:
-            mqs = mqs.exclude(
-                skip=True,
-                manual_skip=True,
-                downloaded=True
-            ).filter(
-                source__download_media=True,
-                can_download=True,
-                key=self.media_key
-            )
-            for m in mqs:
-                t = get_media_download_task(str(m.pk))
-                if t:
-                    media = m
-                    task = t
-                    break
+            # 2. Lazy Init (isolation_level=None for manual transaction control)
+            if _state.conn is None:
+                _state.conn = sqlite3.connect(_state.path, isolation_level=None)
+                _state.conn.execute('PRAGMA synchronous = 1;')
+                _state.created_at = now
+                with _state.conn.cursor() as cursor:
+                    cursor.execute('PRAGMA user_version;')
+                    row = cursor.fetchone()
+                    if row and 0 < row[0]:
+                        cursor.execute('PRAGMA wal_checkpoint(PASSIVE);')
+                        cursor.execute('PRAGMA incremental_vacuum(1000);')
+                        cursor.execute('PRAGMA wal_checkpoint(TRUNCATE);')
+            
+            _state.last_used_at = now
+            if self.media_uuid is None and hasattr(self, 'media_rowid'):
+                with _state.conn.cursor() as cursor:
+                    cursor.execute('SELECT uuid FROM media WHERE id = ?', (self.media_rowid,))
+                    row = cursor.fetchone()
+                    if row and row[0] is not None:
+                        self.media_uuid = row[0]
+            elif self.media_uuid is None:
+                with _state.conn.cursor() as cursor:
+                    cursor.execute('INSERT INTO media (key) VALUES (?)', (self.media_key,))
+                    self.media_rowid = cursor.lastrowid
 
-        if media and task:
-            if self.media_uuid is None:
-                self.media_uuid = media.uuid
-            if self.task_verbose_name is None:
-                # clean up any previously prepended task_status
-                # this happened because of duplicated tasks on my test system
-                self.task_verbose_name = remove_enclosed(
-                    task.verbose_name, '[', ']', ' ',
-                )
-            task.verbose_name = f'{self.task_status} {self.task_verbose_name}'
-            task.save()
+            # 3. Buffer the payload
+            _state.buffer.append({
+                'media_key': self.media_key,
+                'media_rowid': getattr(self, 'media_rowid', 0),
+                'media_uuid': self.media_uuid,
+                'task_status': self.task_status,
+                'task_verbose_name': self.task_verbose_name,
+            })
+            
+            # 4. Throttled Flush: Trigger if buffer >= 100 items or 1 second has passed
+            if (100 <= len(_state.buffer)) or (1.0 < (now - _state.last_flush_at)):
+                _flush_buffer(_state)
 
+    def launch_worker(self, monitor_parent: bool = True):
+        """Launches the worker. monitor_parent=True passes os.getpid()."""
+        global _state
+
+        if _state is not None and not _state.path.exists():
+            _state = None
+        if _state is None:
+            init_queue_db()
+
+        cmd = ['/app/manage.py', 'sync_yt_dlp_hooks_consumer', '--temp-dir', _state.dir]
+        if monitor_parent:
+            cmd.extend(['--pid', str(os.getpid())])
+        
+        subprocess.Popen(cmd)
 
 class ProgressHookStatus(BaseStatus):
     status_dict = progress_hook['status']
@@ -163,11 +293,8 @@ def yt_dlp_progress_hook(event):
         speed = event.get('_speed_str', '?').strip()
         total = event.get('_total_bytes_str', '?').strip()
         percent = None
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             percent = int(float(percent_str.rstrip('%')))
-        # ruff: ignore[S110]
-        except:
-            pass
         if fragment_index >= 0 and fragment_count > 0:
             percent = round(100 * fragment_index / fragment_count)
             percent_str = f'{percent}%'
@@ -209,9 +336,6 @@ def yt_dlp_postprocessor_hook(event):
     elif 'id' in event['info_dict']:
         key = event['info_dict']['id']
 
-    status = PPHookStatus(**event)
-    status.register(key, filename, status.filename)
-
     title = None
     if 'fulltitle' in event['info_dict']:
         title = event['info_dict']['fulltitle']
@@ -221,6 +345,14 @@ def yt_dlp_postprocessor_hook(event):
     if title:
         name = f'{key}: {title}'
 
+    dir = os.path.dirname(event.get('filename', '/downloads/???'))
+    pp_name = event['postprocessor']
+    pp_tracking_key = f'{key}:{pp_name}:{dir}'
+
+    status = PPHookStatus.get(pp_tracking_key)
+    if status is None:
+        status = PPHookStatus(**event)
+        status.register(pp_tracking_key, key, filename, status.filename, status.name)
     status.media_name = name
 
     if 'started' == event['status']:
@@ -230,8 +362,8 @@ def yt_dlp_postprocessor_hook(event):
         })
         logged_dict = filter_response(event['info_dict'], True)
         found_keys = set(logged_dict.keys()).intersection(remove_keys)
-        for key in found_keys:
-            del logged_dict[key]
+        for found_key in found_keys:
+            del logged_dict[found_key]
         log.debug(repr(logged_dict))
 
     if 'Unknown' != key:
@@ -255,6 +387,9 @@ def yt_dlp_postprocessor_hook(event):
         # ruff: ignore[BLE001]
         except Exception as e:
             log.exception(e)
+
+        finally:
+            db.close_old_connections()
     if 'finished' == event['status']:
         status.cleanup()
 
