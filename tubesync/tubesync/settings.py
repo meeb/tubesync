@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'django_huey',
     'django_tasks_db',
     'huey.contrib.djhuey',
+    # 'huey.contrib.djhuey.stats',
     'common',
     'sync',
 ]
@@ -459,6 +460,28 @@ except:
 
 # Tasks scheduled with `background_task` need a chance to finish
 MAX_RUN_TIME = max(600, MAX_RUN_TIME)
+
+_using_djhuey_stats = (
+    'huey.contrib.djhuey.stats' in INSTALLED_APPS and
+    'HUEY' in locals() and
+    'connection' in HUEY and
+    HUEY['connection'].get('filename')
+)  # fmt: skip
+if _using_djhuey_stats:
+    # Coordination the SQLite settings with stats
+    HUEY['connection']['fsync'] = False
+    HUEY['connection']['journal_mode'] = 'WAL'
+    HUEY['connection']['timeout'] = 5
+    HUEY_STATS = {
+        'filename': HUEY['connection']['filename'],
+        'retention_hours': (24) * COMPLETED_TASKS_DAYS_TO_KEEP,  # default: 48
+        'max_events': 100_000,  # default: 2000
+        'inflight_hours': max(1, MAX_RUN_TIME // (60*60)),  # default: 6
+        'capture_args': True,  # default: False
+        'create_tables': True,  # default: True
+        'flush_interval': 1,  # default: 0.5
+        'flush_max': 1000,  # default: 200
+    }
 
 DOWNLOAD_MEDIA_DELAY = 1 + round(MAX_RUN_TIME / 100)
 
