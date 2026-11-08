@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import datetime
+import itertools
 import subprocess
 import threading
 import time
 import uuid
+
 from functools import partial
+from pathlib import Path
+
 from huey import (
     Huey as huey_Huey,
     signals,
@@ -14,7 +18,7 @@ from huey import (
 from huey.api import Task, TaskLock
 from huey.exceptions import TaskLockedException
 from huey.storage import SqliteStorage as huey_SqliteStorage
-from pathlib import Path
+
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
 from .utils import get_usable_cpu_count
 from .yt_dlp import retry_django_db
@@ -61,32 +65,103 @@ class SqliteStorage(huey_SqliteStorage):
         return conn
 
     def initialize_schema(self):
+        kv_result_bool = (
+            'ALTER TABLE kv ADD COLUMN '
+            'result_bool INTEGER NOT NULL DEFAULT 0'
+        )
+        kv_created_at = (
+            'ALTER TABLE kv ADD COLUMN '
+            'created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP'
+        )
+        kv_updated_at = (
+            'ALTER TABLE kv ADD COLUMN '
+            'updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP CHECK(updated_at >= created_at)'
+        )
+        trigger_kv = (
+            'CREATE TRIGGER IF NOT EXISTS trg_kv_updated_at '
+            'AFTER UPDATE ON kv FOR EACH ROW '
+            'BEGIN '
+            '  UPDATE kv SET updated_at = MAX(CURRENT_TIMESTAMP, NEW.created_at) '
+            '  WHERE queue = OLD.queue AND key = OLD.key; '
+            'END'
+        )
+        with self.db(close=True) as curs:
+            curs.execute('PRAGMA auto_vacuum')
+            current_auto_vacuum = curs.fetchall()
+            curs.execute('PRAGMA table_info(kv)')
+            table_info_kv = curs.fetchall()
+        existing_kv_columns = {row[1] for row in table_info_kv}
+        ddl = list(self.ddl)
+        if 'result_bool' not in existing_kv_columns:
+            ddl.append(kv_result_bool)
+        if 'created_at' not in existing_kv_columns:
+            ddl.append(kv_created_at)
+        if 'updated_at' not in existing_kv_columns:
+            ddl.append(kv_updated_at)
+        ddl.append(trigger_kv)
+        self.ddl = tuple(ddl)
         super().initialize_schema()
         auto_vacuum_dict = {'NONE': 0, 'FULL': 1, 'INCREMENTAL': 2}
         valid = set(auto_vacuum_dict.values()) | set(auto_vacuum_dict.keys())
         assert self.auto_vacuum in valid, 'auto_vacuum was invalid'
-        current = self.sql('PRAGMA auto_vacuum', results=True)
-        expected = auto_vacuum_dict.get(self.auto_vacuum) or self.auto_vacuum
         vacuum_db = True
         try:
-            current = int(current[0][0])
-            expected = int(expected)
+            actual = int(current_auto_vacuum[0][0])
+            expected = int(auto_vacuum_dict.get(self.auto_vacuum) or self.auto_vacuum)
         except (TypeError, ValueError):
             pass
         else:
-            vacuum_db = (current != expected)  # fmt: skip
+            vacuum_db = (expected != actual) or (0 == self.auto_vacuum)  # fmt: skip
         with self.db(close=True) as curs:
             curs.execute('PRAGMA wal_checkpoint(TRUNCATE)')
             if vacuum_db:
                 curs.execute(f'PRAGMA auto_vacuum = {self.auto_vacuum}')
                 curs.execute('VACUUM')
 
+    def put_data(self, key, value, is_result=False):
+        q_str = (
+            'INSERT OR REPLACE INTO kv '
+            '(queue, result_bool, key, value) '
+            'VALUES (?, ?, ?, ?)'
+        )
+        p_tuple = (
+            self.name, int(is_result is True), key, self.to_blob(value),
+        )  # fmt: skip
+        self.sql(query=q_str, params=p_tuple, commit=True)
+
+    def _islice_batched(iterable, n):
+        it = iter(iterable)
+        chunk = tuple(itertools.islice(it, n))
+        while chunk:
+            yield chunk
+            chunk = tuple(itertools.islice(it, n))
+
+    def expire_results(self, dt, /, *, chunk_size=100):
+        batched = getattr(itertools, 'batched', self._islice_batched)
+        utc_dt = dt.astimezone(datetime.timezone.utc)
+        sqlite_ts_str = utc_dt.strftime('%Y-%m-%d %H:%M:%S')
+        select_all_q_str = (
+            'SELECT queue, key FROM kv '
+            'WHERE result_bool = 1 AND queue = ? '
+            'AND updated_at < datetime(?)'
+        )
+        delete_row_q_str = (
+            'DELETE FROM kv '
+            'WHERE queue = ? AND key = ?'
+        )
+        if not callable(batched):
+            return
+        batches = batched(
+            self.sql(query=select_all_q_str, params=(self.name, sqlite_ts_str), results=True),
+            chunk_size,
+        )
+        for batch in batches:
+            with self.db(commit=True) as curs:
+                for queue, key in batch:
+                    curs.execute(delete_row_q_str, (queue, key))
+
 
 class Huey(huey_Huey):
-    # do not use __len__ (pending_count) for bool
-    def __bool__(self):
-        return (self._registry._registry or self._registry._periodic_tasks)  # fmt: skip
-
     def _emit(self, signal, task, *args, **kwargs):
         kwargs['huey'] = self
         super()._emit(signal, task, *args, **kwargs)
@@ -97,7 +172,12 @@ class Huey(huey_Huey):
         consumer._logger = consumer._logger.getChild(suffix)
         return consumer
 
-    def reschedule(self, task_id, eta):
+    def prune_results(self, older_than_dt, /):
+        expire_func = getattr(self.storage, 'expire_results', None)
+        if callable(expire_func):
+            expire_func(older_than_dt)
+
+    def reschedule(self, /, task_id, eta):
         pc = self.pending_count()
         found = [
             t
@@ -267,10 +347,8 @@ def h_q_reset_tasks(q, /, *, maint_func=None):
 
 
 def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=None):
-    name_fmt = 'huey_{}'
-    if prefix:
-        name_fmt = f'huey_{prefix}_' + '{}'
-    name = name_fmt.format(key)
+    name = f"huey{('_' + prefix) if prefix else ''}_{key}"
+    tasks_dir = tasks_dir or '/config/tasks'
     thread = thread is True
     try:
         workers = int(workers)
@@ -290,7 +368,7 @@ def sqlite_tasks(key, /, prefix=None, thread=None, workers=None, *, tasks_dir=No
         utc=True,
         compression=True,
         connection=dict(
-            filename=str(Path(tasks_dir or '/config/tasks') / f'{name}.db'),
+            filename=str(Path(tasks_dir) / f'{name}.db'),
             fsync=True,
             isolation_level='IMMEDIATE',  # _create_connection sets this to None
             strict_fifo=True,
@@ -322,9 +400,9 @@ def on_executing_remove_duplicates(signal_name, task_obj, exception_obj=None, /,
         return
     assert exception_obj is None
     assert huey is not None
-    assert hasattr(huey, 'pending') and callable(huey.pending)
-    assert hasattr(huey, 'revoke_by_id') and callable(huey.revoke_by_id)
-    assert hasattr(huey, 'scheduled') and callable(huey.scheduled)
+    assert callable(getattr(huey, 'pending', None))
+    assert callable(getattr(huey, 'revoke_by_id', None))
+    assert callable(getattr(huey, 'scheduled', None))
     assert signals.SIGNAL_EXECUTING == signal_name
 
     from common.models import TaskHistory
@@ -367,7 +445,7 @@ def on_interrupted(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         return
     assert exception_obj is None
     assert huey is not None
-    assert hasattr(huey, 'enqueue') and callable(huey.enqueue)
+    assert callable(getattr(huey, 'enqueue', None))
     huey.enqueue(task_obj)
 
 
@@ -378,8 +456,9 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
     signal_time = time.monotonic()
     signal_dt = datetime.datetime.now(datetime.timezone.utc)
     assert huey is not None
-    assert hasattr(huey, 'get') and callable(huey.get)
-    assert hasattr(huey, 'put') and callable(huey.put)
+    assert callable(getattr(huey, 'delete', None))
+    assert callable(getattr(huey, 'get', None))
+    assert callable(getattr(huey, 'put_result', None))
 
     from common.models import TaskHistory
     add_to_elapsed_signals = frozenset((
@@ -421,10 +500,15 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         history[signal_name] = signal_time
     if signal_name in add_to_elapsed_signals and signals.SIGNAL_EXECUTING in history:
         history['elapsed'] += signal_time - history[signals.SIGNAL_EXECUTING]
-    if signals.SIGNAL_COMPLETE in history:
-        huey.get(key=storage_key)
+    remove_from_storage = (
+        signals.SIGNAL_COMPLETE in history or
+        signals.SIGNAL_REVOKED in history or
+        signals.SIGNAL_EXPIRED in history
+    )  # fmt: skip
+    if remove_from_storage:
+        huey.delete(key=storage_key)
     else:
-        huey.put(key=storage_key, data=history)
+        huey.put_result(key=storage_key, data=history)
     # created never used
     # ruff: ignore[RUF059]
     th, created = retry_django_db(5)(TaskHistory.objects.get_or_create)(
@@ -481,6 +565,8 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
         scheduled_at = huey.scheduled_at_from_task(task_obj)
         if scheduled_at:
             th.scheduled_at = scheduled_at
+    elif signal_name in (signals.SIGNAL_EXPIRED, signals.SIGNAL_REVOKED):
+        th.verbose_name = f'[{signal_name}] {th.verbose_name or th.name}'
     th.end_at = signal_dt
     th.elapsed = history['elapsed']
     th.save()
@@ -491,6 +577,7 @@ def historical_task(signal_name, task_obj, exception_obj=None, /, *, huey=None):
 
 def register_huey_signals():
     from django import db
+    from django.conf import settings
     from django_huey import DJANGO_HUEY, get_queue, pre_execute, post_execute, signal
 
     def close_db(task, task_value=None, exception=None, /, *, huey=None):
@@ -504,15 +591,21 @@ def register_huey_signals():
             return
         db.close_old_connections()
 
-    def prune_queue_storage(qn):
+    def prune_queue_storage(qn, days):
         # clean up old history and results from storage
         q = get_queue(qn)
 
         now_time = time.monotonic()
         now_dt = datetime.datetime.now(datetime.timezone.utc)
 
-        # ruff: ignore[SIM118]
-        for key in q.all_results().keys():
+        # use the new batched deletion and results expiration support first
+        prune_func = getattr(q, 'prune_results', None)
+        if callable(prune_func):
+            delta = now_dt - datetime.timedelta(days=days)
+            prune_func(delta)
+
+        # still try the old routine (it should have little work left)
+        for key in q.all_results():
             if not key.startswith(storage_key_prefix):
                 continue
             history = q.get(peek=True, key=key)
@@ -521,7 +614,7 @@ def register_huey_signals():
             if 'created' not in history:
                 # Set an incorrect created time to ensure eventual removal.
                 history['created'] = now_dt
-                q.put(key=key, data=history)
+                q.put_result(key=key, data=history)
                 # Attempt to calculate an accurate age.
                 # This doesn't work all the time,
                 # so the created datetime is the fail-safe case.
@@ -531,15 +624,20 @@ def register_huey_signals():
                 )
             else:
                 age = now_dt - history['created']
-            if age > datetime.timedelta(days=7):
-                result_key = key[len(storage_key_prefix) :]
-                q.get(peek=False, key=result_key)
-                q.get(peek=False, key=key)
+            if age > datetime.timedelta(days=days):
+                result_key = key.removeprefix(storage_key_prefix)
+                # remove task results from storage
+                q.delete(key=result_key)
+                # remove revoked flag from storage
+                q.restore_by_id(id=result_key)
+                # remove task history metadata from storage
+                q.delete(key=key)
+                
 
-    def _create_cleanup_worker(qn):
+    def _create_cleanup_worker(qn, days):
         def _target():
             try:
-                prune_queue_storage(qn)
+                prune_queue_storage(qn, days)
             # ruff: ignore[BLE001]
             except Exception:
                 from common.logger import log
@@ -550,6 +648,7 @@ def register_huey_signals():
         worker.queue_name = qn
         return worker
 
+    days_to_keep = getattr(settings, 'COMPLETED_TASKS_DAYS_TO_KEEP', 14)
     queues = { qn: get_queue(qn) for qn in DJANGO_HUEY.get('queues', dict()) }
     threads = set()
     for qn, q in queues.items():
@@ -563,7 +662,7 @@ def register_huey_signals():
         signal(signals.SIGNAL_EXECUTING, queue=qn)(on_executing_remove_duplicates)
 
         # add the thread to prune the queue storage
-        threads.add(_create_cleanup_worker(qn))
+        threads.add(_create_cleanup_worker(qn, days_to_keep))
 
     return threads
 

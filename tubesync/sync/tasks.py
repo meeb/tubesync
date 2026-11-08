@@ -14,7 +14,7 @@ import uuid
 from collections import deque as queue
 from io import BytesIO
 from pathlib import Path
-from datetime import timedelta
+from datetime import datetime, timedelta
 from shutil import rmtree
 from django import db
 from django.conf import settings
@@ -203,14 +203,6 @@ def get_media_metadata_task(media_id):
     return get_first_task('sync.tasks.download_media_metadata', media_id)
 
 
-def cleanup_completed_tasks():
-    days_to_keep = getattr(settings, 'COMPLETED_TASKS_DAYS_TO_KEEP', 30)
-    delta = timezone.now() - timedelta(days=days_to_keep)
-    log.info(f'Deleting completed tasks older than {days_to_keep} days '
-             f'(end_at before {delta})')
-    TaskHistory.objects.filter(end_at__lt=delta).delete()
-
-
 @retry_django_db(3)
 def save_model(instance):
     with atomic(durable=False):
@@ -387,19 +379,43 @@ def wait_for_errors(model, /, *, queue_name=None, task_name=None):
         raise HueyConsumerError(_('queue consumer stopped'))
 
 
-@django_task(backend='huey')
-def cleanup_huey_storage():
+@django_task(takes_context=True, queue_name=Val(TaskQueue.LIMIT))
+def cleanup_huey_storage(context):
+    days_to_keep = getattr(settings, 'COMPLETED_TASKS_DAYS_TO_KEEP', 14)
+    now = timezone.now()
+    delta = now - timedelta(days=days_to_keep)
     workers = cleanup_threads
     if not all(
-        (callable(getattr(workers, 'clear', None)),) +
+        (callable(getattr(workers, 'pop', None)),) +
         tuple(callable(getattr(w, 'join', None)) for w in workers) +
         tuple(callable(getattr(w, 'start', None)) for w in workers),
     ):
         return
-    while workers:
-        worker = workers.pop()
+    for worker in workers:
         with contextlib.suppress(RuntimeError):
             worker.start()
+
+    log.info(f'Deleting completed tasks older than {days_to_keep} days '
+             f'(end_at before {delta})')
+    TaskHistory.objects.filter(end_at__lt=delta).delete()
+
+    from huey.contrib.djhuey import HUEY
+    results = (
+        dict(key=k) | HUEY.get(peek=True, key=k)
+        for k in HUEY.all_results()
+        if k.startswith('djt.')
+    )
+    for d in results:
+        if not (when := d.get('finished_at')):
+            continue
+        key = d.get('key')
+        when = datetime.fromisoformat(when)
+        if key and when and when < delta:
+            HUEY.delete(key=key)
+            HUEY.restore_by_id(id=key)
+
+    while workers:
+        worker = workers.pop()
         worker.join()
 
 
@@ -553,7 +569,6 @@ def index_source(source_id):
         Indexes media available from a Source object.
     '''
     db.reset_queries()
-    cleanup_completed_tasks()
     # deleting expired media should happen any time an index task is requested
     cleanup_old_media()
     try:
