@@ -1,10 +1,9 @@
 import contextlib
-import itertools
-import os
-import sqlite3
 import json
-import time
+import os
 import shutil
+import sqlite3
+import time
 
 from pathlib import Path
 
@@ -27,6 +26,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         temp_dir = options['temp_dir']
         db_path = temp_dir / 'queue.db'
+        self.db_path = db_path
         monitor_pid = options['pid']
         pid_alive = True
         threshold = max(5, options['threshold'])
@@ -112,6 +112,7 @@ class Command(BaseCommand):
         db.close_old_connections()
         for data in buffer.values():
             media_key = data['media_key']
+            media_rowid = data['media_rowid']
             media_uuid = data['media_uuid']
             task_status = data['task_status']
             verbose_name_raw = data['task_verbose_name']
@@ -134,6 +135,9 @@ class Command(BaseCommand):
                     if t:
                         media, task = m, t
                         break
+                if media and 0 < media_rowid:
+                    with contextlib.suppress(sqlite3.Error), sqlite3.connect(self.db_path) as conn:
+                        conn.execute('UPDATE media SET uuid = ? WHERE id = ?', (str(media.uuid), media_rowid))
 
             if media and task:
                 if verbose_name_raw is None:
