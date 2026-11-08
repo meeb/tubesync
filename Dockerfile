@@ -22,7 +22,9 @@ ARG SHA256_QJS="fed9715220d616d1a178e1c2e6bd62e8e850626b4fe337cf417940fd32b35802
 
 ARG ALPINE_VERSION="latest"
 ARG DEBIAN_VERSION="13-slim"
+ARG BASE_DEBIAN_UNHOLD_ADDITIONS=""
 ARG OPENRESTY_DEBIAN_VERSION="bookworm"
+ARG OPENRESTY_DEBIAN_SHA1_YEAR="2028"
 
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
@@ -69,6 +71,7 @@ COPY --from=tubesync-etc /etc/debconf.conf /etc/debconf.conf
 COPY --from=tubesync-etc /usr/share/perl5/Debconf/DbDriver/Copy.pm /usr/share/perl5/Debconf/DbDriver/Copy.pm
 COPY --from=tubesync-etc /usr/share/perl5/Debconf/DbDriver/PackageDir.pm /usr/share/perl5/Debconf/DbDriver/PackageDir.pm
 
+ARG BASE_DEBIAN_UNHOLD_ADDITIONS
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
     # to be careful, ensure that these files aren't from a different architecture
@@ -93,7 +96,7 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
       cut -d : -f 2- | \
       xargs -r -t apt-mark hold && \
     # We must allow these upgrades
-    apt-mark unhold libc6 libssl3t64 && \
+    apt-mark unhold libc6 libssl3t64 ${BASE_DEBIAN_UNHOLD_ADDITIONS} && \
     apt-get update && \
     # Include debian-backports.sources for manual use in a container
     _awk_prog='"Suites:" == $1 && /-security$/ { sub("security", "backports"); print; exit; }' && \
@@ -531,10 +534,11 @@ COPY --from=openresty-debian \
 COPY --from=openresty-debian \
     /etc/apt/sources.list.d/openresty.list /etc/apt/sources.list.d/openresty.list
 
+ARG OPENRESTY_DEBIAN_SHA1_YEAR
 RUN mkdir -v -p /etc/crypto-policies/back-ends && \
     cp -v -p /usr/share/apt/default-sequoia.config \
         /etc/crypto-policies/back-ends/apt-sequoia.config && \
-    sed -i -e '/^sha1\./s/2026-/2027-/;' \
+    sed -i -e '/^sha1\./s/2026-/'"${OPENRESTY_DEBIAN_SHA1_YEAR}"'-/;' \
         /etc/crypto-policies/back-ends/apt-sequoia.config
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
