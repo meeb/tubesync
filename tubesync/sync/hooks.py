@@ -52,7 +52,10 @@ class BaseStatus:
 
     def __init__(self, /, hook_status_dict: dict | None = None, *, filename: str | None = None, info_dict: dict | None = None, status: str | None = None):
         self._registered_keys = set()
-        self._status_dict = hook_status_dict or self.status_dict
+        if hook_status_dict is None:
+            self._status_dict = self.status_dict
+        else:
+            self._status_dict = hook_status_dict
         if info_dict is None:
             info_dict = dict()
         fn = info_dict.get('filename', None)
