@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import threading
 
 from pathlib import Path
 from typing import ClassVar
@@ -24,6 +25,42 @@ postprocessor_hook = {
 class BaseStatus:
     status_dict: ClassVar[dict[str, BaseStatus]] = dict()
     valid = frozenset()
+
+    @staticmethod
+    def _purge_dead_thread_connections():
+        """
+        Safely purges dead thread database contexts from memory.
+        Uses clean, separate tracking sets to guard against recycled IDs.
+        """
+        if not hasattr(db.connections, '_connections'):
+            return
+
+        connections_manager = db.connections
+        local_storage = connections_manager._connections
+        storage_dict = None
+
+        # Django's LocalStorage subclass stores its thread-specific objects 
+        # inside its __dict__ or an internal storage layout.
+        storage_dict = getattr(local_storage, '__dict__', None)
+        if storage_dict is None:
+            storage_dict = getattr(local_storage, '_local__storage', None)
+
+        if not storage_dict:
+            return
+
+        alive_threads = {t for t in threading.enumerate() if t.is_alive()}
+        alive_idents, alive_memory_ids = set(), set()
+        for t in alive_threads:
+            alive_memory_ids.add(id(t))
+            if t.ident is not None:
+                alive_idents.add(t.ident)
+
+        msg = '[db-cleanup] Evicted dangling connection for dead thread: %s %r'
+        for thread_key in tuple(storage_dict.keys()):
+            if not (thread_key in alive_idents or thread_key in alive_memory_ids):
+                thread_data = storage_dict.pop(thread_key, None)
+                if thread_data is not None:
+                    log.debug(msg, thread_key, thread_data)
 
     @staticmethod
     def event_key(event: dict) -> str | None:
@@ -69,6 +106,10 @@ class BaseStatus:
         self.task_verbose_name = None
 
     def register(self, *args):
+        # Clean up any leftover connections from previous tasks right before 
+        # registering new references for this download session
+        self._purge_dead_thread_connections()
+
         additions = {key: self for key in args if key is not None}
         self._registered_keys.update(additions)
         self._status_dict.update(additions)
@@ -82,6 +123,9 @@ class BaseStatus:
         # }
         for key in self._registered_keys:
             self._status_dict.pop(key, None)
+
+        # Clean up dead connections immediately upon session completion
+        self._purge_dead_thread_connections()
 
     def update_task(self):
         if self.media_key is None:
@@ -142,6 +186,11 @@ class ProgressHookStatus(BaseStatus):
     def __init__(self, *args, filename=None, info_dict=None, status=None, **kwargs):
         super().__init__(self.status_dict, filename=filename, info_dict=info_dict, status=status)
         self.download_progress = 0
+        self._percentage_lock = threading.Lock()
+
+    @property
+    def lock(self):
+        return self._percentage_lock
 
     def next_progress(self):
         if 0 == self.download_progress:
@@ -196,8 +245,17 @@ def yt_dlp_progress_hook(event):
             percent = round(100 * fragment_index / fragment_count)
         elif downloaded_bytes >= 0 and total_bytes > 0:
             percent = round(100 * downloaded_bytes / total_bytes)
-        if percent and (status.next_progress() < percent) and (0 == percent % 5):
-            status.download_progress = percent
+ 
+        accept_percent = False
+        with status.lock:
+            accept_percent = (
+                percent and
+                (status.next_progress() < percent) and
+                (0 == (percent % 5))
+            )  # fmt: skip
+            if accept_percent:
+                status.download_progress = percent
+        if accept_percent:
             percent_str = f'{percent}%' if '?' == percent_str else percent_str
             if key:
                 status.media_key = key
@@ -253,14 +311,13 @@ def yt_dlp_postprocessor_hook(event):
     status.media_name = name
 
     if 'started' == event['status']:
-        remove_keys = frozenset({
+        remove_keys = (
             'formats',
             'automatic_captions',
-        })
+        )
         logged_dict = filter_response(event['info_dict'], True)
-        found_keys = set(logged_dict.keys()).intersection(remove_keys)
-        for found_key in found_keys:
-            logged_dict.pop(found_key, None)
+        for ktr in remove_keys:
+            logged_dict.pop(ktr, None)
         log.debug(repr(logged_dict))
 
     if 'Unknown' != key:
@@ -276,9 +333,12 @@ def yt_dlp_postprocessor_hook(event):
 
         db.close_old_connections()
         try:
-            media = Media.objects.get(pk=status.media_uuid)
-            media.new_metadata.value['requested_formats'] = event['info_dict'].get('requested_formats')
-            media.new_metadata.value['requested_subtitles'] = event['info_dict'].get('requested_subtitles')
+            media = Media.objects.get(uuid=status.media_uuid)
+            value = dict()
+            value.update(media.new_metadata.value)
+            value['requested_formats'] = event['info_dict'].get('requested_formats')
+            value['requested_subtitles'] = event['info_dict'].get('requested_subtitles')
+            media.new_metadata.value = value
             media.new_metadata.save()
         except Media.DoesNotExist:
             pass
@@ -292,12 +352,12 @@ def yt_dlp_postprocessor_hook(event):
 
 
 progress_hook.update({
-    'class': ProgressHookStatus(),
+    'class': ProgressHookStatus,
     'function': yt_dlp_progress_hook,
 })
 
 postprocessor_hook.update({
-    'class': PPHookStatus(),
+    'class': PPHookStatus,
     'function': yt_dlp_postprocessor_hook,
 })
 
