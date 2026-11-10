@@ -407,6 +407,10 @@ class Source(db.models.Model):
             return False
 
     @property
+    def index_schedule_is_never(self):
+        return Val(IndexSchedule.NEVER) == self.index_schedule
+
+    @property
     def task_run_at_dt(self):
         now = timezone.now()
         when = now.replace(minute=0, second=0, microsecond=0)
