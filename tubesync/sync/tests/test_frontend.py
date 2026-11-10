@@ -329,6 +329,32 @@ class FrontEndTestCase(TestCase):
         response = c.get(f'/source/{source_uuid}')
         self.assertEqual(response.status_code, 404)
 
+    def test_source_never_updated(self):
+        c = Client()
+        source = Source.objects.create(
+            source_type=Val(YouTube_SourceType.CHANNEL),
+            key='testkey',
+            name='testname',
+            directory='testdirectory',
+            index_schedule=Val(IndexSchedule.NEVER),
+            source_resolution=Val(SourceResolution.VIDEO_1080P),
+            source_vcodec=Val(YouTube_VideoCodec.VP9),
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
+            fallback=Val(Fallback.FAIL)
+        )
+        # A source that is never indexed has no next update
+        response = c.get('/sources')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Next update target: <strong>Never</strong>', response.content.decode())
+        response = c.get(f'/source/{source.pk}')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Target schedule<br></span><strong>Never</strong>', response.content.decode())
+        # Once it is indexed again, the target is shown
+        source.index_schedule = Val(IndexSchedule.EVERY_HOUR)
+        source.save()
+        response = c.get('/sources')
+        self.assertNotIn('Next update target: <strong>Never</strong>', response.content.decode())
+
     def test_media(self):
         # Media overview page
         c = Client()
