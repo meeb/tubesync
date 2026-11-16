@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import functools
-import os
+import threading
 
 from pathlib import Path
 from typing import ClassVar
@@ -144,6 +144,11 @@ class ProgressHookStatus(BaseStatus):
     def __init__(self, *args, filename=None, info_dict=None, status=None, **kwargs):
         super().__init__(self.status_dict, filename=filename, info_dict=info_dict, status=status)
         self.download_progress = 0
+        self._percentage_lock = threading.Lock()
+
+    @property
+    def lock(self):
+        return self._percentage_lock
 
     def next_progress(self):
         if 0 == self.download_progress:
@@ -207,8 +212,17 @@ def yt_dlp_progress_hook(event):
             percent = round(100 * fragment_index / fragment_count)
         elif downloaded_bytes >= 0 and total_bytes > 0:
             percent = round(100 * downloaded_bytes / total_bytes)
-        if percent and (status.next_progress() < percent) and (0 == percent % 5):
-            status.download_progress = percent
+
+        accept_percent = False
+        with status.lock:
+            accept_percent = (
+                percent and
+                (status.next_progress() < percent) and
+                (0 == (percent % 5))
+            )  # fmt: skip
+            if accept_percent:
+                status.download_progress = percent
+        if accept_percent:
             percent_str = f'{percent}%' if '?' == percent_str else percent_str
             if key:
                 status.media_key = key
@@ -265,14 +279,13 @@ def yt_dlp_postprocessor_hook(event):
     status.media_name = name
 
     if 'started' == event['status']:
-        remove_keys = frozenset({
+        remove_keys = (
             'formats',
             'automatic_captions',
-        })
+        )
         logged_dict = filter_response(event['info_dict'], True)
-        found_keys = set(logged_dict.keys()).intersection(remove_keys)
-        for found_key in found_keys:
-            logged_dict.pop(found_key, None)
+        for ktr in remove_keys:
+            logged_dict.pop(ktr, None)
         log.debug(repr(logged_dict))
 
     if 'Unknown' != key:
@@ -288,9 +301,12 @@ def yt_dlp_postprocessor_hook(event):
 
         db.close_old_connections()
         try:
-            media = Media.objects.get(pk=status.media_uuid)
-            media.new_metadata.value['requested_formats'] = event['info_dict'].get('requested_formats')
-            media.new_metadata.value['requested_subtitles'] = event['info_dict'].get('requested_subtitles')
+            media = Media.objects.get(uuid=status.media_uuid)
+            value = dict()
+            value.update(media.new_metadata.value)
+            value['requested_formats'] = event['info_dict'].get('requested_formats')
+            value['requested_subtitles'] = event['info_dict'].get('requested_subtitles')
+            media.new_metadata.value = value
             media.new_metadata.save()
         except Media.DoesNotExist:
             pass
@@ -304,12 +320,12 @@ def yt_dlp_postprocessor_hook(event):
 
 
 progress_hook.update({
-    'class': ProgressHookStatus(),
+    'class': ProgressHookStatus,
     'function': yt_dlp_progress_hook,
 })
 
 postprocessor_hook.update({
-    'class': PPHookStatus(),
+    'class': PPHookStatus,
     'function': yt_dlp_postprocessor_hook,
 })
 
