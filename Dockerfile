@@ -509,7 +509,7 @@ FROM tubesync-base AS tubesync-openresty
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
-    --mount=type=bind,from=openresty-repo,target=/run/openresty-repo \
+    --mount=type=bind,source=/srv/repo,target=/run/openresty-repo,from=openresty-repo \
     --mount=type=bind,source=openresty-mirror.sources,target=/etc/apt/sources.list.d/openresty-mirror.sources \
   set -x && \
   apt-get update && \
