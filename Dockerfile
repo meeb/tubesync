@@ -23,8 +23,6 @@ ARG SHA256_QJS="fed9715220d616d1a178e1c2e6bd62e8e850626b4fe337cf417940fd32b35802
 ARG ALPINE_VERSION="latest"
 ARG DEBIAN_VERSION="13-slim"
 ARG BASE_DEBIAN_UNHOLD_ADDITIONS=""
-ARG OPENRESTY_DEBIAN_VERSION="bookworm"
-ARG OPENRESTY_DEBIAN_SHA1_YEAR="2026"
 
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
@@ -55,7 +53,7 @@ FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
 ARG TARGETARCH
 
-ENV DEBIAN_FRONTEND="noninteractive" \
+ENV DEBIAN_FRONTEND="teletype" \
     APT_KEEP_ARCHIVES=1 \
     EDITOR="editor" \
     HOME="/root" \
@@ -258,28 +256,6 @@ FROM denoland/deno:bin AS deno-binaries
 
 FROM scratch AS deno
 COPY --from=deno-binaries /deno /usr/local/bin/
-
-FROM alpine:${ALPINE_VERSION} AS openresty-debian
-ARG OPENRESTY_DEBIAN_VERSION
-ARG TARGETARCH
-ADD 'https://openresty.org/package/pubkey.gpg' '/downloaded/pubkey.gpg'
-RUN set -eu ; \
-    decide_arch() { \
-        case "${TARGETARCH}" in \
-            (amd64) printf -- '' ;; \
-            (arm64) printf -- 'arm64/' ;; \
-        esac ; \
-    } ; \
-    set -x ; \
-    mkdir -v -p '/etc/apt/trusted.gpg.d' && \
-    apk --no-cache --no-progress add cmd:gpg2 && \
-    gpg2 --dearmor \
-        -o '/etc/apt/trusted.gpg.d/openresty.gpg' \
-        < '/downloaded/pubkey.gpg' && \
-    mkdir -v -p '/etc/apt/sources.list.d' && \
-    printf -- >| '/etc/apt/sources.list.d/openresty.list' \
-        'deb http://openresty.org/package/%sdebian %s openresty' \
-        "$(decide_arch)" "${OPENRESTY_DEBIAN_VERSION}"
 
 FROM tubesync-asfald AS ffmpeg-download
 ARG FFMPEG_DATE
@@ -527,22 +503,14 @@ RUN mkdir -v /tmp/extracted && \
 FROM scratch AS tubesync-app
 COPY --from=tubesync-prepare-app /app /app
 
+FROM ghcr.io/meeb/openresty-repo:latest AS openresty-repo
+
 FROM tubesync-base AS tubesync-openresty
-
-COPY --from=openresty-debian \
-    /etc/apt/trusted.gpg.d/openresty.gpg /etc/apt/trusted.gpg.d/openresty.gpg
-COPY --from=openresty-debian \
-    /etc/apt/sources.list.d/openresty.list /etc/apt/sources.list.d/openresty.list
-
-ARG OPENRESTY_DEBIAN_SHA1_YEAR
-RUN mkdir -v -p /etc/crypto-policies/back-ends && \
-    cp -v -p /usr/share/apt/default-sequoia.config \
-        /etc/crypto-policies/back-ends/apt-sequoia.config && \
-    sed -i -e '/^sha1\./s/2026-/'"${OPENRESTY_DEBIAN_SHA1_YEAR}"'-/;' \
-        /etc/crypto-policies/back-ends/apt-sequoia.config
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
     --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    --mount=type=bind,from=openresty-repo,target=/run/openresty-repo \
+    --mount=type=bind,source=openresty-mirror.sources,target=/etc/apt/sources.list.d/openresty-mirror.sources \
   set -x && \
   apt-get update && \
   apt-get -y --no-install-recommends install \
