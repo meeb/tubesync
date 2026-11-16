@@ -1,6 +1,10 @@
+import contextlib
+import functools
 import os
 
 from typing import ClassVar
+
+from django import db
 
 from common.logger import log
 from common.utils import remove_enclosed
@@ -132,6 +136,15 @@ class PPHookStatus(BaseStatus):
         self.status = status
 
 
+def close_db_after(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        with contextlib.closing(db.connection):
+            return fn(*args, **kwargs)
+    return wrapper
+
+
+@close_db_after
 def yt_dlp_progress_hook(event):
     if not ProgressHookStatus.valid_status(event['status']):
         log.warning(f'[youtube-dl] unknown progress event: {event!s}')
@@ -197,6 +210,7 @@ def yt_dlp_progress_hook(event):
         status.cleanup()
 
 
+@close_db_after
 def yt_dlp_postprocessor_hook(event):
     if not PPHookStatus.valid_status(event['status']):
         log.warning(f'[youtube-dl] unknown postprocessor event: {event!s}')
