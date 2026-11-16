@@ -154,9 +154,10 @@ class SqliteStorage(huey_SqliteStorage):
             return
         batches = batched(
             self.sql(query=select_all_q_str, params=(self.name, sqlite_ts_str), results=True),
-            chunk_size,
+            max(1, chunk_size),
         )
         for batch in batches:
+            time.sleep(0.1)
             with self.db(commit=True) as curs:
                 for queue, key in batch:
                     curs.execute(delete_row_q_str, (queue, key))
