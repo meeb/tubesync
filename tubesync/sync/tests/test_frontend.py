@@ -2,7 +2,8 @@ import logging
 from datetime import datetime
 from urllib.parse import urlsplit
 from django.conf import settings
-from django.test import TestCase, Client
+from django.template.defaultfilters import date
+from django.test import TestCase, Client, override_settings
 from django.utils import timezone
 from django_huey import DJANGO_HUEY, get_queue
 from common.models import TaskHistory
@@ -155,6 +156,60 @@ class FrontEndTestCase(TestCase):
         self.assertTrue(checked_key)
         self.assertTrue(checked_name)
         self.assertTrue(checked_directory)
+
+    def test_source_never_updated(self):
+        c = Client()
+        source = Source.objects.create(
+            source_type=Val(YouTube_SourceType.CHANNEL),
+            key='testkey',
+            name='testname',
+            directory='testdirectory',
+            index_schedule=Val(IndexSchedule.NEVER),
+            source_resolution=Val(SourceResolution.VIDEO_1080P),
+            source_vcodec=Val(YouTube_VideoCodec.VP9),
+            source_acodec=Val(YouTube_AudioCodec.OPUS),
+            fallback=Val(Fallback.FAIL)
+        )
+        # A source that is never indexed has no next update
+        response = c.get('/sources')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Next update target: <strong>Never</strong>', response.content.decode())
+        response = c.get(f'/source/{source.pk}')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Target schedule<br></span><strong>Never</strong>', response.content.decode())
+        # Once it is indexed again, the target is shown
+        source.index_schedule = Val(IndexSchedule.EVERY_HOUR)
+        source.save()
+        response = c.get('/sources')
+        self.assertNotIn('Next update target: <strong>Never</strong>', response.content.decode())
+
+    @override_settings(TIME_ZONE='UTC')
+    def test_source_schedule_display(self):
+        target = timezone.make_aware(datetime(2026, 11, 8, 9))
+        source = Source.objects.create(
+            key='schedule-test', name='Schedule test', directory='schedule-test',
+            target_schedule=target,
+        )
+        c = Client()
+        for schedule, active, label in (
+            (IndexSchedule.NEVER, True, 'Never'),
+            (IndexSchedule.EVERY_24_HOURS, True, None),
+            (IndexSchedule.EVERY_24_HOURS, False, 'Never'),
+        ):
+            Source.objects.filter(pk=source.pk).update(
+                index_schedule=schedule, download_media=active,
+                index_videos=active, index_streams=active,
+            )
+            for url, markup, date_format in (
+                ('/sources', 'Next update target: <strong>{}</strong>', 'l, H:00'),
+                (f'/source/{source.pk}',
+                 ('<td><span class="hide-on-med-and-up">Target schedule<br></span>'
+                  '<strong>{}</strong></td>'), 'l, h:00 A (c)'),
+            ):
+                with self.subTest(schedule=schedule, active=active, url=url):
+                    response = c.get(url)
+                    expected = label or date(target, date_format)
+                    self.assertContains(response, markup.format(expected))
 
     def test_source(self):
         #logging.disable(logging.NOTSET)
