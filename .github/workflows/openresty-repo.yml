@@ -12,15 +12,40 @@ permissions:
   contents: read
   packages: write
 
-jobs:
-  sync-image:
-    runs-on: ubuntu-latest
-    env:
-      SOURCE_REPO: 'tcely/openresty-repo-docker-mirror'
-      ASSET_NAME: 'openresty-trixie-repo-amd64*.tar.zst'
-      TARGET_IMAGE: 'ghcr.io/${{ github.repository_owner }}/openresty-repo'
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+env:
+  SOURCE_REPO: 'tcely/openresty-repo-docker-mirror'
+  TARGET_IMAGE: 'ghcr.io/${{ github.repository_owner }}/openresty-repo'
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+jobs:
+  resolve-tag:
+    runs-on: ubuntu-slim
+    outputs:
+      tag: ${{ steps.get-tag.outputs.tag }}
+    steps:
+      - name: Resolve release tag
+        id: get-tag
+        shell: 'bash'
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG=$(gh release view --repo "${SOURCE_REPO}" --json tagName -q .tagName)
+          fi
+          echo "Syncing release tag: ${TAG}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+
+  sync-arch:
+    needs: resolve-tag
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -29,33 +54,47 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download, verify, and push to GHCR
+      - name: Download, verify, and push ${{ matrix.arch }} image
+        env:
+          TAG: ${{ needs.resolve-tag.outputs.tag }}
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
 
-          # Resolve tag (use manual input if provided, otherwise fetch latest)
-          if [ -n "${{ inputs.tag }}" ]; then
-            TAG="${{ inputs.tag }}"
-          else
-            TAG=$(gh release view --repo "${SOURCE_REPO}" --json tagName -q .tagName)
-          fi
-          echo "Syncing release tag: ${TAG}"
+          ASSET_PATTERN="openresty-trixie-repo-${ARCH}*.tar.zst"
 
-          # Download and cryptographically verify the immutable release asset
           gh release download "${TAG}" \
             --repo "${SOURCE_REPO}" \
-            --pattern "${ASSET_NAME}" \
+            --pattern "${ASSET_PATTERN}" \
             --dir "${RUNNER_TEMP}"
 
           downloaded="$(cd "${RUNNER_TEMP}" && ls -1 *.tar.zst | head -n 1)"
           gh release verify-asset "${TAG}" "${RUNNER_TEMP}/${downloaded}" \
             --repo "${SOURCE_REPO}"
 
-          # Decompress and load into Docker
           LOADED_ID=$(zstd -d -c "${RUNNER_TEMP}/${downloaded}" | docker load | awk '/Loaded image/ {print $NF}')
 
-          # Tag with both the resolved release tag and 'latest', then push
-          docker tag "$LOADED_ID" "$TARGET_IMAGE:$TAG"
-          docker tag "$LOADED_ID" "$TARGET_IMAGE:latest"
-          docker push "$TARGET_IMAGE:$TAG"
-          docker push "$TARGET_IMAGE:latest"
+          docker tag "${LOADED_ID}" "${TARGET_IMAGE}:${TAG}-${ARCH}"
+          docker push "${TARGET_IMAGE}:${TAG}-${ARCH}"
+
+  create-manifest:
+    needs: [resolve-tag, sync-arch]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        env:
+          TAG: ${{ needs.resolve-tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            -t "${TARGET_IMAGE}:${TAG}" \
+            -t "${TARGET_IMAGE}:latest" \
+            "${TARGET_IMAGE}:${TAG}-amd64" \
+            "${TARGET_IMAGE}:${TAG}-arm64"
