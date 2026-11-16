@@ -3,25 +3,22 @@
 {% block headtitle %}Skip media - {{ media }}{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Delete and skip media <strong>{{ media }}</strong></h1>
-    <p>
-      You can delete the downloaded file for your media <strong>{{ media }}</strong> and
-      mark it to never be downloaded. You might want to do this if you don't want a local
-      copy of some media or want to skip a single video from a source.
-    </p>
-  </div>
-</div>
-<div class="row">
-  <form method="post" action="{% url 'sync:skip-media' pk=media.pk %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Really delete and skip media <i class="fas fa-trash-alt"></i></button>
-      </div>
+<h1 class="title mb-4">Delete and skip media <strong>{{ media }}</strong></h1>
+<p class="mb-4">
+  You can delete the downloaded file for your media <strong>{{ media }}</strong> and
+  mark it to never be downloaded. You might want to do this if you don't want a local
+  copy of some media or want to skip a single video from a source.
+</p>
+<form method="post" action="{% url 'sync:skip-media' pk=media.pk %}" class="simpleform">
+  {% csrf_token %}
+  {% include 'simpleform.html' with form=form %}
+  <div class="field pt-4 has-text-centered">
+    <div class="control">
+      <button class="button is-danger" type="submit" name="action">
+        <span class="icon"><i class="fas fa-trash-alt"></i></span>
+        <span>Really delete and skip media</span>
+      </button>
     </div>
-  </form>
-</div>
+  </div>
+</form>
 {% endblock %}

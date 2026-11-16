@@ -2,7 +2,7 @@ from django.conf import settings
 from django.urls import path
 from django.views.generic.base import RedirectView
 from django.http import HttpResponse
-from .views import error403, error404, error500, HealthCheckView
+from .views import error403, error404, error500, HealthCheckView, toggle_theme
 
 
 app_name = 'common'
@@ -36,5 +36,9 @@ urlpatterns = [
     path('healthcheck',
         HealthCheckView.as_view(),
         name='healthcheck'),
+
+    path('toggle-theme',
+        toggle_theme,
+        name='toggle-theme'),
 
 ]
