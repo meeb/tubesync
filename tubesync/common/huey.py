@@ -49,13 +49,24 @@ class SqliteStorage(huey_SqliteStorage):
     journal_size_limit = 1024 * 1024 * 64
     wal_autocheckpoint = 100
     vacuum_pages = 10
+    table_kv = '''
+        CREATE TABLE IF NOT EXISTS kv (
+            queue TEXT NOT NULL,
+            key TEXT NOT NULL,
+            value BLOB NOT NULL,
+            result_bool INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (queue, key),
+            CHECK (updated_at >= created_at)
+        )
+    '''
 
     def _create_connection(self):
         conn = super()._create_connection()
         conn.execute(f'PRAGMA auto_vacuum = {self.auto_vacuum}')
         conn.execute('PRAGMA foreign_keys = ON')
         conn.execute(f'PRAGMA journal_size_limit = {self.journal_size_limit}')
-        conn.execute('PRAGMA user_version = 1')
         conn.execute(f'PRAGMA wal_autocheckpoint={self.wal_autocheckpoint}')
         # copied from huey_SqliteHuey to use EXTRA or NORMAL
         # instead of FULL or OFF
@@ -64,43 +75,50 @@ class SqliteStorage(huey_SqliteStorage):
         conn.execute(f'PRAGMA incremental_vacuum({self.vacuum_pages})')
         return conn
 
+    def _table_exists(self, curs, name):
+        curs.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (name,),
+        )
+        return curs.fetchone() is not None
+
     def initialize_schema(self):
-        kv_result_bool = (
-            'ALTER TABLE kv ADD COLUMN '
-            'result_bool INTEGER NOT NULL DEFAULT 0'
-        )
-        kv_created_at = (
-            'ALTER TABLE kv ADD COLUMN '
-            'created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP'
-        )
-        kv_updated_at = (
-            'ALTER TABLE kv ADD COLUMN '
-            'updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP CHECK(updated_at >= created_at)'
-        )
-        trigger_kv = (
-            'CREATE TRIGGER IF NOT EXISTS trg_kv_updated_at '
-            'AFTER UPDATE ON kv FOR EACH ROW '
-            'BEGIN '
-            '  UPDATE kv SET updated_at = MAX(CURRENT_TIMESTAMP, NEW.created_at) '
-            '  WHERE queue = OLD.queue AND key = OLD.key; '
-            'END'
-        )
+        trigger_kv_updated_at = '''
+            CREATE TRIGGER IF NOT EXISTS trg_kv_updated_at
+            AFTER UPDATE OF value ON kv
+            FOR EACH ROW
+            BEGIN
+                UPDATE kv
+                SET updated_at = MAX(CURRENT_TIMESTAMP, NEW.created_at)
+                WHERE queue = OLD.queue AND key = OLD.key;
+            END
+        '''
+        with self.db(commit=True, close=True) as curs:
+            version = curs.execute('PRAGMA user_version').fetchone()[0]
+            if (
+                2 > version
+                and self._table_exists(curs, 'kv')
+                and not self._table_exists(curs, 'kv_v1')
+            ):
+                curs.execute('ALTER TABLE kv RENAME TO kv_v1')
+
+        super().initialize_schema()
+
+        with self.db(commit=True, close=True) as curs:
+            version = curs.execute('PRAGMA user_version').fetchone()[0]
+            if 2 > version:
+                if self._table_exists(curs, 'kv_v1'):
+                    curs.execute(
+                        'INSERT OR IGNORE INTO kv (queue, key, value) '
+                        'SELECT queue, key, value FROM kv_v1'
+                    )
+                    curs.execute('DROP TABLE kv_v1')
+                curs.execute('PRAGMA user_version = 2')
+            curs.execute(trigger_kv_updated_at)
+
         with self.db(close=True) as curs:
             curs.execute('PRAGMA auto_vacuum')
             current_auto_vacuum = curs.fetchall()
-            curs.execute('PRAGMA table_info(kv)')
-            table_info_kv = curs.fetchall()
-        existing_kv_columns = {row[1] for row in table_info_kv}
-        ddl = list(self.ddl)
-        if 'result_bool' not in existing_kv_columns:
-            ddl.append(kv_result_bool)
-        if 'created_at' not in existing_kv_columns:
-            ddl.append(kv_created_at)
-        if 'updated_at' not in existing_kv_columns:
-            ddl.append(kv_updated_at)
-        ddl.append(trigger_kv)
-        self.ddl = tuple(ddl)
-        super().initialize_schema()
         auto_vacuum_dict = {'NONE': 0, 'FULL': 1, 'INCREMENTAL': 2}
         valid = set(auto_vacuum_dict.values()) | set(auto_vacuum_dict.keys())
         assert self.auto_vacuum in valid, 'auto_vacuum was invalid'
