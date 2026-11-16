@@ -53,7 +53,7 @@ FROM debian:${DEBIAN_VERSION} AS tubesync-base
 
 ARG TARGETARCH
 
-ENV DEBIAN_FRONTEND="teletype" \
+ENV DEBIAN_FRONTEND="noninteractive" \
     APT_KEEP_ARCHIVES=1 \
     EDITOR="editor" \
     HOME="/root" \
