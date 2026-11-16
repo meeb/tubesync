@@ -13,4 +13,5 @@ Notable files include:
 - `test_response_filtering.py` for response filtering tests
 - `test_tasks.py` for task-related tests
 - `test_frontend.py` for frontend and view tests
+- `test_youtube.py` for yt-dlp wrapper tests
 - `fixtures.py` for shared test metadata loading
