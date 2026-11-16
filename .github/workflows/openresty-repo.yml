@@ -1,0 +1,61 @@
+name: Sync Release Artifact to Registry
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to sync (leave blank for latest)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  sync-image:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_REPO: 'tcely/openresty-repo-docker-mirror'
+      ASSET_NAME: 'openresty-trixie-repo-amd64*.tar.zst'
+      TARGET_IMAGE: 'ghcr.io/${{ github.repository_owner }}/openresty-repo'
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download, verify, and push to GHCR
+        run: |
+          set -euo pipefail
+
+          # Resolve tag (use manual input if provided, otherwise fetch latest)
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG=$(gh release view --repo "${SOURCE_REPO}" --json tagName -q .tagName)
+          fi
+          echo "Syncing release tag: ${TAG}"
+
+          # Download and cryptographically verify the immutable release asset
+          gh release download "${TAG}" \
+            --repo "${SOURCE_REPO}" \
+            --pattern "${ASSET_NAME}" \
+            --dir "${RUNNER_TEMP}"
+
+          downloaded="$(cd "${RUNNER_TEMP}" && ls -1 *.tar.zst | head -n 1)"
+          gh release verify-asset "${TAG}" "${RUNNER_TEMP}/${downloaded}" \
+            --repo "${SOURCE_REPO}"
+
+          # Decompress and load into Docker
+          LOADED_ID=$(zstd -d -c "${RUNNER_TEMP}/${downloaded}" | docker load | awk '/Loaded image/ {print $NF}')
+
+          # Tag with both the resolved release tag and 'latest', then push
+          docker tag "$LOADED_ID" "$TARGET_IMAGE:$TAG"
+          docker tag "$LOADED_ID" "$TARGET_IMAGE:latest"
+          docker push "$TARGET_IMAGE:$TAG"
+          docker push "$TARGET_IMAGE:latest"
