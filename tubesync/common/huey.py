@@ -129,6 +129,7 @@ class SqliteStorage(huey_SqliteStorage):
         )  # fmt: skip
         self.sql(query=q_str, params=p_tuple, commit=True)
 
+    @staticmethod
     def _islice_batched(iterable, n):
         it = iter(iterable)
         chunk = tuple(itertools.islice(it, n))
