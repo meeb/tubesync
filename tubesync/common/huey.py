@@ -49,18 +49,6 @@ class SqliteStorage(huey_SqliteStorage):
     journal_size_limit = 1024 * 1024 * 64
     wal_autocheckpoint = 100
     vacuum_pages = 10
-    table_kv = '''
-        CREATE TABLE IF NOT EXISTS kv (
-            queue TEXT NOT NULL,
-            key TEXT NOT NULL,
-            value BLOB NOT NULL,
-            result_bool INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (queue, key),
-            CHECK (updated_at >= created_at)
-        )
-    '''
 
     def _create_connection(self):
         conn = super()._create_connection()
@@ -83,6 +71,19 @@ class SqliteStorage(huey_SqliteStorage):
         return curs.fetchone() is not None
 
     def initialize_schema(self):
+        table_kv = '''
+            CREATE TABLE IF NOT EXISTS kv (
+                queue TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value BLOB NOT NULL,
+                result_bool INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (queue, key),
+                CHECK (updated_at >= created_at)
+            )
+        '''
+
         trigger_kv_updated_at = '''
             CREATE TRIGGER IF NOT EXISTS trg_kv_updated_at
             AFTER UPDATE OF value ON kv
@@ -93,6 +94,7 @@ class SqliteStorage(huey_SqliteStorage):
                 WHERE queue = OLD.queue AND key = OLD.key;
             END
         '''
+
         with self.db(commit=True, close=True) as curs:
             version = curs.execute('PRAGMA user_version').fetchone()[0]
             if (
@@ -102,6 +104,9 @@ class SqliteStorage(huey_SqliteStorage):
             ):
                 curs.execute('ALTER TABLE kv RENAME TO kv_v1')
 
+        ddl = list(self.ddl)
+        ddl[0] = table_kv
+        self.ddl = ddl
         super().initialize_schema()
 
         with self.db(commit=True, close=True) as curs:
