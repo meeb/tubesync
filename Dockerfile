@@ -654,10 +654,10 @@ RUN --mount=type=tmpfs,target=/cache \
     --mount=type=bind,source=/usr/local/bin/uv,target=/usr/local/bin/uv,from=uv \
     --mount=type=bind,source=/usr/local/bin/uvx,target=/usr/local/bin/uvx,from=uv \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
-  set -x && \
-  DENO_DIR=/cache/deno && export DENO_DIR && \
-  deno --version && \
-  uv --version && \
+  set -exo pipefail ; \
+  DENO_DIR=/cache/deno && export DENO_DIR ; \
+  deno --version ; \
+  uv --version ; \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -719,7 +719,7 @@ RUN --mount=type=tmpfs,target=/cache \
       -exec du -h '{}' ';' \
       -exec ldd '{}' ';' \
     >| /cache/python-shared-objects 2>&1 && \
-  rm -v -rf /tmp/* ; \
+  rm -v -rf /tmp/* || exit ; \
   if grep >/dev/null -Fe ' => not found' /cache/python-shared-objects ; \
   then \
       cat -v /cache/python-shared-objects ; \
