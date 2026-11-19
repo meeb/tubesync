@@ -734,7 +734,11 @@ RUN --mount=type=tmpfs,target=/cache \
 # Copy root
 COPY config/root /
 
-# patch hat-syslog
+# patch django_tasks_db
+COPY patches/django_tasks_db/ \
+    /usr/local/lib/python3/dist-packages/django_tasks_db/
+
+# patch hat_syslog
 COPY patches/hat/ \
     /usr/local/lib/python3/dist-packages/hat/
 
