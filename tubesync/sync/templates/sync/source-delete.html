@@ -3,26 +3,23 @@
 {% block headtitle %}Delete source - {{ source.name }}{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Delete source <strong>{{ source.name }}</strong></h1>
-    <p>
-      Are you sure you want to delete this source? Deleting a source is permanent.
-      By default, deleting a source does not delete any saved media files. You can
-      <strong>tick the &quot;also delete downloaded media&quot; checkbox to also remove directory {{ source.directory_path }}
-	  </strong>when you delete the source. Deleting a source cannot be undone.
-    </p>
-  </div>
-</div>
-<div class="row">
-  <form method="post" action="{% url 'sync:delete-source' pk=source.pk %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Really delete source <i class="fas fa-trash-alt"></i></button>
-      </div>
+<h1 class="title">Delete source <strong>{{ source.name }}</strong></h1>
+<p class="mb-4">
+  Are you sure you want to delete this source? Deleting a source is permanent.
+  By default, deleting a source does not delete any saved media files. You can
+  <strong>tick the "also delete downloaded media" checkbox to also remove directory {{ source.directory_path }}
+  </strong>when you delete the source. Deleting a source cannot be undone.
+</p>
+<form method="post" action="{% url 'sync:delete-source' pk=source.pk %}" class="simpleform">
+  {% csrf_token %}
+  {% include 'simpleform.html' with form=form %}
+  <div class="field pt-4">
+    <div class="control">
+      <button class="button is-danger" type="submit" name="action">
+        <span class="icon"><i class="fas fa-trash-alt"></i></span>
+        <span>Really delete source</span>
+      </button>
     </div>
-  </form>
-</div>
+  </div>
+</form>
 {% endblock %}

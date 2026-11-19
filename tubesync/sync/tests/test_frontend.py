@@ -203,7 +203,7 @@ class FrontEndTestCase(TestCase):
             for url, markup, date_format in (
                 ('/sources', 'Next update target: <strong>{}</strong>', 'l, H:00'),
                 (f'/source/{source.pk}',
-                 ('<td><span class="hide-on-med-and-up">Target schedule<br></span>'
+                 ('<td><span class="is-hidden-tablet">Target schedule<br></span>'
                   '<strong>{}</strong></td>'), 'l, h:00 A (c)'),
             ):
                 with self.subTest(schedule=schedule, active=active, url=url):

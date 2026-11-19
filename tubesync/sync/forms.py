@@ -23,9 +23,17 @@ SourceForm = forms.modelform_factory(
         'enable_sponsorblock', 'sponsorblock_categories', 'write_subtitles', 'auto_subtitles', 'sub_langs',
     ),
     widgets = {
+        'key': forms.TextInput(attrs={'class': 'input'}),
+        'name': forms.TextInput(attrs={'class': 'input'}),
+        'directory': forms.TextInput(attrs={'class': 'input'}),
+        'filter_text': forms.TextInput(attrs={'class': 'input'}),
+        'filter_seconds': forms.NumberInput(attrs={'class': 'input'}),
+        'media_format': forms.TextInput(attrs={'class': 'input'}),
         'target_schedule': forms.DateTimeInput(
-            attrs={'type': 'datetime-local'},
+            attrs={'type': 'datetime-local', 'class': 'input'},
         ),
+        'days_to_keep': forms.NumberInput(attrs={'class': 'input'}),
+        'sub_langs': forms.TextInput(attrs={'class': 'input'}),
     },
 )
 
@@ -41,7 +49,10 @@ class ValidateSourceForm(forms.Form):
     source_url = forms.URLField(
         label=_('Source URL'),
         required=True,
-        widget=forms.URLInput(attrs={'placeholder': 'https://www.youtube.com/@channelname'}),
+        widget=forms.URLInput(attrs={
+            'placeholder': 'https://www.youtube.com/@channelname',
+            'class': 'input',
+        }),
         **_assume_scheme,
     )
 
@@ -61,6 +72,7 @@ class ScheduleTaskForm(forms.Form):
             attrs={
                 'type': 'datetime-local',
                 'readonly': 'true',
+                'class': 'input',
             },
         ),
     )
@@ -69,7 +81,7 @@ class ScheduleTaskForm(forms.Form):
         label=_('When the task should run'),
         required=True,
         widget=forms.DateTimeInput(
-            attrs={'type': 'datetime-local'},
+            attrs={'type': 'datetime-local', 'class': 'input'},
         ),
     )
 
@@ -81,12 +93,14 @@ class JellyfinMediaServerForm(forms.Form):
         # ruff: ignore[INT001]
         label=_(f'Host name or IP address of the {_media_server_type_label} server'),
         required=True,
+        widget=forms.TextInput(attrs={'class': 'input'}),
     )
     port = forms.IntegerField(
         # ruff: ignore[INT001]
         label=_(f'Port number of the {_media_server_type_label} server'),
         required=True,
         initial=8096,
+        widget=forms.NumberInput(attrs={'class': 'input'}),
     )
     use_https = forms.BooleanField(
         label=_('Connect over HTTPS'),
@@ -102,11 +116,13 @@ class JellyfinMediaServerForm(forms.Form):
         # ruff: ignore[INT001]
         label=_(f'{_media_server_type_label} token'),
         required=True,
+        widget=forms.TextInput(attrs={'class': 'input'}),
     )
     libraries = forms.CharField(
         # ruff: ignore[INT001]
         label=_(f'Comma-separated list of {_media_server_type_label} library IDs to update'),
         required=False,
+        widget=forms.TextInput(attrs={'class': 'input'}),
     )
 
 
@@ -115,12 +131,14 @@ class PlexMediaServerForm(forms.Form):
 
     host = forms.CharField(
         label=_('Host name or IP address of the Plex server'),
-        required=True
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'input'}),
     )
     port = forms.IntegerField(
         label=_('Port number of the Plex server'),
         required=True,
-        initial=32400
+        initial=32400,
+        widget=forms.NumberInput(attrs={'class': 'input'}),
     )
     use_https = forms.BooleanField(
         label=_('Connect over HTTPS'),
@@ -133,8 +151,10 @@ class PlexMediaServerForm(forms.Form):
     )
     token = forms.CharField(
         label=_('Plex token'),
-        required=True
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'input'}),
     )
     libraries = forms.CharField(
-        label=_('Comma-separated list of Plex library IDs to update, such as "9" or "4,6"')
+        label=_('Comma-separated list of Plex library IDs to update, such as "9" or "4,6"'),
+        widget=forms.TextInput(attrs={'class': 'input'}),
     )
