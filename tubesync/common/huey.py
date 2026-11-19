@@ -110,6 +110,8 @@ class SqliteStorage(huey_SqliteStorage):
         super().initialize_schema()
 
         with self.db(commit=True, close=True) as curs:
+            kv_info_rows = curs.execute('PRAGMA table_info(kv)').fetchall()
+            table_columns = { row[1] for row in kv_info_rows }
             version = curs.execute('PRAGMA user_version').fetchone()[0]
             if 2 > version:
                 if self._table_exists(curs, 'kv_v1'):
@@ -119,17 +121,24 @@ class SqliteStorage(huey_SqliteStorage):
                     )
                     curs.execute('DROP TABLE kv_v1')
                 curs.execute('PRAGMA user_version = 2')
-            curs.execute(trigger_kv_updated_at)
+                version = 2
+            elif 2 == version and 'result_bool' not in table_columns:
+                # Retry the migration
+                curs.execute('PRAGMA user_version = 1')
+                version = 1
+                curs.execute('DROP TRIGGER IF EXISTS trg_kv_updated_at')
+            if 2 == version and 'result_bool' in table_columns:
+                curs.execute(trigger_kv_updated_at)
 
         with self.db(close=True) as curs:
             curs.execute('PRAGMA auto_vacuum')
-            current_auto_vacuum = curs.fetchall()
+            current_auto_vacuum = curs.fetchone()
         auto_vacuum_dict = {'NONE': 0, 'FULL': 1, 'INCREMENTAL': 2}
         valid = set(auto_vacuum_dict.values()) | set(auto_vacuum_dict.keys())
         assert self.auto_vacuum in valid, 'auto_vacuum was invalid'
         vacuum_db = True
         try:
-            actual = int(current_auto_vacuum[0][0])
+            actual = int(current_auto_vacuum[0])
             expected = int(auto_vacuum_dict.get(self.auto_vacuum) or self.auto_vacuum)
         except (TypeError, ValueError):
             pass
@@ -142,6 +151,10 @@ class SqliteStorage(huey_SqliteStorage):
                 curs.execute('VACUUM')
 
     def put_data(self, key, value, is_result=False):
+        version = self.sql(query='PRAGMA user_version', results=True)[0][0]
+        if 2 > version:
+            return super().put_data(key, value, is_result)
+
         q_str = (
             'INSERT OR REPLACE INTO kv '
             '(queue, result_bool, key, value) '
@@ -161,6 +174,10 @@ class SqliteStorage(huey_SqliteStorage):
             chunk = tuple(itertools.islice(it, n))
 
     def expire_results(self, dt, /, *, chunk_size=100):
+        version = self.sql(query='PRAGMA user_version', results=True)[0][0]
+        if 2 > version:
+            return
+
         batched = getattr(itertools, 'batched', self._islice_batched)
         utc_dt = dt.astimezone(datetime.timezone.utc)
         sqlite_ts_str = utc_dt.strftime('%Y-%m-%d %H:%M:%S')
