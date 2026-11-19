@@ -28,7 +28,7 @@ os.execv(
     '/usr/bin/env',
     [
         '/usr/bin/env',
-        'nice', '-n', nice_value,
+        'nice', '-n', str(nice_value),
         '/command/s6-setuidgid', 'app',
         sys.executable, '/app/manage.py',
         'db_worker', '-v', '2', '--no-reload',
