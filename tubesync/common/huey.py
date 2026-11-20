@@ -657,7 +657,6 @@ def register_huey_signals():
                 q.restore_by_id(id=result_key)
                 # remove task history metadata from storage
                 q.delete(key=key)
-                
 
     def _create_cleanup_worker(qn, days):
         def _target():
