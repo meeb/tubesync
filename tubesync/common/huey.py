@@ -71,7 +71,7 @@ class SqliteStorage(huey_SqliteStorage):
         return curs.fetchone() is not None
 
     def initialize_schema(self):
-        table_kv = '''
+        table_kv = """
             CREATE TABLE IF NOT EXISTS kv (
                 queue TEXT NOT NULL,
                 key TEXT NOT NULL,
@@ -82,9 +82,9 @@ class SqliteStorage(huey_SqliteStorage):
                 PRIMARY KEY (queue, key),
                 CHECK (updated_at >= created_at)
             )
-        '''
+        """
 
-        trigger_kv_updated_at = '''
+        trigger_kv_updated_at = """
             CREATE TRIGGER IF NOT EXISTS trg_kv_updated_at
             AFTER UPDATE OF value ON kv
             FOR EACH ROW
@@ -93,7 +93,7 @@ class SqliteStorage(huey_SqliteStorage):
                 SET updated_at = MAX(CURRENT_TIMESTAMP, NEW.created_at)
                 WHERE queue = OLD.queue AND key = OLD.key;
             END
-        '''
+        """
 
         with self.db(commit=True, close=True) as curs:
             version = curs.execute('PRAGMA user_version').fetchone()[0]
@@ -298,15 +298,15 @@ def start_consumer(queue_name):
             svc_dir.is_dir(),
             (svc_dir / 'supervise').is_dir(),
             (svc_dir / 'supervise' / 'control').is_fifo(),
-        )):
+        )):  # fmt: skip
             return
     except PermissionError:
         pass
     else:
         subprocess.Popen(
             ['/command/s6-svc', '-U', str(svc_dir)],
-            stdout=-1, stderr=-1, start_new_session=True
-        )
+            stdout=-1, stderr=-1, start_new_session=True,
+        )  # fmt: skip
 
 
 def requeue_ready_tasks() -> set[str]:
@@ -317,9 +317,7 @@ def requeue_ready_tasks() -> set[str]:
     HUEY = tasks_backend.HUEY
     prefix = tasks_backend.KEY % ''
     shim = tasks_backend._shim
-    in_flight_ids = {t.id for t in HUEY.pending()} | {
-        t.id for t in HUEY.scheduled()
-    }
+    in_flight_ids = {t.id for t in HUEY.pending()} | {t.id for t in HUEY.scheduled()}
     candidate_keys = {
         key
         for key in HUEY.all_results()
