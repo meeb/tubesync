@@ -141,6 +141,9 @@ Pipfile.lock
 # Ignore Jetbrains IDE files
 .idea/
 
+# Kiro IDE files (specs, configs, steering — not for the repo)
+.kiro/
+
 # Task queue DBs
 /tubesync/tasks/*.db
 /tubesync/tasks/*.db-shm
