@@ -309,6 +309,67 @@ def start_consumer(queue_name):
         )
 
 
+def requeue_ready_tasks() -> set[str]:
+    """Re-schedules unstarted READY django.tasks shims, filtering result keys before deserializing."""
+    from django.tasks.base import TaskResultStatus
+    from huey.contrib.djhuey import tasks_backend
+
+    HUEY = tasks_backend.HUEY
+    prefix = tasks_backend.KEY % ''
+    shim = tasks_backend._shim
+    in_flight_ids = {t.id for t in HUEY.pending()} | {
+        t.id for t in HUEY.scheduled()
+    }
+    candidate_keys = {
+        key
+        for key in HUEY.all_results()
+        if key.startswith(prefix) and key.removeprefix(prefix) not in in_flight_ids
+    }
+
+    requeued: set[str] = set()
+
+    for result_key in candidate_keys:
+        data = HUEY.get(key=result_key, peek=True)
+        if not isinstance(data, dict) or TaskResultStatus.READY != data.get('status'):
+            continue
+
+        task_id = data.get('id')
+        task_path = data.get('task_path')
+        if not task_id or not task_path:
+            continue
+
+        run_after = data.get('run_after', None)
+        if isinstance(run_after, str):
+            run_after = datetime.datetime.fromisoformat(run_after)
+
+        kwargs = dict()
+        kwargs['id'] = task_id
+        kwargs['eta'] = run_after
+        if kwargs['eta'] is None:
+            kwargs['delay'] = 1
+        else:
+            kwargs['delay'] = None
+
+        kwargs['retries'] = data.get('retries', None)
+        kwargs['retry_delay'] = data.get('retry_delay', None)
+        kwargs['retry_backoff'] = data.get('retry_backoff', None)
+        kwargs['priority'] = data.get('priority', None)
+        kwargs['expires'] = data.get('expires', None)
+        kwargs['timeout'] = data.get('timeout', None)
+
+        msg = shim.s(
+            task_path,
+            tuple(data.get('args', ())),
+            dict(data.get('kwargs', {})),
+            **kwargs,
+        )
+
+        HUEY.add_schedule(msg)
+        requeued.add(task_id)
+
+    return requeued
+
+
 def h_q_reset_maint_func(queue, /, exception=None, status=None):
     if status is None:
         return
