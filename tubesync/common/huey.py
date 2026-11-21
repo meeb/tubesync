@@ -188,7 +188,9 @@ class SqliteStorage(huey_SqliteStorage):
 
 class Huey(huey_Huey):
     def _emit(self, signal, task, *args, **kwargs):
-        kwargs['huey'] = self
+        from huey.contrib.djhuey import HUEY
+        if self is not HUEY:
+            kwargs['huey'] = self
         super()._emit(signal, task, *args, **kwargs)
 
     def create_consumer(self, **options):
