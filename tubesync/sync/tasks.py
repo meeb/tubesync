@@ -159,7 +159,7 @@ def get_running_tasks(arg_dt=None, /):
     max_run_time = getattr(settings, 'MAX_RUN_TIME', 3600)
     return TaskHistory.objects.running(
         now=arg_dt,
-        within=timezone.timedelta(seconds=max_run_time),
+        within=timedelta(seconds=max_run_time),
     )
 
 
@@ -232,7 +232,7 @@ def delete_deleted_sources():
     result = cleanup_huey_storage.enqueue()
     log.info('Cleanup of Huey storage scheduled: %s', result.id)
     now = timezone.now()
-    end_time = now + timezone.timedelta(minutes=5)
+    end_time = now + timedelta(minutes=5)
     qs = Source.objects.filter(
         key__endswith='/deleted',
     )
@@ -257,7 +257,7 @@ def upcoming_media():
         published__isnull=False,
         published__gte=(
             # previous hour
-            timezone.now() - timezone.timedelta(hours=1, minutes=1)
+            timezone.now() - timedelta(hours=1, minutes=1)
         ),
     )
     for media in qs_gen(qs):
@@ -275,12 +275,12 @@ def upcoming_media():
 )
 def schedule_indexing():
     now = timezone.now()
-    next_hour = now + timezone.timedelta(hours=1, minutes=1)
+    next_hour = now + timedelta(hours=1, minutes=1)
     qs = Source.objects.filter(
         index_schedule__gt=Val(IndexSchedule.NEVER),
     )
     for source in qs_gen(qs):
-        previous_run = next_hour - timezone.timedelta(
+        previous_run = next_hour - timedelta(
             seconds=source.index_schedule
         )
         skip_source = (
