@@ -202,25 +202,22 @@ class Huey(huey_Huey):
         if callable(expire_func):
             expire_func(older_than_dt)
 
+    @staticmethod
+    def _find(needle, haystack):
+        haystack = tuple(haystack)
+        found = [t for t in haystack if needle == t.id]
+        if found:
+            return found
+        return False
+
     def reschedule(self, /, task_id, eta):
         pc = self.pending_count()
-        found = [
-            t
-            for t in self.pending(100)
-            if t.id == task_id
-        ]
+
+        found = self._find(task_id, self.pending(100))
         if not found and pc > 100:
-            found = [
-                t
-                for t in self.pending()
-                if t.id == task_id
-            ]
+            found = self._find(task_id, self.pending())
         if not found:
-            found = [
-                t
-                for t in self.scheduled()
-                if t.id == task_id
-            ]
+            found = self._find(task_id, self.scheduled())
         if not found:
             return False
         for t in found:
