@@ -1,10 +1,13 @@
 import os
 import re
+import sys
+import urllib
 import uuid
 
-from collections import deque as queue
+from collections import defaultdict, deque as queue
 from pathlib import Path
 from typing import ClassVar
+from xml.etree import ElementTree as ET
 
 from django import db
 from django.conf import settings
@@ -475,6 +478,30 @@ class Source(db.models.Model):
     def get_index_url(self, url_type, /):
         return self.__class__.create_index_url(self.source_type, url_key=self.key, url_type=url_type)
 
+    def get_feed_url(self, /):
+        qarg = f'playlist_id={self.key}'
+        if self.key.startswith('UC'):
+            qarg = f'channel_id={self.key}'
+        elif not self.is_playlist:
+            url = self.url
+            urls = (url, url.replace('/c/', '/'))
+            for url in urls:
+                try:
+                    req = urllib.request.Request(url)
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        html = resp.read().decode('utf-8', errors='ignore')
+                except (urllib.error.URLError, TimeoutError, OSError):
+                    continue
+                else:
+                    match = re.search(r'property="og:url" content="[^"]+/channel/(UC[^"]+)"', html)
+                    if match:
+                        key = match.group(1)
+                        qarg = f'channel_id={key}'
+                        break
+
+        url = f'https://www.youtube.com/feeds/videos.xml?{qarg}'
+        return url
+
     @property
     def format_summary(self):
         if self.is_audio:
@@ -599,6 +626,69 @@ class Source(db.models.Model):
         if not self.filter_text:
             return True
         return bool(re.search(self.filter_text, media_item_title))
+
+    def get_feed(self, /):
+        def clean_entry(arg_dict):
+            group = arg_dict.pop('group', {})
+
+            description = group.pop('description', None)
+            if description is not None:
+                arg_dict.setdefault('description', description)
+
+            thumbnail = group.pop('thumbnail', None)
+            if thumbnail is not None and '@url' in thumbnail:
+                arg_dict.setdefault('thumbnail', thumbnail.get('@url'))
+
+            video = group
+            video['author'] = arg_dict.pop('author', None)
+            video['channelId'] = arg_dict.pop('channelId', None)
+            video['id'] = arg_dict.pop('id', None)
+            video['link'] = arg_dict.pop('link', None)
+
+            arg_dict.setdefault('video', video)
+
+            return arg_dict
+
+        def local_name(tag):
+            return tag.rsplit('}', 1)[-1]
+
+        def to_dict(element):
+            children = list(element)
+            text = (element.text or '').strip()
+            result = {
+                f'@{local_name(key)}': value
+                for key, value in element.attrib.items()
+            }
+
+            if not children and not result:
+                return text
+
+            grouped = defaultdict(list)
+            for child in children:
+                grouped[local_name(child.tag)].append(to_dict(child))
+
+            for name, values in grouped.items():
+                result[name] = values[0] if 1 == len(values) else values
+
+            if text:
+                result['#text'] = text
+
+            return result
+
+        try:
+            version = sys.version.split()[0]
+            headers = {'User-Agent': f'Python/{version}'}
+            req = urllib.request.Request(self.get_feed_url(), headers=headers)
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                root = ET.fromstring(resp.read())
+        except (urllib.error.URLError, TimeoutError, OSError):
+            pass
+        else:
+            feed_dict = {local_name(root.tag): to_dict(root)}
+            entries = feed_dict['feed'].pop('entry')
+            cleaned = list(map(clean_entry, entries))
+            return True, feed_dict['feed'], cleaned
+        return False
 
     def get_index(self, url_type, /):
         indexer = self.INDEXERS.get(self.source_type, None)
