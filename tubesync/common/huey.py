@@ -164,26 +164,30 @@ class SqliteStorage(huey_SqliteStorage):
         batched = getattr(itertools, 'batched', self._islice_batched)
         utc_dt = dt.astimezone(datetime.timezone.utc)
         sqlite_ts_str = utc_dt.strftime('%Y-%m-%d %H:%M:%S')
-        select_all_q_str = (
-            'SELECT queue, key FROM kv '
+        select_rows_q_str = (
+            'SELECT key FROM kv '
             'WHERE result_bool = 1 AND queue = ? '
             'AND updated_at < datetime(?)'
         )
-        delete_row_q_str = (
-            'DELETE FROM kv '
-            'WHERE queue = ? AND key = ?'
-        )
+        delete_rows_q_fmt = 'DELETE FROM kv WHERE queue = ? AND key IN ({})'
         if not callable(batched):
             return
         batches = batched(
-            self.sql(query=select_all_q_str, params=(self.name, sqlite_ts_str), results=True),
-            max(1, chunk_size),
+            self.sql(
+                query=select_rows_q_str,
+                params=(self.name, sqlite_ts_str),
+                results=True,
+            ),
+            min(800, max(1, chunk_size)),
         )
         for batch in batches:
             time.sleep(0.1)
             with self.db(commit=True) as curs:
-                for queue, key in batch:
-                    curs.execute(delete_row_q_str, (queue, key))
+                keys = {row[0] for row in batch}
+                curs.execute(
+                    delete_rows_q_fmt.format(', '.join('?' * len(keys))),
+                    (self.name, *keys),
+                )
 
 
 class Huey(huey_Huey):
