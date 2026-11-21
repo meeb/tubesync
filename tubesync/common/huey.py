@@ -317,7 +317,7 @@ def requeue_ready_tasks() -> set[str]:
     HUEY = tasks_backend.HUEY
     prefix = tasks_backend.KEY % ''
     shim = tasks_backend._shim
-    in_flight_ids = {t.id for t in HUEY.pending()} | {t.id for t in HUEY.scheduled()}
+    in_flight_ids = {t.id for t in itertools.chain(HUEY.pending(), HUEY.scheduled())}
     candidate_keys = {
         key
         for key in HUEY.all_results()
