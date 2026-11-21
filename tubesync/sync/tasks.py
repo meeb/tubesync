@@ -11,11 +11,13 @@ import requests
 import signal
 import time
 import uuid
+
 from collections import deque as queue
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime, timedelta
 from shutil import rmtree
+
 from django import db
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -25,7 +27,10 @@ from django.utils.translation import gettext_lazy as _
 from django_huey import lock_task as huey_lock_task, task as huey_task
 from django_huey import db_periodic_task, db_task, signal as huey_signal
 from huey import crontab as huey_crontab, signals as huey_signals
-from huey.exceptions import CancelExecution, TaskLockedException
+from huey.contrib.djhuey import HUEY
+from huey.exceptions import CancelExecution, RetryTask, TaskLockedException
+
+from common.batched import batched
 from common.huey import (
     AttemptsTask, BackoffAlgorithm, DjangoBackgroundTasksBackoff,
     register_huey_signals,
@@ -45,6 +50,21 @@ from .choices import Val, IndexSchedule, TaskQueue
 from .models import Source, Media, MediaServer, Metadata
 from .utils import get_remote_image, resize_image_to_height, filter_response
 from .youtube import YouTubeError
+
+
+class TaskExpiredError(Exception):
+    pass
+
+
+class HueyBackoff(BackoffAlgorithm):
+    key = 'Django-Tasks-Backend:huey'
+    retry_delay: int | float = 60
+    retry_backoff: float = 1.15
+
+    @classmethod
+    def calculate(cls, attempt: int) -> float:
+        return cls.retry_delay * (cls.retry_backoff ** max(0, attempt - 1))
+
 
 atomic = db.transaction.atomic
 cleanup_threads = register_huey_signals()
@@ -280,6 +300,12 @@ def schedule_indexing():
         index_schedule__gt=Val(IndexSchedule.NEVER),
     )
     for source in qs_gen(qs):
+        scan_feed.using(
+            run_after=now + timedelta(seconds=random.randint(30, 60*30)),
+        ).enqueue(
+            str(source.pk),
+            deadline=next_hour.isoformat(),
+        )
         previous_run = next_hour - timedelta(
             seconds=source.index_schedule
         )
@@ -556,6 +582,58 @@ def migrate_to_metadata(media_id):
         # clean up the record created during indexing
         data.delete()
     migrating_lock.acquired = False
+
+
+@django_task(backend='huey', takes_context=True)
+@HUEY.rate_limit('sync.tasks.scan_feed', limit=5, per=60)
+def scan_feed(context, source_id: str, /, deadline: str | None = None, max_attempts: int = 55):
+    now = timezone.now()
+    if deadline is not None:
+        expired_dt = datetime.fromisoformat(deadline)
+        if expired_dt <= now:
+            raise TaskExpiredError(f'Task exceeded deadline: {expired_dt}')
+
+    source = Source.objects.get(pk=source_id)
+    if not source.is_active:
+        return
+    r = source.get_feed()
+    if not r:
+        if max_attempts <= context.attempt:
+            raise TaskExpiredError('Task exceeded maximum attempts')
+
+        raise RetryTask(delay=HueyBackoff.calculate(context.attempt))
+    sr, videos = r[1], r[2]
+    key_map = {d['videoId']: d for d in videos}
+    feed_keys = set(key_map)
+    qs = source.media_source.filter(key__in=feed_keys)
+    new_keys = feed_keys.difference(qs.values_list('key', flat=True))
+    for key in new_keys:
+        md = dict(
+            id=key,
+            channel=sr.get('author', {}).get('name'),
+            channel_id=key_map[key].get('video', {}).get('channelId'),
+            channel_url=sr.get('author', {}).get('uri'),
+            description=key_map[key].get('description'),
+            epoch=round((now - Media.posix_epoch).total_seconds()),
+            formats_epoch=0,
+            published=key_map[key].get('published'),
+            title=key_map[key].get('title'),
+            updated=key_map[key].get('updated'),
+        )
+        create_defaults = dict(manual_skip=True)
+        media_defaults = dict()
+        if md.get('published'):
+            media_defaults['published'] = datetime.fromisoformat(md['published'])
+        else:
+            create_defaults['published'] = timezone.now()
+        if md.get('title'):
+            media_defaults['title'] = md['title'][:200]
+        media, created = source.media_source.update_or_create(create_defaults=create_defaults, defaults=media_defaults, key=key)
+        if created:
+            media.ingest_metadata(md)
+            download_media_thumbnails.call_local(str(media.pk))
+            media.manual_skip = False
+        save_model(media)
 
 
 @db_task(delay=30, priority=80, queue=Val(TaskQueue.LIMIT))
