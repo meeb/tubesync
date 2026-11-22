@@ -4,7 +4,6 @@ env:
   IMAGE_NAME: tubesync
   REGISTRY: ghcr.io
   BASE_DEBIAN_UNHOLD_ADDITIONS: 'zlib1g'
-  OPENRESTY_DEBIAN_SHA1_YEAR: '2028'
 
 on:
   workflow_dispatch:
@@ -38,7 +37,6 @@ jobs:
     outputs:
       IMAGE_NAME: ${{ env.IMAGE_NAME }}
       BASE_DEBIAN_UNHOLD_ADDITIONS: ${{ env.BASE_DEBIAN_UNHOLD_ADDITIONS }}
-      OPENRESTY_DEBIAN_SHA1_YEAR: ${{ env.OPENRESTY_DEBIAN_SHA1_YEAR }}
       REGISTRY: ${{ env.REGISTRY }}
       ejs-latest-release: ${{ steps.ejs.outputs.latest-release }}
       ffmpeg-date: ${{ steps.ffmpeg.outputs.date }}
@@ -251,7 +249,6 @@ jobs:
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             BASE_DEBIAN_UNHOLD_ADDITIONS=${{ needs.info.outputs.BASE_DEBIAN_UNHOLD_ADDITIONS }}
-            OPENRESTY_DEBIAN_SHA1_YEAR=${{ needs.info.outputs.OPENRESTY_DEBIAN_SHA1_YEAR }}
             FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
             FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
@@ -306,7 +303,6 @@ jobs:
       build-args: |
         IMAGE_NAME=${{ needs.info.outputs.IMAGE_NAME }}
         BASE_DEBIAN_UNHOLD_ADDITIONS=${{ needs.info.outputs.BASE_DEBIAN_UNHOLD_ADDITIONS }}
-        OPENRESTY_DEBIAN_SHA1_YEAR=${{ needs.info.outputs.OPENRESTY_DEBIAN_SHA1_YEAR }}
         FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
         FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
         YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
