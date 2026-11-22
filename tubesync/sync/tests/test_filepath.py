@@ -223,6 +223,23 @@ class FilepathTestCase(TestCase):
                 # never empty
                 self.assertTrue(result)
 
+    def test_truncate_filename_bytes_long_extension_boundary(self):
+        # An extension just under the byte budget leaves little or no room
+        # for the stem; the result must still fit the byte budget.
+        for ext_len in (199, 200, 201, 202, 203, 205, 207):
+            original = ('a' * 50) + '.' + ('e' * ext_len)
+            with self.subTest(ext_len=ext_len):
+                result = truncate_filename(original, max_bytes=208)
+                # fits the byte budget
+                self.assertLessEqual(len(result.encode('utf-8')), 208)
+                # still valid UTF-8 round-trip (no partial sequences kept)
+                self.assertEqual(
+                    result,
+                    result.encode('utf-8').decode('utf-8'),
+                )
+                # never empty
+                self.assertTrue(result)
+
     def test_truncate_filename_bytes_rejects_non_str(self):
 
         for bad in (None, 42, b'bytes.mkv', Path('p.mkv')):
