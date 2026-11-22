@@ -1,0 +1,6 @@
+Types: deb
+URIs: file:/run/openresty-repo
+Suites: trixie
+Components: openresty
+Architectures: amd64 arm64
+Signed-By: /run/openresty-repo/openresty-mirror.asc
