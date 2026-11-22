@@ -14,10 +14,12 @@ on:
     branches:
       - 'main'
       - 'test-*'
+      - 'test/**'
   pull_request:
     branches:
       - 'main'
       - 'test-*'
+      - 'test/**'
     types:
       - opened
       - reopened
@@ -245,7 +247,7 @@ jobs:
           push: false
           tags: ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:dive
       - name: Analysis with `dive`
-        continue-on-error: ${{ startsWith(github.ref_name, 'test-') || startsWith(github.ref_name, 'test/') }}
+        continue-on-error: ${{ startsWith(github.head_ref || github.ref_name, 'test-') || startsWith(github.head_ref || github.ref_name, 'test/') }}
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
