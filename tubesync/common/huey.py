@@ -110,6 +110,8 @@ class SqliteStorage(huey_SqliteStorage):
         super().initialize_schema()
 
         with self.db(commit=True, close=True) as curs:
+            kv_info_rows = curs.execute('PRAGMA table_info(kv)').fetchall()
+            table_columns = { row[1] for row in kv_info_rows }
             version = curs.execute('PRAGMA user_version').fetchone()[0]
             if 2 > version:
                 if self._table_exists(curs, 'kv_v1'):
@@ -119,17 +121,24 @@ class SqliteStorage(huey_SqliteStorage):
                     )
                     curs.execute('DROP TABLE kv_v1')
                 curs.execute('PRAGMA user_version = 2')
-            curs.execute(trigger_kv_updated_at)
+                version = 2
+            elif 2 == version and 'result_bool' not in table_columns:
+                # Retry the migration
+                curs.execute('PRAGMA user_version = 1')
+                version = 1
+                curs.execute('DROP TRIGGER IF EXISTS trg_kv_updated_at')
+            if 2 == version and 'result_bool' in table_columns:
+                curs.execute(trigger_kv_updated_at)
 
         with self.db(close=True) as curs:
             curs.execute('PRAGMA auto_vacuum')
-            current_auto_vacuum = curs.fetchall()
+            current_auto_vacuum = curs.fetchone()
         auto_vacuum_dict = {'NONE': 0, 'FULL': 1, 'INCREMENTAL': 2}
         valid = set(auto_vacuum_dict.values()) | set(auto_vacuum_dict.keys())
         assert self.auto_vacuum in valid, 'auto_vacuum was invalid'
         vacuum_db = True
         try:
-            actual = int(current_auto_vacuum[0][0])
+            actual = int(current_auto_vacuum[0])
             expected = int(auto_vacuum_dict.get(self.auto_vacuum) or self.auto_vacuum)
         except (TypeError, ValueError):
             pass
@@ -142,6 +151,10 @@ class SqliteStorage(huey_SqliteStorage):
                 curs.execute('VACUUM')
 
     def put_data(self, key, value, is_result=False):
+        version = self.sql(query='PRAGMA user_version', results=True)[0][0]
+        if 2 > version:
+            return super().put_data(key, value, is_result)
+
         q_str = (
             'INSERT OR REPLACE INTO kv '
             '(queue, result_bool, key, value) '
@@ -153,6 +166,10 @@ class SqliteStorage(huey_SqliteStorage):
         self.sql(query=q_str, params=p_tuple, commit=True)
 
     def expire_results(self, dt, /, *, chunk_size=100):
+        version = self.sql(query='PRAGMA user_version', results=True)[0][0]
+        if 2 > version:
+            return
+
         utc_dt = dt.astimezone(datetime.timezone.utc)
         sqlite_ts_str = utc_dt.strftime('%Y-%m-%d %H:%M:%S')
         select_all_q_str = (
@@ -179,7 +196,9 @@ class SqliteStorage(huey_SqliteStorage):
 
 class Huey(huey_Huey):
     def _emit(self, signal, task, *args, **kwargs):
-        kwargs['huey'] = self
+        from huey.contrib.djhuey import HUEY
+        if self is not HUEY:
+            kwargs['huey'] = self
         super()._emit(signal, task, *args, **kwargs)
 
     def create_consumer(self, **options):
@@ -298,6 +317,67 @@ def start_consumer(queue_name):
             ['/command/s6-svc', '-U', str(svc_dir)],
             stdout=-1, stderr=-1, start_new_session=True
         )
+
+
+def requeue_ready_tasks() -> set[str]:
+    """Re-schedules unstarted READY django.tasks shims, filtering result keys before deserializing."""
+    from django.tasks.base import TaskResultStatus
+    from huey.contrib.djhuey import tasks_backend
+
+    HUEY = tasks_backend.HUEY
+    prefix = tasks_backend.KEY % ''
+    shim = tasks_backend._shim
+    in_flight_ids = {t.id for t in HUEY.pending()} | {
+        t.id for t in HUEY.scheduled()
+    }
+    candidate_keys = {
+        key
+        for key in HUEY.all_results()
+        if key.startswith(prefix) and key.removeprefix(prefix) not in in_flight_ids
+    }
+
+    requeued: set[str] = set()
+
+    for result_key in candidate_keys:
+        data = HUEY.get(key=result_key, peek=True)
+        if not isinstance(data, dict) or TaskResultStatus.READY != data.get('status'):
+            continue
+
+        task_id = data.get('id')
+        task_path = data.get('task_path')
+        if not task_id or not task_path:
+            continue
+
+        run_after = data.get('run_after', None)
+        if isinstance(run_after, str):
+            run_after = datetime.datetime.fromisoformat(run_after)
+
+        kwargs = dict()
+        kwargs['id'] = task_id
+        kwargs['eta'] = run_after
+        if kwargs['eta'] is None:
+            kwargs['delay'] = 1
+        else:
+            kwargs['delay'] = None
+
+        kwargs['retries'] = data.get('retries', None)
+        kwargs['retry_delay'] = data.get('retry_delay', None)
+        kwargs['retry_backoff'] = data.get('retry_backoff', None)
+        kwargs['priority'] = data.get('priority', None)
+        kwargs['expires'] = data.get('expires', None)
+        kwargs['timeout'] = data.get('timeout', None)
+
+        msg = shim.s(
+            task_path,
+            tuple(data.get('args', ())),
+            dict(data.get('kwargs', {})),
+            **kwargs,
+        )
+
+        HUEY.add_schedule(msg)
+        requeued.add(task_id)
+
+    return requeued
 
 
 def h_q_reset_maint_func(queue, /, exception=None, status=None):
@@ -648,7 +728,6 @@ def register_huey_signals():
                 q.restore_by_id(id=result_key)
                 # remove task history metadata from storage
                 q.delete(key=key)
-                
 
     def _create_cleanup_worker(qn, days):
         def _target():
