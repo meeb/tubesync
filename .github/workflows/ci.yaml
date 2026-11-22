@@ -27,6 +27,7 @@ on:
 concurrency:
   group: ${{ github.repository }}-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
+  queue: single
 
 jobs:
   info:
@@ -46,26 +47,25 @@ jobs:
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
       # ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
     steps:
-      - uses: actions/checkout@v7
       - name: Lowercase github username
         id: github-actor
-        uses: ./.github/actions/string-case
+        uses: $/.github/actions/string-case
         with:
           string: ${{ github.actor }}
       - name: Lowercase github repository owner
         id: github-repository_owner
-        uses: ./.github/actions/string-case
+        uses: $/.github/actions/string-case
         with:
           string: ${{ github.repository_owner }}
       - name: Retrieve yt-dlp/FFmpeg-Builds releases with GitHub CLI
         id: ffmpeg
-        uses: ./.github/actions/FFmpeg
+        uses: $/.github/actions/FFmpeg
       - name: Retrieve yt-dlp/yt-dlp releases with GitHub CLI
         id: yt-dlp
-        uses: ./.github/actions/yt-dlp
+        uses: $/.github/actions/yt-dlp
       - name: Retrieve yt-dlp/ejs releases with GitHub CLI
         id: ejs
-        uses: ./.github/actions/yt-dlp
+        uses: $/.github/actions/yt-dlp
         with:
           repository_name: ejs
 
@@ -123,7 +123,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.12', '3.13', '3.14']
+        python-version: ['3.12', '3.13', '3.14', '3.15']
     services:
       hat-syslog:
         # avoid hub.docker.com limits
@@ -222,6 +222,7 @@ jobs:
     concurrency:
       group: ${{ github.repository }}-${{ github.workflow }}
       cancel-in-progress: false
+      queue: max
     steps:
       - name: Set up Docker Buildx
         id: buildx
