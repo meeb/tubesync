@@ -238,7 +238,7 @@ def parse_database_connection_string(database_connection_string):
             raise DatabaseConnectionError(f'Database connection string contained an '
                                           f'invalid port, ports must be integers: '
                                           f'{e}') from e
-        if not 0 < port <= 65535:
+        if not (0 < port < (2**16)):
             raise DatabaseConnectionError(f'Database connection string contained an '
                                           f'invalid port, ports must be between 1 and '
                                           f'65535, got {port}')
