@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import itertools
 import subprocess
 import threading
 import time
@@ -19,6 +18,7 @@ from huey.api import Task, TaskLock
 from huey.exceptions import TaskLockedException
 from huey.storage import SqliteStorage as huey_SqliteStorage
 
+from .batched import batched
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
 from .utils import get_usable_cpu_count
 from .yt_dlp import retry_django_db
@@ -165,20 +165,11 @@ class SqliteStorage(huey_SqliteStorage):
         )  # fmt: skip
         self.sql(query=q_str, params=p_tuple, commit=True)
 
-    @staticmethod
-    def _islice_batched(iterable, n):
-        it = iter(iterable)
-        chunk = tuple(itertools.islice(it, n))
-        while chunk:
-            yield chunk
-            chunk = tuple(itertools.islice(it, n))
-
     def expire_results(self, dt, /, *, chunk_size=100):
         version = self.sql(query='PRAGMA user_version', results=True)[0][0]
         if 2 > version:
             return
 
-        batched = getattr(itertools, 'batched', self._islice_batched)
         utc_dt = dt.astimezone(datetime.timezone.utc)
         sqlite_ts_str = utc_dt.strftime('%Y-%m-%d %H:%M:%S')
         select_all_q_str = (
