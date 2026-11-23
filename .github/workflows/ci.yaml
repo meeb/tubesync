@@ -3,7 +3,7 @@ name: CI
 env:
   IMAGE_NAME: tubesync
   REGISTRY: ghcr.io
-  BASE_DEBIAN_UNHOLD_ADDITIONS: 'zlib1g'
+  BASE_DEBIAN_UNHOLD_PKGS: 'zlib1g'
 
 on:
   workflow_dispatch:
@@ -36,7 +36,8 @@ jobs:
     runs-on: ubuntu-slim
     outputs:
       IMAGE_NAME: ${{ env.IMAGE_NAME }}
-      BASE_DEBIAN_UNHOLD_ADDITIONS: ${{ env.BASE_DEBIAN_UNHOLD_ADDITIONS }}
+      BASE_DEBIAN_SNAPSHOT_URI: 'http://snapshot.debian.org/archive/debian/20261120T203430Z'
+      BASE_DEBIAN_UNHOLD_PKGS: ${{ env.BASE_DEBIAN_UNHOLD_PKGS }}
       REGISTRY: ${{ env.REGISTRY }}
       ejs-latest-release: ${{ steps.ejs.outputs.latest-release }}
       ffmpeg-date: ${{ steps.ffmpeg.outputs.date }}
@@ -248,7 +249,8 @@ jobs:
         with:
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
-            BASE_DEBIAN_UNHOLD_ADDITIONS=${{ needs.info.outputs.BASE_DEBIAN_UNHOLD_ADDITIONS }}
+            BASE_DEBIAN_SNAPSHOT_URI=${{ needs.info.outputs.BASE_DEBIAN_SNAPSHOT_URI }}
+            BASE_DEBIAN_UNHOLD_PKGS=${{ needs.info.outputs.BASE_DEBIAN_UNHOLD_PKGS }}
             FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
             FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
@@ -302,7 +304,8 @@ jobs:
         type=ref,event=pr
       build-args: |
         IMAGE_NAME=${{ needs.info.outputs.IMAGE_NAME }}
-        BASE_DEBIAN_UNHOLD_ADDITIONS=${{ needs.info.outputs.BASE_DEBIAN_UNHOLD_ADDITIONS }}
+        BASE_DEBIAN_SNAPSHOT_URI=${{ needs.info.outputs.BASE_DEBIAN_SNAPSHOT_URI }}
+        BASE_DEBIAN_UNHOLD_PKGS=${{ needs.info.outputs.BASE_DEBIAN_UNHOLD_PKGS }}
         FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
         FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
         YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
