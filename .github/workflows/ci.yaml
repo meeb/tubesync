@@ -3,7 +3,7 @@ name: CI
 env:
   IMAGE_NAME: tubesync
   REGISTRY: ghcr.io
-  BASE_DEBIAN_UNHOLD_PKGS: 'zlib1g'
+  BASE_DEBIAN_UNHOLD_PKGS: ''
 
 on:
   workflow_dispatch:
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-slim
     outputs:
       IMAGE_NAME: ${{ env.IMAGE_NAME }}
-      BASE_DEBIAN_SNAPSHOT_URI: 'http://snapshot.debian.org/archive/debian/20261120T203430Z'
+      BASE_DEBIAN_SNAPSHOT_URI: ''
       BASE_DEBIAN_UNHOLD_PKGS: ${{ env.BASE_DEBIAN_UNHOLD_PKGS }}
       REGISTRY: ${{ env.REGISTRY }}
       ejs-latest-release: ${{ steps.ejs.outputs.latest-release }}
