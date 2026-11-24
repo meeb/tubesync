@@ -24,29 +24,28 @@ jobs:
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
       # ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
     steps:
-      - uses: actions/checkout@v7
       - name: Get tag
         id: tag
-        uses: ./.github/actions/get-tag
+        uses: $/.github/actions/get-tag
       - name: Lowercase github username
         id: github-actor
-        uses: ./.github/actions/string-case
+        uses: $/.github/actions/string-case
         with:
           string: ${{ github.actor }}
       - name: Lowercase github repository owner
         id: github-repository_owner
-        uses: ./.github/actions/string-case
+        uses: $/.github/actions/string-case
         with:
           string: ${{ github.repository_owner }}
       - name: Retrieve yt-dlp/FFmpeg-Builds releases with GitHub CLI
         id: ffmpeg
-        uses: ./.github/actions/FFmpeg
+        uses: $/.github/actions/FFmpeg
       - name: Retrieve yt-dlp/yt-dlp releases with GitHub CLI
         id: yt-dlp
-        uses: ./.github/actions/yt-dlp
+        uses: $/.github/actions/yt-dlp
       - name: Retrieve yt-dlp/ejs releases with GitHub CLI
         id: ejs
-        uses: ./.github/actions/yt-dlp
+        uses: $/.github/actions/yt-dlp
         with:
           repository_name: ejs
 
