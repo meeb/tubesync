@@ -501,7 +501,7 @@ def save_db_batch(qs, objs, fields, /):
 
     num_updated = 0
     num_objs = len(objs)
-    with atomic(durable=False):
+    with contextlib.suppress(db.DatabaseError), atomic(durable=False):
         num_updated = qs.bulk_update(objs=objs, fields=fields)
     if (num_updated == num_objs) and callable(func := getattr(objs, 'clear', False)):
         # this covers at least: list, set, deque
@@ -656,11 +656,9 @@ def index_source(source_id):
     processed_keys = set()
     while len(videos) > 0:
         while len(db_batch_data) == db_batch_data.maxlen:
-            with contextlib.suppress(db.DatabaseError):
-                save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
+            save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
         while len(db_batch_media) == db_batch_media.maxlen:
-            with contextlib.suppress(db.DatabaseError):
-                save_db_batch(Media.objects, db_batch_media, db_fields_media)
+            save_db_batch(Media.objects, db_batch_media, db_fields_media)
         vn += 1
         video = videos.popleft()
         # Create or update each video as a Media object
@@ -747,11 +745,9 @@ def index_source(source_id):
     update_task_status(task, None)
     # Update any remaining items in the batches
     while 0 < len(db_batch_data):
-        with contextlib.suppress(db.DatabaseError):
-            save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
+        save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
     while 0 < len(db_batch_media):
-        with contextlib.suppress(db.DatabaseError):
-            save_db_batch(Media.objects, db_batch_media, db_fields_media)
+        save_db_batch(Media.objects, db_batch_media, db_fields_media)
     # Cleanup of media no longer available from the source
     use_published = 'published' == str(
         getattr(settings, 'INDEXING_CLEANUP_UNAVAILABLE_POLICY', 'processed')
