@@ -290,7 +290,7 @@ ARG DESTDIR="/downloaded"
 ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
 RUN --mount=type=secret,id=github_token \
-    GITHUB_API_KEY="$(cat /run/secrets/github_token)" ; \
+    GITHUB_API_KEY="$(cat /run/secrets/github_token || :)" ; \
     set -eu ; \
 \
     decide_arch() { \
@@ -303,7 +303,7 @@ RUN --mount=type=secret,id=github_token \
     FFMPEG_ARCH="$(decide_arch)" ; \
     FFMPEG_PREFIX_FILE="$( printf -- '%s' "${FFMPEG_PREFIX_FILE}" | cut -d '-' -f 1,2 )" ; \
     cd "${DESTDIR}" && \
-    export GITHUB_API_KEY ; \
+    { test -n "${GITHUB_API_KEY}" && export GITHUB_API_KEY || unset -v GITHUB_API_KEY ; } && \
     for url in $(awk ' \
       $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; } \
       ' "${DESTDIR}/${FFMPEG_FILE_SUMS}") ; \
