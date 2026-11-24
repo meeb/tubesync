@@ -3,25 +3,22 @@
 {% block headtitle %}Delete media server - {{ mediaserver }}{% endblock %}
 
 {% block content %}
-<div class="row no-margin-bottom">
-  <div class="col s12">
-    <h1>Delete <strong>{{ mediaserver }}</strong></h1>
-    <p>
-      Deleting a media server will stop it from being updated by TubeSync. This action
-      is permanent. You will have to manually re-add the media server details again if
-      you want to update it automatically in future again.
-    </p>
-  </div>
-</div>
-<div class="row">
-  <form method="post" action="{% url 'sync:delete-mediaserver' pk=mediaserver.pk %}" class="col s12 simpleform">
-    {% csrf_token %}
-    {% include 'simpleform.html' with form=form %}
-    <div class="row no-margin-bottom padding-top">
-      <div class="col s12">
-        <button class="btn" type="submit" name="action">Really delete media server <i class="fas fa-trash-alt"></i></button>
-      </div>
+<h1 class="title mb-4">Delete <strong>{{ mediaserver }}</strong></h1>
+<p class="mb-4">
+  Deleting a media server will stop it from being updated by TubeSync. This action
+  is permanent. You will have to manually re-add the media server details again if
+  you want to update it automatically in future again.
+</p>
+<form method="post" action="{% url 'sync:delete-mediaserver' pk=mediaserver.pk %}" class="simpleform">
+  {% csrf_token %}
+  {% include 'simpleform.html' with form=form %}
+  <div class="field pt-4 has-text-centered">
+    <div class="control">
+      <button class="button is-danger" type="submit" name="action">
+        <span class="icon"><i class="fas fa-trash-alt"></i></span>
+        <span>Really delete media server</span>
+      </button>
     </div>
-  </form>
-</div>
+  </div>
+</form>
 {% endblock %}
