@@ -3,8 +3,7 @@ name: CI
 env:
   IMAGE_NAME: tubesync
   REGISTRY: ghcr.io
-  BASE_DEBIAN_UNHOLD_ADDITIONS: 'zlib1g'
-  OPENRESTY_DEBIAN_SHA1_YEAR: '2028'
+  BASE_DEBIAN_UNHOLD_PKGS: ''
 
 on:
   workflow_dispatch:
@@ -14,10 +13,12 @@ on:
     branches:
       - 'main'
       - 'test-*'
+      - 'test/**'
   pull_request:
     branches:
       - 'main'
       - 'test-*'
+      - 'test/**'
     types:
       - opened
       - reopened
@@ -27,6 +28,7 @@ on:
 concurrency:
   group: ${{ github.repository }}-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
+  queue: single
 
 jobs:
   info:
@@ -34,8 +36,8 @@ jobs:
     runs-on: ubuntu-slim
     outputs:
       IMAGE_NAME: ${{ env.IMAGE_NAME }}
-      BASE_DEBIAN_UNHOLD_ADDITIONS: ${{ env.BASE_DEBIAN_UNHOLD_ADDITIONS }}
-      OPENRESTY_DEBIAN_SHA1_YEAR: ${{ env.OPENRESTY_DEBIAN_SHA1_YEAR }}
+      BASE_DEBIAN_SNAPSHOT_URI: ''
+      BASE_DEBIAN_UNHOLD_PKGS: ${{ env.BASE_DEBIAN_UNHOLD_PKGS }}
       REGISTRY: ${{ env.REGISTRY }}
       ejs-latest-release: ${{ steps.ejs.outputs.latest-release }}
       ffmpeg-date: ${{ steps.ffmpeg.outputs.date }}
@@ -46,26 +48,25 @@ jobs:
       ytdlp-latest-release: ${{ steps.yt-dlp.outputs.latest-release }}
       # ytdlp-releases: ${{ steps.yt-dlp.outputs.releases }}
     steps:
-      - uses: actions/checkout@v7
       - name: Lowercase github username
         id: github-actor
-        uses: ./.github/actions/string-case
+        uses: $/.github/actions/string-case
         with:
           string: ${{ github.actor }}
       - name: Lowercase github repository owner
         id: github-repository_owner
-        uses: ./.github/actions/string-case
+        uses: $/.github/actions/string-case
         with:
           string: ${{ github.repository_owner }}
       - name: Retrieve yt-dlp/FFmpeg-Builds releases with GitHub CLI
         id: ffmpeg
-        uses: ./.github/actions/FFmpeg
+        uses: $/.github/actions/FFmpeg
       - name: Retrieve yt-dlp/yt-dlp releases with GitHub CLI
         id: yt-dlp
-        uses: ./.github/actions/yt-dlp
+        uses: $/.github/actions/yt-dlp
       - name: Retrieve yt-dlp/ejs releases with GitHub CLI
         id: ejs
-        uses: ./.github/actions/yt-dlp
+        uses: $/.github/actions/yt-dlp
         with:
           repository_name: ejs
 
@@ -118,12 +119,27 @@ jobs:
         run: ./tubesync/install_tailwindcss.sh
 
   test:
-    if: ${{ !cancelled() && ( 'pull_request' != github.event_name || (! github.event.pull_request.draft) ) }}
+    if: >-
+      ${{
+        !cancelled()
+        && (
+          'pull_request' != github.event_name
+          || !github.event.pull_request.draft
+        )
+      }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.12', '3.13', '3.14']
+        python-version: ['3.12', '3.13', '3.14', '3.15']
+        exclude: >-
+          ${{
+            fromJSON(
+              github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+              && '[{"python-version": "3.15"}]'
+              || '[]'
+            )
+          }}
     services:
       hat-syslog:
         # avoid hub.docker.com limits
@@ -148,12 +164,59 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install uv
+          mkdir -v -p ./.wheels
+          wheels_dir="$(realpath ./.wheels)"
+          set -x
           uv --no-config --no-managed-python --no-progress \
             tool run pipenv requirements --dev --no-lock >| Pipfile-requirements.txt
+          if python3 -c 'import sys; sys.exit(0 if (3, 15) <= sys.version_info else 1)'
+          then
+            (
+              set -eu
+
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends \
+                build-essential npm pandoc
+
+              work_dir=$(mktemp -d)
+              trap 'rm -rf "${work_dir}"' EXIT
+              cd "${work_dir}"
+
+              uv --no-config --no-progress \
+                venv --python 3.14 .venv
+              { set +x ; . .venv/bin/activate ; set -x ; }
+
+              for hat_repo in aio util json juggler; do
+                git clone "https://github.com/hat-open/hat-${hat_repo}.git"
+                (
+                  cd "hat-${hat_repo}"
+                  latest_tag="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+                  git switch --detach "${latest_tag}"
+                  uv --no-config --no-progress \
+                    pip install --find-links "${wheels_dir}" --group dev -e .
+                  doit
+                  find build -name '*.whl' -exec \
+                    uv --no-config --no-managed-python --no-progress \
+                      tool run wheel tags --python-tag=py3 --remove '{}' +
+                  find build -name '*.whl' -exec \
+                    cp -v -t "${wheels_dir}/" '{}' +
+                )
+              done
+
+              git clone --branch v0.7.28 --depth 1 'https://github.com/hat-open/hat-syslog.git'
+              cd hat-syslog
+              uv --no-config --no-progress \
+                pip install --find-links "${wheels_dir}" --group dev -e .
+              doit
+              uv --no-config --no-managed-python --no-progress \
+                tool run wheel tags --python-tag=py3 --remove build/py/*.whl
+              cp -v -t "${wheels_dir}/" build/py/*.whl
+            )
+          fi
           uv --no-config --no-managed-python --no-progress \
-            pip compile --format requirements.txt --generate-hashes --output-file Pipfile-requirements-with-hashes.txt Pipfile-requirements.txt
+            pip compile --find-links "${wheels_dir}" --format requirements.txt --generate-hashes --output-file Pipfile-requirements-with-hashes.txt Pipfile-requirements.txt
           uv --no-config --no-managed-python --no-progress \
-            pip install --system --strict --requirements Pipfile-requirements-with-hashes.txt
+            pip install --system --strict --find-links "${wheels_dir}" --requirements Pipfile-requirements-with-hashes.txt
       - name: Set up Django environment
         run: |
           mkdir -v -p ~/.config/TubeSync/config
@@ -222,6 +285,7 @@ jobs:
     concurrency:
       group: ${{ github.repository }}-${{ github.workflow }}
       cancel-in-progress: false
+      queue: max
     steps:
       - name: Set up Docker Buildx
         id: buildx
@@ -232,8 +296,8 @@ jobs:
         with:
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
-            BASE_DEBIAN_UNHOLD_ADDITIONS=${{ needs.info.outputs.BASE_DEBIAN_UNHOLD_ADDITIONS }}
-            OPENRESTY_DEBIAN_SHA1_YEAR=${{ needs.info.outputs.OPENRESTY_DEBIAN_SHA1_YEAR }}
+            BASE_DEBIAN_SNAPSHOT_URI=${{ needs.info.outputs.BASE_DEBIAN_SNAPSHOT_URI }}
+            BASE_DEBIAN_UNHOLD_PKGS=${{ needs.info.outputs.BASE_DEBIAN_UNHOLD_PKGS }}
             FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
             FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
             YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
@@ -244,7 +308,7 @@ jobs:
           push: false
           tags: ghcr.io/${{ needs.info.outputs.lowercase-github-repository_owner }}/${{ env.IMAGE_NAME }}:dive
       - name: Analysis with `dive`
-        continue-on-error: false
+        continue-on-error: ${{ startsWith(github.head_ref || github.ref_name, 'test-') || startsWith(github.head_ref || github.ref_name, 'test/') }}
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
@@ -287,8 +351,8 @@ jobs:
         type=ref,event=pr
       build-args: |
         IMAGE_NAME=${{ needs.info.outputs.IMAGE_NAME }}
-        BASE_DEBIAN_UNHOLD_ADDITIONS=${{ needs.info.outputs.BASE_DEBIAN_UNHOLD_ADDITIONS }}
-        OPENRESTY_DEBIAN_SHA1_YEAR=${{ needs.info.outputs.OPENRESTY_DEBIAN_SHA1_YEAR }}
+        BASE_DEBIAN_SNAPSHOT_URI=${{ needs.info.outputs.BASE_DEBIAN_SNAPSHOT_URI }}
+        BASE_DEBIAN_UNHOLD_PKGS=${{ needs.info.outputs.BASE_DEBIAN_UNHOLD_PKGS }}
         FFMPEG_DATE=${{ needs.info.outputs.ffmpeg-date }}
         FFMPEG_VERSION=${{ needs.info.outputs.ffmpeg-version }}
         YTDLP_DATE=${{ fromJSON(needs.info.outputs.ytdlp-latest-release).tag.name }}
