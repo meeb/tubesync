@@ -508,11 +508,28 @@ def save_db_batch(qs, objs, fields, /):
         func()
     elif (num_updated < num_objs) and callable(func := getattr(objs, 'pop', False)):
         # Fallback to saving each object one at a time.
+        failure_budget = initial_budget = max(2, (num_objs * 8) // 100)
         num_saved = 0
         while objs:
             obj = func()
-            obj.save(update_fields=fields)
-            num_saved += 1
+            try:
+                obj.save(update_fields=fields)
+            except db.DatabaseError as e:
+                if 0 >= failure_budget:
+                    log.exception(
+                        'Batch failure budget exceeded; initial_budget: %d',
+                        initial_budget,
+                    )
+                    raise db.Error('failure budget exhausted') from e
+
+                failure_budget -= 1
+                log.exception(
+                    'Save failed; remaining failure budget=%d: %r',
+                    failure_budget,
+                    getattr(obj, 'pk', None),
+                )
+            else:
+                num_saved += 1
         return num_saved
     return num_updated
 
