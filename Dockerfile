@@ -289,8 +289,9 @@ ARG FFMPEG_URL="https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobu
 ARG DESTDIR="/downloaded"
 ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
-ARG GITHUB_API_KEY
-RUN set -eu ; \
+RUN --mount=type=secret,id=github_token \
+    GITHUB_API_KEY="$(cat /run/secrets/github_token)" ; \
+    set -eu ; \
 \
     decide_arch() { \
         case "${TARGETARCH}" in \
@@ -302,6 +303,7 @@ RUN set -eu ; \
     FFMPEG_ARCH="$(decide_arch)" ; \
     FFMPEG_PREFIX_FILE="$( printf -- '%s' "${FFMPEG_PREFIX_FILE}" | cut -d '-' -f 1,2 )" ; \
     cd "${DESTDIR}" && \
+    export GITHUB_API_KEY ; \
     for url in $(awk ' \
       $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; } \
       ' "${DESTDIR}/${FFMPEG_FILE_SUMS}") ; \
@@ -309,7 +311,7 @@ RUN set -eu ; \
         url="${FFMPEG_URL}/${url# }" ; \
         TMPDIR="${DESTDIR}" asfald-latest -qv -- "${url}" ; \
     done ; \
-    unset -v url ; \
+    unset -v url GITHUB_API_KEY ; \
 \
     decide_expected() { \
         case "${TARGETARCH}" in \
