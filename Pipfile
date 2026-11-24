@@ -11,7 +11,6 @@ ruff = "*"
 [packages]
 django = "~=6.0.0"
 django-huey = "*"
-django-tasks-db = "*"
 django-sass-processor = {extras = ["management-command"], version = "*"}
 pillow = "*"
 whitenoise = "*"
@@ -30,6 +29,7 @@ html5lib = "*"
 yt-dlp-remote-cipher = "*"
 babi = "*"
 bgutil-ytdlp-pot-provider = "~=2.0.2"
+django-tasks-db = "==0.13.0"
 hat-syslog = "==0.7.28"
 hat-juggler = "!=0.7.4"
 huey = {extras = ["stats"], version = ">=3.5.0"}

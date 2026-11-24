@@ -1,6 +1,38 @@
-#!/command/with-contenv bash
+#!/command/with-contenv python3
 
-exec nice -n "${TUBESYNC_NICE:-1}" s6-setuidgid app \
-    /usr/bin/python3 /app/manage.py db_worker -v 2 \
-    --no-reload --interval 20 --max-tasks 100 \
-    --queue-name '*' --exclude-queues limited
+import contextlib
+import os
+import sys
+
+svc_dir = os.path.dirname(os.path.abspath(__file__))
+notify_file = os.path.join(svc_dir, 'notification-fd')
+
+if os.path.exists(notify_file):
+    if not os.access(notify_file, os.R_OK) or 0 == os.path.getsize(notify_file):
+        print(
+            f'db-worker: {notify_file} exists but is unreadable or empty',
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    with open(notify_file) as f:
+        os.environ['S6_NOTIFY_FD'] = f.read().strip()
+
+nice_value = 1
+TUBESYNC_NICE = os.environ.get('TUBESYNC_NICE', None)
+if TUBESYNC_NICE is not None:
+    with contextlib.suppress(TypeError, ValueError):
+        nice_value = int(TUBESYNC_NICE)
+
+os.chdir('/app')
+os.execv(
+    '/usr/bin/env',
+    [
+        '/usr/bin/env',
+        'nice', '-n', str(nice_value),
+        '/command/s6-setuidgid', 'app',
+        sys.executable, '/app/manage.py',
+        'db_worker', '-v', '2', '--no-reload',
+        '--interval', '20', '--max-tasks', '100',
+        '--queue-name', '*', '--exclude-queues', 'limited',
+    ],
+)
