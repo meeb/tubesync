@@ -164,12 +164,59 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install uv
+          mkdir -v -p ./.wheels
+          wheels_dir="$(realpath ./.wheels)"
+          set -x
           uv --no-config --no-managed-python --no-progress \
             tool run pipenv requirements --dev --no-lock >| Pipfile-requirements.txt
+          if python3 -c 'import sys; sys.exit(0 if (3, 15) <= sys.version_info else 1)'
+          then
+            (
+              set -eu
+
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends \
+                build-essential npm pandoc
+
+              work_dir=$(mktemp -d)
+              trap 'rm -rf "${work_dir}"' EXIT
+              cd "${work_dir}"
+
+              uv --no-config --no-progress \
+                venv --python 3.14 .venv
+              { set +x ; . .venv/bin/activate ; set -x ; }
+
+              for hat_repo in aio util json juggler; do
+                git clone "https://github.com/hat-open/hat-${hat_repo}.git"
+                (
+                  cd "hat-${hat_repo}"
+                  latest_tag="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+                  git switch --detach "${latest_tag}"
+                  uv --no-config --no-progress \
+                    pip install --find-links "${wheels_dir}" --group dev -e .
+                  doit
+                  find build -name '*.whl' -exec \
+                    uv --no-config --no-managed-python --no-progress \
+                      tool run wheel tags --python-tag=py3 --remove '{}' +
+                  find build -name '*.whl' -exec \
+                    cp -v -t "${wheels_dir}/" '{}' +
+                )
+              done
+
+              git clone --branch v0.7.28 --depth 1 'https://github.com/hat-open/hat-syslog.git'
+              cd hat-syslog
+              uv --no-config --no-progress \
+                pip install --find-links "${wheels_dir}" --group dev -e .
+              doit
+              uv --no-config --no-managed-python --no-progress \
+                tool run wheel tags --python-tag=py3 --remove build/py/*.whl
+              cp -v -t "${wheels_dir}/" build/py/*.whl
+            )
+          fi
           uv --no-config --no-managed-python --no-progress \
-            pip compile --format requirements.txt --generate-hashes --output-file Pipfile-requirements-with-hashes.txt Pipfile-requirements.txt
+            pip compile --find-links "${wheels_dir}" --format requirements.txt --generate-hashes --output-file Pipfile-requirements-with-hashes.txt Pipfile-requirements.txt
           uv --no-config --no-managed-python --no-progress \
-            pip install --system --strict --requirements Pipfile-requirements-with-hashes.txt
+            pip install --system --strict --find-links "${wheels_dir}" --requirements Pipfile-requirements-with-hashes.txt
       - name: Set up Django environment
         run: |
           mkdir -v -p ~/.config/TubeSync/config
