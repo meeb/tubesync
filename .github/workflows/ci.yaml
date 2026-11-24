@@ -247,6 +247,8 @@ jobs:
         id: build-dive-image
         uses: docker/build-push-action@v7
         with:
+          secrets: |
+            github_token=${{ secrets.GITHUB_TOKEN }}
           build-args: |
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             BASE_DEBIAN_SNAPSHOT_URI=${{ needs.info.outputs.BASE_DEBIAN_SNAPSHOT_URI }}
