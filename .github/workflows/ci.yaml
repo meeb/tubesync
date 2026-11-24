@@ -248,6 +248,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           build-args: |
+            GITHUB_API_KEY=${{ secrets.GITHUB_TOKEN }}
             IMAGE_NAME=${{ env.IMAGE_NAME }}
             BASE_DEBIAN_SNAPSHOT_URI=${{ needs.info.outputs.BASE_DEBIAN_SNAPSHOT_URI }}
             BASE_DEBIAN_UNHOLD_PKGS=${{ needs.info.outputs.BASE_DEBIAN_UNHOLD_PKGS }}
