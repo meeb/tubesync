@@ -41,17 +41,16 @@ class Command(BaseCommand):
 
         try:
             while consecutive_empty < threshold and pid_alive:
-                conn = None
                 has_data = False
                 try:
-                    with sqlite3.connect(db_path) as conn:
+                    with self.sqlite3_db(transaction=True) as conn:
                         with contextlib.closing(
-                            conn.execute('SELECT id, payload FROM queue')
+                            conn.execute('SELECT id, payload FROM queue ORDER BY id')
                         ) as cursor:
                             rows = cursor.fetchall()
+                            has_data = bool(rows)
                         
-                        if rows:
-                            has_data = True
+                        if has_data:
                             ids_to_delete = {row[0] for row in rows}
                             for _, payload_json in rows:
                                 payload = json.loads(payload_json)
@@ -60,19 +59,22 @@ class Command(BaseCommand):
                             
                             try:
                                 for batch in batched(tuple(ids_to_delete), batch_size, strict=True):
-                                    conn.execute(sql_full_batch, batch)
-                                    ids_to_delete.difference_update(batch)
-                            except ValueError:
+                                    try:
+                                        self.sqlite3_run(conn, sql_full_batch, batch)
+                                        ids_to_delete.difference_update(batch)
+                                    except ValueError as exc:
+                                        exc._from_loop_body = True
+                                        raise
+                            except ValueError as exc:
+                                if getattr(exc, '_from_loop_body', False):
+                                    raise
+
+                                # batched generated this exception
                                 partial_batch = tuple(ids_to_delete)
                                 sql_partial_batch = sql_full_batch.split('?', 1)[0] + ', '.join('?' * len(partial_batch)) +')'
-                                conn.execute(sql_partial_batch, partial_batch)
+                                self.sqlite3_run(conn, sql_partial_batch, partial_batch)
                 except sqlite3.OperationalError:
                     pass
-
-                finally:
-                    if conn is not None:
-                        with contextlib.suppress(Exception):
-                            conn.close()
 
                 if has_data:
                     consecutive_empty = 0
@@ -112,6 +114,10 @@ class Command(BaseCommand):
         for data in buffer.values():
             media_key = data['media_key']
             media_rowid = data['media_rowid']
+            try:
+                media_rowid = int(media_rowid)
+            except (TypeError, ValueError):
+                media_rowid = int()
             media_uuid = data['media_uuid']
             task_status = data['task_status']
             verbose_name_raw = data['task_verbose_name']
@@ -135,8 +141,12 @@ class Command(BaseCommand):
                         media, task = m, t
                         break
                 if media and 0 < media_rowid:
-                    with contextlib.suppress(sqlite3.Error), sqlite3.connect(self.db_path) as conn:
-                        conn.execute('UPDATE media SET uuid = ? WHERE id = ?', (str(media.uuid), media_rowid))
+                    with (
+                        contextlib.suppress(sqlite3.Error),
+                        self.sqlite3_db(transaction=False) as conn,
+                    ):
+                        sql = 'UPDATE media SET uuid = ? WHERE id = ?'
+                        self.sqlite3_run(conn, sql, (str(media.uuid), media_rowid))
 
             if media and task:
                 if verbose_name_raw is None:
@@ -145,4 +155,19 @@ class Command(BaseCommand):
                 task.save()
 
         db.close_old_connections()
-            
+
+    @staticmethod
+    def sqlite3_run(connection, /, sql, args=()):
+        # close the unassigned cursor
+        with contextlib.closing(connection.execute(sql, args)):
+            pass
+
+    @contextlib.contextmanager
+    def sqlite3_db(self, /, transaction: bool = False):
+        with contextlib.closing(
+            sqlite3.connect(self.db_path, isolation_level=None),
+        ) as connection, connection:
+            if transaction:
+                self.sqlite3_run(connection, 'BEGIN IMMEDIATE')
+            yield connection
+
