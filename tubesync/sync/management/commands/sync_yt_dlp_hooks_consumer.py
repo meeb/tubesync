@@ -10,6 +10,7 @@ from pathlib import Path
 from django import db
 from django.core.management.base import BaseCommand
 
+from common.batched import batched
 from common.utils import remove_enclosed
 from sync.models import Media
 from sync.tasks import get_media_download_task
@@ -36,26 +37,18 @@ class Command(BaseCommand):
         flush_interval = 0.5 
         consecutive_empty = 0
         batch_size = 100
-        sql_full_batch = f"DELETE FROM queue WHERE id IN ({','.join(['?'] * batch_size)})"
-
-        def batched(iterable, n, /, *, strict=False):
-            import itertools
-            func = getattr(itertools, 'batched', None)
-            if callable(func): return func(iterable, n, strict=strict)
-            it = iter(iterable)
-            func = lambda: tuple(itertools.islice(it, max(1, n)))
-            for batch in iter(func, ()):
-                if strict and n > len(batch):
-                    raise ValueError('batched(): incomplete batch')
-                yield batch
+        sql_full_batch = f"DELETE FROM queue WHERE id IN ({', '.join('?' * batch_size)})"
 
         try:
             while consecutive_empty < threshold and pid_alive:
+                conn = None
                 has_data = False
                 try:
                     with sqlite3.connect(db_path) as conn:
-                        cursor = conn.execute('SELECT id, payload FROM queue')
-                        rows = cursor.fetchall()
+                        with contextlib.closing(
+                            conn.execute('SELECT id, payload FROM queue')
+                        ) as cursor:
+                            rows = cursor.fetchall()
                         
                         if rows:
                             has_data = True
@@ -71,10 +64,15 @@ class Command(BaseCommand):
                                     ids_to_delete.difference_update(batch)
                             except ValueError:
                                 partial_batch = tuple(ids_to_delete)
-                                sql_partial_batch = sql_full_batch.split('?', 1)[0] + ','.join(['?'] * len(partial_batch)) +')'
+                                sql_partial_batch = sql_full_batch.split('?', 1)[0] + ', '.join('?' * len(partial_batch)) +')'
                                 conn.execute(sql_partial_batch, partial_batch)
                 except sqlite3.OperationalError:
                     pass
+
+                finally:
+                    if conn is not None:
+                        with contextlib.suppress(Exception):
+                            conn.close()
 
                 if has_data:
                     consecutive_empty = 0
@@ -102,6 +100,7 @@ class Command(BaseCommand):
                         pid_alive = True
                 
                 time.sleep(0.1)
+
         finally:
             # Ensure final buffer is flushed before deleting the temp dir
             if update_buffer:
