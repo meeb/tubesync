@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import contextlib
 import json
 import os
-import shutil
 import sqlite3
 import time
 
@@ -10,164 +11,305 @@ from pathlib import Path
 from django import db
 from django.core.management.base import BaseCommand
 
-from common.batched import batched
 from common.utils import remove_enclosed
 from sync.models import Media
 from sync.tasks import get_media_download_task
 
 
+POLL_INTERVAL = 0.1
+FLUSH_INTERVAL = 0.5
+BATCH_SIZE = 100
+
+
 class Command(BaseCommand):
-    help = 'Processes hook updates with DB throttling via SQLite WAL queue'
+    help = 'Consumes generation-based SQLite hook queues'
 
     def add_arguments(self, parser):
         parser.add_argument('--temp-dir', type=Path, required=True)
-        parser.add_argument('--pid', type=int, default=0, help='Optional PID to monitor for lifecycle')
-        parser.add_argument('--threshold', type=int, default=100)
+        parser.add_argument('--generation', type=str, required=True)
+        parser.add_argument('--coordination-db', type=Path, required=True)
+        parser.add_argument('--pid', type=int, default=0)
 
     def handle(self, *args, **options):
-        temp_dir = options['temp_dir']
-        db_path = temp_dir / 'queue.db'
-        self.db_path = db_path
-        monitor_pid = options['pid']
-        pid_alive = True
-        threshold = max(5, options['threshold'])
-        
-        update_buffer = {}
-        last_flush_time = time.monotonic()
-        flush_interval = 0.5 
-        consecutive_empty = 0
-        batch_size = 100
-        sql_full_batch = f"DELETE FROM queue WHERE id IN ({', '.join('?' * batch_size)})"
+        self.temp_dir: Path = options['temp_dir']
+        self.db_path = self.temp_dir / "queue.db"
+        self.coordination_path: Path = options['coordination_db']
+        self.generation = options['generation']
+        self.monitor_pid = options['pid']
+
+        self._ensure_coordination_schema()
+        update_buffer: dict[str, dict] = {}
+        last_flush = time.monotonic()
 
         try:
-            while consecutive_empty < threshold and pid_alive:
-                has_data = False
+            while True:
+                rows = []
                 try:
-                    with self.sqlite3_db(transaction=True) as conn:
-                        with contextlib.closing(
-                            conn.execute('SELECT id, payload FROM queue ORDER BY id')
-                        ) as cursor:
-                            rows = cursor.fetchall()
-                            has_data = bool(rows)
-                        
-                        if has_data:
-                            ids_to_delete = {row[0] for row in rows}
-                            for _, payload_json in rows:
-                                payload = json.loads(payload_json)
-                                cache_key = payload.get('media_uuid') or payload.get('media_key')
-                                update_buffer[cache_key] = payload
-                            
-                            try:
-                                for batch in batched(tuple(ids_to_delete), batch_size, strict=True):
-                                    try:
-                                        self.sqlite3_run(conn, sql_full_batch, batch)
-                                        ids_to_delete.difference_update(batch)
-                                    except ValueError as exc:
-                                        exc._from_loop_body = True
-                                        raise
-                            except ValueError as exc:
-                                if getattr(exc, '_from_loop_body', False):
-                                    raise
+                    rows = self._take_rows()
+                except sqlite3.Error:
+                    self.stderr.write(
+                        f'Queue read failed for generation {self.generation}'
+                    )
+                    time.sleep(POLL_INTERVAL)
 
-                                # batched generated this exception
-                                partial_batch = tuple(ids_to_delete)
-                                sql_partial_batch = sql_full_batch.split('?', 1)[0] + ', '.join('?' * len(partial_batch)) +')'
-                                self.sqlite3_run(conn, sql_partial_batch, partial_batch)
-                except sqlite3.OperationalError:
-                    pass
+                for payload in rows:
+                    token = payload.get('download_token')
+                    if not token:
+                        continue
+                    previous = update_buffer.get(token)
+                    if (
+                        previous is None
+                        or payload.get('sequence', 0)
+                        >= previous.get('sequence', 0)
+                    ):
+                        update_buffer[token] = payload
 
-                if has_data:
-                    consecutive_empty = 0
-                else:
-                    consecutive_empty += 1
-
-                # Throttled Flush
                 now = time.monotonic()
-                update_buffer.pop(None, None)
-                if update_buffer and (flush_interval < (now - last_flush_time)):
+                retired = self._is_retired() or self._parent_is_dead()
+
+                if update_buffer and (
+                    now - last_flush >= FLUSH_INTERVAL or retired
+                ):
                     self.flush_to_db(update_buffer)
                     update_buffer.clear()
-                    last_flush_time = now
+                    last_flush = now
 
-                # --- Exit Logic ---
-                if 1 < monitor_pid <= (1<<22):
-                    # Mode: Process Monitoring
-                    # Only exit if the process is dead AND the queue/buffer are drained
-                    pid_alive = False
-                    with contextlib.suppress(OSError):
-                        os.kill(monitor_pid, 0)
-                        pid_alive = True
-                    
-                    if not pid_alive and (has_data or update_buffer):
-                        pid_alive = True
-                
-                time.sleep(0.1)
+                if retired and not rows and not update_buffer:
+                    break
+
+                time.sleep(POLL_INTERVAL)
 
         finally:
-            # Ensure final buffer is flushed before deleting the temp dir
-            if update_buffer:
-                self.flush_to_db(update_buffer)
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            # Do not delete the generation directory here. The producer owns
+            # cleanup and waits for this process to exit first.
+            db.close_old_connections()
 
-    def flush_to_db(self, buffer):
-        db.close_old_connections()
-        for data in buffer.values():
-            media_key = data['media_key']
-            media_rowid = data['media_rowid']
-            try:
-                media_rowid = int(media_rowid)
-            except (TypeError, ValueError):
-                media_rowid = int()
-            media_uuid = data['media_uuid']
-            task_status = data['task_status']
-            verbose_name_raw = data['task_verbose_name']
+    def _connect(self, path: Path) -> sqlite3.Connection:
+        conn = sqlite3.connect(
+            path,
+            isolation_level=None,
+            timeout=30,
+        )
+        conn.execute('PRAGMA busy_timeout = 30000')
+        return conn
 
-            media = task = None
-            if media_uuid:
-                try:
-                    media = Media.objects.get(uuid=media_uuid)
-                    task = get_media_download_task(str(media.pk))
-                except Media.DoesNotExist:
-                    continue
-            elif media_key:
-                mqs = Media.objects.exclude(
-                    skip=True, manual_skip=True, downloaded=True
-                ).filter(
-                    source__download_media=True, can_download=True, key=media_key
+    def _ensure_coordination_schema(self) -> None:
+        self.coordination_path.parent.mkdir(parents=True, exist_ok=True)
+        with contextlib.closing(self._connect(self.coordination_path)) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS download_map (
+                    download_token TEXT PRIMARY KEY,
+                    media_key TEXT NOT NULL,
+                    media_uuid TEXT
                 )
-                for m in mqs:
-                    t = get_media_download_task(str(m.pk))
-                    if t:
-                        media, task = m, t
-                        break
-                if media and 0 < media_rowid:
-                    with (
-                        contextlib.suppress(sqlite3.Error),
-                        self.sqlite3_db(transaction=False) as conn,
-                    ):
-                        sql = 'UPDATE media SET uuid = ? WHERE id = ?'
-                        self.sqlite3_run(conn, sql, (str(media.uuid), media_rowid))
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS download_state (
+                    download_token TEXT PRIMARY KEY,
+                    last_sequence INTEGER NOT NULL
+                )
+            """)
 
-            if media and task:
-                if verbose_name_raw is None:
-                    verbose_name_raw = remove_enclosed(task.verbose_name, '[', ']', ' ')
-                task.verbose_name = f'{task_status} {verbose_name_raw}'
+    def _take_rows(self) -> list[dict]:
+        with contextlib.closing(self._connect(self.db_path)) as conn:
+            conn.execute('BEGIN IMMEDIATE')
+            try:
+                rows = conn.execute(
+                    'SELECT id, payload FROM queue ORDER BY id LIMIT ?',
+                    (BATCH_SIZE,),
+                ).fetchall()
+
+                if rows:
+                    conn.executemany(
+                        'DELETE FROM queue WHERE id = ?',
+                        [(row_id,) for row_id, _ in rows],
+                    )
+                conn.execute('COMMIT')
+            except Exception:
+                with contextlib.suppress(sqlite3.Error):
+                    conn.execute('ROLLBACK')
+                raise
+
+        payloads = []
+        for _, raw in rows:
+            try:
+                payload = json.loads(raw)
+                if isinstance(payload, dict):
+                    payloads.append(payload)
+            except (TypeError, ValueError):
+                self.stderr.write(
+                    f'Invalid queue payload in generation {self.generation}'
+                )
+        return payloads
+
+    def _is_retired(self) -> bool:
+        try:
+            with contextlib.closing(self._connect(self.db_path)) as conn:
+                row = conn.execute(
+                    "SELECT value FROM meta WHERE key = 'lifecycle'"
+                ).fetchone()
+            return bool(row and row[0] in {'retired', 'failed'})
+        except sqlite3.Error:
+            return True
+
+    def _parent_is_dead(self) -> bool:
+        if not (1 < self.monitor_pid <= (1 << 22)):
+            return False
+        try:
+            os.kill(self.monitor_pid, 0)
+            return False
+        except OSError:
+            return True
+
+    def flush_to_db(self, buffer: dict[str, dict]) -> None:
+        for payload in sorted(
+            buffer.values(),
+            key=lambda item: item.get('sequence', 0),
+        ):
+            try:
+                self._apply_payload(payload)
+            except Exception:
+                # Queue rows have already been deleted; failed-generation
+                # processing is best-effort by design.
+                self.stderr.write(
+                    'Failed to apply a hook update in generation '
+                    f'{self.generation}'
+                )
+                db.close_old_connections()
+            finally:
+                db.close_old_connections()
+
+    def _resolve_media(self, media_key: str) -> tuple[Media | None, object | None]:
+        candidates = Media.objects.filter(
+            source__download_media=True,
+            can_download=True,
+            key=media_key,
+            skip=False,
+            manual_skip=False,
+            downloaded=False,
+        ).order_by('pk')
+
+        for media in candidates:
+            task = get_media_download_task(str(media.pk))
+            if task:
+                return media, task
+
+        return None, None
+
+    def _apply_payload(self, payload: dict) -> None:
+        token = payload.get('download_token')
+        media_key = payload.get('media_key')
+        media_uuid = payload.get('media_uuid')
+        sequence = int(payload.get('sequence') or 0)
+
+        if not token or not media_key:
+            return
+
+        db.close_old_connections()
+
+        # This transaction serializes updates from old and new consumers.
+        # Sequence checks stop a slow retiring consumer from applying stale
+        # status after a newer generation has already updated the task.
+        with contextlib.closing(
+            self._connect(self.coordination_path)
+        ) as coordination:
+            coordination.execute('BEGIN IMMEDIATE')
+            try:
+                row = coordination.execute(
+                    """
+                    SELECT last_sequence
+                    FROM download_state
+                    WHERE download_token = ?
+                    """,
+                    (token,),
+                ).fetchone()
+                if row and sequence <= row[0]:
+                    coordination.execute('COMMIT')
+                    return
+
+                mapping = coordination.execute(
+                    """
+                    SELECT media_uuid
+                    FROM download_map
+                    WHERE download_token = ?
+                    """,
+                    (token,),
+                ).fetchone()
+
+                if mapping and mapping[0]:
+                    media_uuid = mapping[0]
+
+                media = None
+                task = None
+
+                if media_uuid:
+                    try:
+                        media = Media.objects.get(uuid=media_uuid)
+                        task = get_media_download_task(str(media.pk))
+                    except Media.DoesNotExist:
+                        media = None
+                        task = None
+                else:
+                    media, task = self._resolve_media(str(media_key))
+                    if media is not None:
+                        media_uuid = str(media.uuid)
+                        coordination.execute(
+                            """
+                            INSERT INTO download_map(
+                                download_token, media_key, media_uuid
+                            ) VALUES (?, ?, ?)
+                            ON CONFLICT(download_token) DO UPDATE SET
+                                media_key = excluded.media_key,
+                                media_uuid = excluded.media_uuid
+                            """,
+                            (token, str(media_key), media_uuid),
+                        )
+
+                # Keep the resolved mapping in this generation as well.
+                if media_uuid:
+                    with contextlib.closing(self._connect(self.db_path)) as gen:
+                        gen.execute(
+                            """
+                            INSERT INTO download_map(
+                                download_token, media_key, media_uuid
+                            ) VALUES (?, ?, ?)
+                            ON CONFLICT(download_token) DO UPDATE SET
+                                media_key = excluded.media_key,
+                                media_uuid = COALESCE(
+                                    excluded.media_uuid,
+                                    download_map.media_uuid
+                                )
+                            """,
+                            (token, str(media_key), media_uuid),
+                        )
+
+                if media is None or task is None:
+                    coordination.execute('COMMIT')
+                    return
+
+                verbose_name = payload.get('task_verbose_name')
+                if verbose_name is None:
+                    verbose_name = remove_enclosed(
+                        task.verbose_name, '[', ']', ' '
+                    )
+                task.verbose_name = (
+                    f"{payload.get('task_status', '')} {verbose_name}"
+                )
                 task.save()
 
-        db.close_old_connections()
+                coordination.execute(
+                    """
+                    INSERT INTO download_state(download_token, last_sequence)
+                    VALUES (?, ?)
+                    ON CONFLICT(download_token) DO UPDATE SET
+                        last_sequence = excluded.last_sequence
+                    """,
+                    (token, sequence),
+                )
+                coordination.execute('COMMIT')
 
-    @staticmethod
-    def sqlite3_run(connection, /, sql, args=()):
-        # close the unassigned cursor
-        with contextlib.closing(connection.execute(sql, args)):
-            pass
-
-    @contextlib.contextmanager
-    def sqlite3_db(self, /, transaction: bool = False):
-        with contextlib.closing(
-            sqlite3.connect(self.db_path, isolation_level=None),
-        ) as connection, connection:
-            if transaction:
-                self.sqlite3_run(connection, 'BEGIN IMMEDIATE')
-            yield connection
+            except Exception:
+                with contextlib.suppress(sqlite3.Error):
+                    coordination.execute('ROLLBACK')
+                raise
 
