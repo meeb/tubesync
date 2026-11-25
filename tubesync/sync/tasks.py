@@ -14,7 +14,7 @@ import uuid
 from collections import deque as queue
 from io import BytesIO
 from pathlib import Path
-from datetime import timedelta
+from datetime import datetime, timedelta
 from shutil import rmtree
 from django import db
 from django.conf import settings
@@ -201,14 +201,6 @@ def get_media_metadata_task(media_id):
     return get_first_task('sync.tasks.download_media_metadata', media_id)
 
 
-def cleanup_completed_tasks():
-    days_to_keep = getattr(settings, 'COMPLETED_TASKS_DAYS_TO_KEEP', 30)
-    delta = timezone.now() - timedelta(days=days_to_keep)
-    log.info(f'Deleting completed tasks older than {days_to_keep} days '
-             f'(end_at before {delta})')
-    TaskHistory.objects.filter(end_at__lt=delta).delete()
-
-
 @retry_django_db(3)
 def save_model(instance):
     with atomic(durable=False):
@@ -382,19 +374,43 @@ def wait_for_errors(model, /, *, queue_name=None, task_name=None):
         raise HueyConsumerError(_('queue consumer stopped'))
 
 
-@django_task(backend='huey')
-def cleanup_huey_storage():
+@django_task(takes_context=True, queue_name=Val(TaskQueue.LIMIT))
+def cleanup_huey_storage(context):
+    days_to_keep = getattr(settings, 'COMPLETED_TASKS_DAYS_TO_KEEP', 14)
+    now = timezone.now()
+    delta = now - timedelta(days=days_to_keep)
     workers = cleanup_threads
     if not all(
-        (callable(getattr(workers, 'clear', None)),) +
+        (callable(getattr(workers, 'pop', None)),) +
         tuple(callable(getattr(w, 'join', None)) for w in workers) +
         tuple(callable(getattr(w, 'start', None)) for w in workers),
     ):
         return
-    while workers:
-        worker = workers.pop()
+    for worker in workers:
         with contextlib.suppress(RuntimeError):
             worker.start()
+
+    log.info(f'Deleting completed tasks older than {days_to_keep} days '
+             f'(end_at before {delta})')
+    TaskHistory.objects.filter(end_at__lt=delta).delete()
+
+    from huey.contrib.djhuey import HUEY
+    results = (
+        dict(key=k) | HUEY.get(peek=True, key=k)
+        for k in HUEY.all_results()
+        if k.startswith('djt.')
+    )
+    for d in results:
+        if not (when := d.get('finished_at')):
+            continue
+        key = d.get('key')
+        when = datetime.fromisoformat(when)
+        if key and when and when < delta:
+            HUEY.delete(key=key)
+            HUEY.restore_by_id(id=key)
+
+    while workers:
+        worker = workers.pop()
         worker.join()
 
 
@@ -485,11 +501,36 @@ def save_db_batch(qs, objs, fields, /):
 
     num_updated = 0
     num_objs = len(objs)
-    with atomic(durable=False):
+    with contextlib.suppress(db.DatabaseError), atomic(durable=False):
         num_updated = qs.bulk_update(objs=objs, fields=fields)
-    if num_objs == num_updated and callable(func := getattr(objs, 'clear', False)):
+    if (num_updated == num_objs) and callable(func := getattr(objs, 'clear', False)):
         # this covers at least: list, set, deque
         func()
+    elif (num_updated < num_objs) and callable(func := getattr(objs, 'pop', False)):
+        # Fallback to saving each object one at a time.
+        failure_budget = initial_budget = max(2, (num_objs * 8) // 100)
+        num_saved = 0
+        while objs:
+            obj = func()
+            try:
+                obj.save(update_fields=fields)
+            except db.DatabaseError as e:
+                if 0 >= failure_budget:
+                    log.exception(
+                        'Batch failure budget exceeded; initial_budget: %d',
+                        initial_budget,
+                    )
+                    raise db.Error('failure budget exhausted') from e
+
+                failure_budget -= 1
+                log.exception(
+                    'Save failed; remaining failure budget=%d: %r',
+                    failure_budget,
+                    getattr(obj, 'pk', None),
+                )
+            else:
+                num_saved += 1
+        return num_saved
     return num_updated
 
 
@@ -548,7 +589,6 @@ def index_source(source_id):
         Indexes media available from a Source object.
     '''
     db.reset_queries()
-    cleanup_completed_tasks()
     # deleting expired media should happen any time an index task is requested
     cleanup_old_media()
     try:
@@ -592,13 +632,13 @@ def index_source(source_id):
     num_videos = len(videos)
     log.info(f'Found {num_videos} media items for source: {source}')
     tvn_format = '{:,}' + f'/{num_videos:,}'
-    db_batch_data = queue(list(), maxlen=50)
+    db_batch_data = queue(list(), maxlen=150)
     db_fields_data = frozenset((
         'retrieved',
         'site',
         'value',
     ))
-    db_batch_media = queue(list(), maxlen=10)
+    db_batch_media = queue(list(), maxlen=30)
     db_fields_media = frozenset((
         'duration',
         'published',
@@ -615,19 +655,21 @@ def index_source(source_id):
     vn = 0
     processed_keys = set()
     while len(videos) > 0:
+        while len(db_batch_data) == db_batch_data.maxlen:
+            save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
+        while len(db_batch_media) == db_batch_media.maxlen:
+            save_db_batch(Media.objects, db_batch_media, db_fields_media)
         vn += 1
         video = videos.popleft()
         # Create or update each video as a Media object
         key = video.get(source.key_field, None)
-        if not key:
-            # Video has no unique key (ID), it can't be indexed
+        if not key or key in processed_keys:
+            # Video has no unique key (ID), it can't be indexed.
+            # Or the same key has already been processed.
             continue
         processed_keys.add(key)
-        if len(db_batch_data) == db_batch_data.maxlen:
-            save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
-        if len(db_batch_media) == db_batch_media.maxlen:
-            save_db_batch(Media.objects, db_batch_media, db_fields_media)
-        update_task_status(task, tvn_format.format(vn))
+        if 0 == (vn % 10):
+            update_task_status(task, tvn_format.format(vn))
         media_defaults = dict()
         # create a dummy instance to use its functions
         media = Media(source=source, key=key)
@@ -702,8 +744,10 @@ def index_source(source_id):
     # Reset task.verbose_name to the saved value
     update_task_status(task, None)
     # Update any remaining items in the batches
-    save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
-    save_db_batch(Media.objects, db_batch_media, db_fields_media)
+    while 0 < len(db_batch_data):
+        save_db_batch(Metadata.objects, db_batch_data, db_fields_data)
+    while 0 < len(db_batch_media):
+        save_db_batch(Media.objects, db_batch_media, db_fields_media)
     # Cleanup of media no longer available from the source
     use_published = 'published' == str(
         getattr(settings, 'INDEXING_CLEANUP_UNAVAILABLE_POLICY', 'processed')

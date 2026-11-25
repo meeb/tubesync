@@ -119,6 +119,22 @@ class UtilsTestCase(TestCase):
         with self.assertRaises(DatabaseConnectionError):
             parse_database_connection_string(
                 'postgresql://tubesync:password@localhost:65537/tubesync')
+        # Invalid port
+        with self.assertRaises(DatabaseConnectionError):
+            parse_database_connection_string(
+                'postgresql://tubesync:password@localhost:65536/tubesync')
+        # Invalid port
+        with self.assertRaises(DatabaseConnectionError):
+            parse_database_connection_string(
+                'postgresql://tubesync:password@localhost:0/tubesync')
+        # Valid port at the upper boundary
+        database_dict = parse_database_connection_string(
+            'postgresql://tubesync:password@localhost:65535/tubesync')
+        self.assertEqual(database_dict['PORT'], (1<<16)-1)
+        # Valid port at the lower boundary
+        database_dict = parse_database_connection_string(
+            'postgresql://tubesync:password@localhost:1/tubesync')
+        self.assertEqual(database_dict['PORT'], 1)
         # Invalid username or password
         with self.assertRaises(DatabaseConnectionError):
             parse_database_connection_string(

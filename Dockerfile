@@ -22,7 +22,8 @@ ARG SHA256_QJS="fed9715220d616d1a178e1c2e6bd62e8e850626b4fe337cf417940fd32b35802
 
 ARG ALPINE_VERSION="latest"
 ARG DEBIAN_VERSION="13-slim"
-ARG OPENRESTY_DEBIAN_VERSION="bookworm"
+ARG BASE_DEBIAN_SNAPSHOT_URI=""
+ARG BASE_DEBIAN_UNHOLD_PKGS=""
 
 ARG FFMPEG_PREFIX_FILE="ffmpeg-${FFMPEG_VERSION}"
 ARG FFMPEG_SUFFIX_FILE=".tar.xz"
@@ -69,8 +70,10 @@ COPY --from=tubesync-etc /etc/debconf.conf /etc/debconf.conf
 COPY --from=tubesync-etc /usr/share/perl5/Debconf/DbDriver/Copy.pm /usr/share/perl5/Debconf/DbDriver/Copy.pm
 COPY --from=tubesync-etc /usr/share/perl5/Debconf/DbDriver/PackageDir.pm /usr/share/perl5/Debconf/DbDriver/PackageDir.pm
 
+ARG BASE_DEBIAN_UNHOLD_PKGS
+ARG BASE_DEBIAN_SNAPSHOT_URI
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     # to be careful, ensure that these files aren't from a different architecture
     rm -f /var/cache/apt/*cache.bin ; \
     # Update from the network and keep cache
@@ -92,12 +95,24 @@ RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/va
       grep -e '^Package: ' | \
       cut -d : -f 2- | \
       xargs -r -t apt-mark hold && \
-    # We must allow these upgrades
-    apt-mark unhold libc6 libssl3t64 && \
+    apt-mark unhold tzdata ${BASE_DEBIAN_UNHOLD_PKGS} && \
+    cp -p -T /etc/apt/sources.list.d/debian.sources /var/cache/apt/debian.sources.orig && \
+    if [ -n "${BASE_DEBIAN_SNAPSHOT_URI}" ] ; then \
+      _awk_prog='"URIs:" == $1 { \
+        print "#", $0; \
+        if($NF ~ /\/debian-security/) { security=1; }; \
+        $NF = snapshot; \
+        if(security) { sub("/debian/", "/debian-security/", $NF); }; \
+        print; next; } \
+        { print; } ' && \
+      awk -v snapshot="${BASE_DEBIAN_SNAPSHOT_URI}" >| /var/cache/apt/debian.sources \
+        "${_awk_prog}" /etc/apt/sources.list.d/debian.sources && \
+      cp -v -T /var/cache/apt/debian.sources /etc/apt/sources.list.d/debian.sources ; \
+    fi && \
     apt-get update && \
     # Include debian-backports.sources for manual use in a container
     _awk_prog='"Suites:" == $1 && /-security$/ { sub("security", "backports"); print; exit; }' && \
-    _awk_output=$(awk "${_awk_prog}" /etc/apt/sources.list.d/debian.sources) && \
+    _awk_output=$(awk "${_awk_prog}" /var/cache/apt/debian.sources.orig) && \
     printf -- >| /etc/apt/sources.list.d/debian-backports.sources \
         '%s\n' 'Types: deb' 'URIs: http://deb.debian.org/debian' \
         "${_awk_output}" \
@@ -256,28 +271,6 @@ FROM denoland/deno:bin AS deno-binaries
 FROM scratch AS deno
 COPY --from=deno-binaries /deno /usr/local/bin/
 
-FROM alpine:${ALPINE_VERSION} AS openresty-debian
-ARG OPENRESTY_DEBIAN_VERSION
-ARG TARGETARCH
-ADD 'https://openresty.org/package/pubkey.gpg' '/downloaded/pubkey.gpg'
-RUN set -eu ; \
-    decide_arch() { \
-        case "${TARGETARCH}" in \
-            (amd64) printf -- '' ;; \
-            (arm64) printf -- 'arm64/' ;; \
-        esac ; \
-    } ; \
-    set -x ; \
-    mkdir -v -p '/etc/apt/trusted.gpg.d' && \
-    apk --no-cache --no-progress add cmd:gpg2 && \
-    gpg2 --dearmor \
-        -o '/etc/apt/trusted.gpg.d/openresty.gpg' \
-        < '/downloaded/pubkey.gpg' && \
-    mkdir -v -p '/etc/apt/sources.list.d' && \
-    printf -- >| '/etc/apt/sources.list.d/openresty.list' \
-        'deb http://openresty.org/package/%sdebian %s openresty' \
-        "$(decide_arch)" "${OPENRESTY_DEBIAN_VERSION}"
-
 FROM tubesync-asfald AS ffmpeg-download
 ARG FFMPEG_DATE
 ARG FFMPEG_VERSION
@@ -296,7 +289,9 @@ ARG FFMPEG_URL="https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobu
 ARG DESTDIR="/downloaded"
 ARG TARGETARCH
 ADD "${FFMPEG_URL}/${FFMPEG_FILE_SUMS}" "${DESTDIR}/"
-RUN set -eu ; \
+RUN --mount=type=secret,id=github_token \
+    GITHUB_API_KEY="$(cat /run/secrets/github_token || :)" ; \
+    set -eu ; \
 \
     decide_arch() { \
         case "${TARGETARCH}" in \
@@ -308,6 +303,7 @@ RUN set -eu ; \
     FFMPEG_ARCH="$(decide_arch)" ; \
     FFMPEG_PREFIX_FILE="$( printf -- '%s' "${FFMPEG_PREFIX_FILE}" | cut -d '-' -f 1,2 )" ; \
     cd "${DESTDIR}" && \
+    { test -n "${GITHUB_API_KEY}" && export GITHUB_API_KEY || unset -v GITHUB_API_KEY ; } && \
     for url in $(awk ' \
       $2 ~ /^[*]?'"${FFMPEG_PREFIX_FILE}"'/ && /-'"${FFMPEG_ARCH}"'-/ { $1=""; print; } \
       ' "${DESTDIR}/${FFMPEG_FILE_SUMS}") ; \
@@ -315,7 +311,7 @@ RUN set -eu ; \
         url="${FFMPEG_URL}/${url# }" ; \
         TMPDIR="${DESTDIR}" asfald-latest -qv -- "${url}" ; \
     done ; \
-    unset -v url ; \
+    unset -v url GITHUB_API_KEY ; \
 \
     decide_expected() { \
         case "${TARGETARCH}" in \
@@ -470,7 +466,7 @@ RUN set -eux ; TMPDIR="${DESTDIR}" ; export TMPDIR ; \
     asfald --hash="${SHA256_QJS}" -- "${QJS_URL}/${QJS_FILE}"
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     set -eux ; \
     apt-get update ; \
     apt-get -y --no-install-recommends install unzip ; \
@@ -524,21 +520,14 @@ RUN mkdir -v /tmp/extracted && \
 FROM scratch AS tubesync-app
 COPY --from=tubesync-prepare-app /app /app
 
+FROM ghcr.io/meeb/openresty-repo:latest AS openresty-repo
+
 FROM tubesync-base AS tubesync-openresty
 
-COPY --from=openresty-debian \
-    /etc/apt/trusted.gpg.d/openresty.gpg /etc/apt/trusted.gpg.d/openresty.gpg
-COPY --from=openresty-debian \
-    /etc/apt/sources.list.d/openresty.list /etc/apt/sources.list.d/openresty.list
-
-RUN mkdir -v -p /etc/crypto-policies/back-ends && \
-    cp -v -p /usr/share/apt/default-sequoia.config \
-        /etc/crypto-policies/back-ends/apt-sequoia.config && \
-    sed -i -e '/^sha1\./s/2026-/2027-/;' \
-        /etc/crypto-policies/back-ends/apt-sequoia.config
-
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
+    --mount=type=bind,source=/srv/repo,target=/run/openresty-repo,from=openresty-repo \
+    --mount=type=bind,source=openresty-mirror.sources,target=/etc/apt/sources.list.d/openresty-mirror.sources \
   set -x && \
   apt-get update && \
   apt-get -y --no-install-recommends install \
@@ -566,7 +555,7 @@ ENV S6_VERSION="${S6_VERSION}" \
 
 # Reminder: the SHELL handles all variables
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
   set -x && \
   apt-get update && \
   # Install dependencies we keep
@@ -615,7 +604,7 @@ COPY --from=ffmpeg /usr/local/bin/ /usr/local/bin/
 COPY --from=quickjs /usr/local/sbin/ /usr/local/sbin/
 
 RUN --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     set -x && \
     apt-get update && \
     # Install file
@@ -645,15 +634,15 @@ RUN --mount=type=tmpfs,target=/cache \
     --mount=type=cache,id=uv-cache,sharing=locked,target=/cache/uv \
     --mount=type=cache,id=pipenv-cache,sharing=locked,target=/cache/pipenv \
     --mount=type=cache,id=apt-lib-cache-${TARGETARCH},sharing=private,target=/var/lib/apt \
-    --mount=type=cache,id=apt-cache-cache,sharing=private,target=/var/cache/apt \
+    --mount=type=cache,id=apt-cache-cache,sharing=locked,target=/var/cache/apt \
     --mount=type=bind,source=/usr/local/bin/deno,target=/usr/local/bin/deno,from=deno \
     --mount=type=bind,source=/usr/local/bin/uv,target=/usr/local/bin/uv,from=uv \
     --mount=type=bind,source=/usr/local/bin/uvx,target=/usr/local/bin/uvx,from=uv \
     --mount=type=bind,source=Pipfile,target=/app/Pipfile \
-  set -x && \
-  DENO_DIR=/cache/deno && export DENO_DIR && \
-  deno --version && \
-  uv --version && \
+  set -exo pipefail ; \
+  DENO_DIR=/cache/deno && export DENO_DIR ; \
+  deno --version ; \
+  uv --version ; \
   apt-get update && \
   # Install required build packages
   apt-get -y --no-install-recommends install \
@@ -709,13 +698,16 @@ RUN --mount=type=tmpfs,target=/cache \
   && \
   apt-get -y autopurge && \
   apt-get -y autoclean && \
+  if [ -s /var/cache/apt/debian.sources ] ; then \
+    cp -v -p -T /var/cache/apt/debian.sources.orig /etc/apt/sources.list.d/debian.sources ; \
+  fi && \
   LD_LIBRARY_PATH=/usr/local/lib/python3/dist-packages/pillow.libs:/usr/local/lib/python3/dist-packages/psycopg_binary.libs \
     find /usr/local/lib/python3/dist-packages/ \
       -name '*.so*' -print \
       -exec du -h '{}' ';' \
       -exec ldd '{}' ';' \
     >| /cache/python-shared-objects 2>&1 && \
-  rm -v -rf /tmp/* ; \
+  rm -v -rf /tmp/* || exit ; \
   if grep >/dev/null -Fe ' => not found' /cache/python-shared-objects ; \
   then \
       cat -v /cache/python-shared-objects ; \
@@ -730,7 +722,11 @@ RUN --mount=type=tmpfs,target=/cache \
 # Copy root
 COPY config/root /
 
-# patch hat-syslog
+# patch django_tasks_db
+COPY patches/django_tasks_db/ \
+    /usr/local/lib/python3/dist-packages/django_tasks_db/
+
+# patch hat_syslog
 COPY patches/hat/ \
     /usr/local/lib/python3/dist-packages/hat/
 
