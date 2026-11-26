@@ -341,6 +341,7 @@ ARG FFMPEG_SUFFIX_FILE
 ARG TARGETARCH
 RUN --mount=type=cache,id=extracted-ffmpeg-tar-${TARGETARCH},sharing=private,target=/uncompressed \
     set -eux ; \
+    ls -alR /verified ; \
     mkdir -v /extracted ; \
     cd /extracted ; \
     xz -dc < "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" >| "/uncompressed/ffmpeg${FFMPEG_SUFFIX_FILE}" ; \
