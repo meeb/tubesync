@@ -28,25 +28,39 @@ ghcr.io/meeb/tubesync:latest
 <details>
 <summary>Click to expand screenshots</summary>
 
-### Dashboard
+### Desktop
 
-![TubeSync Dashboard](docs/dashboard-v0.5.png)
+#### Dashboard
+![TubeSync Dashboard](docs/desktop/dashboard.png)
 
-### Sources overview
+#### Sources overview
+![TubeSync sources overview](docs/desktop/sources.png)
 
-![TubeSync sources overview](docs/sources-v0.5.png)
+#### Source details
+![TubeSync source details](docs/desktop/source-details.png)
 
-### Source details
+#### Media overview
+![TubeSync media overview](docs/desktop/media.png)
 
-![TubeSync source details](docs/source-v0.5.png)
+#### Media details
+![TubeSync media-details](docs/desktop/media-details.png)
 
-### Media overview
+### Mobile
 
-![TubeSync media overview](docs/media-v0.5.png)
+#### Dashboard
+![TubeSync Dashboard](docs/mobile/dashboard.png)
 
-### Media details
+#### Sources overview
+![TubeSync sources overview](docs/mobile/sources.png)
 
-![TubeSync media-details](docs/media-item-v0.5.png)
+#### Source details
+![TubeSync source details](docs/mobile/source-details.png)
+
+#### Media overview
+![TubeSync media overview](docs/mobile/media.png)
+
+#### Media details
+![TubeSync media-details](docs/mobile/media-details.png)
 
 </details>
 
