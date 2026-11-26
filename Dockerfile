@@ -341,6 +341,7 @@ ARG FFMPEG_SUFFIX_FILE
 ARG TARGETARCH
 RUN --mount=type=cache,id=extracted-ffmpeg-tar-${TARGETARCH},sharing=private,target=/uncompressed \
     set -eux ; \
+    apk --no-cache --no-progress add cmd:xz ; \
     ls -alR /verified ; \
     mkdir -v /extracted ; \
     cd /extracted ; \
