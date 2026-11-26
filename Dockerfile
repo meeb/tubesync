@@ -339,14 +339,15 @@ COPY --from=ffmpeg-download /verified /verified
 ARG FFMPEG_PREFIX_FILE
 ARG FFMPEG_SUFFIX_FILE
 ARG TARGETARCH
-RUN set -eux ; \
+RUN --mount=type=cache,id=extracted-ffmpeg-tar-${TARGETARCH},sharing=private,target=/uncompressed \
+    set -eux ; \
     mkdir -v /extracted ; \
     cd /extracted ; \
-    ln -s "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" "/tmp/ffmpeg${FFMPEG_SUFFIX_FILE}" ; \
-    tar -tf "/tmp/ffmpeg${FFMPEG_SUFFIX_FILE}" | grep '/bin/\(ffmpeg\|ffprobe\)' > /tmp/files ; \
+    xz -dc < "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" >| "/uncompressed/ffmpeg${FFMPEG_SUFFIX_FILE}" ; \
+    tar -tf "/uncompressed/ffmpeg${FFMPEG_SUFFIX_FILE}" | grep '/bin/\(ffmpeg\|ffprobe\)' > /tmp/files ; \
     tar -xop \
       --strip-components=2 \
-      -f "/tmp/ffmpeg${FFMPEG_SUFFIX_FILE}" \
+      -f "/uncompressed/ffmpeg${FFMPEG_SUFFIX_FILE}" \
       -T /tmp/files ; \
 \
     ls -AlR /extracted ;
