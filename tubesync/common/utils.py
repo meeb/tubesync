@@ -329,18 +329,20 @@ def truncate_filename(filename: str, *, max_bytes=216, encoding='utf-8') -> str:
     path = Path(filename)
     name, ext = clean_filename(path.stem), clean_filename(path.suffix)
     ext_bytes = ext.encode(encoding)
-    if len(ext_bytes) >= max_bytes:
-        # Pathological extension; fall back to a plain byte cut
-        name, ext_bytes = filename, b''
     marker = '_..._'
     stem_budget = max_bytes - len(ext_bytes) - len(marker.encode(encoding))
+    if stem_budget <= 0:
+        # Pathological extension; fall back to a plain byte cut
+        name, ext_bytes = filename, b''
+        stem_budget = max_bytes - len(marker.encode(encoding))
     stem_bytes = name.encode(encoding)
     # Keep the unique suffixes at the end of the stem intact (up to a third of
     # the bytes limit), then fill the rest from the front.
     tail_keep = min(stem_budget // 2, max_bytes // 3)
     head_keep = stem_budget - tail_keep
     head = stem_bytes[:head_keep].decode(encoding, errors='ignore').rstrip()
-    tail = stem_bytes[-tail_keep:].decode(encoding, errors='ignore').lstrip()
+    tail_bytes = stem_bytes[-tail_keep:] if 0 < tail_keep else b''
+    tail = tail_bytes.decode(encoding, errors='ignore').lstrip()
     return head + marker + tail + ext_bytes.decode(encoding)
 
 
