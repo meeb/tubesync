@@ -341,13 +341,19 @@ ARG FFMPEG_SUFFIX_FILE
 ARG TARGETARCH
 RUN --mount=type=cache,id=extracted-ffmpeg-tar-${TARGETARCH},sharing=private,target=/uncompressed \
     set -eux ; \
+    apk --no-cache --no-progress add cmd:xz ; \
+    ls -alR /verified ; \
     mkdir -v /extracted ; \
     cd /extracted ; \
-    xz -dc < "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" >| "/uncompressed/ffmpeg${FFMPEG_SUFFIX_FILE}" ; \
-    tar -tf "/uncompressed/ffmpeg${FFMPEG_SUFFIX_FILE}" | grep '/bin/\(ffmpeg\|ffprobe\)' > /tmp/files ; \
+    cp -v "/verified/${TARGETARCH}"/"${FFMPEG_PREFIX_FILE}"*"${FFMPEG_SUFFIX_FILE}" "/uncompressed/ffmpeg${FFMPEG_SUFFIX_FILE}" ; \
+    case "${FFMPEG_SUFFIX_FILE}" in \
+        (.tar.xz) \
+            xz -v -d "/uncompressed/ffmpeg${FFMPEG_SUFFIX_FILE}" ;; \
+    esac ; \
+    tar -tf /uncompressed/ffmpeg.tar | grep '/bin/\(ffmpeg\|ffprobe\)' > /tmp/files ; \
     tar -xop \
       --strip-components=2 \
-      -f "/uncompressed/ffmpeg${FFMPEG_SUFFIX_FILE}" \
+      -f /uncompressed/ffmpeg.tar \
       -T /tmp/files ; \
 \
     ls -AlR /extracted ;
