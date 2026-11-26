@@ -45,6 +45,7 @@ ghcr.io/meeb/tubesync:latest
 #### Media details
 ![TubeSync media-details](docs/desktop/media-details.png)
 
+<!-- Waiting for #1619 to be completed.
 ### Mobile
 
 #### Dashboard
@@ -61,6 +62,7 @@ ghcr.io/meeb/tubesync:latest
 
 #### Media details
 ![TubeSync media-details](docs/mobile/media-details.png)
+-->
 
 </details>
 
