@@ -1083,7 +1083,7 @@ class FormatMatchingTestCase(TestCase):
             self.assertEqual(match_type, expected_match_type)
 
     def test_metadata_20230629(self):
-        self.source.fallback = Val(Fallback.NEXT_BEST_RESOLUTION)
+        self.source.fallback = Val(Fallback.REQUIRE_CODEC)
         self.media.metadata = all_test_metadata['20230629']
         self.media.save()
         expected_matches = {
@@ -1162,6 +1162,7 @@ class FormatMatchingTestCase(TestCase):
             ('4320p', 'AV1', True, True): (False, '399'),              # Fallback match, no 60fps+hdr, dropped to 1080p (no 4320p AV1)
         }
         for params, expected in expected_matches.items():
+            print((params, expected), flush=True)
             resolution, vcodec, prefer_60fps, prefer_hdr = params
             expected_match_type, expected_format_code = expected
             self.source.source_resolution = resolution
