@@ -1,6 +1,6 @@
 from unittest import TestCase
 from sync.models import Source, Media
-from sync.matching_copy import get_best_video_format
+from sync.matching import get_best_video_format
 from sync.choices import (
     Val, Fallback, SourceResolution,
     YouTube_AudioCodec, YouTube_VideoCodec,
