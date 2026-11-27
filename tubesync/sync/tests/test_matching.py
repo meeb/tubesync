@@ -32,3 +32,4 @@ class MatchingFallbackTestCase(TestCase):
         exact_match, actual_format = get_best_video_format(self.media)
 
         self.assertEqual(expected_format, actual_format)
+        self.assertFalse(exact_match)
