@@ -20,6 +20,7 @@ _TESTDATA_FILES = {
     "multi_audio": "metadata_multi_audio.json",
     "issue499_1080p50": "metadata_issue_499_1080p50.json",
     "issue499_premium": "metadata_issue_499_premium.json",
+    "issue1639": "metadata_issue_1639.json",
     "expected_nfo": "expected_nfo.xml",
     "minimal": "minimal_metadata.json",
 }

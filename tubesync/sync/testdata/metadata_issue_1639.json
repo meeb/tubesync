@@ -1,0 +1,22 @@
+{
+  "formats": [
+    {
+      "format_id": "AVC1_1080",
+      "vcodec": "AVC1",
+      "acodec": null,
+      "height": 1080
+    },
+    {
+      "format_id": "AVC1_720",
+      "vcodec": "AVC1",
+      "acodec": null,
+      "height": 720
+    },
+    {
+      "format_id": "VP9_360",
+      "vcodec": "VP9",
+      "acodec": null,
+      "height": 360
+    }
+  ]
+}
