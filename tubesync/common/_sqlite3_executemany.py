@@ -37,6 +37,7 @@ def execute_many(
     *,
     bindings_per_statement: int = 100,
     needle: str = '{}',
+    prefix_binding_args: tuple[object, ...] = (),
     statements_per_transaction: int = 10,
     sleep_seconds: float = 0.1,
 ) -> int:
@@ -81,7 +82,7 @@ def execute_many(
         ) as connection, connection:
             for batch in transaction_batches:
                 with contextlib.closing(
-                    connection.execute(statement, batch),
+                    connection.execute(statement, prefix_binding_args + batch),
                 ) as cursor:
                     if 0 <= cursor.rowcount:
                         affected_rows += cursor.rowcount
