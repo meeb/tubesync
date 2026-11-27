@@ -295,7 +295,7 @@ def get_best_video_format(media):
                     if matched_resolution(fmt):
                         exact_match, best_match = False, fmt
                         break
-            if not best_match:
+            if not best_match and not can_switch_codecs:
                 for fmt in video_formats:
                     # Check for codec
                     if (source_vcodec == fmt['vcodec']):
@@ -305,7 +305,7 @@ def get_best_video_format(media):
                 # Match the highest resolution
                 exact_match, best_match = False, video_formats[0]
     # Check for resolution + codec + fps match
-    if media.source.prefer_60fps and not media.source.prefer_hdr:
+    elif media.source.prefer_60fps and not media.source.prefer_hdr:
         for fmt in video_formats:
             # Check for an exact match
             if (matched_resolution(fmt) and
@@ -360,7 +360,7 @@ def get_best_video_format(media):
                     if matched_resolution(fmt):
                         exact_match, best_match = False, fmt
                         break
-            if not best_match:
+            if not best_match and not can_switch_codecs:
                 for fmt in video_formats:
                     # Check for codec
                     if (source_vcodec == fmt['vcodec']):
@@ -424,7 +424,7 @@ def get_best_video_format(media):
                     if matched_resolution(fmt):
                         exact_match, best_match = False, fmt
                         break
-            if not best_match:
+            if not best_match and not can_switch_codecs:
                 for fmt in video_formats:
                     # Check for codec
                     if (source_vcodec == fmt['vcodec']):
@@ -497,7 +497,7 @@ def get_best_video_format(media):
                     if matched_resolution(fmt):
                         exact_match, best_match = False, fmt
                         break
-            if not best_match:
+            if not best_match and not can_switch_codecs:
                 for fmt in video_formats:
                     # Check for codec
                     if (source_vcodec == fmt['vcodec']):
