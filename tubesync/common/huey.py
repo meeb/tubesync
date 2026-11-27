@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 import datetime
 import subprocess
 import threading
 import time
 import uuid
 
+from collections.abc import Iterable
 from functools import partial
 from pathlib import Path
 
@@ -18,7 +20,7 @@ from huey.api import Task, TaskLock
 from huey.exceptions import TaskLockedException
 from huey.storage import SqliteStorage as huey_SqliteStorage
 
-from .batched import batched
+from .batched import sqlite3_executemany
 from .timestamp import datetime_to_timestamp, timestamp_to_datetime
 from .utils import get_usable_cpu_count
 from .yt_dlp import retry_django_db
@@ -172,26 +174,32 @@ class SqliteStorage(huey_SqliteStorage):
 
         utc_dt = dt.astimezone(datetime.timezone.utc)
         sqlite_ts_str = utc_dt.strftime('%Y-%m-%d %H:%M:%S')
-        select_all_q_str = (
-            'SELECT queue, key FROM kv '
-            'WHERE result_bool = 1 AND queue = ? '
-            'AND updated_at < datetime(?)'
-        )
-        delete_row_q_str = (
-            'DELETE FROM kv '
-            'WHERE queue = ? AND key = ?'
-        )
-        if not callable(batched):
-            return
-        batches = batched(
-            self.sql(query=select_all_q_str, params=(self.name, sqlite_ts_str), results=True),
-            max(1, chunk_size),
-        )
-        for batch in batches:
-            time.sleep(0.1)
-            with self.db(commit=True) as curs:
-                for queue, key in batch:
-                    curs.execute(delete_row_q_str, (queue, key))
+        delete_row_q_str = 'DELETE FROM kv WHERE queue = ? AND key IN ({})'
+
+        def _expired_key_stream(self, sqlite_ts_str: str) -> Iterable[object]:
+            with self.db(close=True) as cursor:
+                cursor.execute(
+                    (
+                        'CREATE TEMP TABLE expired_keys AS'
+                        ' SELECT key FROM kv WHERE result_bool = 1'
+                        ' AND queue = ? AND updated_at < datetime(?)'
+                    ),
+                    (self.name, sqlite_ts_str),
+                )
+                cursor.execute('SELECT key FROM expired_keys')
+                for row in cursor:
+                    yield row[0]
+
+        with contextlib.closing(
+            self._expired_key_stream(sqlite_ts_str),
+        ) as keys:
+            sqlite3_executemany(
+                Path(self.filename),
+                delete_row_q_str,
+                keys,
+                prefix_binding_args=(self.name,),
+                bindings_per_statement=chunk_size,
+            )
 
 
 class Huey(huey_Huey):
